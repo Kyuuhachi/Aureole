@@ -81,7 +81,7 @@ impl<'a> In<'a> {
 		Ok(self)
 	}
 
-	pub fn slice(&mut self, len: usize) -> Result<&[u8]> {
+	pub fn slice(&mut self, len: usize) -> Result<&'a [u8]> {
 		if len > self.len() - self.pos() {
 			return Err(Error::Read { pos: self.pos(), len, size: self.len() });
 		}

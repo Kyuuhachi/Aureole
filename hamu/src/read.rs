@@ -126,11 +126,8 @@ impl<'a> In<'a> {
 
 macro_rules! primitives {
 	($name:ident, $conv:ident; $($type:ident),*) => { paste::paste! {
-		pub trait $name {
-			$(fn $type(&mut self) -> Result<$type>;)*
-			$(fn [<check_ $type>](&mut self, k: $type) -> Result<()>;)*
-		}
-		impl $name for In<'_> {
+		#[extend::ext(name=$name)]
+		impl In<'_> {
 			$(fn $type(&mut self) -> Result<$type> {
 				Ok($type::$conv(self.array()?))
 			})*

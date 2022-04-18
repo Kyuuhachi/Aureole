@@ -114,11 +114,8 @@ impl<'a, L: Eq + Hash + Debug> Out<'a, L> {
 
 macro_rules! primitives {
 	($name:ident, $conv:ident; $($type:ident),*; $($utype:ident),*) => { paste::paste! {
-		pub trait $name<L> {
-			$(fn $type(&mut self, v: $type);)*
-			$(fn [<delay_ $utype>](&mut self, k: L);)*
-		}
-		impl<L: Eq + Hash + Debug> $name<L> for Out<'_, L> {
+		#[extend::ext(name=$name)]
+		impl<L: Eq + Hash + Debug> Out<'_, L> {
 			$(fn $type(&mut self, v: $type) {
 				self.array(v.$conv());
 			})*

@@ -1,7 +1,10 @@
 use std::{
 	fs::File,
-	path::Path,
+	path::{Path, PathBuf},
 	ops::Range,
+	collections::HashMap,
+	cell::RefCell,
+	rc::Rc,
 };
 use chrono::NaiveDateTime;
 use mapr::Mmap;
@@ -95,29 +98,65 @@ impl Archive {
 	pub fn get(&self, entry: usize) -> Result<(&Entry, &[u8])> {
 		let ent = self.entries.get(entry)
 			.with_context(|| format!("Invalid index {}", entry))?;
-		let data = &self.dat[ent.range.clone()];
-		Ok((ent, data))
-	}
-
-	pub fn get_compressed(&self, entry: usize) -> Result<(&Entry, Vec<u8>)> {
-		let (ent, data) = self.get(entry)?;
-		Ok((ent, crate::decompress::decompress(data)?))
+		Ok((ent, &self.dat[ent.range.clone()]))
 	}
 
 	pub fn get_by_name(&self, name: [u8; 12]) -> Result<(&Entry, &[u8])> {
 		let ent = self.entries.iter()
 			.find(|a| a.name == name)
 			.with_context(|| format!("No name named {}", Entry::display_name(&name)))?;
-		let data = &self.dat[ent.range.clone()];
-		Ok((ent, data))
-	}
-
-	pub fn get_compressed_by_name(&self, name: [u8; 12]) -> Result<(&Entry, Vec<u8>)> {
-		let (ent, data) = self.get_by_name(name)?;
-		Ok((ent, crate::decompress::decompress(data)?))
+		Ok((ent, &self.dat[ent.range.clone()]))
 	}
 
 	pub fn entries(&self) -> &[Entry] {
 		self.entries.as_ref()
+	}
+}
+
+#[derive(Debug)]
+pub struct Archives {
+	path: PathBuf,
+	archives: RefCell<HashMap<u8, Rc<Archive>>>,
+}
+
+impl Archives {
+    pub fn new(path: impl AsRef<Path>) -> Self {
+		Self {
+			path: path.as_ref().to_owned(),
+			archives: Default::default()
+		}
+	}
+
+	pub fn archive(&self, arch: u8) -> Result<Rc<Archive>> {
+		if !self.archives.borrow().contains_key(&arch) {
+			let a = Rc::new(Archive::new(&self.path, arch)?);
+			self.archives.borrow_mut().insert(arch, a.clone());
+		}
+
+		Ok(self.archives.borrow()[&arch].clone())
+	}
+
+	pub fn get(&self, arch: u8, entry: usize) -> Result<(Entry, Vec<u8>)> {
+		let a = self.archive(arch)?;
+		let (ent, data) = a.get(entry)?;
+		Ok((ent.clone(), data.to_owned()))
+	}
+
+	pub fn get_compressed(&self, arch: u8, entry: usize) -> Result<(Entry, Vec<u8>)> {
+		let a = self.archive(arch)?;
+		let (ent, data) = a.get(entry)?;
+		Ok((ent.clone(), crate::decompress::decompress(data)?))
+	}
+
+	pub fn get_by_name(&self, arch: u8, name: [u8; 12]) -> Result<(Entry, Vec<u8>)> {
+		let a = self.archive(arch)?;
+		let (ent, data) = a.get_by_name(name)?;
+		Ok((ent.clone(), data.to_owned()))
+	}
+
+	pub fn get_compressed_by_name(&self, arch: u8, name: [u8; 12]) -> Result<(Entry, Vec<u8>)> {
+		let a = self.archive(arch)?;
+		let (ent, data) = a.get_by_name(name)?;
+		Ok((ent.clone(), crate::decompress::decompress(data)?))
 	}
 }

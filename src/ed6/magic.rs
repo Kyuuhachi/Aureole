@@ -3,11 +3,11 @@ use anyhow::{Result, Context};
 use hamu::read::{In, Le};
 use crate::util::{In_Ext, self};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, strum_macros::Display)]
 pub enum Element {
 	None,
-	Earth,
 	Water,
+	Earth,
 	Fire,
 	Wind,
 	Time,
@@ -16,7 +16,7 @@ pub enum Element {
 }
 
 #[repr(u8)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, IntEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, IntEnum, strum_macros::Display)]
 pub enum MagicEffect {
 	None        =  0,
 	PhysDamage  =  1,
@@ -107,7 +107,7 @@ pub enum MagicEffect {
 }
 
 #[repr(u8)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, IntEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, IntEnum, strum_macros::Display)]
 pub enum MagicTarget {
 	None           =  0,
 	WalkTarget     =  1,
@@ -176,11 +176,11 @@ impl<A> Magic<A> {
 		let flags = MagicFlags::from_bits(i.u16()?).context("invalid flags")?;
 
 		let elements = &[
+			if flags.contains(MagicFlags::Magic) { Element::Time } else { Element::None },
 			Element::Earth,
 			Element::Water,
 			Element::Fire,
 			Element::Wind,
-			Element::Time,
 			Element::Space,
 			Element::Mirage,
 		];

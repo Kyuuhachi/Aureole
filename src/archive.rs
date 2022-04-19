@@ -2,7 +2,6 @@ use std::{
 	fs::File,
 	path::Path,
 	ops::Range,
-	borrow::Cow,
 };
 use chrono::NaiveDateTime;
 use mapr::Mmap;
@@ -28,7 +27,7 @@ impl std::fmt::Debug for Entry {
 			))
 			.field("size", &self.size)
 			.field("timestamp", &self.timestamp)
-			.field("range", &self.range)
+			.field("data", &format_args!("[_; {}]", self.range.end - self.range.start))
 			.finish()
 	}
 }
@@ -36,7 +35,7 @@ impl std::fmt::Debug for Entry {
 #[derive(Debug)]
 pub struct Archive {
 	dat: Mmap,
-	pub entries: Vec<Entry>,
+	entries: Vec<Entry>,
 }
 
 impl Archive {
@@ -59,7 +58,7 @@ impl Archive {
 		let mut entries = Vec::new();
 		for _ in 0..count {
 			let name = i.array::<12>()?;
-			i.check_u32(0)?; // I don't know what this is
+			i.check_u32(0)?; // I don't know what this is. It's nonzero on a few files in 3rd, and some sources (which are me in the past) say it's a second timestamp
 			let len = i.u32()? as usize;
 			let size = i.u32()? as usize;
 			i.check_u32(len as u32)?;
@@ -86,13 +85,13 @@ impl Archive {
 		})
 	}
 
-	pub fn entry(&self, entry: usize) -> Result<&Entry> {
-		Ok(self.entries.get(entry).with_context(|| format!("index {}", entry))?)
+	pub fn get(&self, entry: usize) -> Result<(&Entry, &[u8])> {
+		let ent = self.entries.get(entry).with_context(|| format!("index {}", entry))?;
+		let data = &self.dat[ent.range.clone()];
+		Ok((ent, data))
 	}
 
-	pub fn get(&self, entry: usize) -> Result<Cow<[u8]>> {
-		let ent = self.entry(entry)?;
-		let data = &self.dat[ent.range.clone()];
-		Ok(Cow::Borrowed(data))
+	pub fn entries(&self) -> &[Entry] {
+		self.entries.as_ref()
 	}
 }

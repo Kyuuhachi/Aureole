@@ -54,7 +54,7 @@ pub mod color {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DumpLength {
+enum DumpLength {
 	Bytes(usize),
 	Lines(usize),
 }
@@ -207,5 +207,9 @@ pub impl read::In<'_> {
 		}
 
 		Ok(())
+	}
+
+	fn edump(&mut self, spec: &DumpSpec) -> Result<()> {
+		self.dump(std::io::stderr(), spec)
 	}
 }

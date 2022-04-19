@@ -2,7 +2,6 @@ use std::{
 	fs::File,
 	path::Path,
 	ops::Range,
-	borrow::Cow,
 };
 use chrono::NaiveDateTime;
 use mapr::Mmap;
@@ -17,15 +16,22 @@ pub struct Entry {
 	range: Range<usize>,
 }
 
+impl Entry {
+	pub fn display_name(name: &[u8]) -> String {
+		format!("b\"{}\"",
+			name.into_iter()
+				.copied()
+				.flat_map(std::ascii::escape_default)
+				.map(|a| a as char)
+				.collect::<String>()
+		)
+	}
+}
+
 impl std::fmt::Debug for Entry {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("Entry")
-			.field("name", &format_args!("b\"{}\"",
-				self.name.into_iter()
-					.flat_map(std::ascii::escape_default)
-					.map(|a| a as char)
-					.collect::<String>()
-			))
+			.field("name", &format_args!("{}", Entry::display_name(&self.name)))
 			.field("size", &self.size)
 			.field("timestamp", &self.timestamp)
 			.field("data", &format_args!("[_; {}]", self.range.end - self.range.start))
@@ -40,7 +46,7 @@ pub struct Archive {
 }
 
 impl Archive {
-	pub fn new(path: impl AsRef<Path>, num: usize) -> Result<Archive> {
+	pub fn new(path: impl AsRef<Path>, num: u8) -> Result<Archive> {
 		let mut dir_path = path.as_ref().to_owned();
 		let mut dat_path = path.as_ref().to_owned();
 		dir_path.push(format!("ED6_DT{:02X}.dir", num));
@@ -86,22 +92,29 @@ impl Archive {
 		})
 	}
 
-	pub fn get(&self, entry: usize) -> Result<(&Entry, Cow<[u8]>)> {
-		let ent = self.entries.get(entry).with_context(|| format!("index {}", entry))?;
+	pub fn get(&self, entry: usize) -> Result<(&Entry, &[u8])> {
+		let ent = self.entries.get(entry)
+			.with_context(|| format!("Invalid index {}", entry))?;
 		let data = &self.dat[ent.range.clone()];
-		let uncompressed = [
-			(b"._DS", b"DDS "),
-			(b".WAV", b"RIFF"),
-			(b"._X2", &[2, 0, 1, 0]),
-			(b"._X2", &[1, 0, 2, 0]),
-		];
-		let uncompressed = uncompressed.into_iter()
-			.any(|(ext, head)| ent.name.ends_with(ext) && data.starts_with(head));
-		if uncompressed {
-			Ok((ent, Cow::Borrowed(data)))
-		} else {
-			Ok((ent, Cow::Owned(crate::decompress::decompress(data)?)))
-		}
+		Ok((ent, data))
+	}
+
+	pub fn get_compressed(&self, entry: usize) -> Result<(&Entry, Vec<u8>)> {
+		let (ent, data) = self.get(entry)?;
+		Ok((ent, crate::decompress::decompress(data)?))
+	}
+
+	pub fn get_by_name(&self, name: [u8; 12]) -> Result<(&Entry, &[u8])> {
+		let ent = self.entries.iter()
+			.find(|a| a.name == name)
+			.with_context(|| format!("No name named {}", Entry::display_name(&name)))?;
+		let data = &self.dat[ent.range.clone()];
+		Ok((ent, data))
+	}
+
+	pub fn get_compressed_by_name(&self, name: [u8; 12]) -> Result<(&Entry, Vec<u8>)> {
+		let (ent, data) = self.get_by_name(name)?;
+		Ok((ent, crate::decompress::decompress(data)?))
 	}
 
 	pub fn entries(&self) -> &[Entry] {

@@ -2,6 +2,7 @@ use std::{
 	fs::File,
 	path::Path,
 	ops::Range,
+	borrow::Cow,
 };
 use chrono::NaiveDateTime;
 use mapr::Mmap;
@@ -85,10 +86,22 @@ impl Archive {
 		})
 	}
 
-	pub fn get(&self, entry: usize) -> Result<(&Entry, &[u8])> {
+	pub fn get(&self, entry: usize) -> Result<(&Entry, Cow<[u8]>)> {
 		let ent = self.entries.get(entry).with_context(|| format!("index {}", entry))?;
 		let data = &self.dat[ent.range.clone()];
-		Ok((ent, data))
+		let uncompressed = [
+			(b"._DS", b"DDS "),
+			(b".WAV", b"RIFF"),
+			(b"._X2", &[2, 0, 1, 0]),
+			(b"._X2", &[1, 0, 2, 0]),
+		];
+		let uncompressed = uncompressed.into_iter()
+			.any(|(ext, head)| ent.name.ends_with(ext) && data.starts_with(head));
+		if uncompressed {
+			Ok((ent, Cow::Borrowed(data)))
+		} else {
+			Ok((ent, Cow::Owned(crate::decompress::decompress(data)?)))
+		}
 	}
 
 	pub fn entries(&self) -> &[Entry] {

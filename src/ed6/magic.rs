@@ -54,7 +54,7 @@ pub enum MagicEffect {
 	AglUp       = 33,
 	AglDn       = 34,
 	AtAdvance   = 35,
-	MaxHpDn     = 36,
+	MaxHpDn     = 36, // Needs investigation. In FC it is MaxHpDn(30, 50), stated to give -30%HP +50CP.
 	MovUp       = 37,
 	Rage        = 38,
 	MovDn       = 39,
@@ -118,7 +118,7 @@ pub enum MagicTarget {
 	Combo          =  6,
 	SetArea        = 11,
 	SetLine        = 12,
-	ALL            = 13,
+	All            = 13,
 	SelfArea       = 14,
 	WalkSetArea    = 15,
 	_16            = 16, // Ragnard
@@ -126,15 +126,34 @@ pub enum MagicTarget {
 	FloorTile      = 18,
 	Transform      = 19,
 	Walk           = 50,
-
 }
+
+#[allow(non_upper_case_globals)]
+mod magicflags { bitflags::bitflags! {
+	pub struct MagicFlags: u16 {
+		const Healing      = 0x0001; // Tear and Curia (but not Thelas or crafts)
+		const Exists       = 0x0002; // used on all skills that actually exist ingame, and a few others. Not sure what exactly it means.
+		const TargetEnemy  = 0x0010; // spell can target enemies
+		const TargetDead   = 0x0020; // spell can target dead allies (used on resurrection spells)
+		const Beneficial   = 0x0040; // buffs, healing, etc.
+		const TargetFriend = 0x0080; // spell can target allies
+		const _0100        = 0x0100;
+		const _0200        = 0x0200;
+		const UsesRadius   = 0x0400; // only used on normal attacks and a few of Tita's crafts
+		const _1000        = 0x1000;
+		const Magic        = 0x2000; // this is an orbal art
+		const _4000        = 0x4000;
+		// Wonder if any of the unknown ones is whether it can be impeded?
+	}
+} }
+pub use magicflags::MagicFlags;
 
 #[derive(Debug)]
 pub struct Magic<T> {
 	pub id: u16,
 	pub name: T,
 	pub desc: T,
-	pub flags: u16,
+	pub flags: MagicFlags,
 	pub element: Element,
 	pub target: MagicTarget,
 	pub effect1: MagicEffect,
@@ -154,7 +173,7 @@ pub struct Magic<T> {
 impl<A> Magic<A> {
 	pub fn read_base(i: &mut In, read_str: &mut impl FnMut(&mut In) -> Result<A>) -> Result<Self> {
 		let id = i.u16()?;
-		let flags = i.u16()?;
+		let flags = MagicFlags::from_bits(i.u16()?).context("invalid flags")?;
 
 		let elements = &[
 			Element::Earth,
@@ -170,18 +189,17 @@ impl<A> Magic<A> {
 		let target = MagicTarget::from_int(i.u8()?)?;
 		let effect1 = MagicEffect::from_int(i.u8()?)?;
 		let effect2 = MagicEffect::from_int(i.u8()?)?;
-
 		let target_p1 = i.u16()?;
 		let target_p2 = i.u16()?;
 		let warmup = i.u16()?;
 		let cooldown = i.u16()?;
 		let cost = i.u16()?;
 		let sort = i.u16()?;
-
 		let effect_p1 = i.i16()?;
 		let effect_p2 = i.i16()?;
 		let effect_p3 = i.i16()?;
 		let effect_p4 = i.i16()?;
+
 		let name = read_str(i)?;
 		let desc = read_str(i)?;
 

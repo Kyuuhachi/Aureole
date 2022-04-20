@@ -10,7 +10,7 @@ use mapr::Mmap;
 use anyhow::{Result, Context};
 use hamu::read::{In, Le};
 
-use crate::util::ByteString;
+use crate::util::{ByteString, InExt};
 
 #[derive(Clone)]
 pub struct Entry {
@@ -56,7 +56,7 @@ impl Archive {
 
 		let mut entries = Vec::new();
 		for _ in 0..count {
-			let name = ByteString(i.array::<12>()?);
+			let name = i.bytestring::<12>()?;
 			i.check_u32(0)?; // I don't know what this is. It's nonzero on a few files in 3rd, and some sources (which are me in the past) say it's a second timestamp
 			let len = i.u32()? as usize;
 			let size = i.u32()? as usize;

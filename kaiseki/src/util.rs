@@ -3,7 +3,7 @@ use encoding_rs::SHIFT_JIS;
 use itermore::Itermore;
 use hamu::read::{In, Le};
 
-#[extend::ext]
+#[extend::ext(name=InExt)]
 pub impl In<'_> where Self: Sized {
 	fn str(&mut self) -> Result<String> {
 		let mut s = Vec::new();
@@ -16,6 +16,10 @@ pub impl In<'_> where Self: Sized {
 		let (out, _, error) = SHIFT_JIS.decode(&s);
 		anyhow::ensure!(!error, "Invalid string: {:?}", out);
 		Ok(out.into_owned())
+	}
+
+	fn bytestring<const N: usize>(&mut self) -> Result<ByteString<N>> {
+		Ok(ByteString(self.array()?))
 	}
 }
 

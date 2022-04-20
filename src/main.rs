@@ -1,5 +1,4 @@
 use kaiseki::ed6::Archives;
-use kaiseki::ed6::magic::*;
 use rocket::State;
 use rocket::http::Status;
 use rocket::response::Responder;
@@ -29,8 +28,8 @@ pub type Result<T, E=Error> = std::result::Result<T, E>;
 
 #[rocket::get("/fc/magic")]
 fn fc_magic(arch: &State<Archives>) -> Result<Html<String>> {
-	let data = arch.get_compressed_by_name(0x2, *b"T_MAGIC ._DT")?.1;
-	let magics = Magic::read(&data)?;
+	let data = arch.get_compressed_by_name(0x2, b"T_MAGIC ._DT")?.1;
+	let magics = kaiseki::ed6::magic::Magic::read(&data)?;
 	let doc = ed6::magic::render(&magics);
 	Ok(Html(doc.render_to_string()))
 }

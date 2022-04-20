@@ -1,8 +1,13 @@
+use anyhow::Result;
 use kaiseki::ed6;
 use kaiseki::ed6::magic::*;
+use rocket::State;
+use rocket::response::content::Html;
 
-fn main() -> anyhow::Result<()> {
-	let arch = ed6::Archives::new("data/fc");
+type HtmlOut = Result<Html<String>, rocket::response::Debug<anyhow::Error>>;
+
+#[rocket::get("/fc/magic")]
+fn fc_magic(arch: &State<ed6::Archives>) -> HtmlOut {
 	let data = arch.get_compressed_by_name(0x2, *b"T_MAGIC ._DT")?.1;
 
 	let magics = Magic::read(&data)?;
@@ -126,7 +131,13 @@ fn main() -> anyhow::Result<()> {
 		});
 	});
 	let mut s = String::new();
-	doc.render(&mut s)?;
-	println!("{}", s);
-	Ok(())
+	doc.render(&mut s).unwrap();
+	Ok(Html(s))
+}
+
+#[rocket::launch]
+fn rocket() -> _ {
+	rocket::build()
+		.manage(ed6::Archives::new("data/fc"))
+		.mount("/", rocket::routes![fc_magic])
 }

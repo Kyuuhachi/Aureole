@@ -9,3 +9,4 @@ kaiseki = { path = "./kaiseki" }
 
 anyhow = "1.0.56"
 convert_case = "0.5.0"
+rocket = "0.5.0-rc.1"

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use eyre::Result;
 use encoding_rs::SHIFT_JIS;
 use itermore::Itermore;
 use hamu::read::{In, Le};
@@ -14,11 +14,11 @@ pub impl In<'_> where Self: Sized {
 			}
 		}
 		let (out, _, error) = SHIFT_JIS.decode(&s);
-		anyhow::ensure!(!error, "Invalid string: {:?}", out);
+		eyre::ensure!(!error, "Invalid string: {:?}", out);
 		Ok(out.into_owned())
 	}
 
-	fn bytestring<const N: usize>(&mut self) -> Result<ByteString<N>> {
+	fn bytestring<const N: usize>(&mut self) -> hamu::read::Result<ByteString<N>> {
 		Ok(ByteString(self.array()?))
 	}
 }
@@ -85,6 +85,12 @@ impl<const N: usize> PartialEq<[u8;N]> for ByteString<N> {
 impl<const N: usize> PartialEq<&[u8]> for ByteString<N> {
 	fn eq(&self, other: &&[u8]) -> bool {
 		&self.0 == other
+	}
+}
+
+impl<const N: usize> AsRef<ByteString<N>> for ByteString<N> {
+	fn as_ref(&self) -> &ByteString<N> {
+		self
 	}
 }
 

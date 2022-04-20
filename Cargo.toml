@@ -7,9 +7,10 @@ edition = "2021"
 choubun = { path = "./choubun" }
 kaiseki = { path = "./kaiseki" }
 
-anyhow = "1.0.56"
+eyre = "0.6.8"
 convert_case = "0.5.0"
 rocket = "0.5.0-rc.1"
+color-eyre = { version = "0.6.1", default-features = false }
 
 [workspace]
 members = [
@@ -17,3 +18,6 @@ members = [
 	"choubun",
 	"kaiseki",
 ]
+
+[profile.dev.package.backtrace]
+opt-level = 3

@@ -1,5 +1,5 @@
 use int_enum::IntEnum;
-use anyhow::{Result, Context};
+use eyre::{Result, eyre};
 use hamu::read::{In, Le};
 use crate::util::{self, InExt};
 
@@ -173,7 +173,7 @@ pub struct Magic<T> {
 impl<A> Magic<A> {
 	pub fn read_base(i: &mut In, read_str: &mut impl FnMut(&mut In) -> Result<A>) -> Result<Self> {
 		let id = i.u16()?;
-		let flags = MagicFlags::from_bits(i.u16()?).context("invalid flags")?;
+		let flags = MagicFlags::from_bits(i.u16()?).ok_or_else(|| eyre!("invalid flags"))?;
 
 		let elements = &[
 			if flags.contains(MagicFlags::Magic) { Element::Time } else { Element::None },
@@ -185,7 +185,7 @@ impl<A> Magic<A> {
 			Element::Mirage,
 		];
 
-		let element = *elements.get(i.u8()? as usize).context("invalid element")?;
+		let element = *elements.get(i.u8()? as usize).ok_or_else(|| eyre!("invalid element"))?;
 		let target = MagicTarget::from_int(i.u8()?)?;
 		let effect1 = MagicEffect::from_int(i.u8()?)?;
 		let effect2 = MagicEffect::from_int(i.u8()?)?;

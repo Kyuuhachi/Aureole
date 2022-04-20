@@ -7,10 +7,25 @@ use std::{
 };
 use chrono::NaiveDateTime;
 use mapr::Mmap;
-use anyhow::{Result, Context};
 use hamu::read::{In, Le};
 
 use crate::util::{ByteString, InExt};
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+	#[error("io error")]
+	Io(#[from] std::io::Error),
+	#[error("read error")]
+	Read(#[from] hamu::read::Error),
+	#[error("decompress error")]
+	Decompress(#[from] crate::decompress::Error),
+
+	#[error("file not found: {arch:02X}/{index}")]
+	InvalidIndex { arch: u8, index: usize },
+	#[error("file not found: {arch:02X}/{name:?}")]
+	InvalidName { arch: u8, name: ByteString<12> },
+}
+pub type Result<T, E=Error> = std::result::Result<T, E>;
 
 #[derive(Clone)]
 pub struct Entry {
@@ -84,18 +99,15 @@ impl Archive {
 		})
 	}
 
-	pub fn get(&self, entry: usize) -> Result<(&Entry, &[u8])> {
-		let ent = self.entries.get(entry)
-			.with_context(|| format!("Invalid index {}", entry))?;
-		Ok((ent, &self.dat[ent.range.clone()]))
+	pub fn get(&self, index: usize) -> Option<(&Entry, &[u8])> {
+		self.entries.get(index)
+			.map(|ent| (ent, &self.dat[ent.range.clone()]))
 	}
 
-	pub fn get_by_name(&self, name: impl AsRef<ByteString<12>>) -> Result<(&Entry, &[u8])> {
-		let name = name.as_ref();
-		let ent = self.entries.iter()
+	pub fn get_by_name(&self, name: ByteString<12>) -> Option<(&Entry, &[u8])> {
+		self.entries.iter()
 			.find(|a| a.name == name)
-			.with_context(|| format!("No name named {:?}", name))?;
-		Ok((ent, &self.dat[ent.range.clone()]))
+			.map(|ent| (ent, &self.dat[ent.range.clone()]))
 	}
 
 	pub fn entries(&self) -> &[Entry] {
@@ -126,27 +138,29 @@ impl Archives {
 		Ok(archives[&arch].clone())
 	}
 
-	pub fn get(&self, arch: u8, entry: usize) -> Result<(Entry, Vec<u8>)> {
+	pub fn get(&self, arch: u8, index: usize) -> Result<(Entry, Vec<u8>)> {
 		let a = self.archive(arch)?;
-		let (ent, data) = a.get(entry)?;
+		let (ent, data) = a.get(index).ok_or(Error::InvalidIndex { arch, index })?;
 		Ok((ent.clone(), data.to_owned()))
 	}
 
-	pub fn get_compressed(&self, arch: u8, entry: usize) -> Result<(Entry, Vec<u8>)> {
+	pub fn get_compressed(&self, arch: u8, index: usize) -> Result<(Entry, Vec<u8>)> {
 		let a = self.archive(arch)?;
-		let (ent, data) = a.get(entry)?;
+		let (ent, data) = a.get(index).ok_or(Error::InvalidIndex { arch, index })?;
 		Ok((ent.clone(), crate::decompress::decompress(data)?))
 	}
 
 	pub fn get_by_name(&self, arch: u8, name: impl AsRef<ByteString<12>>) -> Result<(Entry, Vec<u8>)> {
+		let name = *name.as_ref();
 		let a = self.archive(arch)?;
-		let (ent, data) = a.get_by_name(name)?;
+		let (ent, data) = a.get_by_name(name).ok_or(Error::InvalidName { arch, name })?;
 		Ok((ent.clone(), data.to_owned()))
 	}
 
 	pub fn get_compressed_by_name(&self, arch: u8, name: impl AsRef<ByteString<12>>) -> Result<(Entry, Vec<u8>)> {
+		let name = *name.as_ref();
 		let a = self.archive(arch)?;
-		let (ent, data) = a.get_by_name(name)?;
+		let (ent, data) = a.get_by_name(name).ok_or(Error::InvalidName { arch, name })?;
 		Ok((ent.clone(), crate::decompress::decompress(data)?))
 	}
 }

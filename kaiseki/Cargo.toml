@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 hamu = { path = "../hamu" }
 
-anyhow = "1.0.56"
+eyre = "0.6.8"
 mapr = "0.8.0"
 chrono = "0.4.19"
 thiserror = "1.0.30"

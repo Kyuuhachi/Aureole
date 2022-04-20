@@ -1,11 +1,10 @@
 [package]
-name = "kiseki"
+name = "kaiseki"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-choubun = { path = "./choubun" }
-kaiseki = { path = "./kaiseki" }
+hamu = { path = "../hamu" }
 
 anyhow = "1.0.56"
 mapr = "0.8.0"
@@ -17,4 +16,5 @@ extend = "1.1.2"
 itermore = "0.2.0"
 encoding_rs = "0.8.31"
 bitflags = "1.3.2"
-convert_case = "0.5.0"
+strum = "0.24.0"
+strum_macros = "0.24.0"

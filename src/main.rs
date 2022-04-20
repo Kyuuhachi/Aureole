@@ -1,15 +1,11 @@
-mod ed6;
-mod decompress;
-mod util;
-
-use hamu::read::In;
+use kaiseki::ed6;
+use kaiseki::ed6::magic::*;
 
 fn main() -> anyhow::Result<()> {
 	let arch = ed6::Archives::new("data/fc");
 	let data = arch.get_compressed_by_name(0x2, *b"T_MAGIC ._DT")?.1;
-	use ed6::magic::*;
 
-	let magics = Magic::read(&mut In::new(&data))?;
+	let magics = Magic::read(&data)?;
 
 	let doc = choubun::document(|doc| {
 		doc.root.attr("lang", "en");

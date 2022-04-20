@@ -19,9 +19,8 @@ pub impl In<'_> where Self: Sized {
 	}
 }
 
-pub fn toc<'a>(i: &mut In<'a>) -> Result<impl Iterator<Item=(In<'a>, usize)>> {
-	assert_eq!(i.pos(), 0);
-	let mut i = i.clone();
+pub fn toc<'a>(i: &'a [u8]) -> Result<impl Iterator<Item=(In<'a>, usize)>> {
+	let mut i = In::new(i);
 	let start = i.clone().u16()? as usize;
 	let mut v = Vec::with_capacity(start/2+1);
 	for _ in 0..start/2 {

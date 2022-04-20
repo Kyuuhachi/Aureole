@@ -55,13 +55,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "choubun"
-version = "0.1.0"
-dependencies = [
- "linked-hash-map",
-]
-
-[[package]]
 name = "chrono"
 version = "0.4.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -73,12 +66,6 @@ dependencies = [
  "time",
  "winapi",
 ]
-
-[[package]]
-name = "convert_case"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb4a24b1aaf0fd0ce8b45161144d6f42cd91677fd5940fd431183eb023b3a2b8"
 
 [[package]]
 name = "either"
@@ -180,35 +167,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "kiseki"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bitflags",
- "bitmatch",
- "choubun",
- "chrono",
- "convert_case",
- "encoding_rs",
- "extend",
- "int-enum",
- "itermore",
- "kaiseki",
- "mapr",
- "thiserror",
-]
-
-[[package]]
 name = "libc"
 version = "0.2.124"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "21a41fed9d98f27ab1c6d161da622a4fa35e8a54a8adc24bbf3ddd0ef70b0e50"
-
-[[package]]
-name = "linked-hash-map"
-version = "0.5.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fb9b38af92608140b86b693604b9ffcc5824240a484d1ecd4795bacb2fe88f3"
 
 [[package]]
 name = "mapr"

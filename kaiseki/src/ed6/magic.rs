@@ -238,7 +238,7 @@ impl Magic<String> {
 		Magic::read_base(i, &mut |i| i.clone().at(i.u16()? as usize)?.str())
 	}
 
-	pub fn read(i: &mut In) -> Result<Vec<Self>> {
+	pub fn read(i: &[u8]) -> Result<Vec<Self>> {
 		let mut magics = Vec::new();
 		for (mut i, _) in util::toc(i)? {
 			magics.push(Self::read_one(&mut i)?);

@@ -1,7 +1,7 @@
 use int_enum::IntEnum;
 use anyhow::{Result, Context};
 use hamu::read::{In, Le};
-use crate::util::{In_Ext, self};
+use crate::util::{self, In_Ext};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, strum_macros::Display)]
 pub enum Element {

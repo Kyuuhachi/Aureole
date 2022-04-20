@@ -184,18 +184,9 @@ name = "kiseki"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bitflags",
- "bitmatch",
  "choubun",
- "chrono",
  "convert_case",
- "encoding_rs",
- "extend",
- "int-enum",
- "itermore",
  "kaiseki",
- "mapr",
- "thiserror",
 ]
 
 [[package]]

@@ -12,6 +12,8 @@ pub enum Error {
 	Read { pos: usize, len: usize, size: usize },
 	#[error("Mismatched {type_} at {pos:#X}\n  got:      {got}\n  expected: {expected}")]
 	Check { pos: usize, type_: String, got: String, expected: String },
+	#[error("Uncovered data at {uncovered:X?}")]
+	Uncovered { uncovered: Vec<Range<usize>> },
 }
 pub type Result<T, E=Error> = std::result::Result<T, E>;
 
@@ -52,6 +54,15 @@ impl<'a> In<'a> {
 			uncovered.push(last..self.len());
 		}
 		uncovered
+	}
+
+	pub fn assert_covered(&self) -> Result<()> {
+		let uncovered = self.uncovered();
+		if uncovered.is_empty() {
+			Ok(())
+		} else {
+			Err(Error::Uncovered { uncovered })
+		}
 	}
 
 	pub fn pos(&self) -> usize {

@@ -239,10 +239,12 @@ impl Magic<String> {
 	}
 
 	pub fn read(i: &[u8]) -> Result<Vec<Self>> {
+		let mut i = In::new(i);
 		let mut magics = Vec::new();
-		for (mut i, _) in util::toc(i)? {
+		for (mut i, _) in util::toc(&mut i)? {
 			magics.push(Self::read_one(&mut i)?);
 		}
+		i.assert_covered()?;
 		Ok(magics)
 	}
 }

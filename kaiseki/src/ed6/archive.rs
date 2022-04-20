@@ -119,9 +119,8 @@ impl Archives {
 
 	pub fn archive(&self, arch: u8) -> Result<Arc<Archive>> {
 		let mut archives = self.archives.lock().unwrap();
-		if !archives.contains_key(&arch) {
-			let a = Arc::new(Archive::new(&self.path, arch)?);
-			archives.insert(arch, a.clone());
+		if let std::collections::hash_map::Entry::Vacant(e) = archives.entry(arch) {
+			e.insert(Arc::new(Archive::new(&self.path, arch)?));
 		}
 
 		Ok(archives[&arch].clone())

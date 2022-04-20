@@ -80,7 +80,7 @@ impl<const N: usize> PartialEq<[u8;N]> for ByteString<N> {
 
 impl<const N: usize> PartialEq<&[u8]> for ByteString<N> {
 	fn eq(&self, other: &&[u8]) -> bool {
-		&&self.0 == other
+		&self.0 == other
 	}
 }
 

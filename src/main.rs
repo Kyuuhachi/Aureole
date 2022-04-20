@@ -15,9 +15,7 @@ fn fc_magic(arch: &State<Archives>) -> HtmlOut {
 	let data = arch.get_compressed_by_name(0x2, *b"T_MAGIC ._DT")?.1;
 	let magics = Magic::read(&data)?;
 	let doc = ed6::magic::render(&magics);
-	let mut s = String::new();
-	doc.render(&mut s).unwrap();
-	Ok(Html(s))
+	Ok(Html(doc.render_to_string()))
 }
 
 #[rocket::launch]

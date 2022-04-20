@@ -203,6 +203,12 @@ impl Node {
 		self.render_fragment(out, 0)
 	}
 
+	pub fn render_to_string(&self) -> String {
+		let mut out = String::new();
+		self.render(&mut out).unwrap();
+		out
+	}
+
 	pub fn render_fragment(&self, out: &mut impl fmt::Write, indent: usize) -> fmt::Result {
 		self.leaf.render_fragment(out)?;
 		self.body.render_fragment(out, self.indent, indent+1)?;

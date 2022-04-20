@@ -3,8 +3,7 @@ use std::{
 	path::{Path, PathBuf},
 	ops::Range,
 	collections::HashMap,
-	cell::RefCell,
-	rc::Rc,
+	sync::{Arc, Mutex},
 };
 use chrono::NaiveDateTime;
 use mapr::Mmap;
@@ -116,7 +115,7 @@ impl Archive {
 #[derive(Debug)]
 pub struct Archives {
 	path: PathBuf,
-	archives: RefCell<HashMap<u8, Rc<Archive>>>,
+	archives: Mutex<HashMap<u8, Arc<Archive>>>,
 }
 
 impl Archives {
@@ -127,13 +126,14 @@ impl Archives {
 		}
 	}
 
-	pub fn archive(&self, arch: u8) -> Result<Rc<Archive>> {
-		if !self.archives.borrow().contains_key(&arch) {
-			let a = Rc::new(Archive::new(&self.path, arch)?);
-			self.archives.borrow_mut().insert(arch, a.clone());
+	pub fn archive(&self, arch: u8) -> Result<Arc<Archive>> {
+		let mut archives = self.archives.lock().unwrap();
+		if !archives.contains_key(&arch) {
+			let a = Arc::new(Archive::new(&self.path, arch)?);
+			archives.insert(arch, a.clone());
 		}
 
-		Ok(self.archives.borrow()[&arch].clone())
+		Ok(archives[&arch].clone())
 	}
 
 	pub fn get(&self, arch: u8, entry: usize) -> Result<(Entry, Vec<u8>)> {

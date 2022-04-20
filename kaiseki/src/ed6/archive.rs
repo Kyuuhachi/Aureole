@@ -10,30 +10,20 @@ use mapr::Mmap;
 use anyhow::{Result, Context};
 use hamu::read::{In, Le};
 
+use crate::util::ByteString;
+
 #[derive(Clone)]
 pub struct Entry {
-	pub name: [u8; 12],
+	pub name: ByteString<12>,
 	pub size: usize,
 	pub timestamp: NaiveDateTime,
 	range: Range<usize>,
 }
 
-impl Entry {
-	pub fn display_name(name: &[u8]) -> String {
-		format!("b\"{}\"",
-			name.into_iter()
-				.copied()
-				.flat_map(std::ascii::escape_default)
-				.map(|a| a as char)
-				.collect::<String>()
-		)
-	}
-}
-
 impl std::fmt::Debug for Entry {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("Entry")
-			.field("name", &format_args!("{}", Entry::display_name(&self.name)))
+			.field("name", &self.name)
 			.field("size", &self.size)
 			.field("timestamp", &self.timestamp)
 			.field("data", &format_args!("[_; {}]", self.range.end - self.range.start))
@@ -66,7 +56,7 @@ impl Archive {
 
 		let mut entries = Vec::new();
 		for _ in 0..count {
-			let name = i.array::<12>()?;
+			let name = ByteString(i.array::<12>()?);
 			i.check_u32(0)?; // I don't know what this is. It's nonzero on a few files in 3rd, and some sources (which are me in the past) say it's a second timestamp
 			let len = i.u32()? as usize;
 			let size = i.u32()? as usize;
@@ -100,10 +90,11 @@ impl Archive {
 		Ok((ent, &self.dat[ent.range.clone()]))
 	}
 
-	pub fn get_by_name(&self, name: [u8; 12]) -> Result<(&Entry, &[u8])> {
+	pub fn get_by_name(&self, name: impl AsRef<ByteString<12>>) -> Result<(&Entry, &[u8])> {
+		let name = name.as_ref();
 		let ent = self.entries.iter()
 			.find(|a| a.name == name)
-			.with_context(|| format!("No name named {}", Entry::display_name(&name)))?;
+			.with_context(|| format!("No name named {:?}", name))?;
 		Ok((ent, &self.dat[ent.range.clone()]))
 	}
 
@@ -148,13 +139,13 @@ impl Archives {
 		Ok((ent.clone(), crate::decompress::decompress(data)?))
 	}
 
-	pub fn get_by_name(&self, arch: u8, name: [u8; 12]) -> Result<(Entry, Vec<u8>)> {
+	pub fn get_by_name(&self, arch: u8, name: impl AsRef<ByteString<12>>) -> Result<(Entry, Vec<u8>)> {
 		let a = self.archive(arch)?;
 		let (ent, data) = a.get_by_name(name)?;
 		Ok((ent.clone(), data.to_owned()))
 	}
 
-	pub fn get_compressed_by_name(&self, arch: u8, name: [u8; 12]) -> Result<(Entry, Vec<u8>)> {
+	pub fn get_compressed_by_name(&self, arch: u8, name: impl AsRef<ByteString<12>>) -> Result<(Entry, Vec<u8>)> {
 		let a = self.archive(arch)?;
 		let (ent, data) = a.get_by_name(name)?;
 		Ok((ent.clone(), crate::decompress::decompress(data)?))

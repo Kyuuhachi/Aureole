@@ -36,3 +36,63 @@ pub fn toc<'a>(i: &mut In<'a>) -> Result<impl Iterator<Item=(In<'a>, usize)>> {
 		.map(move |[a, b]| (i.clone().at(a).unwrap(), b-a))
 	)
 }
+
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct ByteString<const N: usize>(pub [u8; N]);
+
+impl<const N: usize> std::fmt::Debug for ByteString<N> {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		write!(f, "b\"{}\"",
+			self.0.into_iter()
+				.flat_map(std::ascii::escape_default)
+				.map(|a| a as char)
+				.collect::<String>()
+		)
+	}
+}
+
+impl<const N: usize> std::ops::Deref for ByteString<N> {
+	type Target = [u8; N];
+
+	fn deref(&self) -> &Self::Target {
+		&self.0
+	}
+}
+
+impl<const N: usize> std::ops::DerefMut for ByteString<N> {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut self.0
+	}
+}
+
+impl<const N: usize> PartialEq<&ByteString<N>> for ByteString<N> {
+	fn eq(&self, other: &&ByteString<N>) -> bool {
+		self.0 == other.0
+	}
+}
+
+impl<const N: usize> PartialEq<[u8;N]> for ByteString<N> {
+	fn eq(&self, other: &[u8;N]) -> bool {
+		&self.0 == other
+	}
+}
+
+impl<const N: usize> PartialEq<&[u8]> for ByteString<N> {
+	fn eq(&self, other: &&[u8]) -> bool {
+		&&self.0 == other
+	}
+}
+
+impl<const N: usize> AsRef<[u8;N]> for ByteString<N> {
+	fn as_ref(&self) -> &[u8;N] {
+		&self.0
+	}
+}
+
+impl<const N: usize> AsRef<ByteString<N>> for [u8;N] {
+	fn as_ref(&self) -> &ByteString<N> {
+		// SAFETY: it's repr(transparent)
+		unsafe { std::mem::transmute::<&[u8;N], &ByteString<N>>(self) }
+	}
+}

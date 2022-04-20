@@ -9,18 +9,26 @@ pub mod ed6 {
 }
 
 #[derive(Debug)]
-pub struct Error(eyre::Error);
+pub enum Error {
+	Error(eyre::Error),
+	NotFound,
+}
 
 impl<E: Into<eyre::Error>> From<E> for Error {
 	fn from(e: E) -> Self {
-		Error(e.into())
+		Error::Error(e.into())
 	}
 }
 
 impl<'r> Responder<'r, 'static> for Error {
 	fn respond_to(self, _: &'r rocket::Request<'_>) -> rocket::response::Result<'static> {
-		eprintln!("{:?}", self.0);
-		Err(Status::InternalServerError)
+		Err(match self {
+			Error::Error(e) => {
+				eprintln!("{:?}", e);
+				Status::InternalServerError
+			},
+			Error::NotFound => Status::NotFound,
+		})
 	}
 }
 
@@ -34,10 +42,24 @@ fn fc_magic(arch: &State<Archives>) -> Result<Html<String>> {
 	Ok(Html(doc.render_to_string()))
 }
 
+#[rocket::get("/fc/scena/<name>")]
+fn fc_scena(arch: &State<Archives>, name: &str) -> Result<()> {
+	if name.len() > 8 { return Err(Error::NotFound) }
+	let mut s = kaiseki::ByteString(*b"        ._SN");
+	s[..name.len()].copy_from_slice(name.as_bytes());
+	let data = match arch.get_compressed_by_name(0x1, s) {
+		Ok(d) => d,
+		Err(kaiseki::ed6::archive::Error::InvalidName { .. } ) => return Err(Error::NotFound),
+		Err(e) => return Err(e.into()),
+	};
+
+	Ok(())
+}
+
 #[rocket::launch]
 fn rocket() -> _ {
 	color_eyre::install().unwrap();
 	rocket::build()
 		.manage(Archives::new("data/fc"))
-		.mount("/", rocket::routes![fc_magic])
+		.mount("/", rocket::routes![fc_magic, fc_scena])
 }

@@ -4,6 +4,8 @@ use std::{
 	ops::Range,
 };
 
+use crate::dump::Dump;
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
 	#[error("Out-of-bounds seek to {pos:#X} (size {size:#X})")]
@@ -35,34 +37,8 @@ impl<'a> In<'a> {
 		}
 	}
 
-	pub fn coverage(&self) -> Vec<Range<usize>> {
-		// Cloning isn't strictly necessary here, but it makes a better interface and isn't used in
-		// hot paths
-		self.coverage.borrow().clone()
-	}
-
-	pub fn uncovered(&self) -> Vec<Range<usize>> {
-		let mut uncovered = Vec::new();
-		let mut last = 0;
-		for range in self.coverage.borrow().iter() {
-			if range.start != last {
-				uncovered.push(last..range.start);
-			}
-			last = range.end;
-		}
-		if last != self.len() {
-			uncovered.push(last..self.len());
-		}
-		uncovered
-	}
-
-	pub fn assert_covered(&self) -> Result<()> {
-		let uncovered = self.uncovered();
-		if uncovered.is_empty() {
-			Ok(())
-		} else {
-			Err(Error::Uncovered { uncovered })
-		}
+	pub fn data(&self) -> &[u8] {
+		self.data
 	}
 
 	pub fn pos(&self) -> usize {
@@ -134,12 +110,8 @@ impl<'a> In<'a> {
 		Ok(())
 	}
 
-	pub fn dump(&self) -> crate::dump::Dump {
-		crate::dump::Dump::new(self)
-	}
-
-	pub fn data(&self) -> &[u8] {
-		self.data
+	pub fn dump(&self) -> Dump {
+		Dump::new(self)
 	}
 }
 
@@ -170,6 +142,54 @@ macro_rules! primitives {
 
 primitives!(Le, from_le_bytes; u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, f32, f64);
 primitives!(Be, from_be_bytes; u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, f32, f64);
+
+impl<'a> In<'a> {
+	pub fn coverage(&self) -> Vec<Range<usize>> {
+		// Cloning isn't strictly necessary here, but it makes a better interface and isn't used in
+		// hot paths
+		self.coverage.borrow().clone()
+	}
+
+	pub fn uncovered(&self) -> Vec<Range<usize>> {
+		let mut uncovered = Vec::new();
+		let mut last = 0;
+		for range in self.coverage.borrow().iter() {
+			if range.start != last {
+				uncovered.push(last..range.start);
+			}
+			last = range.end;
+		}
+		if last != self.len() {
+			uncovered.push(last..self.len());
+		}
+		uncovered
+	}
+
+	pub fn assert_covered(&self) -> Result<()> {
+		let uncovered = self.uncovered();
+		if uncovered.is_empty() {
+			Ok(())
+		} else {
+			Err(Error::Uncovered { uncovered })
+		}
+	}
+
+	pub fn dump_uncovered(&self, mut f: impl FnMut(Dump)) -> Result<()> {
+		let uncovered = self.uncovered();
+		if uncovered.is_empty() {
+			Ok(())
+		} else {
+			uncovered.iter().for_each(|r| {
+				f(self.clone()
+					.at(r.start).unwrap()
+					.dump()
+					.end(r.end)
+				)
+			});
+			Err(Error::Uncovered { uncovered })
+		}
+	}
+}
 
 fn find_coverage(coverage: &mut Vec<Range<usize>>, pos: usize) -> usize {
 	use std::cmp::Ordering;

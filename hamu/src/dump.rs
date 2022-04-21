@@ -1,17 +1,8 @@
 use std::{
-	io::{self, Write},
+	io::{self, Write, Result},
 	collections::BTreeMap,
 };
-use crate::read::{self, In};
-
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-	#[error("Read error")]
-	Read(#[from] read::Error),
-	#[error("Write error")]
-	Write(#[from] io::Error),
-}
-pub type Result<T, E=Error> = std::result::Result<T, E>;
+use crate::read::In;
 
 pub mod preview {
 	use std::io::Write;
@@ -59,6 +50,7 @@ enum DumpLength {
 	Lines(usize),
 }
 
+#[must_use]
 #[derive(Clone)]
 pub struct Dump<'a> {
 	i: &'a In<'a>,
@@ -96,6 +88,10 @@ impl<'a> Dump<'a> {
 
 	pub fn bytes(self, bytes: usize) -> Self {
 		Dump { length: DumpLength::Bytes(bytes), ..self }
+	}
+
+	pub fn end(self, end: usize) -> Self {
+		Dump { length: DumpLength::Bytes(end - self.i.pos()), ..self }
 	}
 
 	pub fn width(self, width: usize) -> Self {
@@ -139,7 +135,7 @@ impl<'a> Dump<'a> {
 		self
 	}
 
-	fn to<W: Write>(self, out: &mut W) -> Result<()> {
+	pub fn to<W: Write>(self, out: &mut W) -> Result<()> {
 		let mut out = io::BufWriter::new(out);
 		let width = match self.width {
 			0 if self.preview.is_some() => 48,
@@ -202,7 +198,7 @@ impl<'a> Dump<'a> {
 		Ok(())
 	}
 
-	pub fn to_stderr(self) -> Result<()> {
-		self.to(&mut std::io::stderr())
+	pub fn to_stderr(self) {
+		self.to(&mut std::io::stderr()).unwrap()
 	}
 }

@@ -246,7 +246,7 @@ impl Body {
 			match item {
 				Item::Node(v) => { indent_(out)?; v.render_fragment(out, indent)? },
 				Item::Leaf(v) => { indent_(out)?; v.render_fragment(out)? },
-				Item::Text(v) => { indent_(out)?; escape(out, &v)? },
+				Item::Text(v) => { indent_(out)?; escape(out, v)? },
 				Item::Raw(v)  => { indent_(out)?; write!(out, "{}", v)? },
 				Item::Rc(v) => v.borrow().render_fragment(out, do_indent, indent)?,
 			}

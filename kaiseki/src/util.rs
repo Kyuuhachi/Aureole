@@ -27,7 +27,7 @@ pub impl In<'_> where Self: Sized {
 	}
 }
 
-pub fn toc<A>(i: &[u8], mut f: impl FnMut(&mut In, usize) -> Result<A>) -> Result<Vec<A>> {
+pub fn toc<A>(i: &[u8], f: impl FnMut(&mut In, usize) -> Result<A>) -> Result<Vec<A>> {
 	let mut i = In::new(i);
 	let start = i.clone().u16()? as usize;
 	let mut pos = Vec::with_capacity(start/2);
@@ -35,7 +35,7 @@ pub fn toc<A>(i: &[u8], mut f: impl FnMut(&mut In, usize) -> Result<A>) -> Resul
 		pos.push(i.u16()? as usize);
 	}
 	let len = i.len();
-	let out = multiple(&mut i, &pos, len, f)?;
+	let out = multiple(&i, &pos, len, f)?;
 	i.dump_uncovered(|a| a.to_stderr())?;
 	Ok(out)
 }

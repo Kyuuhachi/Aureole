@@ -133,6 +133,14 @@ impl<'a> In<'a> {
 		}
 		Ok(())
 	}
+
+	pub fn dump(&self) -> crate::dump::Dump {
+		crate::dump::Dump::new(self)
+	}
+
+	pub fn data(&self) -> &[u8] {
+		self.data
+	}
 }
 
 macro_rules! primitives {

@@ -2,7 +2,7 @@ use std::{
 	io::{self, Write},
 	collections::BTreeMap,
 };
-use crate::read;
+use crate::read::{self, In};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -60,7 +60,8 @@ enum DumpLength {
 }
 
 #[derive(Clone)]
-pub struct DumpSpec<'a> {
+pub struct Dump<'a> {
+	i: &'a In<'a>,
 	length: DumpLength,
 	width: usize,
 	color: &'a dyn Fn(&mut dyn Write, u8) -> Result<()>,
@@ -71,9 +72,10 @@ pub struct DumpSpec<'a> {
 	marks: BTreeMap<usize, String>,
 }
 
-impl<'a> DumpSpec<'a> {
-	pub fn new() -> Self {
+impl<'a> Dump<'a> {
+	pub fn new(i: &'a In<'a>) -> Self {
 		Self {
+			i,
 			width: 0,
 			length: DumpLength::Bytes(usize::MAX),
 			color: &color::ascii,
@@ -84,47 +86,47 @@ impl<'a> DumpSpec<'a> {
 		}
 	}
 
-	pub fn oneline() -> Self {
-		Self::new().lines(1).newline(false)
+	pub fn oneline(self) -> Self {
+		self.lines(1).newline(false)
 	}
 
 	pub fn lines(self, lines: usize) -> Self {
-		DumpSpec { length: DumpLength::Lines(lines), ..self }
+		Dump { length: DumpLength::Lines(lines), ..self }
 	}
 
 	pub fn bytes(self, bytes: usize) -> Self {
-		DumpSpec { length: DumpLength::Bytes(bytes), ..self }
+		Dump { length: DumpLength::Bytes(bytes), ..self }
 	}
 
 	pub fn width(self, width: usize) -> Self {
 		assert!(width > 0);
-		DumpSpec { width, ..self }
+		Dump { width, ..self }
 	}
 
 	pub fn color(self, color: &'a dyn Fn(&mut dyn Write, u8) -> Result<()>) -> Self {
-		DumpSpec { color, ..self }
+		Dump { color, ..self }
 	}
 
 	pub fn preview(self, preview: &'a dyn Fn(&mut dyn Write, &[u8]) -> Result<()>) -> Self {
-		DumpSpec { preview: Some(preview), ..self }
+		Dump { preview: Some(preview), ..self }
 	}
 
 	// This is different from a no-op preview function, since it affects the
 	// default width and trailing space on the last line.
 	pub fn no_preview(self) -> Self {
-		DumpSpec { preview: None, ..self }
+		Dump { preview: None, ..self }
 	}
 
 	pub fn number_width(self, size: usize) -> Self {
-		DumpSpec { number_width: Some(size), ..self }
+		Dump { number_width: Some(size), ..self }
 	}
 
 	pub fn no_number(self) -> Self {
-		DumpSpec { number_width: None, ..self }
+		Dump { number_width: None, ..self }
 	}
 
 	pub fn newline(self, newline: bool) -> Self {
-		DumpSpec { newline, ..self }
+		Dump { newline, ..self }
 	}
 
 	pub fn mark(mut self, pos: usize, mark: String) -> Self {
@@ -136,33 +138,24 @@ impl<'a> DumpSpec<'a> {
 		self.marks.extend(iter);
 		self
 	}
-}
 
-impl Default for DumpSpec<'_> {
-	fn default() -> Self {
-		Self::new()
-	}
-}
-
-#[extend::ext(name=Dump)]
-pub impl read::In<'_> {
-	fn dump<W: Write>(&mut self, out: W, spec: &DumpSpec) -> Result<()> {
+	fn to<W: Write>(self, out: &mut W) -> Result<()> {
 		let mut out = io::BufWriter::new(out);
-		let width = match spec.width {
-			0 if spec.preview.is_some() => 48,
-			0 if spec.preview.is_none() => 72,
+		let width = match self.width {
+			0 if self.preview.is_some() => 48,
+			0 if self.preview.is_none() => 72,
 			w => w,
 		};
 
-		let start = self.pos();
-		let end = start + match spec.length {
+		let start = self.i.pos();
+		let end = start + match self.length {
 			DumpLength::Bytes(b) => b,
 			DumpLength::Lines(l) => l * width,
-		}.min(self.remaining());
+		}.min(self.i.remaining());
 		let mut pos = start;
 
-		let mut marks = spec.marks.range(start..=end).peekable();
-		let number_width = spec.number_width.map(|a| a.max(format!("{:X}", self.len()).len()));
+		let mut marks = self.marks.range(start..=end).peekable();
+		let number_width = self.number_width.map(|a| a.max(format!("{:X}", self.i.len()).len()));
 
 		loop {
 			if let Some(number_width) = number_width {
@@ -173,13 +166,13 @@ pub impl read::In<'_> {
 				write!(out, "\x1B[33m{}\x1B[m", s)?;
 			}
 
-			let data = self.slice(width.min(end - pos))?;
+			let data = &self.i.data()[pos..pos+width.min(end - pos)];
 			for &b in data {
 				match marks.next_if(|&(&a, _)| a <= pos) {
 					Some((_, mark)) => write!(out, "{}", mark)?,
 					_ => write!(out, " ")?,
 				}
-				(spec.color)(&mut out, b)?;
+				(self.color)(&mut out, b)?;
 				write!(out, "{:02X}", b)?;
 				pos += 1;
 			}
@@ -190,7 +183,7 @@ pub impl read::In<'_> {
 			}
 			write!(out, "\x1B[m")?;
 
-			if let Some(preview) = spec.preview {
+			if let Some(preview) = self.preview {
 				if data.len() < width {
 					write!(out, "{}", "   ".repeat(width - data.len()))?;
 				}
@@ -202,14 +195,14 @@ pub impl read::In<'_> {
 			if pos == end { break; }
 		}
 
-		if spec.newline {
+		if self.newline {
 			writeln!(out)?;
 		}
 
 		Ok(())
 	}
 
-	fn edump(&mut self, spec: &DumpSpec) -> Result<()> {
-		self.dump(std::io::stderr(), spec)
+	pub fn to_stderr(self) -> Result<()> {
+		self.to(&mut std::io::stderr())
 	}
 }

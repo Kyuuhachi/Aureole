@@ -51,14 +51,22 @@ fn fc_scena(arch: &State<Archives>, name: &str) -> Result<()> {
 		Ok(d) => d,
 		Err(kaiseki::ed6::archive::Error::InvalidName { .. } ) => return Err(Error::NotFound),
 		Err(e) => return Err(e.into()),
-	};
+	}.1;
+
+	kaiseki::ed6::scena::read(&data)?;
 
 	Ok(())
 }
 
 #[rocket::launch]
 fn rocket() -> _ {
-	color_eyre::install().unwrap();
+	color_eyre::config::HookBuilder::default()
+		.add_frame_filter(Box::new(|frames| {
+			if let Some(a) = frames.iter().rposition(|f| matches!(&f.filename, Some(a) if a.starts_with(env!("CARGO_MANIFEST_DIR")))) {
+				frames.truncate(a+2)
+			}
+		})).install().unwrap();
+
 	rocket::build()
 		.manage(Archives::new("data/fc"))
 		.mount("/", rocket::routes![fc_magic, fc_scena])

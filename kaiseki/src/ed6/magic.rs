@@ -235,16 +235,10 @@ impl Magic<()> {
 impl Magic<String> {
 	pub fn read_one(i: &mut In) -> Result<Self> {
 		// This can be made slightly less hacky with #[feature(type_changing_struct_update)]
-		Magic::read_base(i, &mut |i| i.clone().at(i.u16()? as usize)?.str())
+		Magic::read_base(i, &mut |i| i.ptr_u16()?.str())
 	}
 
 	pub fn read(i: &[u8]) -> Result<Vec<Self>> {
-		let mut i = In::new(i);
-		let mut magics = Vec::new();
-		for (mut i, _) in util::toc(&mut i)? {
-			magics.push(Self::read_one(&mut i)?);
-		}
-		i.assert_covered()?;
-		Ok(magics)
+		util::toc(i, |i, _| Self::read_one(i))
 	}
 }

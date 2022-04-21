@@ -18,27 +18,34 @@ pub impl In<'_> where Self: Sized {
 		Ok(out.into_owned())
 	}
 
+	fn ptr_u16(&mut self) -> hamu::read::Result<Self> {
+		Ok(self.clone().at(self.u16()? as usize)?)
+	}
+
 	fn bytestring<const N: usize>(&mut self) -> hamu::read::Result<ByteString<N>> {
 		Ok(ByteString(self.array()?))
 	}
 }
 
-pub fn toc<'a>(i: &mut In<'a>) -> Result<impl Iterator<Item=(In<'a>, usize)>> {
-	assert_eq!(i.pos(), 0);
-	let mut i = i.clone();
+pub fn toc<A>(i: &[u8], mut f: impl FnMut(&mut In, usize) -> Result<A>) -> Result<Vec<A>> {
+	let mut i = In::new(i);
 	let start = i.clone().u16()? as usize;
-	let mut v = Vec::with_capacity(start/2+1);
+	let mut pos = Vec::with_capacity(start/2);
 	for _ in 0..start/2 {
-		let p = i.u16()? as usize;
-		i.clone().seek(p)?;
-		v.push(p);
+		pos.push(i.u16()? as usize);
 	}
-	v.push(i.len());
-	Ok(
-		v.into_iter()
-		.array_windows()
-		.map(move |[a, b]| (i.clone().at(a).unwrap(), b-a))
-	)
+	let len = i.len();
+	let out = multiple(&mut i, &pos, len, f)?;
+	i.dump_uncovered(|a| a.to_stderr())?;
+	Ok(out)
+}
+
+pub fn multiple<A>(i: &In, pos: &[usize], end: usize, mut f: impl FnMut(&mut In, usize) -> Result<A>) -> Result<Vec<A>> {
+	let mut out = Vec::with_capacity(pos.len());
+	for [a, b] in pos.iter().copied().chain(std::iter::once(end)).array_windows() {
+		out.push(f(&mut i.clone().at(a)?, b-a)?);
+	}
+	Ok(out)
 }
 
 #[repr(transparent)]

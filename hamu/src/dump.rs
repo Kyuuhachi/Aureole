@@ -125,13 +125,15 @@ impl<'a> Dump<'a> {
 		Dump { newline, ..self }
 	}
 
-	pub fn mark(mut self, pos: usize, mark: String) -> Self {
-		self.marks.insert(pos, mark);
+	pub fn mark(mut self, pos: usize, mark: impl AsRef<str>) -> Self {
+		self.marks.insert(pos, mark.as_ref().to_owned());
 		self
 	}
 
-	pub fn marks<T>(mut self, iter: T) -> Self where T: IntoIterator, BTreeMap<usize, String>: Extend<T::Item> {
-		self.marks.extend(iter);
+	pub fn marks(mut self, iter: impl Iterator<Item=(impl std::ops::Deref<Target=usize>, impl AsRef<str>)>) -> Self {
+		for (k, v) in iter {
+			self = self.mark(*k, v);
+		}
 		self
 	}
 

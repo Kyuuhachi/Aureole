@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use eyre::Result;
 use hamu::read::{self, In, Le};
 use crate::util::{self, ByteString, InExt};
@@ -223,10 +224,9 @@ pub fn read(i: &[u8]) -> Result<Scena> {
 	}
 
 	util::multiple(&i, &func_table, code_end, |i, len| {
-		// TODO
-		Ok(())
+		Ok(InsnParser::new().read_func(i, i.pos() + len))
 	})?;
-	//
+
 	// i.dump_uncovered(|a| a.to_stderr())?;
 
 	Ok(Scena {
@@ -256,4 +256,241 @@ fn list<A>((mut i, count): (In, u16), mut f: impl FnMut(&mut In) -> Result<A>) -
 		out.push(f(&mut i)?);
 	}
 	Ok(out)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Character(u16);
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Flag(u16);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ExprBinop {
+	Eq, Ne, Lt, Gt, Le, Ge,
+	BoolAnd, And, Or,
+	Add, Sub, Xor, Mul, Div, Mod,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ExprUnop {
+	Not, Neg, Inv,
+	Ass, MulAss, DivAss, ModAss, AddAss, SubAss, AndAss, XorAss, OrAss
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Expr {
+	Const(u32),
+	Binop(ExprBinop, Box<Expr>, Box<Expr>),
+	Unop(ExprUnop, Box<Expr>),
+	Exec(Insn),
+	Flag(Flag),
+	Var(u16),
+	Attr(u8),
+	CharAttr(Character, u8),
+	Rand,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Insn {
+	/*01*/ Return,
+	/*02*/ If(Box<Expr>, usize /*Addr*/),
+	/*03*/ Goto(usize /*Addr*/),
+	/*04*/ Switch(Box<Expr>, Vec<(u16, usize /*Addr*/)>, usize /*Addr (default)*/),
+	/*09*/ FlagsSet(u32 /*Flags*/),
+	/*0A*/ FlagsUnset(u32 /*Flags*/),
+	/*0B*/ FadeOn(u32 /*Time*/, u32 /*Color*/, u8),
+	/*0C*/ FadeOff(u32 /*Time*/, u32 /*Color*/),
+	/*16*/ Map(MapInsn),
+	/*19*/ EventBegin(u8),
+	/*1B*/ _1B(u16, u16),
+	/*1C*/ _1C(u16, u16),
+	/*43*/ CharForkFunc(Character, u8 /*ForkId*/, FuncRef),
+	/*45*/ CharFork(Character, u16 /*ForkId*/, Vec<Insn>), // why is this is u16?
+	/*49*/ Event(FuncRef), // Not sure if this is different from Call
+	/*5A*/ TextSetPos(i16, i16, i16, i16),
+	/*60*/ TextSetName(String),
+	/*6C*/ CamAngle(i32 /*Angle*/, u32 /*Time*/),
+	/*6D*/ CamPos(Pos3, u32 /*Time*/),
+	/*88*/ CharSetPos(Character, Pos3, u16),
+	/*8A*/ CharLookAt(Character, Character, u16 /*Time*/),
+	/*8E*/ CharWalkTo(Character, Pos3, u32 /*Speed*/, u8),
+	/*92*/ _Char92(Character, Character, u32, u32, u8),
+	/*A2*/ FlagSet(Flag), // Is this order really right?
+	/*A3*/ FlagUnset(Flag),
+	/*A5*/ AwaitFlagUnset(Flag),
+	/*A6*/ AwaitFlagSet(Flag),
+	/*B1*/ OpLoad(String /*._OP filename*/),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum MapInsn {
+	/*00*/ Hide,
+	/*01*/ Show,
+	/*02*/ Set(i32, (i32, i32), FileRef /* archive 03 */), // XXX this seems to be (arch, index) while others are (index, arch)?
+}
+
+struct InsnParser {
+	marks: HashMap<usize, String>,
+}
+impl InsnParser {
+	fn new() -> Self {
+		InsnParser {
+			marks: HashMap::new(),
+		}
+	}
+
+	fn read_func(&mut self, i: &mut In, end: usize) -> Result<()> {
+		let start = i.clone();
+		let mut ops = Vec::<(usize, Insn)>::new();
+		let a: Result<()> = (|| -> Result<()> {
+			self.marks.insert(i.pos(), "\x1B[0;7m[".to_owned());
+			while i.pos() < end {
+				ops.push((i.pos(), self.read_insn(i)?));
+				self.marks.insert(i.pos(), "\x1B[0;7m•".to_owned());
+			}
+			self.marks.insert(i.pos(), "\x1B[0;7m]".to_owned());
+			eyre::ensure!(i.pos() == end, "Overshot: {:X} > {:X}", i.pos(), end);
+			Ok(())
+		})();
+		match a {
+			Ok(a) => Ok(a),
+			Err(e) => {
+				for (addr, op) in &ops {
+					eprintln!("{:04X}: {:?}", addr, op);
+				}
+				start.dump().end(end)
+					.marks(self.marks.iter())
+					.mark(i.pos()-1, "\x1B[0;7m ")
+					.number_width(4)
+					.to_stderr();
+				Err(e)
+			}
+		}
+	}
+
+	fn read_insn(&mut self, i: &mut In) -> Result<Insn> {
+		Ok(match i.u8()? {
+			0x01 => Insn::Return,
+			0x02 => Insn::If(self.read_expr(i)?, i.u16()? as usize),
+			0x03 => Insn::Goto(i.u16()? as usize),
+			0x04 => Insn::Switch(self.read_expr(i)?, {
+				let mut out = Vec::new();
+				for _ in 0..i.u16()? {
+					out.push((i.u16()?, i.u16()? as usize));
+				}
+				out
+			}, i.u16()? as usize),
+			0x09 => Insn::FlagsSet(i.u32()?),
+			0x0A => Insn::FlagsUnset(i.u32()?),
+			0x0B => Insn::FadeOn(i.u32()?, i.u32()?, i.u8()?),
+			0x0C => Insn::FadeOff(i.u32()?, i.u32()?),
+			0x16 => Insn::Map(match i.u8()? {
+				0x00 => MapInsn::Hide,
+				0x01 => MapInsn::Show,
+				0x02 => MapInsn::Set(i.i32()?, (i.i32()?, i.i32()?), i.file_ref()?),
+				op => eyre::bail!("Unknown map opcode: {:02X}", op)
+			}),
+			0x19 => Insn::EventBegin(i.u8()?),
+			0x1B => Insn::_1B(i.u16()?, i.u16()?),
+			0x1C => Insn::_1C(i.u16()?, i.u16()?),
+			0x43 => Insn::CharForkFunc(Character(i.u16()?), i.u8()?, FuncRef(i.u8()? as u16, i.u16()?)),
+			0x45 => Insn::CharFork(Character(i.u16()?), i.u16()?, {
+				let end = i.u8()? as usize + i.pos();
+				let mut insns = Vec::new();
+				while i.pos() < end {
+					self.marks.insert(i.pos(), "\x1B[0;7;2m•".to_owned());
+					insns.push(self.read_insn(i)?);
+				}
+				eyre::ensure!(i.pos() == end, "Overshot: {:X} > {:X}", i.pos(), end);
+				i.check_u8(0)?;
+				insns
+			}),
+			0x49 => Insn::Event(FuncRef(i.u8()? as u16, i.u16()?)),
+			0x5A => Insn::TextSetPos(i.i16()?, i.i16()?, i.i16()?, i.i16()?),
+			0x60 => Insn::TextSetName(i.str()?),
+			0x6C => Insn::CamAngle(i.i32()?, i.u32()?),
+			0x6D => Insn::CamPos(i.pos3()?, i.u32()?),
+			0x88 => Insn::CharSetPos(Character(i.u16()?), i.pos3()?, i.u16()?),
+			0x8A => Insn::CharLookAt(Character(i.u16()?), Character(i.u16()?), i.u16()?),
+			0x8E => Insn::CharWalkTo(Character(i.u16()?), i.pos3()?, i.u32()?, i.u8()?),
+			0x92 => Insn::_Char92(Character(i.u16()?), Character(i.u16()?), i.u32()?, i.u32()?, i.u8()?),
+			0xA2 => Insn::FlagSet(Flag(i.u16()?)),
+			0xA3 => Insn::FlagUnset(Flag(i.u16()?)),
+			0xA5 => Insn::AwaitFlagUnset(Flag(i.u16()?)),
+			0xA6 => Insn::AwaitFlagSet(Flag(i.u16()?)),
+			0xB1 => Insn::OpLoad(i.str()?),
+
+			op => eyre::bail!("Unknown opcode: {:02X}", op)
+		})
+	}
+
+	fn read_expr(&mut self, i: &mut In) -> Result<Box<Expr>> {
+		#[allow(clippy::vec_box)]
+		struct Stack(Vec<Box<Expr>>);
+		impl Stack {
+			fn push(&mut self, expr: Expr) {
+				self.0.push(Box::new(expr))
+			}
+
+			fn binop(&mut self, op: ExprBinop) -> Result<Expr> {
+				Ok(Expr::Binop(op, self.pop()?, self.pop()?))
+			}
+
+			fn unop(&mut self, op: ExprUnop) -> Result<Expr> {
+				Ok(Expr::Unop(op, self.pop()?))
+			}
+
+			fn pop(&mut self) -> Result<Box<Expr>> {
+				Ok(self.0.pop().ok_or_else(|| eyre::eyre!("Empty expr stack"))?)
+			}
+		}
+		let mut stack = Stack(Vec::new());
+		self.marks.insert(i.pos(), "\x1B[0;7;2m[".to_owned());
+		loop {
+			let op = match i.u8()? {
+				0x00 => Expr::Const(i.u32()?),
+				0x01 => break,
+				0x02 => stack.binop(ExprBinop::Eq)?,
+				0x03 => stack.binop(ExprBinop::Ne)?,
+				0x04 => stack.binop(ExprBinop::Lt)?,
+				0x05 => stack.binop(ExprBinop::Gt)?,
+				0x06 => stack.binop(ExprBinop::Le)?,
+				0x07 => stack.binop(ExprBinop::Ge)?,
+				0x08 => stack.unop(ExprUnop::Not)?,
+				0x09 => stack.binop(ExprBinop::BoolAnd)?,
+				0x0A => stack.binop(ExprBinop::And)?,
+				0x0B => stack.binop(ExprBinop::Or)?,
+				0x0C => stack.binop(ExprBinop::Add)?,
+				0x0D => stack.binop(ExprBinop::Sub)?,
+				0x0E => stack.unop(ExprUnop::Neg)?,
+				0x0F => stack.binop(ExprBinop::Xor)?,
+				0x10 => stack.binop(ExprBinop::Mul)?,
+				0x11 => stack.binop(ExprBinop::Div)?,
+				0x12 => stack.binop(ExprBinop::Mod)?,
+				0x13 => stack.unop(ExprUnop::Ass)?,
+				0x14 => stack.unop(ExprUnop::MulAss)?,
+				0x15 => stack.unop(ExprUnop::DivAss)?,
+				0x16 => stack.unop(ExprUnop::ModAss)?,
+				0x17 => stack.unop(ExprUnop::AddAss)?,
+				0x18 => stack.unop(ExprUnop::SubAss)?,
+				0x19 => stack.unop(ExprUnop::AndAss)?,
+				0x1A => stack.unop(ExprUnop::XorAss)?,
+				0x1B => stack.unop(ExprUnop::SubAss)?,
+				0x1C => Expr::Exec(self.read_insn(i)?),
+				0x1D => stack.unop(ExprUnop::Neg)?,
+				0x1E => Expr::Flag(Flag(i.u16()?)),
+				0x1F => Expr::Var(i.u16()?),
+				0x20 => Expr::Attr(i.u8()?),
+				0x21 => Expr::CharAttr(Character(i.u16()?), i.u8()?),
+				0x22 => Expr::Rand,
+				op => eyre::bail!("Unknown expr opcode: {:02X}", op)
+			};
+			stack.push(op);
+			self.marks.insert(i.pos(), "\x1B[0;7;2m•".to_owned());
+		}
+		self.marks.insert(i.pos(), "\x1B[0;7;2m]".to_owned());
+		match stack.0.len() {
+			1 => Ok(stack.pop()?),
+			_ => eyre::bail!("Invalid expr: {:?}", stack.0)
+		}
+	}
 }

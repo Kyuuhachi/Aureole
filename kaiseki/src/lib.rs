@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 #![allow(clippy::needless_question_mark)]
 
 pub mod ed6 {

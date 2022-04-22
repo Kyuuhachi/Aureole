@@ -95,19 +95,19 @@ pub struct CameraAngle {
 
 #[derive(Debug, Clone)]
 pub struct Scena {
-	dir: ByteString<10>,
-	fname: ByteString<14>,
-	town: u16, // T_TOWN index
-	bgm: u16, // T_BGMTBL index
-	entry_func: FuncRef,
-	includes: [FileRef; 8],
-	ch: Vec<FileRef>,
-	cp: Vec<FileRef>,
-	npcs: Vec<Npc>,
-	monsters: Vec<Monster>,
-	triggers: Vec<Trigger>,
-	objects: Vec<Object>,
-	camera_angles: Vec<CameraAngle>,
+	pub dir: ByteString<10>,
+	pub fname: ByteString<14>,
+	pub town: u16, // T_TOWN index
+	pub bgm: u16, // T_BGMTBL index
+	pub entry_func: FuncRef,
+	pub includes: [FileRef; 8],
+	pub ch: Vec<FileRef>,
+	pub cp: Vec<FileRef>,
+	pub npcs: Vec<Npc>,
+	pub monsters: Vec<Monster>,
+	pub triggers: Vec<Trigger>,
+	pub objects: Vec<Object>,
+	pub camera_angles: Vec<CameraAngle>,
 }
 
 #[extend::ext(name=InExtForScena)]
@@ -474,9 +474,9 @@ impl InsnParser {
 				0x18 => stack.unop(ExprUnop::SubAss)?,
 				0x19 => stack.unop(ExprUnop::AndAss)?,
 				0x1A => stack.unop(ExprUnop::XorAss)?,
-				0x1B => stack.unop(ExprUnop::SubAss)?,
+				0x1B => stack.unop(ExprUnop::OrAss)?,
 				0x1C => Expr::Exec(self.read_insn(i)?),
-				0x1D => stack.unop(ExprUnop::Neg)?,
+				0x1D => stack.unop(ExprUnop::Inv)?,
 				0x1E => Expr::Flag(Flag(i.u16()?)),
 				0x1F => Expr::Var(i.u16()?),
 				0x20 => Expr::Attr(i.u8()?),

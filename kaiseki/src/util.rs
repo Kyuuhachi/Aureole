@@ -169,14 +169,14 @@ pub fn read_text(i: &mut In) -> Result<Text> {
 		// 0x09 =>
 		// 0x18 =>
 		0x1F => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::Item(i.u16()?)) }
-		op@(0x00..=0x1F) => eyre::bail!("Invalid text op: {:02X}", op),
+		op@(0x00..=0x1F) => eyre::bail!("Invalid TextSegment: b{:?}", char::from(op)),
 		b'#' => {
 			drain(&mut segments, &mut curr)?;
 			let mut n = 0;
 			loop { match i.u8()? {
 				ch@(b'0'..=b'9') => n = n * 10 + (ch - b'0') as u16,
 				b'F' => { segments.push(TextSegment::Face(n)); break },
-				op => eyre::bail!("Invalid text op: #{}{}", n, op),
+				op => eyre::bail!("Invalid TextSegment: #{}{}", n, op),
 			} }
 		}
 		ch => {

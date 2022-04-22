@@ -227,7 +227,7 @@ pub fn read(i: &[u8]) -> Result<Scena> {
 		Ok(funcparser.read_func(i, i.pos() + len)?)
 	})?;
 
-	// i.dump_uncovered(|a| a.to_stderr())?;
+	i.dump_uncovered(|a| a.to_stderr())?;
 
 	Ok(Scena {
 		dir, fname,

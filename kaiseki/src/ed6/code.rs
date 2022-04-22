@@ -165,7 +165,9 @@ pub enum QuestGetInsn {
 pub struct CodeParser {
 	marks: HashMap<usize, String>,
 }
+
 impl CodeParser {
+	#[allow(clippy::new_without_default)]
 	pub fn new() -> Self {
 		CodeParser {
 			marks: HashMap::new(),
@@ -312,7 +314,9 @@ impl CodeParser {
 			}
 
 			fn binop(&mut self, op: ExprBinop) -> Result<Expr> {
-				Ok(Expr::Binop(op, self.pop()?, self.pop()?))
+				let r = self.pop()?;
+				let l = self.pop()?;
+				Ok(Expr::Binop(op, l, r))
 			}
 
 			fn unop(&mut self, op: ExprUnop) -> Result<Expr> {
@@ -370,7 +374,7 @@ impl CodeParser {
 		self.marks.insert(i.pos(), "\x1B[0;7;2m]".to_owned());
 		match stack.0.len() {
 			1 => Ok(stack.pop()?),
-			_ => eyre::bail!("Invalid expr: {:?}", stack.0)
+			_ => eyre::bail!("Invalid Expr: {:?}", stack.0)
 		}
 	}
 

@@ -43,7 +43,7 @@ fn fc_magic(arch: &State<Archives>) -> Result<Html<String>> {
 }
 
 #[rocket::get("/fc/scena/<name>")]
-fn fc_scena(arch: &State<Archives>, name: &str) -> Result<()> {
+fn fc_scena(arch: &State<Archives>, name: &str) -> Result<String> {
 	if name.len() > 8 { return Err(Error::NotFound) }
 	let mut s = kaiseki::ByteString(*b"        ._SN");
 	s[..name.len()].copy_from_slice(name.as_bytes());
@@ -53,9 +53,9 @@ fn fc_scena(arch: &State<Archives>, name: &str) -> Result<()> {
 		Err(e) => return Err(e.into()),
 	}.1;
 
-	kaiseki::ed6::scena::read(&data)?;
+	let scena = kaiseki::ed6::scena::read(&data)?;
 
-	Ok(())
+	Ok(format!("{:#?}", scena))
 }
 
 #[rocket::launch]

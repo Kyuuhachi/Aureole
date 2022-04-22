@@ -108,6 +108,7 @@ pub struct Scena {
 	pub triggers: Vec<Trigger>,
 	pub objects: Vec<Object>,
 	pub camera_angles: Vec<CameraAngle>,
+	pub code: Vec<Vec<(usize, Insn)>>,
 }
 
 #[extend::ext(name=InExtForScena)]
@@ -224,7 +225,7 @@ pub fn read(i: &[u8]) -> Result<Scena> {
 	}
 
 	let mut funcparser = FuncParser::new();
-	util::multiple(&i, &func_table, code_end, |i, len| {
+	let code = util::multiple(&i, &func_table, code_end, |i, len| {
 		Ok(funcparser.read_func(i, i.pos() + len)?)
 	})?;
 
@@ -239,6 +240,7 @@ pub fn read(i: &[u8]) -> Result<Scena> {
 		npcs, monsters,
 		triggers, objects,
 		camera_angles,
+		code,
 	})
 }
 
@@ -260,25 +262,25 @@ fn list<A>((mut i, count): (In, u16), mut f: impl FnMut(&mut In) -> Result<A>) -
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Character(u16);
+pub struct Character(pub u16);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Flag(u16);
+pub struct Flag(pub u16);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ExprBinop {
+pub enum ExprBinop {
 	Eq, Ne, Lt, Gt, Le, Ge,
 	BoolAnd, And, Or,
 	Add, Sub, Xor, Mul, Div, Mod,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ExprUnop {
+pub enum ExprUnop {
 	Not, Neg, Inv,
 	Ass, MulAss, DivAss, ModAss, AddAss, SubAss, AndAss, XorAss, OrAss
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum Expr {
+pub enum Expr {
 	Const(u32),
 	Binop(ExprBinop, Box<Expr>, Box<Expr>),
 	Unop(ExprUnop, Box<Expr>),
@@ -291,22 +293,25 @@ enum Expr {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum Insn {
+pub enum Insn {
 	/*01*/ Return,
 	/*02*/ If(Box<Expr>, usize /*Addr*/),
 	/*03*/ Goto(usize /*Addr*/),
 	/*04*/ Switch(Box<Expr>, Vec<(u16, usize /*Addr*/)>, usize /*Addr*/ /*(default)*/),
+	/*08*/ Sleep(u32 /*Time*/),
 	/*09*/ FlagsSet(u32 /*Flags*/),
 	/*0A*/ FlagsUnset(u32 /*Flags*/),
 	/*0B*/ FadeOn(u32 /*Time*/, u32 /*Color*/, u8),
 	/*0C*/ FadeOff(u32 /*Time*/, u32 /*Color*/),
 	/*16*/ Map(MapInsn),
 	/*19*/ EventBegin(u8),
+	/*1A*/ EventEnd(u8),
 	/*1B*/ _1B(u16, u16),
 	/*1C*/ _1C(u16, u16),
 	/*43*/ CharForkFunc(Character, u8 /*ForkId*/, FuncRef),
 	/*45*/ CharFork(Character, u16 /*ForkId*/, Vec<Insn>), // why is this is u16?
 	/*49*/ Event(FuncRef), // Not sure if this is different from Call
+	/*53*/ TextEnd(Character),
 	/*54*/ TextMessage(util::Text),
 	/*56*/ TextReset(u8), // Not sure what this does, is it always 0?
 	/*58*/ TextWait,
@@ -319,6 +324,7 @@ enum Insn {
 	/*88*/ CharSetPos(Character, Pos3, u16),
 	/*8A*/ CharLookAt(Character, Character, u16 /*Time*/),
 	/*8E*/ CharWalkTo(Character, Pos3, u32 /*Speed*/, u8),
+	/*90*/ CharWalk(Character, Pos3, u32 /*Speed*/, u8), // I don't know how this differs from CharWalkTo; is it relative maybe?
 	/*92*/ _Char92(Character, Character, u32, u32, u8),
 	/*A2*/ FlagSet(Flag), // Is this order really right?
 	/*A3*/ FlagUnset(Flag),
@@ -328,7 +334,7 @@ enum Insn {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum MapInsn {
+pub enum MapInsn {
 	/*00*/ Hide,
 	/*01*/ Show,
 	/*02*/ Set(i32, (i32, i32), FileRef /* archive 03 */), // XXX this seems to be (arch, index) while others are (index, arch)?
@@ -344,10 +350,10 @@ impl FuncParser {
 		}
 	}
 
-	fn read_func(&mut self, i: &mut In, end: usize) -> Result<()> {
+	fn read_func(&mut self, i: &mut In, end: usize) -> Result<Vec<(usize, Insn)>> {
 		let start = i.clone();
-		let mut ops = Vec::<(usize, Insn)>::new();
-		let a: Result<()> = (|| -> Result<()> {
+		let mut ops = Vec::new();
+		(|| -> Result<_> {
 			self.marks.insert(i.pos(), "\x1B[0;7m[".to_owned());
 			while i.pos() < end {
 				ops.push((i.pos(), self.read_insn(i)?));
@@ -356,8 +362,7 @@ impl FuncParser {
 			self.marks.insert(i.pos(), "\x1B[0;7m]".to_owned());
 			eyre::ensure!(i.pos() == end, "Overshot: {:X} > {:X}", i.pos(), end);
 			Ok(())
-		})();
-		a.map_err(|e| {
+		})().map_err(|e| {
 			use color_eyre::{Section, SectionExt};
 			use std::fmt::Write;
 			e.section({
@@ -376,7 +381,8 @@ impl FuncParser {
 					.to_string()
 					.header("Dump:")
 			})
-		})
+		})?;
+		Ok(ops)
 	}
 
 	fn read_insn(&mut self, i: &mut In) -> Result<Insn> {
@@ -391,6 +397,7 @@ impl FuncParser {
 				}
 				out
 			}, i.u16()? as usize),
+			0x08 => Insn::Sleep(i.u32()?),
 			0x09 => Insn::FlagsSet(i.u32()?),
 			0x0A => Insn::FlagsUnset(i.u32()?),
 			0x0B => Insn::FadeOn(i.u32()?, i.u32()?, i.u8()?),
@@ -402,6 +409,7 @@ impl FuncParser {
 				op => eyre::bail!("Unknown map op: {:02X}", op)
 			}),
 			0x19 => Insn::EventBegin(i.u8()?),
+			0x1A => Insn::EventEnd(i.u8()?),
 			0x1B => Insn::_1B(i.u16()?, i.u16()?),
 			0x1C => Insn::_1C(i.u16()?, i.u16()?),
 			0x43 => Insn::CharForkFunc(Character(i.u16()?), i.u8()?, FuncRef(i.u8()? as u16, i.u16()?)),
@@ -417,6 +425,7 @@ impl FuncParser {
 				insns
 			}),
 			0x49 => Insn::Event(FuncRef(i.u8()? as u16, i.u16()?)),
+			0x53 => Insn::TextEnd(Character(i.u16()?)),
 			0x54 => Insn::TextMessage(self.read_text(i)?),
 			0x56 => Insn::TextReset(i.u8()?),
 			0x58 => Insn::TextWait,
@@ -429,6 +438,7 @@ impl FuncParser {
 			0x88 => Insn::CharSetPos(Character(i.u16()?), i.pos3()?, i.u16()?),
 			0x8A => Insn::CharLookAt(Character(i.u16()?), Character(i.u16()?), i.u16()?),
 			0x8E => Insn::CharWalkTo(Character(i.u16()?), i.pos3()?, i.u32()?, i.u8()?),
+			0x90 => Insn::CharWalk(Character(i.u16()?), i.pos3()?, i.u32()?, i.u8()?),
 			0x92 => Insn::_Char92(Character(i.u16()?), Character(i.u16()?), i.u32()?, i.u32()?, i.u8()?),
 			0xA2 => Insn::FlagSet(Flag(i.u16()?)),
 			0xA3 => Insn::FlagUnset(Flag(i.u16()?)),

@@ -162,23 +162,12 @@ pub enum QuestGetInsn {
 	/*01*/ Flags(u8),
 }
 
+#[derive(derive_more::Deref, derive_more::DerefMut)]
 pub struct CodeParser<'a> {
 	marks: HashMap<usize, String>,
-	i: In<'a>,
-}
-
-impl<'a> std::ops::Deref for CodeParser<'a> {
-	type Target = In<'a>;
-
-	fn deref(&self) -> &Self::Target {
-		&self.i
-	}
-}
-
-impl<'a> std::ops::DerefMut for CodeParser<'a> {
-	fn deref_mut(&mut self) -> &mut Self::Target {
-		&mut self.i
-	}
+	#[deref]
+	#[deref_mut]
+	inner: In<'a>,
 }
 
 impl<'a> CodeParser<'a> {
@@ -186,12 +175,12 @@ impl<'a> CodeParser<'a> {
 	pub fn new(i: In<'a>) -> Self {
 		CodeParser {
 			marks: HashMap::new(),
-			i,
+			inner: i,
 		}
 	}
 
 	pub fn read_func(&mut self, end: usize) -> Result<Vec<(usize, Insn)>> {
-		let start = self.i.clone();
+		let start = self.inner.clone();
 		let mut ops = Vec::new();
 		(|| -> Result<_> {
 			self.marks.insert(self.pos(), "\x1B[0;7m[".to_owned());
@@ -322,76 +311,7 @@ impl<'a> CodeParser<'a> {
 	}
 
 	fn read_expr(&mut self) -> Result<Box<Expr>> {
-		#[allow(clippy::vec_box)]
-		struct Stack(Vec<Box<Expr>>);
-		impl Stack {
-			fn push(&mut self, expr: Expr) {
-				self.0.push(Box::new(expr))
-			}
-
-			fn binop(&mut self, op: ExprBinop) -> Result<Expr> {
-				let r = self.pop()?;
-				let l = self.pop()?;
-				Ok(Expr::Binop(op, l, r))
-			}
-
-			fn unop(&mut self, op: ExprUnop) -> Result<Expr> {
-				Ok(Expr::Unop(op, self.pop()?))
-			}
-
-			fn pop(&mut self) -> Result<Box<Expr>> {
-				Ok(self.0.pop().ok_or_else(|| eyre::eyre!("Empty expr stack"))?)
-			}
-		}
-		let mut stack = Stack(Vec::new());
-		self.marks.insert(self.pos(), "\x1B[0;7;2m[".to_owned());
-		loop {
-			let op = match self.u8()? {
-				0x00 => Expr::Const(self.u32()?),
-				0x01 => break,
-				0x02 => stack.binop(ExprBinop::Eq)?,
-				0x03 => stack.binop(ExprBinop::Ne)?,
-				0x04 => stack.binop(ExprBinop::Lt)?,
-				0x05 => stack.binop(ExprBinop::Gt)?,
-				0x06 => stack.binop(ExprBinop::Le)?,
-				0x07 => stack.binop(ExprBinop::Ge)?,
-				0x08 => stack.unop(ExprUnop::Not)?,
-				0x09 => stack.binop(ExprBinop::BoolAnd)?,
-				0x0A => stack.binop(ExprBinop::And)?,
-				0x0B => stack.binop(ExprBinop::Or)?,
-				0x0C => stack.binop(ExprBinop::Add)?,
-				0x0D => stack.binop(ExprBinop::Sub)?,
-				0x0E => stack.unop(ExprUnop::Neg)?,
-				0x0F => stack.binop(ExprBinop::Xor)?,
-				0x10 => stack.binop(ExprBinop::Mul)?,
-				0x11 => stack.binop(ExprBinop::Div)?,
-				0x12 => stack.binop(ExprBinop::Mod)?,
-				0x13 => stack.unop(ExprUnop::Ass)?,
-				0x14 => stack.unop(ExprUnop::MulAss)?,
-				0x15 => stack.unop(ExprUnop::DivAss)?,
-				0x16 => stack.unop(ExprUnop::ModAss)?,
-				0x17 => stack.unop(ExprUnop::AddAss)?,
-				0x18 => stack.unop(ExprUnop::SubAss)?,
-				0x19 => stack.unop(ExprUnop::AndAss)?,
-				0x1A => stack.unop(ExprUnop::XorAss)?,
-				0x1B => stack.unop(ExprUnop::OrAss)?,
-				0x1C => Expr::Exec(self.read_insn()?),
-				0x1D => stack.unop(ExprUnop::Inv)?,
-				0x1E => Expr::Flag(Flag(self.u16()?)),
-				0x1F => Expr::Var(self.u16()?),
-				0x20 => Expr::Attr(self.u8()?),
-				0x21 => Expr::CharAttr(Character(self.u16()?), self.u8()?),
-				0x22 => Expr::Rand,
-				op => eyre::bail!("Unknown Expr: {:02X}", op)
-			};
-			stack.push(op);
-			self.marks.insert(self.pos(), "\x1B[0;7;2m•".to_owned());
-		}
-		self.marks.insert(self.pos(), "\x1B[0;7;2m]".to_owned());
-		match stack.0.len() {
-			1 => Ok(stack.pop()?),
-			_ => eyre::bail!("Invalid Expr: {:?}", stack.0)
-		}
+		ExprParser::new(self).read_expr()
 	}
 
 	fn read_text(&mut self) -> Result<Text> {
@@ -399,5 +319,95 @@ impl<'a> CodeParser<'a> {
 		let v = util::read_text(self)?;
 		self.marks.insert(self.pos(), "\x1B[0;7;2m\"".to_owned());
 		Ok(v)
+	}
+}
+
+#[derive(derive_more::Deref, derive_more::DerefMut)]
+struct ExprParser<'a, 'b> {
+	#[allow(clippy::vec_box)]
+	stack: Vec<Box<Expr>>,
+	#[deref]
+	#[deref_mut]
+	inner: &'a mut CodeParser<'b>,
+}
+
+impl<'a, 'b> ExprParser<'a, 'b> {
+	fn new(inner: &'a mut CodeParser<'b>) -> ExprParser<'a, 'b> {
+		ExprParser {
+			stack: Vec::new(),
+			inner,
+		}
+	}
+
+	fn read_expr(mut self) -> Result<Box<Expr>> {
+		self.inner.marks.insert(self.inner.pos(), "\x1B[0;7;2m[".to_owned());
+		while let Some(op) = self.read_op()? {
+			self.push(op);
+			self.inner.marks.insert(self.inner.pos(), "\x1B[0;7;2m•".to_owned());
+		}
+		self.inner.marks.insert(self.inner.pos(), "\x1B[0;7;2m]".to_owned());
+		match self.stack.len() {
+			1 => Ok(self.pop()?),
+			_ => eyre::bail!("Invalid Expr: {:?}", self.stack)
+		}
+	}
+
+	fn read_op(&mut self) -> Result<Option<Expr>> {
+		Ok(Some(match self.u8()? {
+			0x00 => Expr::Const(self.u32()?),
+			0x01 => return Ok(None),
+			0x02 => self.binop(ExprBinop::Eq)?,
+			0x03 => self.binop(ExprBinop::Ne)?,
+			0x04 => self.binop(ExprBinop::Lt)?,
+			0x05 => self.binop(ExprBinop::Gt)?,
+			0x06 => self.binop(ExprBinop::Le)?,
+			0x07 => self.binop(ExprBinop::Ge)?,
+			0x08 => self.unop(ExprUnop::Not)?,
+			0x09 => self.binop(ExprBinop::BoolAnd)?,
+			0x0A => self.binop(ExprBinop::And)?,
+			0x0B => self.binop(ExprBinop::Or)?,
+			0x0C => self.binop(ExprBinop::Add)?,
+			0x0D => self.binop(ExprBinop::Sub)?,
+			0x0E => self.unop(ExprUnop::Neg)?,
+			0x0F => self.binop(ExprBinop::Xor)?,
+			0x10 => self.binop(ExprBinop::Mul)?,
+			0x11 => self.binop(ExprBinop::Div)?,
+			0x12 => self.binop(ExprBinop::Mod)?,
+			0x13 => self.unop(ExprUnop::Ass)?,
+			0x14 => self.unop(ExprUnop::MulAss)?,
+			0x15 => self.unop(ExprUnop::DivAss)?,
+			0x16 => self.unop(ExprUnop::ModAss)?,
+			0x17 => self.unop(ExprUnop::AddAss)?,
+			0x18 => self.unop(ExprUnop::SubAss)?,
+			0x19 => self.unop(ExprUnop::AndAss)?,
+			0x1A => self.unop(ExprUnop::XorAss)?,
+			0x1B => self.unop(ExprUnop::OrAss)?,
+			0x1C => Expr::Exec(self.read_insn()?),
+			0x1D => self.unop(ExprUnop::Inv)?,
+			0x1E => Expr::Flag(Flag(self.u16()?)),
+			0x1F => Expr::Var(self.u16()?),
+			0x20 => Expr::Attr(self.u8()?),
+			0x21 => Expr::CharAttr(Character(self.u16()?), self.u8()?),
+			0x22 => Expr::Rand,
+			op => eyre::bail!("Unknown Expr: {:02X}", op)
+		}))
+	}
+
+	fn push(&mut self, expr: Expr) {
+		self.stack.push(Box::new(expr))
+	}
+
+	fn binop(&mut self, op: ExprBinop) -> Result<Expr> {
+		let r = self.pop()?;
+		let l = self.pop()?;
+		Ok(Expr::Binop(op, l, r))
+	}
+
+	fn unop(&mut self, op: ExprUnop) -> Result<Expr> {
+		Ok(Expr::Unop(op, self.pop()?))
+	}
+
+	fn pop(&mut self) -> Result<Box<Expr>> {
+		Ok(self.stack.pop().ok_or_else(|| eyre::eyre!("Empty expr stack"))?)
 	}
 }

@@ -141,7 +141,6 @@ pub struct Text(Vec<TextSegment>);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TextSegment {
 	String(String),
-	Line,
 	Wait,
 	Page,
 	Face(u16 /*Face*/),
@@ -161,7 +160,7 @@ pub fn read_text(i: &mut In) -> Result<Text> {
 	}
 	loop { match i.u8()? {
 		0x00 => { drain(&mut segments, &mut curr)?; break }
-		0x01 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::Line) }
+		0x01 => { curr.push(b'\n') }
 		0x02 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::Wait) }
 		0x03 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::Page) }
 		// 0x05 =>

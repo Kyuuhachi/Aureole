@@ -162,29 +162,45 @@ pub enum QuestGetInsn {
 	/*01*/ Flags(u8),
 }
 
-pub struct CodeParser {
+pub struct CodeParser<'a> {
 	marks: HashMap<usize, String>,
+	i: In<'a>,
 }
 
-impl CodeParser {
+impl<'a> std::ops::Deref for CodeParser<'a> {
+	type Target = In<'a>;
+
+	fn deref(&self) -> &Self::Target {
+		&self.i
+	}
+}
+
+impl<'a> std::ops::DerefMut for CodeParser<'a> {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut self.i
+	}
+}
+
+impl<'a> CodeParser<'a> {
 	#[allow(clippy::new_without_default)]
-	pub fn new() -> Self {
+	pub fn new(i: In<'a>) -> Self {
 		CodeParser {
 			marks: HashMap::new(),
+			i,
 		}
 	}
 
-	pub fn read_func(&mut self, i: &mut In, end: usize) -> Result<Vec<(usize, Insn)>> {
-		let start = i.clone();
+	pub fn read_func(&mut self, end: usize) -> Result<Vec<(usize, Insn)>> {
+		let start = self.i.clone();
 		let mut ops = Vec::new();
 		(|| -> Result<_> {
-			self.marks.insert(i.pos(), "\x1B[0;7m[".to_owned());
-			while i.pos() < end {
-				ops.push((i.pos(), self.read_insn(i)?));
-				self.marks.insert(i.pos(), "\x1B[0;7m•".to_owned());
+			self.marks.insert(self.pos(), "\x1B[0;7m[".to_owned());
+			while self.pos() < end {
+				ops.push((self.pos(), self.read_insn()?));
+				self.marks.insert(self.pos(), "\x1B[0;7m•".to_owned());
 			}
-			self.marks.insert(i.pos(), "\x1B[0;7m]".to_owned());
-			eyre::ensure!(i.pos() == end, "Overshot: {:X} > {:X}", i.pos(), end);
+			self.marks.insert(self.pos(), "\x1B[0;7m]".to_owned());
+			eyre::ensure!(self.pos() == end, "Overshot: {:X} > {:X}", self.pos(), end);
 			Ok(())
 		})().map_err(|e| {
 			use color_eyre::{Section, SectionExt};
@@ -199,7 +215,7 @@ impl CodeParser {
 			}).section({
 				start.dump().end(end)
 					.marks(self.marks.iter())
-					.mark(i.pos()-1, "\x1B[0;7m ")
+					.mark(self.pos()-1, "\x1B[0;7m ")
 					.number_width(4)
 					.newline(false)
 					.to_string()
@@ -209,103 +225,103 @@ impl CodeParser {
 		Ok(ops)
 	}
 
-	fn read_insn(&mut self, i: &mut In) -> Result<Insn> {
-		Ok(match i.u8()? {
+	fn read_insn(&mut self) -> Result<Insn> {
+		Ok(match self.u8()? {
 			0x01 => Insn::Return,
-			0x02 => Insn::If(self.read_expr(i)?, i.u16()? as usize),
-			0x03 => Insn::Goto(i.u16()? as usize),
-			0x04 => Insn::Switch(self.read_expr(i)?, {
+			0x02 => Insn::If(self.read_expr()?, self.u16()? as usize),
+			0x03 => Insn::Goto(self.u16()? as usize),
+			0x04 => Insn::Switch(self.read_expr()?, {
 				let mut out = Vec::new();
-				for _ in 0..i.u16()? {
-					out.push((i.u16()?, i.u16()? as usize));
+				for _ in 0..self.u16()? {
+					out.push((self.u16()?, self.u16()? as usize));
 				}
 				out
-			}, i.u16()? as usize),
-			0x08 => Insn::Sleep(i.u32()?),
-			0x09 => Insn::FlagsSet(i.u32()?),
-			0x0A => Insn::FlagsUnset(i.u32()?),
-			0x0B => Insn::FadeOn(i.u32()?, i.u32()?, i.u8()?),
-			0x0C => Insn::FadeOff(i.u32()?, i.u32()?),
+			}, self.u16()? as usize),
+			0x08 => Insn::Sleep(self.u32()?),
+			0x09 => Insn::FlagsSet(self.u32()?),
+			0x0A => Insn::FlagsUnset(self.u32()?),
+			0x0B => Insn::FadeOn(self.u32()?, self.u32()?, self.u8()?),
+			0x0C => Insn::FadeOff(self.u32()?, self.u32()?),
 			0x0D => Insn::_0D,
-			0x0F => Insn::Battle(i.u16()?, i.u16()?, i.u16()?, i.u16()?, i.u8()?, i.u16()?, i.i8()?),
-			0x16 => Insn::Map(match i.u8()? {
+			0x0F => Insn::Battle(self.u16()?, self.u16()?, self.u16()?, self.u16()?, self.u8()?, self.u16()?, self.i8()?),
+			0x16 => Insn::Map(match self.u8()? {
 				0x00 => MapInsn::Hide,
 				0x01 => MapInsn::Show,
-				0x02 => MapInsn::Set(i.i32()?, (i.i32()?, i.i32()?), i.file_ref()?),
+				0x02 => MapInsn::Set(self.i32()?, (self.i32()?, self.i32()?), self.file_ref()?),
 				op => eyre::bail!("Unknown MapInsn: {:02X}", op)
 			}),
-			0x19 => Insn::EventBegin(i.u8()?),
-			0x1A => Insn::EventEnd(i.u8()?),
-			0x1B => Insn::_1B(i.u16()?, i.u16()?),
-			0x1C => Insn::_1C(i.u16()?, i.u16()?),
-			0x22 => Insn::SoundPlay(i.u16()?, i.u8()?, i.u8()?),
-			0x23 => Insn::SoundStop(i.u16()?),
-			0x24 => Insn::SoundLoop(i.u16()?, i.u8()?),
-			0x28 => Insn::Quest(i.u16()?, match i.u8()? {
-				0x01 => QuestInsn::TaskSet(i.u16()?),
-				0x02 => QuestInsn::TaskUnset(i.u16()?),
-				0x03 => QuestInsn::FlagsSet(i.u8()?),
-				0x04 => QuestInsn::FlagsUnset(i.u8()?),
+			0x19 => Insn::EventBegin(self.u8()?),
+			0x1A => Insn::EventEnd(self.u8()?),
+			0x1B => Insn::_1B(self.u16()?, self.u16()?),
+			0x1C => Insn::_1C(self.u16()?, self.u16()?),
+			0x22 => Insn::SoundPlay(self.u16()?, self.u8()?, self.u8()?),
+			0x23 => Insn::SoundStop(self.u16()?),
+			0x24 => Insn::SoundLoop(self.u16()?, self.u8()?),
+			0x28 => Insn::Quest(self.u16()?, match self.u8()? {
+				0x01 => QuestInsn::TaskSet(self.u16()?),
+				0x02 => QuestInsn::TaskUnset(self.u16()?),
+				0x03 => QuestInsn::FlagsSet(self.u8()?),
+				0x04 => QuestInsn::FlagsUnset(self.u8()?),
 				op => eyre::bail!("Unknown QuestInsn: {:02X}", op)
 			}),
-			0x29 => Insn::QuestGet(i.u16()?, match i.u8()? {
-				0x00 => QuestGetInsn::Task(i.u16()?),
-				0x01 => QuestGetInsn::Flags(i.u8()?),
+			0x29 => Insn::QuestGet(self.u16()?, match self.u8()? {
+				0x00 => QuestGetInsn::Task(self.u16()?),
+				0x01 => QuestGetInsn::Flags(self.u8()?),
 				op => eyre::bail!("Unknown QuestGetInsn: {:02X}", op)
 			}),
-			0x30 => Insn::_Party30(i.u8()?),
-			0x43 => Insn::CharForkFunc(Character(i.u16()?), i.u8()?, FuncRef(i.u8()? as u16, i.u16()?)),
-			0x45 => Insn::CharFork(Character(i.u16()?), i.u16()?, {
-				let end = i.u8()? as usize + i.pos();
+			0x30 => Insn::_Party30(self.u8()?),
+			0x43 => Insn::CharForkFunc(Character(self.u16()?), self.u8()?, FuncRef(self.u8()? as u16, self.u16()?)),
+			0x45 => Insn::CharFork(Character(self.u16()?), self.u16()?, {
+				let end = self.u8()? as usize + self.pos();
 				let mut insns = Vec::new();
-				while i.pos() < end {
-					self.marks.insert(i.pos(), "\x1B[0;7;2m•".to_owned());
-					insns.push(self.read_insn(i)?);
+				while self.pos() < end {
+					self.marks.insert(self.pos(), "\x1B[0;7;2m•".to_owned());
+					insns.push(self.read_insn()?);
 				}
-				eyre::ensure!(i.pos() == end, "Overshot: {:X} > {:X}", i.pos(), end);
-				i.check_u8(0)?;
+				eyre::ensure!(self.pos() == end, "Overshot: {:X} > {:X}", self.pos(), end);
+				self.check_u8(0)?;
 				insns
 			}),
-			0x49 => Insn::Event(FuncRef(i.u8()? as u16, i.u16()?)),
-			0x4D => Insn::ExprVar(i.u16()?, self.read_expr(i)?),
-			0x4F => Insn::ExprAttr(i.u8()?, self.read_expr(i)?),
-			0x51 => Insn::ExprCharAttr(Character(i.u16()?), i.u8()?, self.read_expr(i)?),
-			0x53 => Insn::TextEnd(Character(i.u16()?)),
-			0x54 => Insn::TextMessage(self.read_text(i)?),
-			0x56 => Insn::TextReset(i.u8()?),
+			0x49 => Insn::Event(FuncRef(self.u8()? as u16, self.u16()?)),
+			0x4D => Insn::ExprVar(self.u16()?, self.read_expr()?),
+			0x4F => Insn::ExprAttr(self.u8()?, self.read_expr()?),
+			0x51 => Insn::ExprCharAttr(Character(self.u16()?), self.u8()?, self.read_expr()?),
+			0x53 => Insn::TextEnd(Character(self.u16()?)),
+			0x54 => Insn::TextMessage(self.read_text()?),
+			0x56 => Insn::TextReset(self.u8()?),
 			0x58 => Insn::TextWait,
-			0x5A => Insn::TextSetPos(i.i16()?, i.i16()?, i.i16()?, i.i16()?),
-			0x5B => Insn::TextTalk(Character(i.u16()?), self.read_text(i)?),
-			0x5C => Insn::TextTalkNamed(Character(i.u16()?), i.str()?, self.read_text(i)?),
-			0x5D => Insn::Menu(i.u16()?, (i.i16()?, i.i16()?), i.u8()?, i.str()?.split_terminator('\x01').map(|a| a.to_owned()).collect()),
-			0x5E => Insn::MenuWait(i.u16()?),
-			0x5F => Insn::_Menu5F(i.u16()?),
-			0x60 => Insn::TextSetName(i.str()?),
-			0x69 => Insn::CamLookAt(Character(i.u16()?), i.u32()?),
-			0x6C => Insn::CamAngle(i.i32()?, i.u32()?),
-			0x6D => Insn::CamPos(i.pos3()?, i.u32()?),
-			0x87 => Insn::CharSetFrame(Character(i.u16()?), i.u16()?),
-			0x88 => Insn::CharSetPos(Character(i.u16()?), i.pos3()?, i.u16()?),
-			0x8A => Insn::CharLookAt(Character(i.u16()?), Character(i.u16()?), i.u16()?),
-			0x8E => Insn::CharWalkTo(Character(i.u16()?), i.pos3()?, i.u32()?, i.u8()?),
-			0x90 => Insn::CharWalk(Character(i.u16()?), i.pos3()?, i.u32()?, i.u8()?),
-			0x92 => Insn::_Char92(Character(i.u16()?), Character(i.u16()?), i.u32()?, i.u32()?, i.u8()?),
-			0x99 => Insn::CharAnimation(Character(i.u16()?), i.u8()?, i.u8()?, i.u32()?),
-			0x9A => Insn::CharFlagsSet(Character(i.u16()?), i.u16()?),
-			0x9B => Insn::CharFlagsUnset(Character(i.u16()?), i.u16()?),
-			0xA2 => Insn::FlagSet(Flag(i.u16()?)),
-			0xA3 => Insn::FlagUnset(Flag(i.u16()?)),
-			0xA5 => Insn::AwaitFlagUnset(Flag(i.u16()?)),
-			0xA6 => Insn::AwaitFlagSet(Flag(i.u16()?)),
-			0xB1 => Insn::OpLoad(i.str()?),
-			0xB2 => Insn::_B2(i.u8()?, i.u8()?, i.u16()?),
-			0xB4 => Insn::ReturnToTitle(i.u8()?),
+			0x5A => Insn::TextSetPos(self.i16()?, self.i16()?, self.i16()?, self.i16()?),
+			0x5B => Insn::TextTalk(Character(self.u16()?), self.read_text()?),
+			0x5C => Insn::TextTalkNamed(Character(self.u16()?), self.str()?, self.read_text()?),
+			0x5D => Insn::Menu(self.u16()?, (self.i16()?, self.i16()?), self.u8()?, self.str()?.split_terminator('\x01').map(|a| a.to_owned()).collect()),
+			0x5E => Insn::MenuWait(self.u16()?),
+			0x5F => Insn::_Menu5F(self.u16()?),
+			0x60 => Insn::TextSetName(self.str()?),
+			0x69 => Insn::CamLookAt(Character(self.u16()?), self.u32()?),
+			0x6C => Insn::CamAngle(self.i32()?, self.u32()?),
+			0x6D => Insn::CamPos(self.pos3()?, self.u32()?),
+			0x87 => Insn::CharSetFrame(Character(self.u16()?), self.u16()?),
+			0x88 => Insn::CharSetPos(Character(self.u16()?), self.pos3()?, self.u16()?),
+			0x8A => Insn::CharLookAt(Character(self.u16()?), Character(self.u16()?), self.u16()?),
+			0x8E => Insn::CharWalkTo(Character(self.u16()?), self.pos3()?, self.u32()?, self.u8()?),
+			0x90 => Insn::CharWalk(Character(self.u16()?), self.pos3()?, self.u32()?, self.u8()?),
+			0x92 => Insn::_Char92(Character(self.u16()?), Character(self.u16()?), self.u32()?, self.u32()?, self.u8()?),
+			0x99 => Insn::CharAnimation(Character(self.u16()?), self.u8()?, self.u8()?, self.u32()?),
+			0x9A => Insn::CharFlagsSet(Character(self.u16()?), self.u16()?),
+			0x9B => Insn::CharFlagsUnset(Character(self.u16()?), self.u16()?),
+			0xA2 => Insn::FlagSet(Flag(self.u16()?)),
+			0xA3 => Insn::FlagUnset(Flag(self.u16()?)),
+			0xA5 => Insn::AwaitFlagUnset(Flag(self.u16()?)),
+			0xA6 => Insn::AwaitFlagSet(Flag(self.u16()?)),
+			0xB1 => Insn::OpLoad(self.str()?),
+			0xB2 => Insn::_B2(self.u8()?, self.u8()?, self.u16()?),
+			0xB4 => Insn::ReturnToTitle(self.u8()?),
 
 			op => eyre::bail!("Unknown Insn: {:02X}", op)
 		})
 	}
 
-	fn read_expr(&mut self, i: &mut In) -> Result<Box<Expr>> {
+	fn read_expr(&mut self) -> Result<Box<Expr>> {
 		#[allow(clippy::vec_box)]
 		struct Stack(Vec<Box<Expr>>);
 		impl Stack {
@@ -328,10 +344,10 @@ impl CodeParser {
 			}
 		}
 		let mut stack = Stack(Vec::new());
-		self.marks.insert(i.pos(), "\x1B[0;7;2m[".to_owned());
+		self.marks.insert(self.pos(), "\x1B[0;7;2m[".to_owned());
 		loop {
-			let op = match i.u8()? {
-				0x00 => Expr::Const(i.u32()?),
+			let op = match self.u8()? {
+				0x00 => Expr::Const(self.u32()?),
 				0x01 => break,
 				0x02 => stack.binop(ExprBinop::Eq)?,
 				0x03 => stack.binop(ExprBinop::Ne)?,
@@ -359,29 +375,29 @@ impl CodeParser {
 				0x19 => stack.unop(ExprUnop::AndAss)?,
 				0x1A => stack.unop(ExprUnop::XorAss)?,
 				0x1B => stack.unop(ExprUnop::OrAss)?,
-				0x1C => Expr::Exec(self.read_insn(i)?),
+				0x1C => Expr::Exec(self.read_insn()?),
 				0x1D => stack.unop(ExprUnop::Inv)?,
-				0x1E => Expr::Flag(Flag(i.u16()?)),
-				0x1F => Expr::Var(i.u16()?),
-				0x20 => Expr::Attr(i.u8()?),
-				0x21 => Expr::CharAttr(Character(i.u16()?), i.u8()?),
+				0x1E => Expr::Flag(Flag(self.u16()?)),
+				0x1F => Expr::Var(self.u16()?),
+				0x20 => Expr::Attr(self.u8()?),
+				0x21 => Expr::CharAttr(Character(self.u16()?), self.u8()?),
 				0x22 => Expr::Rand,
 				op => eyre::bail!("Unknown Expr: {:02X}", op)
 			};
 			stack.push(op);
-			self.marks.insert(i.pos(), "\x1B[0;7;2m•".to_owned());
+			self.marks.insert(self.pos(), "\x1B[0;7;2m•".to_owned());
 		}
-		self.marks.insert(i.pos(), "\x1B[0;7;2m]".to_owned());
+		self.marks.insert(self.pos(), "\x1B[0;7;2m]".to_owned());
 		match stack.0.len() {
 			1 => Ok(stack.pop()?),
 			_ => eyre::bail!("Invalid Expr: {:?}", stack.0)
 		}
 	}
 
-	fn read_text(&mut self, i: &mut In) -> Result<Text> {
-		self.marks.insert(i.pos(), "\x1B[0;7;2m\"".to_owned());
-		let v = util::read_text(i)?;
-		self.marks.insert(i.pos(), "\x1B[0;7;2m\"".to_owned());
+	fn read_text(&mut self) -> Result<Text> {
+		self.marks.insert(self.pos(), "\x1B[0;7;2m\"".to_owned());
+		let v = util::read_text(self)?;
+		self.marks.insert(self.pos(), "\x1B[0;7;2m\"".to_owned());
 		Ok(v)
 	}
 }

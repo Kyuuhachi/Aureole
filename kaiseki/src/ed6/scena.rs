@@ -195,9 +195,10 @@ pub fn read(i: &[u8]) -> Result<Scena> {
 		});
 	}
 
-	let mut codeparser = CodeParser::new();
+	let mut codeparser = CodeParser::new(i.clone());
 	let code = util::multiple(&i, &func_table, code_end, |i, len| {
-		Ok(codeparser.read_func(i, i.pos() + len)?)
+		codeparser.seek(i.pos())?;
+		Ok(codeparser.read_func(i.pos() + len)?)
 	})?;
 
 	i.dump_uncovered(|a| a.to_stderr())?;

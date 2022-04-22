@@ -179,13 +179,13 @@ impl<'a> CodeParser<'a> {
 		}
 	}
 
-	pub fn read_func(&mut self, end: usize) -> Result<Vec<(usize, Insn)>> {
+	pub fn func(&mut self, end: usize) -> Result<Vec<(usize, Insn)>> {
 		let start = self.inner.clone();
 		let mut ops = Vec::new();
 		(|| -> Result<_> {
 			self.marks.insert(self.pos(), "\x1B[0;7m[".to_owned());
 			while self.pos() < end {
-				ops.push((self.pos(), self.read_insn()?));
+				ops.push((self.pos(), self.insn()?));
 				self.marks.insert(self.pos(), "\x1B[0;7m•".to_owned());
 			}
 			self.marks.insert(self.pos(), "\x1B[0;7m]".to_owned());
@@ -214,12 +214,12 @@ impl<'a> CodeParser<'a> {
 		Ok(ops)
 	}
 
-	fn read_insn(&mut self) -> Result<Insn> {
+	fn insn(&mut self) -> Result<Insn> {
 		Ok(match self.u8()? {
 			0x01 => Insn::Return,
-			0x02 => Insn::If(self.read_expr()?, self.u16()? as usize),
+			0x02 => Insn::If(self.expr()?, self.u16()? as usize),
 			0x03 => Insn::Goto(self.u16()? as usize),
-			0x04 => Insn::Switch(self.read_expr()?, {
+			0x04 => Insn::Switch(self.expr()?, {
 				let mut out = Vec::new();
 				for _ in 0..self.u16()? {
 					out.push((self.u16()?, self.u16()? as usize));
@@ -265,23 +265,23 @@ impl<'a> CodeParser<'a> {
 				let mut insns = Vec::new();
 				while self.pos() < end {
 					self.marks.insert(self.pos(), "\x1B[0;7;2m•".to_owned());
-					insns.push(self.read_insn()?);
+					insns.push(self.insn()?);
 				}
 				eyre::ensure!(self.pos() == end, "Overshot: {:X} > {:X}", self.pos(), end);
 				self.check_u8(0)?;
 				insns
 			}),
 			0x49 => Insn::Event(FuncRef(self.u8()? as u16, self.u16()?)),
-			0x4D => Insn::ExprVar(self.u16()?, self.read_expr()?),
-			0x4F => Insn::ExprAttr(self.u8()?, self.read_expr()?),
-			0x51 => Insn::ExprCharAttr(Character(self.u16()?), self.u8()?, self.read_expr()?),
+			0x4D => Insn::ExprVar(self.u16()?, self.expr()?),
+			0x4F => Insn::ExprAttr(self.u8()?, self.expr()?),
+			0x51 => Insn::ExprCharAttr(Character(self.u16()?), self.u8()?, self.expr()?),
 			0x53 => Insn::TextEnd(Character(self.u16()?)),
-			0x54 => Insn::TextMessage(self.read_text()?),
+			0x54 => Insn::TextMessage(self.text()?),
 			0x56 => Insn::TextReset(self.u8()?),
 			0x58 => Insn::TextWait,
 			0x5A => Insn::TextSetPos(self.i16()?, self.i16()?, self.i16()?, self.i16()?),
-			0x5B => Insn::TextTalk(Character(self.u16()?), self.read_text()?),
-			0x5C => Insn::TextTalkNamed(Character(self.u16()?), self.str()?, self.read_text()?),
+			0x5B => Insn::TextTalk(Character(self.u16()?), self.text()?),
+			0x5C => Insn::TextTalkNamed(Character(self.u16()?), self.str()?, self.text()?),
 			0x5D => Insn::Menu(self.u16()?, (self.i16()?, self.i16()?), self.u8()?, self.str()?.split_terminator('\x01').map(|a| a.to_owned()).collect()),
 			0x5E => Insn::MenuWait(self.u16()?),
 			0x5F => Insn::_Menu5F(self.u16()?),
@@ -310,13 +310,13 @@ impl<'a> CodeParser<'a> {
 		})
 	}
 
-	fn read_expr(&mut self) -> Result<Box<Expr>> {
-		ExprParser::new(self).read_expr()
+	fn expr(&mut self) -> Result<Box<Expr>> {
+		ExprParser::new(self).expr()
 	}
 
-	fn read_text(&mut self) -> Result<Text> {
+	fn text(&mut self) -> Result<Text> {
 		self.marks.insert(self.pos(), "\x1B[0;7;2m\"".to_owned());
-		let v = util::read_text(self)?;
+		let v = util::Text::read(self)?;
 		self.marks.insert(self.pos(), "\x1B[0;7;2m\"".to_owned());
 		Ok(v)
 	}
@@ -339,9 +339,9 @@ impl<'a, 'b> ExprParser<'a, 'b> {
 		}
 	}
 
-	fn read_expr(mut self) -> Result<Box<Expr>> {
+	fn expr(mut self) -> Result<Box<Expr>> {
 		self.inner.marks.insert(self.inner.pos(), "\x1B[0;7;2m[".to_owned());
-		while let Some(op) = self.read_op()? {
+		while let Some(op) = self.op()? {
 			self.push(op);
 			self.inner.marks.insert(self.inner.pos(), "\x1B[0;7;2m•".to_owned());
 		}
@@ -352,7 +352,7 @@ impl<'a, 'b> ExprParser<'a, 'b> {
 		}
 	}
 
-	fn read_op(&mut self) -> Result<Option<Expr>> {
+	fn op(&mut self) -> Result<Option<Expr>> {
 		Ok(Some(match self.u8()? {
 			0x00 => Expr::Const(self.u32()?),
 			0x01 => return Ok(None),
@@ -382,7 +382,7 @@ impl<'a, 'b> ExprParser<'a, 'b> {
 			0x19 => self.unop(ExprUnop::AndAss)?,
 			0x1A => self.unop(ExprUnop::XorAss)?,
 			0x1B => self.unop(ExprUnop::OrAss)?,
-			0x1C => Expr::Exec(self.read_insn()?),
+			0x1C => Expr::Exec(self.insn()?),
 			0x1D => self.unop(ExprUnop::Inv)?,
 			0x1E => Expr::Flag(Flag(self.u16()?)),
 			0x1F => Expr::Var(self.u16()?),

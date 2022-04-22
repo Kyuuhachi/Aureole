@@ -148,40 +148,42 @@ pub enum TextSegment {
 	Item(u16 /*Item*/),
 }
 
-pub fn read_text(i: &mut In) -> Result<Text> {
-	let mut segments = Vec::new();
-	let mut curr = Vec::new();
-	fn drain(segments: &mut Vec<TextSegment>, curr: &mut Vec<u8>) -> Result<()> {
-		if !curr.is_empty() {
-			segments.push(TextSegment::String(decode(curr)?));
+impl Text {
+	pub fn read(i: &mut In) -> Result<Text> {
+		let mut segments = Vec::new();
+		let mut curr = Vec::new();
+		fn drain(segments: &mut Vec<TextSegment>, curr: &mut Vec<u8>) -> Result<()> {
+			if !curr.is_empty() {
+				segments.push(TextSegment::String(decode(curr)?));
+			}
+			curr.clear();
+			Ok(())
 		}
-		curr.clear();
-		Ok(())
+		loop { match i.u8()? {
+			0x00 => { drain(&mut segments, &mut curr)?; break }
+			0x01 => { curr.push(b'\n') }
+			0x02 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::Wait) }
+			0x03 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::Page) }
+			// 0x05 =>
+			// 0x06 =>
+			0x07 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::Color(i.u8()?)) }
+			// 0x09 =>
+			// 0x18 =>
+			0x1F => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::Item(i.u16()?)) }
+			op@(0x00..=0x1F) => eyre::bail!("Unknown TextSegment: b{:?}", char::from(op)),
+			b'#' => {
+				drain(&mut segments, &mut curr)?;
+				let mut n = 0;
+				loop { match i.u8()? {
+					ch@(b'0'..=b'9') => n = n * 10 + (ch - b'0') as u16,
+					b'F' => { segments.push(TextSegment::Face(n)); break },
+					op => eyre::bail!("Unknown TextSegment: #{}{}", n, op),
+				} }
+			}
+			ch => {
+				curr.push(ch);
+			}
+		} }
+		Ok(Text(segments))
 	}
-	loop { match i.u8()? {
-		0x00 => { drain(&mut segments, &mut curr)?; break }
-		0x01 => { curr.push(b'\n') }
-		0x02 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::Wait) }
-		0x03 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::Page) }
-		// 0x05 =>
-		// 0x06 =>
-		0x07 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::Color(i.u8()?)) }
-		// 0x09 =>
-		// 0x18 =>
-		0x1F => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::Item(i.u16()?)) }
-		op@(0x00..=0x1F) => eyre::bail!("Unknown TextSegment: b{:?}", char::from(op)),
-		b'#' => {
-			drain(&mut segments, &mut curr)?;
-			let mut n = 0;
-			loop { match i.u8()? {
-				ch@(b'0'..=b'9') => n = n * 10 + (ch - b'0') as u16,
-				b'F' => { segments.push(TextSegment::Face(n)); break },
-				op => eyre::bail!("Unknown TextSegment: #{}{}", n, op),
-			} }
-		}
-		ch => {
-			curr.push(ch);
-		}
-	} }
-	Ok(Text(segments))
 }

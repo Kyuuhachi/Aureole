@@ -1,7 +1,7 @@
 use eyre::Result;
 use hamu::read::{In, Le};
 use crate::util::{self, ByteString, InExt};
-use super::code::{FileRef, FuncRef, Pos3, Code, CodeParser};
+use super::code::{self, FileRef, FuncRef, Pos3, Code};
 
 #[derive(Debug, Clone)]
 pub struct Npc {
@@ -195,10 +195,8 @@ pub fn read(i: &[u8]) -> Result<Scena> {
 		});
 	}
 
-	let mut codeparser = CodeParser::new(i.clone());
 	let code = util::multiple(&i, &func_table, code_end, |i, len| {
-		codeparser.seek(i.pos())?;
-		Ok(codeparser.func(i.pos() + len)?)
+		Ok(code::read(i.clone(), i.pos() + len)?)
 	})?;
 
 	i.dump_uncovered(|a| a.to_stderr())?;

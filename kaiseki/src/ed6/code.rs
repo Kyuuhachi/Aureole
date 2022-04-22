@@ -162,8 +162,12 @@ pub enum QuestGetInsn {
 	/*01*/ Flags(u8),
 }
 
+pub fn read(i: In, end: usize) -> Result<Code> {
+	CodeParser::new(i).func(end)
+}
+
 #[derive(derive_more::Deref, derive_more::DerefMut)]
-pub struct CodeParser<'a> {
+struct CodeParser<'a> {
 	marks: HashMap<usize, String>,
 	#[deref]
 	#[deref_mut]
@@ -172,14 +176,14 @@ pub struct CodeParser<'a> {
 
 impl<'a> CodeParser<'a> {
 	#[allow(clippy::new_without_default)]
-	pub fn new(i: In<'a>) -> Self {
+	fn new(i: In<'a>) -> Self {
 		CodeParser {
 			marks: HashMap::new(),
 			inner: i,
 		}
 	}
 
-	pub fn func(&mut self, end: usize) -> Result<Vec<(usize, Insn)>> {
+	fn func(&mut self, end: usize) -> Result<Code> {
 		let start = self.inner.clone();
 		let mut ops = Vec::new();
 		(|| -> Result<_> {

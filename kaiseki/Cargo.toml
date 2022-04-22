@@ -7,6 +7,7 @@ edition = "2021"
 hamu = { path = "../hamu" }
 
 eyre = "0.6.8"
+color-eyre = { version = "0.6.1", default-features = false }
 mapr = "0.8.0"
 chrono = "0.4.19"
 thiserror = "1.0.30"

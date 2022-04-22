@@ -42,10 +42,27 @@ pub fn toc<A>(i: &[u8], f: impl FnMut(&mut In, usize) -> Result<A>) -> Result<Ve
 
 pub fn multiple<A>(i: &In, pos: &[usize], end: usize, mut f: impl FnMut(&mut In, usize) -> Result<A>) -> Result<Vec<A>> {
 	let mut out = Vec::with_capacity(pos.len());
-	for [a, b] in pos.iter().copied().chain(std::iter::once(end)).array_windows() {
-		out.push(f(&mut i.clone().at(a)?, b-a)?);
+	let mut errors = Vec::new();
+	for (idx, [a, b]) in pos.iter().copied().chain(std::iter::once(end)).array_windows().enumerate() {
+		match f(&mut i.clone().at(a)?, b-a) {
+			Ok(v) => out.push(v),
+			Err(e) => errors.push(e.wrap_err(eyre::eyre!("Item {}", idx))),
+		}
 	}
-	Ok(out)
+
+	use std::fmt::Write;
+	use color_eyre::{Section, SectionExt};
+	match errors.len() {
+		0 => Ok(out),
+		1 => Err(errors.pop().unwrap()),
+		_ => Err(eyre::eyre!("Multiple errors").section({
+			let mut s = String::new();
+			for e in errors {
+				write!(s, "{:?}", e).unwrap();
+			}
+			s.header("Errors:")
+		})),
+	}
 }
 
 #[repr(transparent)]

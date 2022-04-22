@@ -645,6 +645,7 @@ dependencies = [
  "bitflags",
  "bitmatch",
  "chrono",
+ "color-eyre",
  "encoding_rs",
  "extend",
  "eyre",

@@ -137,7 +137,7 @@ impl<'a> Dump<'a> {
 		self
 	}
 
-	pub fn to<W: Write>(self, out: &mut W) -> Result<()> {
+	pub fn to<W: Write>(&self, out: &mut W) -> Result<()> {
 		let mut out = io::BufWriter::new(out);
 		let width = match self.width {
 			0 if self.preview.is_some() => 48,
@@ -200,7 +200,19 @@ impl<'a> Dump<'a> {
 		Ok(())
 	}
 
-	pub fn to_stderr(self) {
+	pub fn to_stdout(&self) {
+		self.to(&mut std::io::stdout()).unwrap()
+	}
+
+	pub fn to_stderr(&self) {
 		self.to(&mut std::io::stderr()).unwrap()
+	}
+}
+
+impl std::fmt::Display for Dump<'_> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let mut out = Vec::new();
+		self.to(&mut out).unwrap();
+		f.write_str(&String::from_utf8_lossy(&out))
 	}
 }

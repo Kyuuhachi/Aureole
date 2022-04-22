@@ -351,20 +351,26 @@ impl InsnParser {
 			eyre::ensure!(i.pos() == end, "Overshot: {:X} > {:X}", i.pos(), end);
 			Ok(())
 		})();
-		match a {
-			Ok(a) => Ok(a),
-			Err(e) => {
+		a.map_err(|e| {
+			use color_eyre::{Section, SectionExt};
+			use std::fmt::Write;
+			e.section({
+				let mut s = String::new();
 				for (addr, op) in &ops {
-					eprintln!("{:04X}: {:?}", addr, op);
+					writeln!(s, "{:04X}: {:?}", addr, op).unwrap();
 				}
+				s.pop(); // remove newline
+				s.header("Code:")
+			}).section({
 				start.dump().end(end)
 					.marks(self.marks.iter())
 					.mark(i.pos()-1, "\x1B[0;7m ")
 					.number_width(4)
-					.to_stderr();
-				Err(e)
-			}
-		}
+					.newline(false)
+					.to_string()
+					.header("Dump:")
+			})
+		})
 	}
 
 	fn read_insn(&mut self, i: &mut In) -> Result<Insn> {
@@ -387,7 +393,7 @@ impl InsnParser {
 				0x00 => MapInsn::Hide,
 				0x01 => MapInsn::Show,
 				0x02 => MapInsn::Set(i.i32()?, (i.i32()?, i.i32()?), i.file_ref()?),
-				op => eyre::bail!("Unknown map opcode: {:02X}", op)
+				op => eyre::bail!("Unknown map op: {:02X}", op)
 			}),
 			0x19 => Insn::EventBegin(i.u8()?),
 			0x1B => Insn::_1B(i.u16()?, i.u16()?),
@@ -419,7 +425,7 @@ impl InsnParser {
 			0xA6 => Insn::AwaitFlagSet(Flag(i.u16()?)),
 			0xB1 => Insn::OpLoad(i.str()?),
 
-			op => eyre::bail!("Unknown opcode: {:02X}", op)
+			op => eyre::bail!("Unknown op: {:02X}", op)
 		})
 	}
 
@@ -482,7 +488,7 @@ impl InsnParser {
 				0x20 => Expr::Attr(i.u8()?),
 				0x21 => Expr::CharAttr(Character(i.u16()?), i.u8()?),
 				0x22 => Expr::Rand,
-				op => eyre::bail!("Unknown expr opcode: {:02X}", op)
+				op => eyre::bail!("Unknown expr op: {:02X}", op)
 			};
 			stack.push(op);
 			self.marks.insert(i.pos(), "\x1B[0;7;2m•".to_owned());

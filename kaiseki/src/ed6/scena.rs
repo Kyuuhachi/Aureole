@@ -223,8 +223,9 @@ pub fn read(i: &[u8]) -> Result<Scena> {
 		});
 	}
 
+	let mut funcparser = FuncParser::new();
 	util::multiple(&i, &func_table, code_end, |i, len| {
-		Ok(InsnParser::new().read_func(i, i.pos() + len))
+		Ok(funcparser.read_func(i, i.pos() + len)?)
 	})?;
 
 	// i.dump_uncovered(|a| a.to_stderr())?;
@@ -294,7 +295,7 @@ enum Insn {
 	/*01*/ Return,
 	/*02*/ If(Box<Expr>, usize /*Addr*/),
 	/*03*/ Goto(usize /*Addr*/),
-	/*04*/ Switch(Box<Expr>, Vec<(u16, usize /*Addr*/)>, usize /*Addr (default)*/),
+	/*04*/ Switch(Box<Expr>, Vec<(u16, usize /*Addr*/)>, usize /*Addr*/ /*(default)*/),
 	/*09*/ FlagsSet(u32 /*Flags*/),
 	/*0A*/ FlagsUnset(u32 /*Flags*/),
 	/*0B*/ FadeOn(u32 /*Time*/, u32 /*Color*/, u8),
@@ -306,7 +307,12 @@ enum Insn {
 	/*43*/ CharForkFunc(Character, u8 /*ForkId*/, FuncRef),
 	/*45*/ CharFork(Character, u16 /*ForkId*/, Vec<Insn>), // why is this is u16?
 	/*49*/ Event(FuncRef), // Not sure if this is different from Call
+	/*54*/ TextMessage(util::Text),
+	/*56*/ TextReset(u8), // Not sure what this does, is it always 0?
+	/*58*/ TextWait,
 	/*5A*/ TextSetPos(i16, i16, i16, i16),
+	/*5B*/ TextTalk(Character, util::Text),
+	/*5C*/ TextTalkNamed(Character, String, util::Text),
 	/*60*/ TextSetName(String),
 	/*6C*/ CamAngle(i32 /*Angle*/, u32 /*Time*/),
 	/*6D*/ CamPos(Pos3, u32 /*Time*/),
@@ -328,12 +334,12 @@ enum MapInsn {
 	/*02*/ Set(i32, (i32, i32), FileRef /* archive 03 */), // XXX this seems to be (arch, index) while others are (index, arch)?
 }
 
-struct InsnParser {
+struct FuncParser {
 	marks: HashMap<usize, String>,
 }
-impl InsnParser {
+impl FuncParser {
 	fn new() -> Self {
-		InsnParser {
+		FuncParser {
 			marks: HashMap::new(),
 		}
 	}
@@ -411,7 +417,12 @@ impl InsnParser {
 				insns
 			}),
 			0x49 => Insn::Event(FuncRef(i.u8()? as u16, i.u16()?)),
+			0x54 => Insn::TextMessage(self.read_text(i)?),
+			0x56 => Insn::TextReset(i.u8()?),
+			0x58 => Insn::TextWait,
 			0x5A => Insn::TextSetPos(i.i16()?, i.i16()?, i.i16()?, i.i16()?),
+			0x5B => Insn::TextTalk(Character(i.u16()?), self.read_text(i)?),
+			0x5C => Insn::TextTalkNamed(Character(i.u16()?), i.str()?, self.read_text(i)?),
 			0x60 => Insn::TextSetName(i.str()?),
 			0x6C => Insn::CamAngle(i.i32()?, i.u32()?),
 			0x6D => Insn::CamPos(i.pos3()?, i.u32()?),
@@ -498,5 +509,12 @@ impl InsnParser {
 			1 => Ok(stack.pop()?),
 			_ => eyre::bail!("Invalid expr: {:?}", stack.0)
 		}
+	}
+
+	fn read_text(&mut self, i: &mut In) -> Result<util::Text> {
+		self.marks.insert(i.pos(), "\x1B[0;7;2m\"".to_owned());
+		let v = util::read_text(i)?;
+		self.marks.insert(i.pos(), "\x1B[0;7;2m\"".to_owned());
+		Ok(v)
 	}
 }

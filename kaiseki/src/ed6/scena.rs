@@ -89,8 +89,7 @@ pub struct CameraAngle {
 	pub _9: u32,
 	pub _10: u32,
 	pub _11: u32,
-	pub _12: u32,
-	pub _13: [u16; 6],
+	pub _12: [u16; 8],
 }
 
 #[derive(Debug, Clone)]
@@ -219,8 +218,7 @@ pub fn read(i: &[u8]) -> Result<Scena> {
 			_9: i.u32()?,
 			_10: i.u32()?,
 			_11: i.u32()?,
-			_12: i.u32()?,
-			_13: [i.u16()?, i.u16()?, i.u16()?, i.u16()?, i.u16()?, i.u16()?]
+			_12: [i.u16()?, i.u16()?, i.u16()?, i.u16()?, i.u16()?, i.u16()?, i.u16()?, i.u16()?]
 		});
 	}
 

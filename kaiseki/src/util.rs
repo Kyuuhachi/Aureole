@@ -174,11 +174,12 @@ impl Text {
 			b'#' => {
 				drain(&mut segments, &mut curr)?;
 				let mut n = 0;
-				loop { match i.u8()? {
+				segments.push(loop { match i.u8()? {
+					// XXX this can panic
 					ch@(b'0'..=b'9') => n = n * 10 + (ch - b'0') as u16,
-					b'F' => { segments.push(TextSegment::Face(n)); break },
+					b'F' => break TextSegment::Face(n),
 					op => eyre::bail!("Unknown TextSegment: #{}{}", n, op),
-				} }
+				} })
 			}
 			ch => {
 				curr.push(ch);

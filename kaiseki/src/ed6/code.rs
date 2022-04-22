@@ -34,7 +34,7 @@ impl In<'_> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Character(pub u16);
+pub struct Char(pub u16);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Flag(pub u16);
 
@@ -60,7 +60,7 @@ pub enum Expr {
 	Flag(Flag),
 	Var(u16 /*Var*/),
 	Attr(u8 /*Attr*/),
-	CharAttr(Character, u8 /*CharAttr*/),
+	CharAttr(Char, u8 /*CharAttr*/),
 	Rand,
 }
 
@@ -88,35 +88,35 @@ pub enum Insn {
 	/*28*/ Quest(u16 /*Quest*/, QuestInsn),
 	/*29*/ QuestGet(u16 /*Quest*/, QuestGetInsn),
 	/*30*/ _Party30(u8),
-	/*43*/ CharForkFunc(Character, u8 /*ForkId*/, FuncRef),
-	/*45*/ CharFork(Character, u16 /*ForkId*/, Vec<Insn>), // why is this is u16?
+	/*43*/ CharForkFunc(Char, u8 /*ForkId*/, FuncRef),
+	/*45*/ CharFork(Char, u16 /*ForkId*/, Vec<Insn>), // why is this is u16?
 	/*49*/ Event(FuncRef), // Not sure if this is different from Call
 	/*4D*/ ExprVar(u16 /*Var*/, Box<Expr>),
 	/*4F*/ ExprAttr(u8 /*Attr*/, Box<Expr>),
-	/*51*/ ExprCharAttr(Character, u8 /*CharAttr*/, Box<Expr>),
-	/*53*/ TextEnd(Character),
+	/*51*/ ExprCharAttr(Char, u8 /*CharAttr*/, Box<Expr>),
+	/*53*/ TextEnd(Char),
 	/*54*/ TextMessage(Text),
 	/*56*/ TextReset(u8),
 	/*58*/ TextWait,
 	/*5A*/ TextSetPos(i16, i16, i16, i16),
-	/*5B*/ TextTalk(Character, Text),
-	/*5C*/ TextTalkNamed(Character, String, Text),
+	/*5B*/ TextTalk(Char, Text),
+	/*5C*/ TextTalkNamed(Char, String, Text),
 	/*5D*/ Menu(u16 /*MenuId*/, (i16, i16) /*Pos*/, u8, Vec<String>),
 	/*5E*/ MenuWait(u16 /*MenuId*/),
 	/*5F*/ _Menu5F(u16 /*MenuId*/), // MenuClose?
 	/*60*/ TextSetName(String),
-	/*69*/ CamLookAt(Character, u32 /*Time*/),
+	/*69*/ CamLookAt(Char, u32 /*Time*/),
 	/*6C*/ CamAngle(i32 /*Angle*/, u32 /*Time*/),
 	/*6D*/ CamPos(Pos3, u32 /*Time*/),
-	/*87*/ CharSetFrame(Character, u16),
-	/*88*/ CharSetPos(Character, Pos3, u16 /*Angle*/),
-	/*8A*/ CharLookAt(Character, Character, u16 /*Time*/),
-	/*8E*/ CharWalkTo(Character, Pos3, u32 /*Speed*/, u8),
-	/*90*/ CharWalk(Character, Pos3, u32 /*Speed*/, u8), // I don't know how this differs from CharWalkTo; is it relative maybe?
-	/*92*/ _Char92(Character, Character, u32, u32, u8),
-	/*99*/ CharAnimation(Character, u8, u8, u32 /*Time*/),
-	/*9A*/ CharFlagsSet(Character, u16 /*CharFlags*/),
-	/*9B*/ CharFlagsUnset(Character, u16 /*CharFlags*/),
+	/*87*/ CharSetFrame(Char, u16),
+	/*88*/ CharSetPos(Char, Pos3, u16 /*Angle*/),
+	/*8A*/ CharLookAt(Char, Char, u16 /*Time*/),
+	/*8E*/ CharWalkTo(Char, Pos3, u32 /*Speed*/, u8),
+	/*90*/ CharWalk(Char, Pos3, u32 /*Speed*/, u8), // I don't know how this differs from CharWalkTo; is it relative maybe?
+	/*92*/ _Char92(Char, Char, u32, u32, u8),
+	/*99*/ CharAnimation(Char, u8, u8, u32 /*Time*/),
+	/*9A*/ CharFlagsSet(Char, u16 /*CharFlags*/),
+	/*9B*/ CharFlagsUnset(Char, u16 /*CharFlags*/),
 	/*A2*/ FlagSet(Flag),
 	/*A3*/ FlagUnset(Flag),
 	/*A5*/ AwaitFlagUnset(Flag),
@@ -249,8 +249,8 @@ impl<'a> CodeParser<'a> {
 				op => eyre::bail!("Unknown QuestGetInsn: {:02X}", op)
 			}),
 			0x30 => Insn::_Party30(self.u8()?),
-			0x43 => Insn::CharForkFunc(Character(self.u16()?), self.u8()?, FuncRef(self.u8()? as u16, self.u16()?)),
-			0x45 => Insn::CharFork(Character(self.u16()?), self.u16()?, {
+			0x43 => Insn::CharForkFunc(Char(self.u16()?), self.u8()?, FuncRef(self.u8()? as u16, self.u16()?)),
+			0x45 => Insn::CharFork(Char(self.u16()?), self.u16()?, {
 				let end = self.u8()? as usize + self.pos();
 				let mut insns = Vec::new();
 				while self.pos() < end {
@@ -264,30 +264,30 @@ impl<'a> CodeParser<'a> {
 			0x49 => Insn::Event(FuncRef(self.u8()? as u16, self.u16()?)),
 			0x4D => Insn::ExprVar(self.u16()?, self.expr()?),
 			0x4F => Insn::ExprAttr(self.u8()?, self.expr()?),
-			0x51 => Insn::ExprCharAttr(Character(self.u16()?), self.u8()?, self.expr()?),
-			0x53 => Insn::TextEnd(Character(self.u16()?)),
+			0x51 => Insn::ExprCharAttr(Char(self.u16()?), self.u8()?, self.expr()?),
+			0x53 => Insn::TextEnd(Char(self.u16()?)),
 			0x54 => Insn::TextMessage(self.text()?),
 			0x56 => Insn::TextReset(self.u8()?),
 			0x58 => Insn::TextWait,
 			0x5A => Insn::TextSetPos(self.i16()?, self.i16()?, self.i16()?, self.i16()?),
-			0x5B => Insn::TextTalk(Character(self.u16()?), self.text()?),
-			0x5C => Insn::TextTalkNamed(Character(self.u16()?), self.str()?, self.text()?),
+			0x5B => Insn::TextTalk(Char(self.u16()?), self.text()?),
+			0x5C => Insn::TextTalkNamed(Char(self.u16()?), self.str()?, self.text()?),
 			0x5D => Insn::Menu(self.u16()?, (self.i16()?, self.i16()?), self.u8()?, self.str()?.split_terminator('\x01').map(|a| a.to_owned()).collect()),
 			0x5E => Insn::MenuWait(self.u16()?),
 			0x5F => Insn::_Menu5F(self.u16()?),
 			0x60 => Insn::TextSetName(self.str()?),
-			0x69 => Insn::CamLookAt(Character(self.u16()?), self.u32()?),
+			0x69 => Insn::CamLookAt(Char(self.u16()?), self.u32()?),
 			0x6C => Insn::CamAngle(self.i32()?, self.u32()?),
 			0x6D => Insn::CamPos(self.pos3()?, self.u32()?),
-			0x87 => Insn::CharSetFrame(Character(self.u16()?), self.u16()?),
-			0x88 => Insn::CharSetPos(Character(self.u16()?), self.pos3()?, self.u16()?),
-			0x8A => Insn::CharLookAt(Character(self.u16()?), Character(self.u16()?), self.u16()?),
-			0x8E => Insn::CharWalkTo(Character(self.u16()?), self.pos3()?, self.u32()?, self.u8()?),
-			0x90 => Insn::CharWalk(Character(self.u16()?), self.pos3()?, self.u32()?, self.u8()?),
-			0x92 => Insn::_Char92(Character(self.u16()?), Character(self.u16()?), self.u32()?, self.u32()?, self.u8()?),
-			0x99 => Insn::CharAnimation(Character(self.u16()?), self.u8()?, self.u8()?, self.u32()?),
-			0x9A => Insn::CharFlagsSet(Character(self.u16()?), self.u16()?),
-			0x9B => Insn::CharFlagsUnset(Character(self.u16()?), self.u16()?),
+			0x87 => Insn::CharSetFrame(Char(self.u16()?), self.u16()?),
+			0x88 => Insn::CharSetPos(Char(self.u16()?), self.pos3()?, self.u16()?),
+			0x8A => Insn::CharLookAt(Char(self.u16()?), Char(self.u16()?), self.u16()?),
+			0x8E => Insn::CharWalkTo(Char(self.u16()?), self.pos3()?, self.u32()?, self.u8()?),
+			0x90 => Insn::CharWalk(Char(self.u16()?), self.pos3()?, self.u32()?, self.u8()?),
+			0x92 => Insn::_Char92(Char(self.u16()?), Char(self.u16()?), self.u32()?, self.u32()?, self.u8()?),
+			0x99 => Insn::CharAnimation(Char(self.u16()?), self.u8()?, self.u8()?, self.u32()?),
+			0x9A => Insn::CharFlagsSet(Char(self.u16()?), self.u16()?),
+			0x9B => Insn::CharFlagsUnset(Char(self.u16()?), self.u16()?),
 			0xA2 => Insn::FlagSet(Flag(self.u16()?)),
 			0xA3 => Insn::FlagUnset(Flag(self.u16()?)),
 			0xA5 => Insn::AwaitFlagUnset(Flag(self.u16()?)),
@@ -377,7 +377,7 @@ impl<'a, 'b> ExprParser<'a, 'b> {
 			0x1E => Expr::Flag(Flag(self.u16()?)),
 			0x1F => Expr::Var(self.u16()?),
 			0x20 => Expr::Attr(self.u8()?),
-			0x21 => Expr::CharAttr(Character(self.u16()?), self.u8()?),
+			0x21 => Expr::CharAttr(Char(self.u16()?), self.u8()?),
 			0x22 => Expr::Rand,
 			op => eyre::bail!("Unknown Expr: {:02X}", op)
 		}))

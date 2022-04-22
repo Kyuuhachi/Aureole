@@ -1,6 +1,7 @@
 use eyre::Result;
 use encoding_rs::SHIFT_JIS;
 use itermore::Itermore;
+use derive_more::*;
 use hamu::read::{In, Le};
 
 #[extend::ext(name=InExt)]
@@ -70,7 +71,7 @@ pub fn multiple<A>(i: &In, pos: &[usize], end: usize, mut f: impl FnMut(&mut In,
 }
 
 #[repr(transparent)]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Deref, DerefMut, From, Into)]
 pub struct ByteString<const N: usize>(pub [u8; N]);
 
 impl<const N: usize> std::fmt::Debug for ByteString<N> {
@@ -81,20 +82,6 @@ impl<const N: usize> std::fmt::Debug for ByteString<N> {
 				.map(|a| a as char)
 				.collect::<String>()
 		)
-	}
-}
-
-impl<const N: usize> std::ops::Deref for ByteString<N> {
-	type Target = [u8; N];
-
-	fn deref(&self) -> &Self::Target {
-		&self.0
-	}
-}
-
-impl<const N: usize> std::ops::DerefMut for ByteString<N> {
-	fn deref_mut(&mut self) -> &mut Self::Target {
-		&mut self.0
 	}
 }
 

@@ -1,36 +1,22 @@
 use std::collections::HashMap;
 use eyre::Result;
+use derive_more::*;
 use hamu::read::{In, Le};
 use crate::util::{self, Text, InExt};
 
 pub type Code = Vec<(usize, Insn)>;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, DebugCustom)]
+#[debug(fmt = "FileRef({_0:#02X}, {_1})")]
 pub struct FileRef(pub u16, pub u16); // (index, arch)
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, DebugCustom)]
+#[debug(fmt = "FuncRef({_0}, {_1})")]
 pub struct FuncRef(pub u16, pub u16);
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, DebugCustom)]
+#[debug(fmt = "Pos3({_0}, {_1}, {_2})")]
 pub struct Pos3(pub i32, pub i32, pub i32);
-
-impl std::fmt::Debug for FileRef {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "FileRef({:#02X}, {})", self.0, self.1)
-	}
-}
-
-impl std::fmt::Debug for FuncRef {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "FuncRef({}, {})", self.0, self.1)
-	}
-}
-
-impl std::fmt::Debug for Pos3 {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "Pos3({}, {}, {})", self.0, self.1, self.2)
-	}
-}
 
 #[extend::ext(name=InExtForCode)]
 impl In<'_> {
@@ -166,7 +152,7 @@ pub fn read(i: In, end: usize) -> Result<Code> {
 	CodeParser::new(i).func(end)
 }
 
-#[derive(derive_more::Deref, derive_more::DerefMut)]
+#[derive(Deref, DerefMut)]
 struct CodeParser<'a> {
 	marks: HashMap<usize, String>,
 	#[deref]
@@ -326,7 +312,7 @@ impl<'a> CodeParser<'a> {
 	}
 }
 
-#[derive(derive_more::Deref, derive_more::DerefMut)]
+#[derive(Deref, DerefMut)]
 struct ExprParser<'a, 'b> {
 	#[allow(clippy::vec_box)]
 	stack: Vec<Box<Expr>>,

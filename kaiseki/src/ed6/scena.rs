@@ -127,13 +127,13 @@ pub fn read(i: &[u8]) -> Result<Scena> {
 	let code_end = i.clone().u16()? as usize;
 	let func_table = (i.ptr_u16()?, i.u16()? / 2);
 
-	eyre::ensure!(strings.str()? == "@FileName", stringify!(strings.str()? == "@FileName"));
+	eyre::ensure!(strings.string()? == "@FileName", stringify!(strings.string()? == "@FileName"));
 
 	let ch = chcp_list(ch)?;
 	let cp = chcp_list(cp)?;
 
 	let npcs = list(npcs, |i| Ok(Npc {
-		name: strings.str()?,
+		name: strings.string()?,
 		pos: i.pos3()?,
 		angle: i.u16()?,
 		ch: (i.u16()?, i.u16()?),
@@ -144,7 +144,7 @@ pub fn read(i: &[u8]) -> Result<Scena> {
 	}))?;
 
 	let monsters = list(monsters, |i| Ok(Monster {
-		name: strings.str()?,
+		name: strings.string()?,
 		pos: i.pos3()?,
 		angle: i.u16()?,
 		_1: i.u16()?,

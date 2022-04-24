@@ -235,7 +235,7 @@ impl Magic<()> {
 impl Magic<String> {
 	pub fn read_one(i: &mut In) -> Result<Self> {
 		// This can be made slightly less hacky with #[feature(type_changing_struct_update)]
-		Magic::read_base(i, &mut |i| i.ptr_u16()?.str())
+		Magic::read_base(i, &mut |i| i.ptr_u16()?.string())
 	}
 
 	pub fn read(i: &[u8]) -> Result<Vec<Self>> {

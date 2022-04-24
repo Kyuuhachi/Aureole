@@ -135,7 +135,6 @@ impl<'a> CodeParser<'a> {
 		Ok(v)
 	}
 
-	fn string(&mut self) -> Result<String> { self.str() }
 	fn char(&mut self) -> Result<Char> { Ok(Char(self.u16()?)) }
 	fn flag(&mut self) -> Result<Flag> { Ok(Flag(self.u16()?)) }
 }

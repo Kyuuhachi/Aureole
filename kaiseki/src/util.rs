@@ -6,7 +6,7 @@ use hamu::read::{In, Le};
 
 #[extend::ext(name=InExt)]
 pub impl In<'_> where Self: Sized {
-	fn str(&mut self) -> Result<String> {
+	fn string(&mut self) -> Result<String> {
 		let mut s = Vec::new();
 		loop {
 			match self.u8()? {

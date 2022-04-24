@@ -23,7 +23,7 @@ pub struct Monster {
 	pub _1: u16, // this is likely related to chcp, but not sure
 	pub flags: u16,
 	pub _2: i32, // Is this maybe a funcref? It's always -1
-	pub battle: u16, // T_BATTLE index
+	pub battle: u16 /*battle*/,
 	pub flag: u16, // set when defeated
 	pub _3: u16,
 }
@@ -69,8 +69,8 @@ pub struct CameraAngle {
 pub struct Scena {
 	pub dir: ByteString<10>,
 	pub fname: ByteString<14>,
-	pub town: u16, // T_TOWN index
-	pub bgm: u16, // T_BGMTBL index
+	pub town: u16 /*town*/,
+	pub bgm: u16 /*bgmtbl*/,
 	pub entry_func: FuncRef,
 	pub includes: [FileRef; 8],
 	pub ch: Vec<FileRef>,

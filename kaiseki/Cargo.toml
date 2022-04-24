@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 hamu = { path = "../hamu" }
+kaiseki_macros = { path = "../kaiseki_macros" }
 
 eyre = "0.6.8"
 color-eyre = { version = "0.6.1", default-features = false }

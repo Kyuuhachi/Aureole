@@ -56,96 +56,12 @@ pub enum Expr {
 	Const(u32),
 	Binop(ExprBinop, Box<Expr>, Box<Expr>),
 	Unop(ExprUnop, Box<Expr>),
-	Exec(Insn),
+	Exec(Box<Insn>),
 	Flag(Flag),
 	Var(u16 /*Var*/),
 	Attr(u8 /*Attr*/),
 	CharAttr(Char, u8 /*CharAttr*/),
 	Rand,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Insn {
-	/*01*/ Return,
-	/*02*/ If(Box<Expr>, usize /*Addr*/),
-	/*03*/ Goto(usize /*Addr*/),
-	/*04*/ Switch(Box<Expr>, Vec<(u16, usize /*Addr*/)>, usize /*Addr*/ /*(default)*/),
-	/*08*/ Sleep(u32 /*Time*/),
-	/*09*/ FlagsSet(u32 /*Flags*/),
-	/*0A*/ FlagsUnset(u32 /*Flags*/),
-	/*0B*/ FadeOn(u32 /*Time*/, u32 /*Color*/, u8),
-	/*0C*/ FadeOff(u32 /*Time*/, u32 /*Color*/),
-	/*0D*/ _0D,
-	/*0F*/ Battle(u16 /*BattleId*/, u16, u16, u16, u8, u16, i8),
-	/*16*/ Map(MapInsn),
-	/*19*/ EventBegin(u8),
-	/*1A*/ EventEnd(u8),
-	/*1B*/ _1B(u16, u16),
-	/*1C*/ _1C(u16, u16),
-	/*22*/ SoundPlay(u16 /*Sound*/, u8, u8 /*Volume*/),
-	/*23*/ SoundStop(u16 /*Sound*/),
-	/*24*/ SoundLoop(u16 /*Sound*/, u8),
-	/*28*/ Quest(u16 /*Quest*/, QuestInsn),
-	/*29*/ QuestGet(u16 /*Quest*/, QuestGetInsn),
-	/*30*/ _Party30(u8),
-	/*43*/ CharForkFunc(Char, u8 /*ForkId*/, FuncRef),
-	/*45*/ CharFork(Char, u16 /*ForkId*/, Vec<Insn>), // why is this is u16?
-	/*49*/ Event(FuncRef), // Not sure if this is different from Call
-	/*4D*/ ExprVar(u16 /*Var*/, Box<Expr>),
-	/*4F*/ ExprAttr(u8 /*Attr*/, Box<Expr>),
-	/*51*/ ExprCharAttr(Char, u8 /*CharAttr*/, Box<Expr>),
-	/*53*/ TextEnd(Char),
-	/*54*/ TextMessage(Text),
-	/*56*/ TextReset(u8),
-	/*58*/ TextWait,
-	/*5A*/ TextSetPos(i16, i16, i16, i16),
-	/*5B*/ TextTalk(Char, Text),
-	/*5C*/ TextTalkNamed(Char, String, Text),
-	/*5D*/ Menu(u16 /*MenuId*/, (i16, i16) /*Pos*/, u8, Vec<String>),
-	/*5E*/ MenuWait(u16 /*MenuId*/),
-	/*5F*/ _Menu5F(u16 /*MenuId*/), // MenuClose?
-	/*60*/ TextSetName(String),
-	/*69*/ CamLookAt(Char, u32 /*Time*/),
-	/*6C*/ CamAngle(i32 /*Angle*/, u32 /*Time*/),
-	/*6D*/ CamPos(Pos3, u32 /*Time*/),
-	/*87*/ CharSetFrame(Char, u16),
-	/*88*/ CharSetPos(Char, Pos3, u16 /*Angle*/),
-	/*8A*/ CharLookAt(Char, Char, u16 /*Time*/),
-	/*8E*/ CharWalkTo(Char, Pos3, u32 /*Speed*/, u8),
-	/*90*/ CharWalk(Char, Pos3, u32 /*Speed*/, u8), // I don't know how this differs from CharWalkTo; is it relative maybe?
-	/*92*/ _Char92(Char, Char, u32, u32, u8),
-	/*99*/ CharAnimation(Char, u8, u8, u32 /*Time*/),
-	/*9A*/ CharFlagsSet(Char, u16 /*CharFlags*/),
-	/*9B*/ CharFlagsUnset(Char, u16 /*CharFlags*/),
-	/*A2*/ FlagSet(Flag),
-	/*A3*/ FlagUnset(Flag),
-	/*A5*/ AwaitFlagUnset(Flag),
-	/*A6*/ AwaitFlagSet(Flag),
-	/*B1*/ OpLoad(String /*._OP filename*/),
-	/*B2*/ _B2(u8, u8, u16),
-	/*B4*/ ReturnToTitle(u8),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum MapInsn {
-	/*00*/ Hide,
-	/*01*/ Show,
-	/*02*/ Set(i32, (i32, i32), FileRef /* archive 03 */), // XXX this seems to be (arch, index) while others are (index, arch)?
-}
-
-// I am unsure whether these are Set or Unset
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum QuestInsn {
-	/*01*/ TaskSet(u16),
-	/*02*/ TaskUnset(u16),
-	/*03*/ FlagsSet(u8),
-	/*04*/ FlagsUnset(u8),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum QuestGetInsn {
-	/*00*/ Task(u16),
-	/*01*/ Flags(u8),
 }
 
 pub fn read(i: In, end: usize) -> Result<Code> {
@@ -205,102 +121,10 @@ impl<'a> CodeParser<'a> {
 	}
 
 	fn insn(&mut self) -> Result<Insn> {
-		Ok(match self.u8()? {
-			0x01 => Insn::Return,
-			0x02 => Insn::If(self.expr()?, self.u16()? as usize),
-			0x03 => Insn::Goto(self.u16()? as usize),
-			0x04 => Insn::Switch(self.expr()?, {
-				let mut out = Vec::new();
-				for _ in 0..self.u16()? {
-					out.push((self.u16()?, self.u16()? as usize));
-				}
-				out
-			}, self.u16()? as usize),
-			0x08 => Insn::Sleep(self.u32()?),
-			0x09 => Insn::FlagsSet(self.u32()?),
-			0x0A => Insn::FlagsUnset(self.u32()?),
-			0x0B => Insn::FadeOn(self.u32()?, self.u32()?, self.u8()?),
-			0x0C => Insn::FadeOff(self.u32()?, self.u32()?),
-			0x0D => Insn::_0D,
-			0x0F => Insn::Battle(self.u16()?, self.u16()?, self.u16()?, self.u16()?, self.u8()?, self.u16()?, self.i8()?),
-			0x16 => Insn::Map(match self.u8()? {
-				0x00 => MapInsn::Hide,
-				0x01 => MapInsn::Show,
-				0x02 => MapInsn::Set(self.i32()?, (self.i32()?, self.i32()?), self.file_ref()?),
-				op => eyre::bail!("Unknown MapInsn: {:02X}", op)
-			}),
-			0x19 => Insn::EventBegin(self.u8()?),
-			0x1A => Insn::EventEnd(self.u8()?),
-			0x1B => Insn::_1B(self.u16()?, self.u16()?),
-			0x1C => Insn::_1C(self.u16()?, self.u16()?),
-			0x22 => Insn::SoundPlay(self.u16()?, self.u8()?, self.u8()?),
-			0x23 => Insn::SoundStop(self.u16()?),
-			0x24 => Insn::SoundLoop(self.u16()?, self.u8()?),
-			0x28 => Insn::Quest(self.u16()?, match self.u8()? {
-				0x01 => QuestInsn::TaskSet(self.u16()?),
-				0x02 => QuestInsn::TaskUnset(self.u16()?),
-				0x03 => QuestInsn::FlagsSet(self.u8()?),
-				0x04 => QuestInsn::FlagsUnset(self.u8()?),
-				op => eyre::bail!("Unknown QuestInsn: {:02X}", op)
-			}),
-			0x29 => Insn::QuestGet(self.u16()?, match self.u8()? {
-				0x00 => QuestGetInsn::Task(self.u16()?),
-				0x01 => QuestGetInsn::Flags(self.u8()?),
-				op => eyre::bail!("Unknown QuestGetInsn: {:02X}", op)
-			}),
-			0x30 => Insn::_Party30(self.u8()?),
-			0x43 => Insn::CharForkFunc(Char(self.u16()?), self.u8()?, FuncRef(self.u8()? as u16, self.u16()?)),
-			0x45 => Insn::CharFork(Char(self.u16()?), self.u16()?, {
-				let end = self.u8()? as usize + self.pos();
-				let mut insns = Vec::new();
-				while self.pos() < end {
-					self.marks.insert(self.pos(), "\x1B[0;7;2m•".to_owned());
-					insns.push(self.insn()?);
-				}
-				eyre::ensure!(self.pos() == end, "Overshot: {:X} > {:X}", self.pos(), end);
-				self.check_u8(0)?;
-				insns
-			}),
-			0x49 => Insn::Event(FuncRef(self.u8()? as u16, self.u16()?)),
-			0x4D => Insn::ExprVar(self.u16()?, self.expr()?),
-			0x4F => Insn::ExprAttr(self.u8()?, self.expr()?),
-			0x51 => Insn::ExprCharAttr(Char(self.u16()?), self.u8()?, self.expr()?),
-			0x53 => Insn::TextEnd(Char(self.u16()?)),
-			0x54 => Insn::TextMessage(self.text()?),
-			0x56 => Insn::TextReset(self.u8()?),
-			0x58 => Insn::TextWait,
-			0x5A => Insn::TextSetPos(self.i16()?, self.i16()?, self.i16()?, self.i16()?),
-			0x5B => Insn::TextTalk(Char(self.u16()?), self.text()?),
-			0x5C => Insn::TextTalkNamed(Char(self.u16()?), self.str()?, self.text()?),
-			0x5D => Insn::Menu(self.u16()?, (self.i16()?, self.i16()?), self.u8()?, self.str()?.split_terminator('\x01').map(|a| a.to_owned()).collect()),
-			0x5E => Insn::MenuWait(self.u16()?),
-			0x5F => Insn::_Menu5F(self.u16()?),
-			0x60 => Insn::TextSetName(self.str()?),
-			0x69 => Insn::CamLookAt(Char(self.u16()?), self.u32()?),
-			0x6C => Insn::CamAngle(self.i32()?, self.u32()?),
-			0x6D => Insn::CamPos(self.pos3()?, self.u32()?),
-			0x87 => Insn::CharSetFrame(Char(self.u16()?), self.u16()?),
-			0x88 => Insn::CharSetPos(Char(self.u16()?), self.pos3()?, self.u16()?),
-			0x8A => Insn::CharLookAt(Char(self.u16()?), Char(self.u16()?), self.u16()?),
-			0x8E => Insn::CharWalkTo(Char(self.u16()?), self.pos3()?, self.u32()?, self.u8()?),
-			0x90 => Insn::CharWalk(Char(self.u16()?), self.pos3()?, self.u32()?, self.u8()?),
-			0x92 => Insn::_Char92(Char(self.u16()?), Char(self.u16()?), self.u32()?, self.u32()?, self.u8()?),
-			0x99 => Insn::CharAnimation(Char(self.u16()?), self.u8()?, self.u8()?, self.u32()?),
-			0x9A => Insn::CharFlagsSet(Char(self.u16()?), self.u16()?),
-			0x9B => Insn::CharFlagsUnset(Char(self.u16()?), self.u16()?),
-			0xA2 => Insn::FlagSet(Flag(self.u16()?)),
-			0xA3 => Insn::FlagUnset(Flag(self.u16()?)),
-			0xA5 => Insn::AwaitFlagUnset(Flag(self.u16()?)),
-			0xA6 => Insn::AwaitFlagSet(Flag(self.u16()?)),
-			0xB1 => Insn::OpLoad(self.str()?),
-			0xB2 => Insn::_B2(self.u8()?, self.u8()?, self.u16()?),
-			0xB4 => Insn::ReturnToTitle(self.u8()?),
-
-			op => eyre::bail!("Unknown Insn: {:02X}", op)
-		})
+		insn(self)
 	}
 
-	fn expr(&mut self) -> Result<Box<Expr>> {
+	fn expr(&mut self) -> Result<Expr> {
 		ExprParser::new(self).expr()
 	}
 
@@ -310,12 +134,110 @@ impl<'a> CodeParser<'a> {
 		self.marks.insert(self.pos(), "\x1B[0;7;2m\"".to_owned());
 		Ok(v)
 	}
+
+	fn string(&mut self) -> Result<String> { self.str() }
+	fn char(&mut self) -> Result<Char> { Ok(Char(self.u16()?)) }
+	fn flag(&mut self) -> Result<Flag> { Ok(Flag(self.u16()?)) }
+}
+
+#[kaiseki_macros::bytecode(
+	#[derive(Debug, Clone, PartialEq, Eq)]
+	pub enum Insn
+)]
+fn insn(i: &mut CodeParser) -> Result<Insn> {
+	match u8 {
+		0x01 => Return(),
+		0x02 => If(Expr, {i.u16()? as usize} as usize + addr),
+		0x03 => Goto({i.u16()? as usize} as usize + addr),
+		0x04 => Switch(Expr, {
+			let mut out = Vec::new();
+			for _ in 0..i.u16()? {
+				out.push((i.u16()?, i.u16()? as usize));
+			}
+			(out, i.u16()? as usize)
+		} as (Vec<(u16, usize)>, usize) + switch_table),
+		0x08 => Sleep(u32 + time),
+		0x09 => FlagsSet(u32 + flags),
+		0x0A => FlagsUnset(u32 + flags),
+		0x0B => FadeOn(u32 + time, u32 + color, u8),
+		0x0C => FadeOff(u32 + time, u32 + color),
+		0x0D => _0D(),
+		0x0F => Battle(u16 + battle, u16, u16, u16, u8, u16, i8),
+		0x16 => Map(match u8 {
+			0x00 => Hide(),
+			0x01 => Show(),
+			0x02 => Set(i32, i32, i32, FileRef),
+		}),
+		0x19 => EventBegin(u8),
+		0x1A => EventEnd(u8),
+		0x1B => _1B(u16, u16),
+		0x1C => _1C(u16, u16),
+		0x22 => SoundPlay(u16 + sound, u8, u8),
+		0x23 => SoundStop(u16 + sound),
+		0x24 => SoundLoop(u16 + sound, u8),
+		0x28 => Quest(u16 + quest, match u8 {
+			0x01 => TaskSet(u16 + quest_task),
+			0x02 => TaskUnset(u16 + quest_task),
+			0x03 => FlagsSet(u8 + quest_flag),
+			0x04 => FlagsUnset(u8 + quest_flag),
+		}),
+		0x29 => QuestGet(u16 + quest, match u8 {
+			0x00 => Task(u16 + quest_task),
+			0x01 => Flags(u8 + quest_flag),
+		}),
+		0x30 => _Party30(u8),
+		0x43 => CharForkFunc(Char, u8 /*ForkId*/, FuncRef),
+		0x45 => CharFork(Char, u16 /*ForkId*/, {
+			let end = i.u8()? as usize + i.pos();
+			let mut insns = Vec::new();
+			while i.pos() < end {
+				i.marks.insert(i.pos(), "\x1B[0;7;2m•".to_owned());
+				insns.push(insn(i)?);
+			}
+			eyre::ensure!(i.pos() == end, "Overshot: {:X} > {:X}", i.pos(), end);
+			i.check_u8(0)?;
+			insns
+		} as Vec<Insn> + fork),
+		0x49 => Event(FuncRef), // Not sure if this is different from Call
+		0x4D => ExprVar(u16 + var, Expr),
+		0x4F => ExprAttr(u8 + attr, Expr),
+		0x51 => ExprCharAttr(Char, u8 + char_attr, Expr),
+		0x53 => TextEnd(Char),
+		0x54 => TextMessage(Text),
+		0x56 => TextReset(u8),
+		0x58 => TextWait(),
+		0x5A => TextSetPos(i16, i16, i16, i16),
+		0x5B => TextTalk(Char, Text),
+		0x5C => TextTalkNamed(Char, String, Text),
+		0x5D => Menu(u16 + menu_id, i16, i16, u8, {i.string()?.split_terminator('\x01').map(|a| a.to_owned()).collect()} as Vec<String> + menu),
+		0x5E => MenuWait(u16 + menu_id),
+		0x5F => _Menu5F(u16 + menu_id), // MenuClose?
+		0x60 => TextSetName(String),
+		0x69 => CamLookAt(Char, u32 + time),
+		0x6C => CamAngle(i32 + angle, u32 + time),
+		0x6D => CamPos(Pos3, u32 + time),
+		0x87 => CharSetFrame(Char, u16),
+		0x88 => CharSetPos(Char, Pos3, u16 + anle),
+		0x8A => CharLookAt(Char, Char, u16 + time),
+		0x8E => CharWalkTo(Char, Pos3, u32 + speed, u8),
+		0x90 => CharWalk(Char, Pos3, u32 + speed, u8),  // I don't know how this differs from CharWalkTo; is it relative maybe?
+		0x92 => _Char92(Char, Char, u32, u32 + time, u8),
+		0x99 => CharAnimation(Char, u8, u8, u32),
+		0x9A => CharFlagsSet(Char, u16 + char_flags),
+		0x9B => CharFlagsUnset(Char, u16 + char_flags),
+		0xA2 => FlagSet(Flag),
+		0xA3 => FlagUnset(Flag),
+		0xA5 => AwaitFlagUnset(Flag),
+		0xA6 => AwaitFlagSet(Flag),
+		0xB1 => OpLoad(String),
+		0xB2 => _B2(u8, u8, u16),
+		0xB4 => ReturnToTitle(u8),
+	}
 }
 
 #[derive(Deref, DerefMut)]
 struct ExprParser<'a, 'b> {
-	#[allow(clippy::vec_box)]
-	stack: Vec<Box<Expr>>,
+	stack: Vec<Expr>,
 	#[deref]
 	#[deref_mut]
 	inner: &'a mut CodeParser<'b>,
@@ -329,10 +251,10 @@ impl<'a, 'b> ExprParser<'a, 'b> {
 		}
 	}
 
-	fn expr(mut self) -> Result<Box<Expr>> {
+	fn expr(mut self) -> Result<Expr> {
 		self.inner.marks.insert(self.inner.pos(), "\x1B[0;7;2m[".to_owned());
 		while let Some(op) = self.op()? {
-			self.push(op);
+			self.stack.push(op);
 			self.inner.marks.insert(self.inner.pos(), "\x1B[0;7;2m•".to_owned());
 		}
 		self.inner.marks.insert(self.inner.pos(), "\x1B[0;7;2m]".to_owned());
@@ -372,7 +294,7 @@ impl<'a, 'b> ExprParser<'a, 'b> {
 			0x19 => self.unop(ExprUnop::AndAss)?,
 			0x1A => self.unop(ExprUnop::XorAss)?,
 			0x1B => self.unop(ExprUnop::OrAss)?,
-			0x1C => Expr::Exec(self.insn()?),
+			0x1C => Expr::Exec(Box::new(self.insn()?)),
 			0x1D => self.unop(ExprUnop::Inv)?,
 			0x1E => Expr::Flag(Flag(self.u16()?)),
 			0x1F => Expr::Var(self.u16()?),
@@ -383,21 +305,18 @@ impl<'a, 'b> ExprParser<'a, 'b> {
 		}))
 	}
 
-	fn push(&mut self, expr: Expr) {
-		self.stack.push(Box::new(expr))
-	}
-
 	fn binop(&mut self, op: ExprBinop) -> Result<Expr> {
-		let r = self.pop()?;
-		let l = self.pop()?;
+		let r = Box::new(self.pop()?);
+		let l = Box::new(self.pop()?);
 		Ok(Expr::Binop(op, l, r))
 	}
 
 	fn unop(&mut self, op: ExprUnop) -> Result<Expr> {
-		Ok(Expr::Unop(op, self.pop()?))
+		let v = Box::new(self.pop()?);
+		Ok(Expr::Unop(op, v))
 	}
 
-	fn pop(&mut self) -> Result<Box<Expr>> {
+	fn pop(&mut self) -> Result<Expr> {
 		Ok(self.stack.pop().ok_or_else(|| eyre::eyre!("Empty expr stack"))?)
 	}
 }

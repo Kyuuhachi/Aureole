@@ -664,10 +664,22 @@ dependencies = [
  "hamu",
  "int-enum",
  "itermore",
+ "kaiseki_macros",
  "mapr",
  "strum",
  "strum_macros",
  "thiserror",
+]
+
+[[package]]
+name = "kaiseki_macros"
+version = "0.1.0"
+dependencies = [
+ "convert_case",
+ "either",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

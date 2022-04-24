@@ -17,6 +17,7 @@ members = [
 	"hamu",
 	"choubun",
 	"kaiseki",
+	"kaiseki_macros",
 ]
 
 [profile.dev.package.backtrace]

@@ -34,11 +34,6 @@ impl In<'_> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Char(pub u16);
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Flag(pub u16);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExprBinop {
 	Eq, Ne, Lt, Gt, Le, Ge,
 	BoolAnd, And, Or,
@@ -57,10 +52,10 @@ pub enum Expr {
 	Binop(ExprBinop, Box<Expr>, Box<Expr>),
 	Unop(ExprUnop, Box<Expr>),
 	Exec(Box<Insn>),
-	Flag(Flag),
+	Flag(u16 /*Flag*/),
 	Var(u16 /*Var*/),
 	Attr(u8 /*Attr*/),
-	CharAttr(Char, u8 /*CharAttr*/),
+	CharAttr(u16 /*Char*/, u8 /*CharAttr*/),
 	Rand,
 }
 
@@ -134,9 +129,6 @@ impl<'a> CodeParser<'a> {
 		self.marks.insert(self.pos(), "\x1B[0;7;2m\"".to_owned());
 		Ok(v)
 	}
-
-	fn char(&mut self) -> Result<Char> { Ok(Char(self.u16()?)) }
-	fn flag(&mut self) -> Result<Flag> { Ok(Flag(self.u16()?)) }
 }
 
 #[kaiseki_macros::bytecode(
@@ -185,8 +177,8 @@ fn insn(i: &mut CodeParser) -> Result<Insn> {
 			0x01 => Flags(u8 + quest_flag),
 		}),
 		0x30 => _Party30(u8),
-		0x43 => CharForkFunc(Char, u8 /*ForkId*/, FuncRef),
-		0x45 => CharFork(Char, u16 /*ForkId*/, {
+		0x43 => CharForkFunc(u16 + char, u8 + forkid, FuncRef),
+		0x45 => CharFork(u16 + char, u16 + forkid, {
 			let end = i.u8()? as usize + i.pos();
 			let mut insns = Vec::new();
 			while i.pos() < end {
@@ -200,34 +192,34 @@ fn insn(i: &mut CodeParser) -> Result<Insn> {
 		0x49 => Event(FuncRef), // Not sure if this is different from Call
 		0x4D => ExprVar(u16 + var, Expr),
 		0x4F => ExprAttr(u8 + attr, Expr),
-		0x51 => ExprCharAttr(Char, u8 + char_attr, Expr),
-		0x53 => TextEnd(Char),
+		0x51 => ExprCharAttr(u16 + char, u8 + char_attr, Expr),
+		0x53 => TextEnd(u16 + char),
 		0x54 => TextMessage(Text),
 		0x56 => TextReset(u8),
 		0x58 => TextWait(),
 		0x5A => TextSetPos(i16, i16, i16, i16),
-		0x5B => TextTalk(Char, Text),
-		0x5C => TextTalkNamed(Char, String, Text),
+		0x5B => TextTalk(u16 + char, Text),
+		0x5C => TextTalkNamed(u16 + char, String, Text),
 		0x5D => Menu(u16 + menu_id, i16, i16, u8, {i.string()?.split_terminator('\x01').map(|a| a.to_owned()).collect()} as Vec<String> + menu),
 		0x5E => MenuWait(u16 + menu_id),
 		0x5F => _Menu5F(u16 + menu_id), // MenuClose?
 		0x60 => TextSetName(String),
-		0x69 => CamLookAt(Char, u32 + time),
+		0x69 => CamLookAt(u16 + char, u32 + time),
 		0x6C => CamAngle(i32 + angle, u32 + time),
 		0x6D => CamPos(Pos3, u32 + time),
-		0x87 => CharSetFrame(Char, u16),
-		0x88 => CharSetPos(Char, Pos3, u16 + anle),
-		0x8A => CharLookAt(Char, Char, u16 + time),
-		0x8E => CharWalkTo(Char, Pos3, u32 + speed, u8),
-		0x90 => CharWalk(Char, Pos3, u32 + speed, u8),  // I don't know how this differs from CharWalkTo; is it relative maybe?
-		0x92 => _Char92(Char, Char, u32, u32 + time, u8),
-		0x99 => CharAnimation(Char, u8, u8, u32),
-		0x9A => CharFlagsSet(Char, u16 + char_flags),
-		0x9B => CharFlagsUnset(Char, u16 + char_flags),
-		0xA2 => FlagSet(Flag),
-		0xA3 => FlagUnset(Flag),
-		0xA5 => AwaitFlagUnset(Flag),
-		0xA6 => AwaitFlagSet(Flag),
+		0x87 => CharSetFrame(u16 + char, u16),
+		0x88 => CharSetPos(u16 + char, Pos3, u16 + anle),
+		0x8A => CharLookAt(u16 + char, u16 + char, u16 + time),
+		0x8E => CharWalkTo(u16 + char, Pos3, u32 + speed, u8),
+		0x90 => CharWalk(u16 + char, Pos3, u32 + speed, u8),  // I don't know how this differs from CharWalkTo; is it relative maybe?
+		0x92 => _Char92(u16 + char, u16 + char, u32, u32 + time, u8),
+		0x99 => CharAnimation(u16 + char, u8, u8, u32),
+		0x9A => CharFlagsSet(u16 + char, u16 + char_flags),
+		0x9B => CharFlagsUnset(u16 + char, u16 + char_flags),
+		0xA2 => FlagSet(u16 + flag),
+		0xA3 => FlagUnset(u16 + flag),
+		0xA5 => AwaitFlagUnset(u16 + flag),
+		0xA6 => AwaitFlagSet(u16 + flag),
 		0xB1 => OpLoad(String),
 		0xB2 => _B2(u8, u8, u16),
 		0xB4 => ReturnToTitle(u8),
@@ -295,10 +287,10 @@ impl<'a, 'b> ExprParser<'a, 'b> {
 			0x1B => self.unop(ExprUnop::OrAss)?,
 			0x1C => Expr::Exec(Box::new(self.insn()?)),
 			0x1D => self.unop(ExprUnop::Inv)?,
-			0x1E => Expr::Flag(Flag(self.u16()?)),
+			0x1E => Expr::Flag(self.u16()?),
 			0x1F => Expr::Var(self.u16()?),
 			0x20 => Expr::Attr(self.u8()?),
-			0x21 => Expr::CharAttr(Char(self.u16()?), self.u8()?),
+			0x21 => Expr::CharAttr(self.u16()?, self.u8()?),
 			0x22 => Expr::Rand,
 			op => eyre::bail!("Unknown Expr: {:02X}", op)
 		}))

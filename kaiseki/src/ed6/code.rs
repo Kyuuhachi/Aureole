@@ -138,22 +138,22 @@ impl<'a> CodeParser<'a> {
 fn insn(i: &mut CodeParser) -> Result<Insn> {
 	match u8 {
 		0x01 => Return(),
-		0x02 => If(Expr, {i.u16()? as usize} as usize + addr),
-		0x03 => Goto({i.u16()? as usize} as usize + addr),
-		0x04 => Switch(Expr, {
+		0x02 => If(Expr, addr/{i.u16()? as usize} as usize),
+		0x03 => Goto(addr/{i.u16()? as usize} as usize),
+		0x04 => Switch(Expr, switch_table/{
 			let mut out = Vec::new();
 			for _ in 0..i.u16()? {
 				out.push((i.u16()?, i.u16()? as usize));
 			}
 			(out, i.u16()? as usize)
-		} as (Vec<(u16, usize)>, usize) + switch_table),
-		0x08 => Sleep(u32 + time),
-		0x09 => FlagsSet(u32 + flags),
-		0x0A => FlagsUnset(u32 + flags),
-		0x0B => FadeOn(u32 + time, u32 + color, u8),
-		0x0C => FadeOff(u32 + time, u32 + color),
+		} as (Vec<(u16, usize)>, usize)),
+		0x08 => Sleep(time/u32),
+		0x09 => FlagsSet(flags/u32),
+		0x0A => FlagsUnset(flags/u32),
+		0x0B => FadeOn(time/u32, color/u32, u8),
+		0x0C => FadeOff(time/u32, color/u32),
 		0x0D => _0D(),
-		0x0F => Battle(u16 + battle, u16, u16, u16, u8, u16, i8),
+		0x0F => Battle(battle/u16, u16, u16, u16, u8, u16, i8),
 		0x16 => Map(match u8 {
 			0x00 => Hide(),
 			0x01 => Show(),
@@ -163,22 +163,22 @@ fn insn(i: &mut CodeParser) -> Result<Insn> {
 		0x1A => EventEnd(u8),
 		0x1B => _1B(u16, u16),
 		0x1C => _1C(u16, u16),
-		0x22 => SoundPlay(u16 + sound, u8, u8),
-		0x23 => SoundStop(u16 + sound),
-		0x24 => SoundLoop(u16 + sound, u8),
-		0x28 => Quest(u16 + quest, match u8 {
-			0x01 => TaskSet(u16 + quest_task),
-			0x02 => TaskUnset(u16 + quest_task),
-			0x03 => FlagsSet(u8 + quest_flag),
-			0x04 => FlagsUnset(u8 + quest_flag),
+		0x22 => SoundPlay(sound/u16, u8, u8),
+		0x23 => SoundStop(sound/u16),
+		0x24 => SoundLoop(sound/u16, u8),
+		0x28 => Quest(quest/u16, match u8 {
+			0x01 => TaskSet(quest_task/u16),
+			0x02 => TaskUnset(quest_task/u16),
+			0x03 => FlagsSet(quest_flag/u8),
+			0x04 => FlagsUnset(quest_flag/u8),
 		}),
-		0x29 => QuestGet(u16 + quest, match u8 {
-			0x00 => Task(u16 + quest_task),
-			0x01 => Flags(u8 + quest_flag),
+		0x29 => QuestGet(quest/u16, match u8 {
+			0x00 => Task(quest_task/u16),
+			0x01 => Flags(quest_flag/u8),
 		}),
 		0x30 => _Party30(u8),
-		0x43 => CharForkFunc(u16 + char, u8 + forkid, FuncRef),
-		0x45 => CharFork(u16 + char, u16 + forkid, {
+		0x43 => CharForkFunc(char/u16, forkid/u8, FuncRef),
+		0x45 => CharFork(char/u16, forkid/u16, fork/{
 			let end = i.u8()? as usize + i.pos();
 			let mut insns = Vec::new();
 			while i.pos() < end {
@@ -188,38 +188,38 @@ fn insn(i: &mut CodeParser) -> Result<Insn> {
 			eyre::ensure!(i.pos() == end, "Overshot: {:X} > {:X}", i.pos(), end);
 			i.check_u8(0)?;
 			insns
-		} as Vec<Insn> + fork),
+		} as Vec<Insn>),
 		0x49 => Event(FuncRef), // Not sure if this is different from Call
-		0x4D => ExprVar(u16 + var, Expr),
-		0x4F => ExprAttr(u8 + attr, Expr),
-		0x51 => ExprCharAttr(u16 + char, u8 + char_attr, Expr),
-		0x53 => TextEnd(u16 + char),
+		0x4D => ExprVar(var/u16, Expr),
+		0x4F => ExprAttr(attr/u8, Expr),
+		0x51 => ExprCharAttr(char/u16, char_attr/u8, Expr),
+		0x53 => TextEnd(char/u16),
 		0x54 => TextMessage(Text),
 		0x56 => TextReset(u8),
 		0x58 => TextWait(),
 		0x5A => TextSetPos(i16, i16, i16, i16),
-		0x5B => TextTalk(u16 + char, Text),
-		0x5C => TextTalkNamed(u16 + char, String, Text),
-		0x5D => Menu(u16 + menu_id, i16, i16, u8, {i.string()?.split_terminator('\x01').map(|a| a.to_owned()).collect()} as Vec<String> + menu),
-		0x5E => MenuWait(u16 + menu_id),
-		0x5F => _Menu5F(u16 + menu_id), // MenuClose?
+		0x5B => TextTalk(char/u16, Text),
+		0x5C => TextTalkNamed(char/u16, String, Text),
+		0x5D => Menu(menu_id/u16, i16, i16, u8, menu/{i.string()?.split_terminator('\x01').map(|a| a.to_owned()).collect()} as Vec<String>),
+		0x5E => MenuWait(menu_id/u16),
+		0x5F => _Menu5F(menu_id/u16), // MenuClose?
 		0x60 => TextSetName(String),
-		0x69 => CamLookAt(u16 + char, u32 + time),
-		0x6C => CamAngle(i32 + angle, u32 + time),
-		0x6D => CamPos(Pos3, u32 + time),
-		0x87 => CharSetFrame(u16 + char, u16),
-		0x88 => CharSetPos(u16 + char, Pos3, u16 + anle),
-		0x8A => CharLookAt(u16 + char, u16 + char, u16 + time),
-		0x8E => CharWalkTo(u16 + char, Pos3, u32 + speed, u8),
-		0x90 => CharWalk(u16 + char, Pos3, u32 + speed, u8),  // I don't know how this differs from CharWalkTo; is it relative maybe?
-		0x92 => _Char92(u16 + char, u16 + char, u32, u32 + time, u8),
-		0x99 => CharAnimation(u16 + char, u8, u8, u32),
-		0x9A => CharFlagsSet(u16 + char, u16 + char_flags),
-		0x9B => CharFlagsUnset(u16 + char, u16 + char_flags),
-		0xA2 => FlagSet(u16 + flag),
-		0xA3 => FlagUnset(u16 + flag),
-		0xA5 => AwaitFlagUnset(u16 + flag),
-		0xA6 => AwaitFlagSet(u16 + flag),
+		0x69 => CamLookAt(char/u16, time/u32),
+		0x6C => CamAngle(angle/i32, time/u32),
+		0x6D => CamPos(Pos3, time/u32),
+		0x87 => CharSetFrame(char/u16, u16),
+		0x88 => CharSetPos(char/u16, Pos3, anle/u16),
+		0x8A => CharLookAt(char/u16, char/u16, time/u16),
+		0x8E => CharWalkTo(char/u16, Pos3, speed/u32, u8),
+		0x90 => CharWalk(char/u16, Pos3, speed/u32, u8),  // I don't know how this differs from CharWalkTo; is it relative maybe?
+		0x92 => _Char92(char/u16, char/u16, u32, time/u32, u8),
+		0x99 => CharAnimation(char/u16, u8, u8, u32),
+		0x9A => CharFlagsSet(char/u16, char_flags/u16),
+		0x9B => CharFlagsUnset(char/u16, char_flags/u16),
+		0xA2 => FlagSet(flag/u16),
+		0xA3 => FlagUnset(flag/u16),
+		0xA5 => AwaitFlagUnset(flag/u16),
+		0xA6 => AwaitFlagSet(flag/u16),
 		0xB1 => OpLoad(String),
 		0xB2 => _B2(u8, u8, u16),
 		0xB4 => ReturnToTitle(u8),

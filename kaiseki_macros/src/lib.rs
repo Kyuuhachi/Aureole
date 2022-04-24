@@ -135,10 +135,10 @@ fn parse_arm(arm: &Arm) -> Result<Instruction> {
 fn parse_field(expr: &Expr) -> Result<Field> {
 	let span = expr.span();
 	let (expr, alias) = match expr {
-		Expr::Binary(ExprBinary { left, op: BinOp::Add {..}, right, ..}) => {
-			let right = cast!(Expr::Path, &**right)?;
-			let alias = to_ident(&right.path)?;
-			(&**left, Some(alias))
+		Expr::Binary(ExprBinary { left, op: BinOp::Div {..}, right, ..}) => {
+			let alias = cast!(Expr::Path, &**left)?;
+			let alias = to_ident(&alias.path)?;
+			(&**right, Some(alias))
 		}
 		expr => (expr, None)
 	};

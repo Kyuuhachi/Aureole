@@ -131,6 +131,8 @@ pub enum TextSegment {
 	Wait,
 	Page,
 	Face(u16 /*Face*/),
+	Pos(u16),
+	_05,
 	Color(u8),
 	Item(u16 /*Item*/),
 }
@@ -151,7 +153,7 @@ impl Text {
 			0x01 => { curr.push(b'\n') }
 			0x02 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::Wait) }
 			0x03 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::Page) }
-			// 0x05 =>
+			0x05 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::_05) }
 			// 0x06 =>
 			0x07 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::Color(i.u8()?)) }
 			// 0x09 =>
@@ -165,7 +167,8 @@ impl Text {
 					// XXX this can panic
 					ch@(b'0'..=b'9') => n = n * 10 + (ch - b'0') as u16,
 					b'F' => break TextSegment::Face(n),
-					op => eyre::bail!("Unknown TextSegment: #{}{}", n, op),
+					b'P' => break TextSegment::Pos(n),
+					op => eyre::bail!("Unknown TextSegment: #{}{}", n, char::from(op)),
 				} })
 			}
 			ch => {

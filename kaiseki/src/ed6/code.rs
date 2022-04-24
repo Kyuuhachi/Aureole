@@ -7,7 +7,7 @@ use crate::util::{self, Text, InExt};
 pub type Code = Vec<(usize, Insn)>;
 
 #[derive(Clone, Copy, PartialEq, Eq, DebugCustom)]
-#[debug(fmt = "FileRef({_0}, {_1:#02X})")]
+#[debug(fmt = "FileRef({_0}, {_1})")]
 pub struct FileRef(pub u16, pub u16); // (index, arch)
 
 #[derive(Clone, Copy, PartialEq, Eq, DebugCustom)]
@@ -257,11 +257,11 @@ fn insn(i: &mut CodeParser) -> Result<Insn> {
 		0x8C => CharSetAngle(char/u16, angle/u16, time/u16),
 		0x8D => CharIdle(char/u16, Pos2, Pos2, speed/u32),
 		0x8E => CharWalkTo(char/u16, Pos3, speed/u32, u8),
-		0x8F => CharWalkTo2(char/u16, Pos3, speed/u32, u8),
-		0x90 => CharWalkTo3(char/u16, Pos3, speed/u32, u8), // how are these three different?
-		0x91 => _Char91(char/u16, Pos3, i32, u8),
+		0x8F => CharWalkTo2(char/u16, Pos3, speed/u32, u8), // how are these two different?
+		0x90 => DontGoThere(u16, relative/Pos3, u32, u8),
+		0x91 => _Char91(char/u16, relative/Pos3, i32, u8),
 		0x92 => _Char92(char/u16, char/u16, u32, time/u32, u8),
-		0x95 => CharJump(char/u16, Pos3, time/u32, u32),
+		0x95 => CharJump(char/u16, relative/Pos3, time/u32, u32),
 		0x97 => _Char97(char/u16, Pos2, i32, time/u32, u16), // used with pigeons
 		0x99 => CharAnimation(char/u16, u8, u8, u32),
 		0x9A => CharFlagsSet(char/u16, char_flags/u16),

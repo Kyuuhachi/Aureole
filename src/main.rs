@@ -6,6 +6,7 @@ use rocket::response::content::Html;
 
 pub mod ed6 {
 	pub mod magic;
+	pub mod scena;
 }
 
 #[derive(Debug)]
@@ -43,7 +44,7 @@ fn fc_magic(arch: &State<Archives>) -> Result<Html<String>> {
 }
 
 #[rocket::get("/fc/scena/<name>")]
-fn fc_scena(arch: &State<Archives>, name: &str) -> Result<String> {
+fn fc_scena(arch: &State<Archives>, name: &str) -> Result<Html<String>> {
 	if name.len() > 8 { return Err(Error::NotFound) }
 	let mut s = kaiseki::ByteString(*b"        ._SN");
 	s[..name.len()].copy_from_slice(name.as_bytes());
@@ -54,8 +55,8 @@ fn fc_scena(arch: &State<Archives>, name: &str) -> Result<String> {
 	}.1;
 
 	let scena = kaiseki::ed6::scena::read(&data)?;
-
-	Ok(format!("{:#?}", scena))
+	let doc = ed6::scena::render(&scena);
+	Ok(Html(doc.render_to_string()))
 }
 
 #[rocket::launch]

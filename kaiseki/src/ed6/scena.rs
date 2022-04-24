@@ -62,7 +62,7 @@ pub struct CameraAngle {
 	pub _9: u32,
 	pub _10: u32,
 	pub _11: u32,
-	pub _12: [u16; 8],
+	pub _12: [u16; 6],
 }
 
 #[derive(Debug, Clone)]
@@ -104,7 +104,7 @@ pub fn read(i: &[u8]) -> Result<Scena> {
 	let dir = i.bytestring::<10>()?;
 	let fname = i.bytestring::<14>()?;
 	let town = i.u16()?;
-	let bgm = i.u16()?; // T_BGMTBL index
+	let bgm = i.u16()?;
 	let entry_func = i.func_ref()?;
 	let includes = [
 		i.file_ref()?, i.file_ref()?, i.file_ref()?, i.file_ref()?,
@@ -191,9 +191,10 @@ pub fn read(i: &[u8]) -> Result<Scena> {
 			_9: i.u32()?,
 			_10: i.u32()?,
 			_11: i.u32()?,
-			_12: [i.u16()?, i.u16()?, i.u16()?, i.u16()?, i.u16()?, i.u16()?, i.u16()?, i.u16()?]
+			_12: [i.u16()?, i.u16()?, i.u16()?, i.u16()?, i.u16()?, i.u16()?]
 		});
 	}
+	eyre::ensure!(i.pos() == head_end, "Overshot: {:X} > {:X}", i.pos(), head_end);
 
 	let code = util::multiple(&i, &func_table, code_end, |i, len| {
 		Ok(code::read(i.clone(), i.pos() + len)?)

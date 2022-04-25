@@ -19,12 +19,26 @@ pub fn render(scena: &Scena, asm: bool) -> choubun::Node {
 		let name = format!("{}/{}", dir.decode(), fname.decode());
 		doc.head.node("title", |a| a.text(&name));
 		doc.head.node("style", |a| a.raw(r#"
-			.syntax { color: purple }
-			.label { color: green }
-			.keyword { font-weight: bold; }
 			.code { tab-size: 4; }
-			.indent::before { position: absolute; content: "⟩"; opacity: 0.25; }
-			.empty-block { color: #AFAFAF }
+			.code .indent::before { position: absolute; content: "⟩"; }
+
+			.code              { color: #FF0000; }
+			.code .indent      { color: #CFCFCF; }
+			.code .empty-block { color: #AFAFAF; }
+
+			.code .syntax      { color: #7F007F; }
+			.code .keyword     { color: #7F007F; font-weight: bold; }
+			.code .case        { color: #007F00; }
+			.code .label       { color: #007F00; }
+			.code .insn        { color: #000000; }
+			.code .expr-op     { color: #3F3F00; }
+
+			.code .int         { color: #007F3F; }
+			.code .flag        { color: #0000FF; }
+			.code .var         { color: #3F007F; }
+			.code .attr        { color: #3F7F7F; }
+			.code .char        { color: #7F3F00; }
+			.code .char-attr   { color: #7F7F00; }
 		"#));
 
 		doc.body.node("h1", |a| a.text(format!("{} (town: {}, bgm: {})", &name, town, bgm)));
@@ -96,7 +110,9 @@ pub fn render(scena: &Scena, asm: bool) -> choubun::Node {
 		doc.body.node("h2", |a| a.text("Code"));
 		for (i, func) in functions.iter().enumerate() {
 			doc.body.node("h3", |a| a.text(format!("Function {}", i)));
-			let render = RenderCode {};
+			let render = RenderCode {
+				raw: asm,
+			};
 			if asm {
 				doc.body.node_class("pre", "code asm", |a| render.asm(a, func));
 			} else {
@@ -135,7 +151,9 @@ impl Node {
 	}
 }
 
-struct RenderCode { }
+struct RenderCode {
+	raw: bool,
+}
 
 impl RenderCode {
 	fn asm(&self, a: &mut Node, asm: &Asm) {
@@ -209,9 +227,7 @@ impl RenderCode {
 				}
 
 				FlowInsn::Insn(insn) => {
-					a.span("insn", |a| {
-						a.text(format!("{:?}", insn));
-					});
+					self.insn(a, insn);
 				}
 			}
 			a.text("\n");
@@ -293,9 +309,7 @@ impl RenderCode {
 
 				Stmt::Insn(insn) => {
 					line(a, indent, |a| {
-						a.span("insn", |a| {
-							a.text(format!("{:?}", insn));
-						});
+						self.insn(a, insn);
 					});
 				}
 			}
@@ -303,8 +317,130 @@ impl RenderCode {
 	}
 
 	fn expr(&self, a: &mut Node, expr: &Expr) {
-		a.span("expr", |a| {
-			a.text(format!("{:?}", expr));
-		});
+		self.expr_inner(a, expr, 0)
+	}
+
+	fn expr_inner(&self, a: &mut Node, expr: &Expr, prio: u8) {
+		match expr {
+			Expr::Const(v) => {
+				a.span_text("int", v);
+			}
+
+			Expr::Binop(op, l, r) => {
+				let (text, prio2) = match op {
+					ExprBinop::Eq      => ("==", 4),
+					ExprBinop::Ne      => ("!=", 4),
+					ExprBinop::Lt      => ("<",  4),
+					ExprBinop::Gt      => (">",  4),
+					ExprBinop::Le      => ("<=", 4),
+					ExprBinop::Ge      => (">=", 4),
+					ExprBinop::BoolAnd => ("&&", 3),
+					ExprBinop::And     => ("&", 3),
+					ExprBinop::Or      => ("|", 1),
+					ExprBinop::Add     => ("+", 5),
+					ExprBinop::Sub     => ("-", 5),
+					ExprBinop::Xor     => ("^", 2),
+					ExprBinop::Mul     => ("*", 6),
+					ExprBinop::Div     => ("/", 6),
+					ExprBinop::Mod     => ("%", 6),
+				};
+				if prio2 < prio || self.raw { a.span_text("syntax", "("); }
+				self.expr_inner(a, l, prio2);
+				a.text(" ");
+				a.span_text("expr-op", text);
+				a.text(" ");
+				self.expr_inner(a, r, prio2+1);
+				if prio2 < prio || self.raw { a.span_text("syntax", ")"); }
+			}
+
+			Expr::Unop(op, v) => {
+				let (text, is_assign) = match op {
+					ExprUnop::Not    => ("!", false),
+					ExprUnop::Neg    => ("-", false),
+					ExprUnop::Inv    => ("~", false),
+					ExprUnop::Ass    => ("=",  true),
+					ExprUnop::MulAss => ("*=", true),
+					ExprUnop::DivAss => ("/=", true),
+					ExprUnop::ModAss => ("%=", true),
+					ExprUnop::AddAss => ("+=", true),
+					ExprUnop::SubAss => ("-=", true),
+					ExprUnop::AndAss => ("&=", true),
+					ExprUnop::XorAss => ("^=", true),
+					ExprUnop::OrAss  => ("|=", true),
+				};
+				a.span_text("expr-op", text);
+				if is_assign {
+					a.text(" ");
+					self.expr_inner(a, v, 0);
+				} else {
+					self.expr_inner(a, v, 100);
+				}
+			}
+
+			Expr::Exec(insn) => {
+				self.insn(a, insn);
+			}
+			Expr::Flag(flag) => {
+				let mut r = self.visitor(a, "Flag");
+				r.flag(flag);
+			}
+			Expr::Var(var) => {
+				let mut r = self.visitor(a, "Var");
+				r.var(var);
+			}
+			Expr::Attr(attr) => {
+				let mut r = self.visitor(a, "Attr");
+				r.attr(attr);
+			}
+			Expr::CharAttr(char, attr) => {
+				let mut r = self.visitor(a, "CharAttr");
+				r.char(char);
+				r.char_attr(attr);
+			},
+			Expr::Rand => {
+				self.visitor(a, "Rand");
+			}
+		}
+	}
+
+	fn visitor<'a, 'b>(&'a self, a: &'b mut Node, name: &'static str) -> InsnVisitor<'a, 'b> {
+		a.span_text("insn", name);
+		InsnVisitor { context: self, node: a }
+	}
+
+	fn insn(&self, a: &mut Node, insn: &Insn) {
+		a.span_text("insn", format!("{:?}", insn));
+	}
+}
+
+struct InsnVisitor<'a, 'b> {
+	context: &'a RenderCode,
+	node: &'b mut Node,
+}
+
+// This might seem a little convoluted right now, but it's necessary for when I add proper traversal
+impl InsnVisitor<'_, '_> {
+	fn flag(&mut self, v: &u16) {
+		self.node.text(" ");
+		self.node.span_text("flag", v);
+	}
+
+	fn var(&mut self, v: &u16) {
+		self.node.text(" ");
+		self.node.span_text("var", v);
+	}
+
+	fn attr(&mut self, v: &u8) {
+		self.node.text(" ");
+		self.node.span_text("attr", v);
+	}
+
+	fn char(&mut self, v: &u16) {
+		self.node.text(" ");
+		self.node.span_text("char", v);
+	}
+
+	fn char_attr(&mut self, v: &u8) {
+		self.node.span_text("char-attr", format!(":{}", v));
 	}
 }

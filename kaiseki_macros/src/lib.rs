@@ -193,7 +193,7 @@ impl Gen {
 		&mut self,
 		table: &Table,
 		prefix: String,
-		vars: &[(Ident, Box<Type>)],
+		vars: &[(Ident, &Field)],
 	) -> Expr {
 		let expr = self.make_call(&table.expr);
 
@@ -215,7 +215,7 @@ impl Gen {
 					field_expr.span(),
 				);
 				decls.push(make!(Stmt, field.span; let #field_name = #field_expr;));
-				vars.push((field_name, field.ty.clone()));
+				vars.push((field_name, field));
 			}
 
 			let last: Expr = match &arm.tail {
@@ -223,7 +223,7 @@ impl Gen {
 				None => {
 					let enum_name = Ident::new(&self.enum_name, name.span());
 					let names = vars.iter().map(|a|&a.0);
-					let types = vars.iter().map(|a|&a.1);
+					let types = vars.iter().map(|a|&a.1.ty);
 					self.variants.push(make!(Variant, arm.span; #name(#(#types),*)));
 					make!(Expr, arm.span; #enum_name::#name(#(#names),*))
 				}

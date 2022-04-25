@@ -61,6 +61,14 @@ fn fc_scena(arch: &State<Archives>, name: &str) -> Result<Html<String>> {
 
 #[rocket::launch]
 fn rocket() -> _ {
+	use tracing_subscriber::prelude::*;
+
+	// XXX this for some reason breaks the log format
+	tracing_subscriber::registry()
+		.with(tracing_subscriber::fmt::layer().with_target(false))
+		.with(tracing_error::ErrorLayer::default())
+		.init();
+
 	color_eyre::config::HookBuilder::default()
 		.add_frame_filter(Box::new(|frames| {
 			if let Some(a) = frames.iter().rposition(|f| matches!(&f.filename, Some(a) if a.starts_with(env!("CARGO_MANIFEST_DIR")))) {

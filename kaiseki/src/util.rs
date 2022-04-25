@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use eyre::Result;
 use encoding_rs::SHIFT_JIS;
 use itermore::Itermore;
@@ -48,8 +50,8 @@ pub fn toc<A>(i: &[u8], f: impl FnMut(&mut In, usize) -> Result<A>) -> Result<Ve
 pub fn multiple<A>(i: &In, pos: &[usize], end: usize, mut f: impl FnMut(&mut In, usize) -> Result<A>) -> Result<Vec<A>> {
 	let mut out = Vec::with_capacity(pos.len());
 	let mut errors = Vec::new();
-	for (idx, [a, b]) in pos.iter().copied().chain(std::iter::once(end)).array_windows().enumerate() {
-		match f(&mut i.clone().at(a)?, b-a) {
+	for (idx, range) in ranges(pos.iter().copied(), end).enumerate() {
+		match f(&mut i.clone().at(range.start)?, range.end-range.start) {
 			Ok(v) => out.push(v),
 			Err(e) => errors.push(e.wrap_err(eyre::eyre!("Item {}", idx))),
 		}
@@ -68,6 +70,10 @@ pub fn multiple<A>(i: &In, pos: &[usize], end: usize, mut f: impl FnMut(&mut In,
 			s.header("Errors:")
 		})),
 	}
+}
+
+pub fn ranges<A: Clone>(items: impl Iterator<Item=A>, end: A) -> impl Iterator<Item=Range<A>> {
+	items.chain(std::iter::once(end)).array_windows().map(|[a,b]| a..b)
 }
 
 #[repr(transparent)]

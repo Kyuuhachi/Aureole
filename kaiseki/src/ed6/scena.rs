@@ -1,7 +1,7 @@
 use eyre::Result;
 use hamu::read::{In, Le};
 use crate::util::{self, ByteString, InExt};
-use super::code::{self, FileRef, FuncRef, Pos3, Code};
+use super::code::{self, FileRef, FuncRef, Pos3, Asm};
 
 #[derive(Debug, Clone)]
 pub struct Npc {
@@ -80,7 +80,7 @@ pub struct Scena {
 	pub triggers: Vec<Trigger>,
 	pub objects: Vec<Object>,
 	pub camera_angles: Vec<CameraAngle>,
-	pub code: Vec<Code>,
+	pub code: Vec<Asm>,
 }
 
 #[extend::ext(name=InExtForScena)]

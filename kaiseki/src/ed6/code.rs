@@ -1,13 +1,33 @@
 use std::collections::HashMap;
 use eyre::Result;
+use color_eyre::{Section, SectionExt};
 use derive_more::*;
 use hamu::read::{In, Le};
 use crate::util::{self, Text, InExt};
 
-pub type Code = Vec<(usize, Insn)>;
+#[derive(Debug, Clone)]
+pub struct Asm {
+	code: Vec<(usize, FlowInsn)>,
+	end: usize,
+}
+
+pub type FlowInsn = crate::decompile::FlowInsn<Expr, Insn>;
+
+pub type Stmt = crate::decompile::Stmt<Expr, Insn>;
+
+pub fn decompile(asm: &Asm) -> Result<Vec<Stmt>> {
+	crate::decompile::decompile(&asm.code, asm.end)
+		.with_section(|| {
+			asm.code.iter()
+				.map(|(addr, op)| format!("{addr} {op:?}"))
+				.collect::<Vec<_>>()
+				.join("\n")
+				.header("Code:")
+		})
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, DebugCustom)]
-#[debug(fmt = "FileRef({_0}, {_1})")]
+#[debug(fmt = "FileRef({_0}, {_1:#02X})")]
 pub struct FileRef(pub u16, pub u16); // (index, arch)
 
 #[derive(Clone, Copy, PartialEq, Eq, DebugCustom)]
@@ -48,8 +68,9 @@ pub enum Expr {
 	Rand,
 }
 
-pub fn read(i: In, end: usize) -> Result<Code> {
-	CodeParser::new(i).func(end)
+pub fn read(i: In, end: usize) -> Result<Asm> {
+	let code = CodeParser::new(i).func(end)?;
+	Ok(Asm { code, end })
 }
 
 #[derive(Deref, DerefMut)]
@@ -69,20 +90,19 @@ impl<'a> CodeParser<'a> {
 		}
 	}
 
-	fn func(&mut self, end: usize) -> Result<Code> {
+	fn func(&mut self, end: usize) -> Result<Vec<(usize, FlowInsn)>> {
 		let start = self.inner.clone();
 		let mut ops = Vec::new();
 		(|| -> Result<_> {
 			self.marks.insert(self.pos(), "\x1B[0;7m[".to_owned());
 			while self.pos() < end {
-				ops.push((self.pos(), self.insn()?));
+				ops.push((self.pos(), self.flow_insn()?));
 				self.marks.insert(self.pos(), "\x1B[0;7m•".to_owned());
 			}
 			self.marks.insert(self.pos(), "\x1B[0;7m]".to_owned());
 			eyre::ensure!(self.pos() == end, "Overshot: {:X} > {:X}", self.pos(), end);
 			Ok(())
 		})().map_err(|e| {
-			use color_eyre::{Section, SectionExt};
 			use std::fmt::Write;
 			e.section({
 				let mut s = String::new();
@@ -104,8 +124,27 @@ impl<'a> CodeParser<'a> {
 		Ok(ops)
 	}
 
+	fn flow_insn(&mut self) -> Result<FlowInsn> {
+		let pos = self.pos();
+		Ok(match self.u8()? {
+			0x02 => FlowInsn::If(self.expr()?, self.u16()? as usize),
+			0x03 => FlowInsn::Goto(self.u16()? as usize),
+			0x04 => FlowInsn::Switch(self.expr()?, {
+				let mut out = Vec::new();
+				for _ in 0..self.u16()? {
+					out.push((self.u16()?, self.u16()? as usize));
+				}
+				out
+			}, self.u16()? as usize),
+			_ => {
+				self.seek(pos).unwrap();
+				FlowInsn::Insn(self.insn()?)
+			}
+		})
+	}
+
 	fn insn(&mut self) -> Result<Insn> {
-		insn(self)
+		__insn(self)
 	}
 
 	fn expr(&mut self) -> Result<Expr> {
@@ -140,18 +179,9 @@ impl<'a> CodeParser<'a> {
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub enum Insn
 )]
-fn insn(i: &mut CodeParser) -> Result<Insn> {
+fn __insn(i: &mut CodeParser) -> Result<Insn> {
 	match u8 {
 		0x01 => Return(),
-		0x02 => If(Expr, addr/{i.u16()? as usize} as usize),
-		0x03 => Goto(addr/{i.u16()? as usize} as usize),
-		0x04 => Switch(Expr, switch_table/{
-			let mut out = Vec::new();
-			for _ in 0..i.u16()? {
-				out.push((i.u16()?, i.u16()? as usize));
-			}
-			(out, i.u16()? as usize)
-		} as (Vec<(u16, usize)>, usize)),
 		0x05 => Call(FuncRef),
 		0x06 => NewScene(FileRef, u8, u8, u8, u8),
 		0x08 => Sleep(time/u32),
@@ -200,7 +230,7 @@ fn insn(i: &mut CodeParser) -> Result<Insn> {
 			let mut insns = Vec::new();
 			while i.pos() < pos+len {
 				i.marks.insert(i.pos(), "\x1B[0;7;2m•".to_owned());
-				insns.push(insn(i)?);
+				insns.push(i.insn()?);
 			}
 			eyre::ensure!(i.pos() == pos+len, "Overshot: {:X} > {:X}", i.pos(), pos+len);
 			i.check_u8(0)?;
@@ -212,11 +242,11 @@ fn insn(i: &mut CodeParser) -> Result<Insn> {
 			let mut insns = Vec::new();
 			while i.pos() < pos+len {
 				i.marks.insert(i.pos(), "\x1B[0;7;2m•".to_owned());
-				insns.push(insn(i)?);
+				insns.push((i.insn())?);
 			}
 			eyre::ensure!(i.pos() == pos+len, "Overshot: {:X} > {:X}", i.pos(), pos+len);
-			eyre::ensure!(insn(i)? == Insn::_48(), "Invalid loop");
-			eyre::ensure!(insn(i)? == Insn::Goto(pos), "Invalid loop");
+			eyre::ensure!(i.flow_insn()? == FlowInsn::Insn(Insn::_48()), "Invalid loop");
+			eyre::ensure!(i.flow_insn()? == FlowInsn::Goto(pos), "Invalid loop");
 			insns
 		} as Vec<Insn>),
 		0x48 => _48(),

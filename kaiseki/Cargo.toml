@@ -8,7 +8,7 @@ hamu = { path = "../hamu" }
 kaiseki_macros = { path = "../kaiseki_macros" }
 
 eyre = "0.6.8"
-color-eyre = { version = "0.6.1", default-features = false }
+color-eyre = "0.6.1"
 mapr = "0.8.0"
 chrono = "0.4.19"
 thiserror = "1.0.30"
@@ -21,3 +21,4 @@ bitflags = "1.3.2"
 strum = "0.24.0"
 strum_macros = "0.24.0"
 derive_more = { version = "0.99.17", default-features = false, features = ["deref", "deref_mut", "display", "from", "into"] }
+tracing = "0.1.34"

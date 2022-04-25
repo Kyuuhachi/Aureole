@@ -8,9 +8,13 @@ choubun = { path = "./choubun" }
 kaiseki = { path = "./kaiseki" }
 
 eyre = "0.6.8"
+color-eyre = "0.6.1"
 convert_case = "0.5.0"
 rocket = "0.5.0-rc.1"
-color-eyre = { version = "0.6.1", default-features = false }
+tracing = "0.1.34"
+tracing-error = "0.2.0"
+tracing-subscriber = "0.3.11"
+extend = "1.1.2"
 
 [workspace]
 members = [

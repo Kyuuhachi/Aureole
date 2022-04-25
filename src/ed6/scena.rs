@@ -1,3 +1,4 @@
+use choubun::Node;
 use kaiseki::ed6::{scena::*, code::*};
 
 pub fn render(Scena {
@@ -83,12 +84,109 @@ pub fn render(Scena {
 		doc.body.node("h2", |a| a.text("Code"));
 		for (i, func) in code.iter().enumerate() {
 			doc.body.node("h3", |a| a.text(format!("Function {}", i)));
-			doc.body.node("pre", |a| {
-				for (addr, op) in func {
-					a.text(format!("{} {:?}\n", addr, op));
-				}
-			});
+			match decompile(func) {
+				Ok(code) => {
+					doc.body.node("pre", |a| {
+						render_code(a, 0, &code);
+					});
+				},
+				Err(_) => todo!(),
+			}
 		}
 	})
 }
 
+#[extend::ext]
+impl Node {
+	fn span<A>(&mut self, class: &str, body: impl FnOnce(&mut Node) -> A) -> A {
+		self.node("span", |a| {
+			a.class(class);
+			body(a)
+		})
+	}
+
+	fn span_text(&mut self, class: &str, text: impl ToString) {
+		self.span(class, |a| a.text(text))
+	}
+
+	fn line<A>(&mut self, indent: usize, body: impl FnOnce(&mut Node) -> A) -> A {
+		for _ in 0..indent {
+			self.span_text("indent", "\t");
+		}
+		let v = body(self);
+		self.text("\n");
+		v
+	}
+}
+
+
+fn render_code(a: &mut Node, indent: usize, code: &[Stmt]) {
+	for stmt in code {
+		a.node("span", |a| {
+			a.class("stmt");
+			match stmt {
+				Stmt::If(cases) => {
+					a.line(indent, |a| {
+						a.span_text("keyword", "IF");
+					});
+					for (expr, body) in cases {
+						a.line(indent+1, |a| {
+							match expr {
+								Some(expr) => render_expr(a, expr),
+								None => a.span_text("keyword", "ELSE"),
+							}
+							a.text(" ");
+							a.span_text("keyword", "=>");
+						});
+						render_code(a, indent+2, body);
+					}
+				}
+
+				Stmt::Switch(expr, cases) => {
+					a.line(indent, |a| {
+						a.span_text("keyword", "SWITCH");
+						a.text(" ");
+						render_expr(a, expr);
+					});
+					for (cases, body) in cases {
+						a.line(indent+1, |a| {
+							a.span_text("case", format!("{:?}", cases));
+							a.text(" ");
+							a.span_text("keyword", "=>");
+						});
+						render_code(a, indent+2, body);
+					}
+				}
+
+				Stmt::While(expr, body) => {
+					a.line(indent, |a| {
+						a.span_text("keyword", "WHILE");
+						a.text(" ");
+						render_expr(a, expr);
+					});
+					render_code(a, indent+1, body);
+				}
+
+				Stmt::Break => {
+					a.line(indent, |a| {
+						a.span_text("keyword", "BREAK");
+					});
+				}
+
+				Stmt::Insn(insn) => {
+					a.line(indent, |a| {
+						a.span("insn", |a| {
+							a.text(format!("{:?}", insn));
+						});
+					});
+				}
+			}
+		});
+	}
+}
+
+fn render_expr(a: &mut Node, expr: &Expr) {
+	a.span("expr", |a| {
+		a.text(format!("{:?}", expr));
+	});
+}

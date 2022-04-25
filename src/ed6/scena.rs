@@ -139,12 +139,29 @@ struct RenderCode { }
 
 impl RenderCode {
 	fn asm(&self, a: &mut Node, asm: &Asm) {
-		let labels = self.find_labels(asm);
+		let mut labels = BTreeSet::<usize>::new();
+		for (_, insn) in &asm.code {
+			match insn {
+				FlowInsn::If(_, target) => {
+					labels.insert(*target);
+				}
+				FlowInsn::Goto(target) => {
+					labels.insert(*target);
+				}
+				FlowInsn::Switch(_, branches, default) => {
+					labels.extend(branches.iter().map(|a| a.1));
+					labels.insert(*default);
+				}
+				FlowInsn::Insn(_) => {}
+			}
+		}
+
 		let labels: BTreeMap<usize, String> =
 			labels.into_iter()
 			.enumerate()
 			.map(|(i, a)| (a, format!("L{}", i)))
 			.collect();
+
 		for (addr, insn) in &asm.code {
 			if let Some(label) = labels.get(addr) {
 				a.span_text("label", label);
@@ -152,6 +169,7 @@ impl RenderCode {
 				a.text("\n");
 			}
 			a.text("  ");
+
 			match insn {
 				FlowInsn::If(expr, target) => {
 					a.span_text("keyword", "UNLESS");
@@ -198,26 +216,6 @@ impl RenderCode {
 			}
 			a.text("\n");
 		}
-	}
-
-	fn find_labels(&self, asm: &Asm) -> BTreeSet<usize> {
-		let mut labels = BTreeSet::<usize>::new();
-		for (_, insn) in &asm.code {
-			match insn {
-				FlowInsn::If(_, target) => {
-					labels.insert(*target);
-				}
-				FlowInsn::Goto(target) => {
-					labels.insert(*target);
-				}
-				FlowInsn::Switch(_, branches, default) => {
-					labels.extend(branches.iter().map(|a| a.1));
-					labels.insert(*default);
-				}
-				FlowInsn::Insn(_) => {}
-			}
-		}
-		labels
 	}
 
 	fn code(&self, a: &mut Node, indent: usize, code: &[Stmt]) {

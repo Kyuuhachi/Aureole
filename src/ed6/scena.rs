@@ -255,7 +255,18 @@ fn render_code(a: &mut Node, indent: usize, code: &[Stmt]) {
 				});
 				for (cases, body) in cases {
 					line(a, indent+1, |a| {
-						a.span_text("case", format!("{:?}", cases));
+						let mut first = true;
+						for case in cases {
+							if !first {
+								a.span_text("syntax", ",");
+								a.text(" ");
+							}
+							first = false;
+							match case {
+								Some(case) => a.span_text("case", case),
+								None => a.span_text("keyword", "default"),
+							}
+						}
 						a.text(" ");
 						a.span_text("syntax", "=>");
 					});

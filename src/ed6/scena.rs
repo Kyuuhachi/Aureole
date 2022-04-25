@@ -22,6 +22,8 @@ pub fn render(scena: &Scena, asm: bool) -> choubun::Node {
 			.syntax { color: purple }
 			.label { color: green }
 			.keyword { font-weight: bold; }
+			.code { tab-size: 4; }
+			.indent::before { position: absolute; content: "⟩"; opacity: 0.25; }
 		"#));
 
 		doc.body.node("h1", |a| a.text(format!("{} (town: {}, bgm: {})", &name, town, bgm)));

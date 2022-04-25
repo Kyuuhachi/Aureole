@@ -144,7 +144,7 @@ impl<'a> CodeParser<'a> {
 	}
 
 	fn insn(&mut self) -> Result<Insn> {
-		__insn(self)
+		Insn::read(self)
 	}
 
 	fn expr(&mut self) -> Result<Expr> {
@@ -179,7 +179,7 @@ impl<'a> CodeParser<'a> {
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub enum Insn
 )]
-fn __insn(i: &mut CodeParser) -> Result<Insn> {
+fn read(i: &mut CodeParser) -> Result<Self> {
 	match u8 {
 		0x01 => Return(),
 		0x05 => Call(FuncRef),

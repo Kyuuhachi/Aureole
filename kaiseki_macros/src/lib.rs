@@ -221,11 +221,10 @@ impl Gen {
 			let last: Expr = match &arm.tail {
 				Some(tail) => self.process_table(tail, name.to_string(), &vars),
 				None => {
-					let enum_name = Ident::new(&self.enum_name, name.span());
 					let names = vars.iter().map(|a|&a.0);
 					let types = vars.iter().map(|a|&a.1.ty);
 					self.variants.push(make!(Variant, arm.span; #name(#(#types),*)));
-					make!(Expr, arm.span; #enum_name::#name(#(#names),*))
+					make!(Expr, arm.span; Self::#name(#(#names),*))
 				}
 			};
 
@@ -269,8 +268,11 @@ pub fn bytecode(mut attr: TS, item: TS) -> TS {
 	func.block = Box::new(make!(Block, Span::call_site(); { Ok(#body) }));
 	the_enum.variants = gen.variants.into_iter().collect();
 
+	let enum_name = &the_enum.ident;
 	quote! {
 		#the_enum
-		#func
+		impl #enum_name {
+			#func
+		}
 	}.into()
 }

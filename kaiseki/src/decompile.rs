@@ -12,7 +12,9 @@ pub enum FlowInsn<E, I> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Stmt<E, I> {
+	#[allow(clippy::type_complexity)]
 	If(Vec<(Option<E>, Vec<Stmt<E, I>>)>),
+	#[allow(clippy::type_complexity)]
 	Switch(E, Vec<(Vec<Option<u16>>, Vec<Stmt<E, I>>)>),
 	While(E, Vec<Stmt<E, I>>),
 	Break,

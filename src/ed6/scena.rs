@@ -24,6 +24,7 @@ pub fn render(scena: &Scena, asm: bool) -> choubun::Node {
 			.keyword { font-weight: bold; }
 			.code { tab-size: 4; }
 			.indent::before { position: absolute; content: "⟩"; opacity: 0.25; }
+			.empty-block { color: #AFAFAF }
 		"#));
 
 		doc.body.node("h1", |a| a.text(format!("{} (town: {}, bgm: {})", &name, town, bgm)));
@@ -223,6 +224,9 @@ fn render_code(a: &mut Node, indent: usize, code: &[Stmt]) {
 		let v = body(a);
 		a.text("\n");
 		v
+	}
+	if code.is_empty() {
+		line(a, indent, |a| a.span_text("empty-block", "(empty)"));
 	}
 	for stmt in code {
 		match stmt {

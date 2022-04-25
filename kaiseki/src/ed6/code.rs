@@ -175,9 +175,69 @@ impl<'a> CodeParser<'a> {
 	}
 }
 
+pub trait InsnVisitor {
+	fn u8(&self, v: &u8);
+	fn u16(&self, v: &u16);
+	fn u32(&self, v: &u32);
+
+	fn i8(&self, v: &i8);
+	fn i16(&self, v: &i16);
+	fn i32(&self, v: &i32);
+
+	fn func_ref(&self, v: &FuncRef);
+	fn file_ref(&self, v: &FileRef);
+
+	fn pos2(&self, v: &Pos2);
+	fn pos3(&self, v: &Pos3);
+	fn relative(&self, v: &Pos3);
+
+	fn time(&self, v: &u32);
+	fn speed(&self, v: &u32);
+	fn angle(&self, v: &u16);
+	fn color(&self, v: &u32);
+
+	fn time16(&self, v: &u16);
+	fn angle32(&self, v: &i32);
+
+	fn battle(&self, v: &u16);
+	fn town(&self, v: &u16);
+	fn bgmtbl(&self, v: &u8);
+	fn quest(&self, v: &u16);
+	fn sound(&self, v: &u16);
+	fn item(&self, v: &u16);
+	fn flag(&self, v: &u16);
+
+	fn fork(&self, v: &[Insn]);
+	fn expr(&self, v: &Expr);
+	fn string(&self, v: &str);
+	fn text(&self, v: &Text);
+	fn menu(&self, v: &[String]);
+	fn emote(&self, v: &(u8, u8, u32, u8));
+
+	fn flags(&self, v: &u32);
+	fn quest_flag(&self, v: &u8);
+	fn char_flags(&self, v: &u16);
+	fn quest_task(&self, v: &u16);
+	fn member(&self, v: &u8);
+
+	fn var(&self, v: &u16);
+	fn attr(&self, v: &u8);
+	fn char_attr(&self, v: &u8);
+
+	fn char(&self, v: &u16);
+	fn chcp(&self, v: &u16);
+	fn fork_id(&self, v: &u8);
+	fn menu_id(&self, v: &u16);
+	fn object(&self, v: &u16);
+
+	fn data(&self, v: &[u8]);
+}
+
 #[kaiseki_macros::bytecode(
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub enum Insn {}
+	pub fn visit(&self, vis: impl InsnVisitor) {}
+	pub fn name(&self) -> &'static str {}
 )]
 fn read(i: &mut CodeParser) -> Result<Self> {
 	match u8 {
@@ -218,13 +278,13 @@ fn read(i: &mut CodeParser) -> Result<Self> {
 			0x00 => FlagsGet(quest_flag/u8),
 			0x01 => TaskGet(quest_task/u16),
 		}),
-		0x2D => PartyAdd(member/u8, char/u8), // FC only
+		0x2D => PartyAdd(member/u8, char/{i.u8()? as u16} as u16), // FC only
 		0x30 => _Party30(u8),
 		0x3E => ItemAdd(item/u16, u16),
 		0x3F => ItemRemove(item/u16, u16),
-		0x43 => CharForkFunc(char/u16, forkid/u8, FuncRef),
-		0x44 => CharForkQuit(char/u16, forkid/u8),
-		0x45 => CharFork(char/u16, forkid/u8, u8, fork/{
+		0x43 => CharForkFunc(char/u16, fork_id/u8, FuncRef),
+		0x44 => CharForkQuit(char/u16, fork_id/u8),
+		0x45 => CharFork(char/u16, fork_id/u8, u8, fork/{
 			let len = i.u8()? as usize;
 			let pos = i.pos();
 			let mut insns = Vec::new();
@@ -236,7 +296,7 @@ fn read(i: &mut CodeParser) -> Result<Self> {
 			i.check_u8(0)?;
 			insns
 		} as Vec<Insn>),
-		0x46 => CharForkLoop(char/u16, forkid/u8, u8, fork/{
+		0x46 => CharForkLoop(char/u16, fork_id/u8, u8, fork/{
 			let len = i.u8()? as usize;
 			let pos = i.pos();
 			let mut insns = Vec::new();
@@ -276,15 +336,15 @@ fn read(i: &mut CodeParser) -> Result<Self> {
 		0x69 => CamLookAt(char/u16, time/u32),
 		0x6A => _Char6A(char/u16),
 		0x6B => CamDistance(i32, time/u32),
-		0x6C => CamAngle(angle/i32, time/u32),
+		0x6C => CamAngle(angle32/i32, time/u32),
 		0x6D => CamPos(Pos3, time/u32),
-		0x6F => _Obj6F(obj/u16, u32),
-		0x70 => _Obj70(obj/u16, u32),
+		0x6F => _Obj6F(object/u16, u32),
+		0x70 => _Obj70(object/u16, u32),
 		0x86 => CharSetChcp(char/u16, chcp/u16),
 		0x87 => CharSetFrame(char/u16, u16),
-		0x88 => CharSetPos(char/u16, Pos3, anle/u16),
-		0x8A => CharLookAt(char/u16, char/u16, time/u16),
-		0x8C => CharSetAngle(char/u16, angle/u16, time/u16),
+		0x88 => CharSetPos(char/u16, Pos3, angle/u16),
+		0x8A => CharLookAt(char/u16, char/u16, time16/u16),
+		0x8C => CharSetAngle(char/u16, angle/u16, time16/u16),
 		0x8D => CharIdle(char/u16, Pos2, Pos2, speed/u32),
 		0x8E => CharWalkTo(char/u16, Pos3, speed/u32, u8),
 		0x8F => CharWalkTo2(char/u16, Pos3, speed/u32, u8), // how are these two different?

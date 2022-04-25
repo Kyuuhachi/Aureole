@@ -8,6 +8,7 @@ use quote::{quote, format_ident};
 use syn::{
 	*,
 	spanned::Spanned,
+	parse::{Parser, ParseStream},
 	punctuated::*
 };
 
@@ -70,13 +71,12 @@ fn emit<A>(e: impl FnOnce() -> Result<A>) -> Option<A> {
 	}
 }
 
-fn parse_fn(item: &ItemFn) -> Result<(String, Table)> {
+fn parse_fn(item: &ItemFn) -> Result<(&Ident, Table)> {
 	let first_arg = item.sig.inputs.first()
 		.ok_or_else(|| Error::new(item.sig.span(), "need at least one argument"))?;
 	let first_arg = cast!(FnArg::Typed, first_arg)?;
 	let first_arg = cast!(Pat::Ident, &*first_arg.pat)?;
-	let first_arg = first_arg.ident.to_string();
-	// I'd like to allow self too, but can't put types inside impls anyway so it doesn't matter
+	let first_arg = &first_arg.ident;
 
 	let expr = match &item.block.stmts[..] {
 		[Stmt::Expr(a)] => a,
@@ -179,24 +179,18 @@ macro_rules! make {
 
 struct Gen {
 	enum_name: String,
-	first_arg: String,
 	variants: Vec<Variant>,
+	visit_arms: Vec<Arm>,
+	name_arms: Vec<Arm>,
 }
 
 impl Gen {
-	fn make_call(&self, name: &Ident) -> Expr {
-		let first_arg = Ident::new(&self.first_arg, name.span());
-		make!(Expr, name.span(); #first_arg.#name()?)
-	}
-
 	fn process_table(
 		&mut self,
 		table: &Table,
 		prefix: String,
 		vars: &[(Ident, &Field)],
 	) -> Expr {
-		let expr = self.make_call(&table.expr);
-
 		let mut arms = Vec::new();
 		for arm in &table.arms {
 			let lhs = &arm.lhs;
@@ -208,7 +202,7 @@ impl Gen {
 			for field in &arm.fields {
 				let field_expr = match &field.expr {
 					Either::Left(expr) => expr.clone(),
-					Either::Right(name) => self.make_call(name),
+					Either::Right(name) => make!(Expr, name.span(); i.#name()?),
 				};
 				let field_name = Ident::new(
 					&format!("_{}", vars.len()),
@@ -221,9 +215,19 @@ impl Gen {
 			let last: Expr = match &arm.tail {
 				Some(tail) => self.process_table(tail, name.to_string(), &vars),
 				None => {
-					let names = vars.iter().map(|a|&a.0);
-					let types = vars.iter().map(|a|&a.1.ty);
+					let names = vars.iter().map(|a|&a.0).collect::<Vec<_>>();
+					let types = vars.iter().map(|a|&a.1.ty).collect::<Vec<_>>();
+					let aliases = vars.iter().map(|a|&a.1.alias).collect::<Vec<_>>();
 					self.variants.push(make!(Variant, arm.span; #name(#(#types),*)));
+					self.visit_arms.push(make!(Arm, arm.span;
+						Self::#name(#(#names),*) => {
+							#(vis.#aliases(#names);)*
+						}
+					));
+					let name_str = name.to_string();
+					self.name_arms.push(make!(Arm, arm.span;
+						Self::#name(#(#names),*) => #name_str,
+					));
 					make!(Expr, arm.span; Self::#name(#(#names),*))
 				}
 			};
@@ -238,6 +242,8 @@ impl Gen {
 		};
 		let fallback = make!(Arm, table.span; op => eyre::bail!("Unknown {}: {:02X}", #description, op));
 
+		let name = &table.expr;
+		let expr = make!(Expr, name.span(); i.#name()?);
 		make!(Expr, table.span; match #expr { #(#arms),* #fallback })
 	}
 }
@@ -245,32 +251,63 @@ impl Gen {
 // {{{1 Main
 #[proc_macro_attribute]
 pub fn bytecode(attr: TS, item: TS) -> TS {
-	let attr = parse_macro_input!(attr as ItemEnum);
-	let func = parse_macro_input!(item as ItemFn);
-	match emit(|| run(attr, func)) {
+	match emit(|| run(attr.into(), item.into())) {
 		Some(ts) => ts.into(),
 		None => TS::new(),
 	}
 }
 
-fn run(mut the_enum: ItemEnum, mut func: ItemFn) -> Result<TokenStream> {
-	let (first_arg, table) = parse_fn(&func)?;
+fn run(attr: TokenStream, item: TokenStream) -> Result<TokenStream> {
+	let (mut the_enum, mut visit_fn, mut name_fn) = Parser::parse2(move |content: ParseStream| {
+		Ok((
+			content.parse::<ItemEnum>()?,
+			content.parse::<ItemFn>()?,
+			content.parse::<ItemFn>()?,
+		))
+	}, attr)?;
+
+	let mut func = parse2::<ItemFn>(item)?;
+
+	let visit_arg = cast!(Some, visit_fn.sig.inputs.iter().nth(1))?;
+	let visit_arg = cast!(FnArg::Typed, visit_arg)?;
+	let visit_arg = cast!(Pat::Ident, &*visit_arg.pat)?;
+	let visit_arg = &visit_arg.ident;
+
+	let (read_arg, table) = parse_fn(&func)?;
 
 	let mut gen = Gen {
 		enum_name: the_enum.ident.to_string(),
-		first_arg,
 		variants: Vec::new(),
+		visit_arms: Vec::new(),
+		name_arms: Vec::new(),
 	};
 
 	let body = gen.process_table(&table, String::new(), &[]);
-	func.block = Box::new(make!(Block, Span::call_site(); { Ok(#body) }));
+	func.block = Box::new(make!(Block, Span::call_site(); {
+		let mut i = #read_arg;
+		Ok(#body)
+	}));
+
 	the_enum.variants = gen.variants.into_iter().collect();
+
+	let arms = gen.visit_arms;
+	visit_fn.block = Box::new(make!(Block, Span::call_site(); {
+		let mut vis = #visit_arg;
+		match self { #(#arms)* }
+	}));
+
+	let arms = gen.name_arms;
+	name_fn.block = Box::new(make!(Block, Span::call_site(); {
+		match self { #(#arms)* }
+	}));
 
 	let enum_name = &the_enum.ident;
 	Ok(quote! {
 		#the_enum
 		impl #enum_name {
 			#func
+			#visit_fn
+			#name_fn
 		}
 	})
 }

@@ -48,7 +48,7 @@ impl<E: Clone, I: Clone> Decompiler<'_, E, I> {
 		*range = self.advance(range.clone());
 		match &self.asm[&start] {
 			&&FlowInsn::If(ref expr, jump) => {
-				let (inner, target) = self.find_target(range.start..jump);
+				let (inner, target) = self.find_target(range.start..jump, brk);
 				range.start = jump;
 				if target == Some(start) {
 					return Ok(Stmt::While(expr.clone(), self.block(inner, Some(jump))?))
@@ -102,11 +102,12 @@ impl<E: Clone, I: Clone> Decompiler<'_, E, I> {
 	}
 
 	#[tracing::instrument(skip(self))]
-	fn find_target(&self, range: Range<usize>) -> (Range<usize>, Option<usize>) {
+	fn find_target(&self, range: Range<usize>, brk: Option<usize>) -> (Range<usize>, Option<usize>) {
 		if let Some((addr, FlowInsn::Goto(target))) = self.asm.range(range.clone()).next_back() {
-			(range.start..*addr, Some(*target))
-		} else {
-			(range, None)
+			if Some(*target) != brk {
+				return (range.start..*addr, Some(*target))
+			}
 		}
+		(range, None)
 	}
 }

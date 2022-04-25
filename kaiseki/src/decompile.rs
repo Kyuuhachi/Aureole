@@ -56,12 +56,10 @@ impl<E: Clone, I: Clone> Decompiler<'_, E, I> {
 
 				let mut cases = vec![(Some(expr.clone()), self.block(inner, brk)?)];
 				if let Some(target) = target {
-					if range.contains(&target) {
-						range.start = target;
-						match &self.block(jump..target, brk)?[..] {
-							[Stmt::If(more_cases)] => cases.extend(more_cases.iter().cloned()),
-							a => cases.push((None, a.to_owned())),
-						}
+					range.start = target;
+					match &self.block(jump..target, brk)?[..] {
+						[Stmt::If(more_cases)] => cases.extend(more_cases.iter().cloned()),
+						a => cases.push((None, a.to_owned())),
 					}
 				};
 				Ok(Stmt::If(cases))

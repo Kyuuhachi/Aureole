@@ -61,11 +61,11 @@ fn fc_scena(arch: &State<Archives>, name: &str) -> Result<Html<String>> {
 
 #[rocket::launch]
 fn rocket() -> _ {
-	use tracing_subscriber::prelude::*;
+	use tracing_subscriber::{prelude::*, EnvFilter};
 
-	// XXX this for some reason breaks the log format
 	tracing_subscriber::registry()
-		.with(tracing_subscriber::fmt::layer().with_target(false))
+		.with(tracing_subscriber::fmt::layer())
+		.with(EnvFilter::from_default_env())
 		.with(tracing_error::ErrorLayer::default())
 		.init();
 

@@ -71,18 +71,18 @@ impl std::ops::DerefMut for Node {
 }
 
 impl Leaf {
-	fn new(name: impl AsRef<str>) -> Leaf {
+	fn new(name: &str) -> Leaf {
 		Leaf {
-			name: name.as_ref().to_owned(),
+			name: name.to_owned(),
 			attrs: LinkedHashMap::new(),
 		}
 	}
 
-	pub fn attr(&mut self, name: impl AsRef<str>, value: impl AsRef<str>) {
-		self.attrs.insert(name.as_ref().to_owned(), value.as_ref().to_owned());
+	pub fn attr(&mut self, name: &str, value: impl ToString) {
+		self.attrs.insert(name.to_owned(), value.to_string());
 	}
 
-	pub fn class(&mut self, class: impl AsRef<str>) {
+	pub fn class(&mut self, class: &str) {
 		if let Some(v) = self.attrs.get_mut("class") {
 			v.push(' ');
 			v.push_str(class.as_ref());
@@ -93,7 +93,7 @@ impl Leaf {
 }
 
 impl Node {
-	fn new(name: impl AsRef<str>) -> Node {
+	fn new(name: &str) -> Node {
 		Node {
 			indent: false,
 			leaf: Leaf::new(name),
@@ -105,36 +105,36 @@ impl Node {
 		self.indent = true;
 	}
 
-	pub fn attr(&mut self, name: impl AsRef<str>, value: impl AsRef<str>) {
+	pub fn attr(&mut self, name: &str, value: impl ToString) {
 		self.leaf.attr(name, value);
 	}
 
-	pub fn class(&mut self, class: impl AsRef<str>) {
+	pub fn class(&mut self, class: &str) {
 		self.leaf.class(class);
 	}
 }
 
 impl Body {
-	pub fn node<A>(&mut self, name: impl AsRef<str>, body: impl FnOnce(&mut Node) -> A) -> A {
+	pub fn node<A>(&mut self, name: &str, body: impl FnOnce(&mut Node) -> A) -> A {
 		let mut node = Node::new(name);
 		let v = body(&mut node);
 		self.0.push(Item::Node(node));
 		v
 	}
 
-	pub fn leaf<A>(&mut self, name: impl AsRef<str>, body: impl FnOnce(&mut Leaf) -> A) -> A {
+	pub fn leaf<A>(&mut self, name: &str, body: impl FnOnce(&mut Leaf) -> A) -> A {
 		let mut node = Leaf::new(name);
 		let v = body(&mut node);
 		self.0.push(Item::Leaf(node));
 		v
 	}
 
-	pub fn text(&mut self, text: impl AsRef<str>) {
-		self.0.push(Item::Text(text.as_ref().to_owned()));
+	pub fn text(&mut self, text: impl ToString) {
+		self.0.push(Item::Text(text.to_string()));
 	}
 
-	pub fn raw(&mut self, text: impl AsRef<str>) {
-		self.0.push(Item::Raw(text.as_ref().to_owned()));
+	pub fn raw(&mut self, text: &str) {
+		self.0.push(Item::Raw(text.to_owned()));
 	}
 
 	pub fn here(&mut self) -> Rc<RefCell<Body>> {
@@ -144,11 +144,11 @@ impl Body {
 	}
 }
 
-pub fn node(name: impl AsRef<str>, body: impl FnOnce(&mut Node)) -> Node {
+pub fn node(name: &str, body: impl FnOnce(&mut Node)) -> Node {
 	node_(name, body).0
 }
 
-pub fn node_<A>(name: impl AsRef<str>, body: impl FnOnce(&mut Node) -> A) -> (Node, A) {
+pub fn node_<A>(name: &str, body: impl FnOnce(&mut Node) -> A) -> (Node, A) {
 	let mut node = Node::new(name);
 	let v = body(&mut node);
 	(node, v)

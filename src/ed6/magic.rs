@@ -32,7 +32,7 @@ pub fn render(magics: &Vec<Magic<String>>) -> choubun::Node {
 			} in magics {
 				a.node("tr", |a| {
 					a.indent();
-					a.class(format!("el-{}", element.to_string().to_lowercase()));
+					a.class(&format!("el-{}", element.to_string().to_lowercase()));
 
 					a.node("td", |a| {
 						a.class("name");

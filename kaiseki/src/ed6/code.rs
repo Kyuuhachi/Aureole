@@ -177,7 +177,7 @@ impl<'a> CodeParser<'a> {
 
 #[kaiseki_macros::bytecode(
 	#[derive(Debug, Clone, PartialEq, Eq)]
-	pub enum Insn
+	pub enum Insn {}
 )]
 fn read(i: &mut CodeParser) -> Result<Self> {
 	match u8 {

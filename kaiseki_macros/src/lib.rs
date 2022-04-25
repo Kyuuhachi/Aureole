@@ -3,7 +3,7 @@
 use either::Either;
 use convert_case::{Case, Casing, Boundary};
 use proc_macro::{TokenStream as TS, Diagnostic, Level};
-use proc_macro2::Span;
+use proc_macro2::{Span, TokenStream};
 use quote::{quote, format_ident};
 use syn::{
 	*,
@@ -244,19 +244,17 @@ impl Gen {
 
 // {{{1 Main
 #[proc_macro_attribute]
-pub fn bytecode(mut attr: TS, item: TS) -> TS {
-	{
-		use proc_macro::*;
-		attr.extend([TokenTree::Group(Group::new(Delimiter::Brace, TS::new()))]);
+pub fn bytecode(attr: TS, item: TS) -> TS {
+	let attr = parse_macro_input!(attr as ItemEnum);
+	let func = parse_macro_input!(item as ItemFn);
+	match emit(|| run(attr, func)) {
+		Some(ts) => ts.into(),
+		None => TS::new(),
 	}
-	let mut the_enum = parse_macro_input!(attr as ItemEnum);
+}
 
-	let mut func = parse_macro_input!(item as ItemFn);
-
-	let (first_arg, table) = match emit(|| parse_fn(&func)) {
-		Some(a) => a,
-		None => return TS::new(),
-	};
+fn run(mut the_enum: ItemEnum, mut func: ItemFn) -> Result<TokenStream> {
+	let (first_arg, table) = parse_fn(&func)?;
 
 	let mut gen = Gen {
 		enum_name: the_enum.ident.to_string(),
@@ -269,10 +267,10 @@ pub fn bytecode(mut attr: TS, item: TS) -> TS {
 	the_enum.variants = gen.variants.into_iter().collect();
 
 	let enum_name = &the_enum.ident;
-	quote! {
+	Ok(quote! {
 		#the_enum
 		impl #enum_name {
 			#func
 		}
-	}.into()
+	})
 }

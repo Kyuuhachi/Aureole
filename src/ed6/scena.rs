@@ -1,19 +1,28 @@
+use std::collections::{BTreeSet, BTreeMap};
+
 use choubun::Node;
 use kaiseki::ed6::{scena::*, code::*};
 
-pub fn render(Scena {
-	dir, fname, town, bgm,
-	entry_func,
-	includes,
-	ch, cp,
-	npcs, monsters, triggers, objects,
-	camera_angles,
-	code,
-}: &Scena) -> choubun::Node {
+pub fn render(scena: &Scena, asm: bool) -> choubun::Node {
+	let Scena {
+		dir, fname, town, bgm,
+		entry_func,
+		includes,
+		ch, cp,
+		npcs, monsters, triggers, objects,
+		camera_angles,
+		functions,
+	} = scena;
+
 	choubun::document(|doc| {
 		doc.root.attr("lang", "en");
 		let name = format!("{}/{}", dir.decode(), fname.decode());
 		doc.head.node("title", |a| a.text(&name));
+		doc.head.node("style", |a| a.raw(r#"
+			.syntax { color: purple }
+			.label { color: green }
+			.keyword { font-weight: bold; }
+		"#));
 
 		doc.body.node("h1", |a| a.text(format!("{} (town: {}, bgm: {})", &name, town, bgm)));
 
@@ -82,15 +91,23 @@ pub fn render(Scena {
 		});
 
 		doc.body.node("h2", |a| a.text("Code"));
-		for (i, func) in code.iter().enumerate() {
+		for (i, func) in functions.iter().enumerate() {
 			doc.body.node("h3", |a| a.text(format!("Function {}", i)));
-			match decompile(func) {
-				Ok(code) => {
-					doc.body.node("pre", |a| {
-						render_code(a, 0, &code);
-					});
-				},
-				Err(_) => todo!(),
+			if asm {
+				doc.body.node_class("pre", "code asm", |a| render_asm(a, func));
+			} else {
+				match decompile(func) {
+					Ok(code) => {
+						doc.body.node_class("pre", "code", |a| render_code(a, 0, &code));
+					},
+					Err(e) => {
+						tracing::error!("{:?}", e);
+						doc.body.node_class("div", "decompile-error", |a| {
+							a.text("Decompilation failed. This is a bug.");
+						});
+						doc.body.node_class("pre", "code asm", |a| render_asm(a, func));
+					},
+				}
 			}
 		}
 	})
@@ -98,90 +115,171 @@ pub fn render(Scena {
 
 #[extend::ext]
 impl Node {
-	fn span<A>(&mut self, class: &str, body: impl FnOnce(&mut Node) -> A) -> A {
-		self.node("span", |a| {
+	fn node_class<A>(&mut self, name: &str, class: &str, body: impl FnOnce(&mut Node) -> A) -> A {
+		self.node(name, |a| {
 			a.class(class);
 			body(a)
 		})
 	}
 
+	fn span<A>(&mut self, class: &str, body: impl FnOnce(&mut Node) -> A) -> A {
+		self.node_class("span", class, body)
+	}
+
 	fn span_text(&mut self, class: &str, text: impl ToString) {
 		self.span(class, |a| a.text(text))
 	}
+}
 
-	fn line<A>(&mut self, indent: usize, body: impl FnOnce(&mut Node) -> A) -> A {
-		for _ in 0..indent {
-			self.span_text("indent", "\t");
+fn render_asm(a: &mut Node, asm: &Asm) {
+	let labels = find_labels(asm);
+	let labels: BTreeMap<usize, String> =
+		labels.into_iter()
+		.enumerate()
+		.map(|(i, a)| (a, format!("L{}", i)))
+		.collect();
+	for (addr, insn) in &asm.code {
+		if let Some(label) = labels.get(addr) {
+			a.span_text("label", label);
+			a.span_text("syntax", ":");
+			a.text("\n");
 		}
-		let v = body(self);
-		self.text("\n");
-		v
+		a.text("  ");
+		match insn {
+			FlowInsn::If(expr, target) => {
+				a.span_text("keyword", "UNLESS");
+				a.text(" ");
+				render_expr(a, expr);
+				a.text(" ");
+				a.span_text("keyword", "GOTO");
+				a.text(" ");
+				a.span_text("label", &labels[target]);
+			}
+
+			FlowInsn::Goto(target) => {
+				a.span_text("keyword", "GOTO");
+				a.text(" ");
+				a.span_text("label", &labels[target]);
+			}
+
+			FlowInsn::Switch(expr, branches, default) => {
+				a.span_text("keyword", "SWITCH");
+				a.text(" ");
+				render_expr(a, expr);
+				a.text(" ");
+				a.span_text("syntax", "[");
+				for (case, target) in branches {
+					a.span_text("case", case);
+					a.span_text("syntax", ":");
+					a.text(" ");
+					a.span_text("label", &labels[target]);
+					a.span_text("syntax", ",");
+					a.text(" ");
+				}
+				a.span_text("keyword", "default");
+				a.span_text("syntax", ":");
+				a.text(" ");
+				a.span_text("label", &labels[default]);
+				a.span_text("syntax", "]");
+			}
+
+			FlowInsn::Insn(insn) => {
+				a.span("insn", |a| {
+					a.text(format!("{:?}", insn));
+				});
+			}
+		}
+		a.text("\n");
 	}
 }
 
+fn find_labels(asm: &Asm) -> BTreeSet<usize> {
+	let mut labels = BTreeSet::<usize>::new();
+	for (_, insn) in &asm.code {
+		match insn {
+			FlowInsn::If(_, target) => {
+				labels.insert(*target);
+			}
+			FlowInsn::Goto(target) => {
+				labels.insert(*target);
+			}
+			FlowInsn::Switch(_, branches, default) => {
+				labels.extend(branches.iter().map(|a| a.1));
+				labels.insert(*default);
+			}
+			FlowInsn::Insn(_) => {}
+		}
+	}
+	labels
+}
 
 fn render_code(a: &mut Node, indent: usize, code: &[Stmt]) {
+	fn line<A>(a: &mut Node, indent: usize, body: impl FnOnce(&mut Node) -> A) -> A {
+		for _ in 0..indent {
+			a.span_text("indent", "\t");
+		}
+		let v = body(a);
+		a.text("\n");
+		v
+	}
 	for stmt in code {
-		a.node("span", |a| {
-			a.class("stmt");
-			match stmt {
-				Stmt::If(cases) => {
-					a.line(indent, |a| {
-						a.span_text("keyword", "IF");
-					});
-					for (expr, body) in cases {
-						a.line(indent+1, |a| {
-							match expr {
-								Some(expr) => render_expr(a, expr),
-								None => a.span_text("keyword", "ELSE"),
-							}
-							a.text(" ");
-							a.span_text("keyword", "=>");
-						});
-						render_code(a, indent+2, body);
-					}
-				}
-
-				Stmt::Switch(expr, cases) => {
-					a.line(indent, |a| {
-						a.span_text("keyword", "SWITCH");
+		match stmt {
+			Stmt::If(cases) => {
+				line(a, indent, |a| {
+					a.span_text("keyword", "IF");
+				});
+				for (expr, body) in cases {
+					line(a, indent+1, |a| {
+						match expr {
+							Some(expr) => render_expr(a, expr),
+							None => a.span_text("keyword", "ELSE"),
+						}
 						a.text(" ");
-						render_expr(a, expr);
+						a.span_text("syntax", "=>");
 					});
-					for (cases, body) in cases {
-						a.line(indent+1, |a| {
-							a.span_text("case", format!("{:?}", cases));
-							a.text(" ");
-							a.span_text("keyword", "=>");
-						});
-						render_code(a, indent+2, body);
-					}
-				}
-
-				Stmt::While(expr, body) => {
-					a.line(indent, |a| {
-						a.span_text("keyword", "WHILE");
-						a.text(" ");
-						render_expr(a, expr);
-					});
-					render_code(a, indent+1, body);
-				}
-
-				Stmt::Break => {
-					a.line(indent, |a| {
-						a.span_text("keyword", "BREAK");
-					});
-				}
-
-				Stmt::Insn(insn) => {
-					a.line(indent, |a| {
-						a.span("insn", |a| {
-							a.text(format!("{:?}", insn));
-						});
-					});
+					render_code(a, indent+2, body);
 				}
 			}
-		});
+
+			Stmt::Switch(expr, cases) => {
+				line(a, indent, |a| {
+					a.span_text("keyword", "SWITCH");
+					a.text(" ");
+					render_expr(a, expr);
+				});
+				for (cases, body) in cases {
+					line(a, indent+1, |a| {
+						a.span_text("case", format!("{:?}", cases));
+						a.text(" ");
+						a.span_text("syntax", "=>");
+					});
+					render_code(a, indent+2, body);
+				}
+			}
+
+			Stmt::While(expr, body) => {
+				line(a, indent, |a| {
+					a.span_text("keyword", "WHILE");
+					a.text(" ");
+					render_expr(a, expr);
+				});
+				render_code(a, indent+1, body);
+			}
+
+			Stmt::Break => {
+				line(a, indent, |a| {
+					a.span_text("keyword", "BREAK");
+				});
+			}
+
+			Stmt::Insn(insn) => {
+				line(a, indent, |a| {
+					a.span("insn", |a| {
+						a.text(format!("{:?}", insn));
+					});
+				});
+			}
+		}
 	}
 }
 

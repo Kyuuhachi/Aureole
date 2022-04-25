@@ -7,8 +7,8 @@ use crate::util::{self, Text, InExt};
 
 #[derive(Debug, Clone)]
 pub struct Asm {
-	code: Vec<(usize, FlowInsn)>,
-	end: usize,
+	pub code: Vec<(usize, FlowInsn)>,
+	pub end: usize,
 }
 
 pub type FlowInsn = crate::decompile::FlowInsn<Expr, Insn>;

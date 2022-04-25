@@ -80,7 +80,7 @@ pub struct Scena {
 	pub triggers: Vec<Trigger>,
 	pub objects: Vec<Object>,
 	pub camera_angles: Vec<CameraAngle>,
-	pub code: Vec<Asm>,
+	pub functions: Vec<Asm>,
 }
 
 #[extend::ext(name=InExtForScena)]
@@ -196,7 +196,7 @@ pub fn read(i: &[u8]) -> Result<Scena> {
 	}
 	eyre::ensure!(i.pos() == head_end, "Overshot: {:X} > {:X}", i.pos(), head_end);
 
-	let code = util::multiple(&i, &func_table, code_end, |i, len| {
+	let functions = util::multiple(&i, &func_table, code_end, |i, len| {
 		Ok(code::read(i.clone(), i.pos() + len)?)
 	})?;
 
@@ -211,7 +211,7 @@ pub fn read(i: &[u8]) -> Result<Scena> {
 		npcs, monsters,
 		triggers, objects,
 		camera_angles,
-		code,
+		functions,
 	})
 }
 

@@ -1,5 +1,4 @@
 #![feature(proc_macro_diagnostic)]
-#![allow(dead_code)]
 
 use either::Either;
 use convert_case::{Case, Casing, Boundary};

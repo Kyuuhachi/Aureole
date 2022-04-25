@@ -33,14 +33,14 @@ pub fn render(scena: &Scena, asm: bool) -> choubun::Node {
 				a.indent();
 				a.attr("id", "ch");
 				for ch in ch {
-					a.node("option", |a| a.text(format!("{:?}", ch)))
+					a.node("option", |a| a.text(format!("{:?}", ch)));
 				}
 			});
 			a.node("select", |a| {
 				a.indent();
 				a.attr("id", "cp");
 				for cp in cp {
-					a.node("option", |a| a.text(format!("{:?}", cp)))
+					a.node("option", |a| a.text(format!("{:?}", cp)));
 				}
 			});
 		});
@@ -127,7 +127,7 @@ impl Node {
 	}
 
 	fn span_text(&mut self, class: &str, text: impl ToString) {
-		self.span(class, |a| a.text(text))
+		self.span(class, |a| a.text(text));
 	}
 }
 

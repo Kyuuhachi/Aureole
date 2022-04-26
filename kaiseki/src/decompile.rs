@@ -82,34 +82,59 @@ impl<E: Clone, I: Clone> Decompiler<'_, E, I> {
 		let start = range.start;
 		*range = self.advance(range.clone());
 		match &self.asm[&start] {
-			&&FlowInsn::If(ref expr, jump) => {
-				match self.find_jump_before(jump, brk) {
-					Some((inner, outer)) if outer == start => {
-						let body = self.block(range.start..inner, Some(jump))?;
-						range.start = jump;
+			&&FlowInsn::If(ref expr, l1) => {
+				match self.find_jump_before(l1, brk) {
+					// While
+					// =====
+					// L0:
+					//   UNLESS expr GOTO L1
+					//   body (brk=L1)
+					//   GOTO L0
+					// L1:
+					Some((inner, l0)) if l0 == start => {
+						let body = self.block(range.start..inner, Some(l1))?;
+						range.start = l1;
 						Ok(Stmt::While(expr.clone(), body))
 					}
-					Some((inner, outer)) if outer > jump => {
-						let body = self.block(range.start..inner, brk)?;
-						let mut cases = vec![(Some(expr.clone()), body)];
-						match &self.block(jump..outer, brk)?[..] {
+
+					// If/else (flattened for convenience)
+					// =======
+					//   UNLESS expr GOTO L1
+					//   body1 (brk=inherit)
+					//   GOTO L2
+					// L1:
+					//   body2 (brk=inherit)
+					// L2:
+					Some((inner, l2)) if l2 > l1 => {
+						let body1 = self.block(range.start..inner, brk)?;
+						let body2 = self.block(l1..l2, brk)?;
+						range.start = l2;
+
+						let mut cases = vec![(Some(expr.clone()), body1)];
+						match &body2[..] {
 							[Stmt::If(more_cases)] => cases.extend(more_cases.iter().cloned()),
 							a => cases.push((None, a.to_owned())),
 						}
-						range.start = outer;
 						Ok(Stmt::If(cases))
 					}
+
+					// If
+					// ==
+					//   UNLESS expr GOTO L1
+					//   then (brk=inherit)
+					// L1:
 					_ => {
-						let body = self.block(range.start..jump, brk)?;
+						let body = self.block(range.start..l1, brk)?;
+						range.start = l1;
+
 						let cases = vec![(Some(expr.clone()), body)];
-						range.start = jump;
 						Ok(Stmt::If(cases))
 					}
 				}
 			}
 
-			&&FlowInsn::Goto(jump) => {
-				eyre::ensure!(Some(jump) == brk, "invalid goto {:?}", jump);
+			&&FlowInsn::Goto(l1) => {
+				eyre::ensure!(Some(l1) == brk, "invalid goto {:?}", l1);
 				Ok(Stmt::Break)
 			}
 

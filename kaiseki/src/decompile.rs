@@ -81,8 +81,8 @@ impl<E: Clone, I: Clone> Decompiler<'_, E, I> {
 	fn stmt(&self, range: &mut Range<usize>, brk: Option<usize>) -> Result<Stmt<E, I>> {
 		let start = range.start;
 		*range = self.advance(range.clone());
-		match &self.asm[&start] {
-			&&FlowInsn::If(ref expr, l1) => {
+		match *self.asm[&start] {
+			FlowInsn::If(ref expr, l1) => {
 				match self.find_jump_before(l1, brk) {
 					// While
 					// =====
@@ -133,12 +133,12 @@ impl<E: Clone, I: Clone> Decompiler<'_, E, I> {
 				}
 			}
 
-			&&FlowInsn::Goto(l1) => {
+			FlowInsn::Goto(l1) => {
 				eyre::ensure!(Some(l1) == brk, "invalid goto {:?}", l1);
 				Ok(Stmt::Break)
 			}
 
-			&&FlowInsn::Switch(ref expr, ref clauses, default) => {
+			FlowInsn::Switch(ref expr, ref clauses, default) => {
 				let mut groups = BTreeMap::new();
 				clauses.iter()
 					.map(|(a, b)| (Some(*a), *b))
@@ -161,7 +161,7 @@ impl<E: Clone, I: Clone> Decompiler<'_, E, I> {
 				Ok(Stmt::Switch(expr.clone(), branches))
 			}
 
-			FlowInsn::Insn(i) => Ok(Stmt::Insn(i.clone())),
+			FlowInsn::Insn(ref insn) => Ok(Stmt::Insn(insn.clone())),
 		}
 	}
 

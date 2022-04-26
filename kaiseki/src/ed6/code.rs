@@ -340,9 +340,9 @@ fn read(i: &mut CodeParser) -> Result<Self> {
 		0x49 => Event(FuncRef), // Not sure how this differs from Call
 		0x4A => _Char4A(char/u16, u8),
 		0x4B => _Char4B(char/u16, u8),
-		0x4D => ExprVar(var/u16, Expr),
-		0x4F => ExprAttr(attr/u8, Expr),
-		0x51 => ExprCharAttr(char/u16, char_attr/u8, Expr),
+		0x4D => Var(var/u16, Expr),
+		0x4F => Attr(attr/u8, Expr),
+		0x51 => CharAttr(char/u16, char_attr/u8, Expr),
 		0x52 => TextStart(char/u16),
 		0x53 => TextEnd(char/u16),
 		0x54 => TextMessage(Text),
@@ -352,8 +352,8 @@ fn read(i: &mut CodeParser) -> Result<Self> {
 		0x5B => TextTalk(char/u16, Text),
 		0x5C => TextTalkNamed(char/u16, String, Text),
 		0x5D => Menu(menu_id/u16, i16, i16, u8, menu/{i.string()?.split_terminator('\x01').map(|a| a.to_owned()).collect()} as Vec<String>),
-		0x5E => MenuWait(menu_id/u16),
-		0x5F => _Menu5F(menu_id/u16), // MenuClose?
+		0x5E => MenuWait(var/u16),
+		0x5F => MenuClose(menu_id/u16),
 		0x60 => TextSetName(String),
 		0x61 => _61(char/u16),
 		0x62 => Emote(char/u16, i32, time/u32, emote/{(i.u8()?, i.u8()?, i.u32()?, i.u8()?)} as (u8, u8, u32, u8)),
@@ -396,6 +396,7 @@ fn read(i: &mut CodeParser) -> Result<Self> {
 		0xA5 => AwaitFlagUnset(flag/u16),
 		0xA6 => AwaitFlagSet(flag/u16),
 		0xA9 => ShopOpen(shop/u8),
+		0xAC => RecipeLearn(u16), // TODO check type
 		0xB1 => OpLoad(String),
 		0xB2 => _B2(u8, u8, u16),
 		0xB3 => Show(match u8 {
@@ -403,6 +404,7 @@ fn read(i: &mut CodeParser) -> Result<Self> {
 			0x01 => Video1(u8),
 		}),
 		0xB4 => ReturnToTitle(u8),
+		0xB5 => PartySlot(member/u8, u8, u8), // FC only
 		0xB9 => ReadBook(item/u16, u16), // FC only
 		0xDE => SaveClearData(), // FC only
 	}

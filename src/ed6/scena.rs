@@ -425,7 +425,14 @@ impl InsnVisitor for InsnRenderer<'_, '_> {
 	fn time(&mut self, v: &u32) { self.node.text(" "); self.node.span_text("time", format!("{}ms", v)); }
 	fn speed(&mut self, v: &u32) { self.node.text(" "); self.node.span_text("speed", format!("{}mm/s", v)); }
 	fn angle(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("angle", format!("{}°", v)); }
-	fn color(&mut self, v: &u32) { self.node.text(" "); self.node.span_text("color", format!("#{:08X}", v)); }
+	fn color(&mut self, v: &u32) {
+		self.node.text(" ");
+		self.node.span("color", |a| {
+			a.attr("style", format!("--splat-color: #{:06X}; --splat-alpha: {}", v&0xFFFFFF, (v>>24) as f32 / 255.0));
+			a.node_class("svg", "color-splat", |a| a.node("use", |a| a.attr("href", rocket::uri!("/assets/color-splat.svg#splat"))));
+			a.text(format!("#{:08X}", v));
+		});
+	}
 
 	fn time16(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("time", format!("{}ms", v)); }
 	fn angle32(&mut self, v: &i32) { self.node.text(" "); self.node.span_text("angle", format!("{}m°", v)); }

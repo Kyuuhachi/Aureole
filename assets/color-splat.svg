@@ -1,0 +1,39 @@
+<!-- CSS variables are not inherited by gradients, making this much more convoluted than it needs to be. -->
+<svg id="splat" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1" fill="none">
+	<pattern id="grid" viewBox="0 0 2 2" width="50%" height="50%" fill="white">
+		<rect x="0" y="0" width="1" height="1" />
+		<rect x="1" y="1" width="1" height="1" />
+	</pattern>
+
+	<linearGradient id="gradient" x1="0" x2="0" y1="0" y2="1">
+		<stop offset="0%"   stop-color="#FFFFFF" />
+		<stop offset="67%"  stop-color="#7F7F7F" />
+		<stop offset="100%" stop-color="#000000" />
+	</linearGradient>
+
+	<mask id="no-overflow">  <circle r="0.5" cx="0.5" cy="0.5" fill="white" /></mask>
+	<mask id="grid-mask">    <rect width="1" height="1" fill="url(#grid)" /></mask>
+	<mask id="gradient-mask"><rect width="1" height="1" fill="url(#gradient)" /></mask>
+
+	<circle r="0.5" cx="0.5" cy="0.5"
+		fill="currentcolor"
+		opacity="0.5"
+		mask="url(#grid-mask)"
+		/>
+
+	<circle r="0.5" cx="0.5" cy="0.5"
+		fill="var(--splat-color, red)"
+		opacity="var(--splat-alpha, 0)"
+		/>
+
+	<circle r="0.5" cx="0.5" cy="0.5"
+		fill="var(--splat-color, red)"
+		mask="url(#gradient-mask)"
+		/>
+
+	<circle r="0.5" cx="0.5" cy="0.5"
+		vector-effect="non-scaling-stroke"
+		stroke="currentcolor"
+		mask="url(#no-overflow)"
+		/>
+</svg>

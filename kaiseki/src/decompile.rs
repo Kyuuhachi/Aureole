@@ -105,7 +105,7 @@ impl<E: Clone, I: Clone> Decompiler<'_, E, I> {
 					// L1:
 					//   body2 (brk=inherit)
 					// L2:
-					Some((inner, l2)) if l2 > l1 => {
+					Some((inner, l2)) if l2 >= l1 => {
 						let body1 = self.block(range.start..inner, brk)?;
 						let body2 = self.block(l1..l2, brk)?;
 						range.start = l2;

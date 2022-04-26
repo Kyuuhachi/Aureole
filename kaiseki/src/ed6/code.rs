@@ -176,61 +176,61 @@ impl<'a> CodeParser<'a> {
 }
 
 pub trait InsnVisitor {
-	fn u8(&self, v: &u8);
-	fn u16(&self, v: &u16);
-	fn u32(&self, v: &u32);
+	fn u8(&mut self, v: &u8);
+	fn u16(&mut self, v: &u16);
+	fn u32(&mut self, v: &u32);
 
-	fn i8(&self, v: &i8);
-	fn i16(&self, v: &i16);
-	fn i32(&self, v: &i32);
+	fn i8(&mut self, v: &i8);
+	fn i16(&mut self, v: &i16);
+	fn i32(&mut self, v: &i32);
 
-	fn func_ref(&self, v: &FuncRef);
-	fn file_ref(&self, v: &FileRef);
+	fn func_ref(&mut self, v: &FuncRef);
+	fn file_ref(&mut self, v: &FileRef);
 
-	fn pos2(&self, v: &Pos2);
-	fn pos3(&self, v: &Pos3);
-	fn relative(&self, v: &Pos3);
+	fn pos2(&mut self, v: &Pos2);
+	fn pos3(&mut self, v: &Pos3);
+	fn relative(&mut self, v: &Pos3);
 
-	fn time(&self, v: &u32);
-	fn speed(&self, v: &u32);
-	fn angle(&self, v: &u16);
-	fn color(&self, v: &u32);
+	fn time(&mut self, v: &u32);
+	fn speed(&mut self, v: &u32);
+	fn angle(&mut self, v: &u16);
+	fn color(&mut self, v: &u32);
 
-	fn time16(&self, v: &u16);
-	fn angle32(&self, v: &i32);
+	fn time16(&mut self, v: &u16);
+	fn angle32(&mut self, v: &i32);
 
-	fn battle(&self, v: &u16);
-	fn town(&self, v: &u16);
-	fn bgmtbl(&self, v: &u8);
-	fn quest(&self, v: &u16);
-	fn sound(&self, v: &u16);
-	fn item(&self, v: &u16);
-	fn flag(&self, v: &u16);
+	fn battle(&mut self, v: &u16);
+	fn town(&mut self, v: &u16);
+	fn bgmtbl(&mut self, v: &u8);
+	fn quest(&mut self, v: &u16);
+	fn sound(&mut self, v: &u16);
+	fn item(&mut self, v: &u16);
+	fn flag(&mut self, v: &u16);
 
-	fn fork(&self, v: &[Insn]);
-	fn expr(&self, v: &Expr);
-	fn string(&self, v: &str);
-	fn text(&self, v: &Text);
-	fn menu(&self, v: &[String]);
-	fn emote(&self, v: &(u8, u8, u32, u8));
+	fn fork(&mut self, v: &[Insn]);
+	fn expr(&mut self, v: &Expr);
+	fn string(&mut self, v: &str);
+	fn text(&mut self, v: &Text);
+	fn menu(&mut self, v: &[String]);
+	fn emote(&mut self, v: &(u8, u8, u32, u8));
 
-	fn flags(&self, v: &u32);
-	fn quest_flag(&self, v: &u8);
-	fn char_flags(&self, v: &u16);
-	fn quest_task(&self, v: &u16);
-	fn member(&self, v: &u8);
+	fn flags(&mut self, v: &u32);
+	fn quest_flag(&mut self, v: &u8);
+	fn char_flags(&mut self, v: &u16);
+	fn quest_task(&mut self, v: &u16);
+	fn member(&mut self, v: &u8);
 
-	fn var(&self, v: &u16);
-	fn attr(&self, v: &u8);
-	fn char_attr(&self, v: &u8);
+	fn var(&mut self, v: &u16);
+	fn attr(&mut self, v: &u8);
+	fn char_attr(&mut self, v: &u8);
 
-	fn char(&self, v: &u16);
-	fn chcp(&self, v: &u16);
-	fn fork_id(&self, v: &u8);
-	fn menu_id(&self, v: &u16);
-	fn object(&self, v: &u16);
+	fn char(&mut self, v: &u16);
+	fn chcp(&mut self, v: &u16);
+	fn fork_id(&mut self, v: &u8);
+	fn menu_id(&mut self, v: &u16);
+	fn object(&mut self, v: &u16);
 
-	fn data(&self, v: &[u8]);
+	fn data(&mut self, v: &[u8]);
 }
 
 #[kaiseki_macros::bytecode(

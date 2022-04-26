@@ -409,9 +409,7 @@ struct InsnRenderer<'a, 'b> {
 	node: &'b mut Node,
 }
 
-// This might seem a little convoluted right now, but it's necessary for when I add proper traversal
-impl InsnRenderer<'_, '_> {
-}
+impl InsnRenderer<'_, '_> { }
 
 impl InsnVisitor for InsnRenderer<'_, '_> {
 	fn u8(&mut self, v: &u8) { self.node.text(" "); self.node.span_text("int", v); }
@@ -427,7 +425,7 @@ impl InsnVisitor for InsnRenderer<'_, '_> {
 
 	fn pos2(&mut self, v: &Pos2) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 	fn pos3(&mut self, v: &Pos3) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-	fn relative(&mut self, v: &Pos3) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn relative(&mut self, v: &Pos3) { self.node.text(" "); self.node.span_text("unknown", format!("relative{:?}", v)); }
 
 	fn time(&mut self, v: &u32) { self.node.text(" "); self.node.span_text("time", format!("{}ms", v)); }
 	fn speed(&mut self, v: &u32) { self.node.text(" "); self.node.span_text("speed", format!("{}mm/s", v)); }
@@ -454,6 +452,8 @@ impl InsnVisitor for InsnRenderer<'_, '_> {
 		self.node.text(" ");
 		self.node.span_text("flag", v);
 	}
+	fn shop(&mut self, v: &u8) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn magic(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 
 	fn fork(&mut self, v: &[Insn]) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 	fn expr(&mut self, v: &Expr) {
@@ -463,6 +463,11 @@ impl InsnVisitor for InsnRenderer<'_, '_> {
 	fn string(&mut self, v: &str) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 	fn text(&mut self, v: &Text) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 	fn menu(&mut self, v: &[String]) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn quests(&mut self, v: &[u16]) {
+		for q in v {
+			self.quest(q)
+		}
+	}
 	fn emote(&mut self, v: &(u8, u8, u32, u8)) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 
 	fn flags(&mut self, v: &u32) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
@@ -470,6 +475,7 @@ impl InsnVisitor for InsnRenderer<'_, '_> {
 	fn char_flags(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 	fn quest_task(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 	fn member(&mut self, v: &u8) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn element(&mut self, v: &u8) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 
 	fn var(&mut self, v: &u16) {
 		self.node.text(" ");

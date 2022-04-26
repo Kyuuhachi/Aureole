@@ -206,12 +206,15 @@ pub trait InsnVisitor {
 	fn sound(&mut self, v: &u16);
 	fn item(&mut self, v: &u16);
 	fn flag(&mut self, v: &u16);
+	fn shop(&mut self, v: &u8);
+	fn magic(&mut self, v: &u16);
 
 	fn fork(&mut self, v: &[Insn]);
 	fn expr(&mut self, v: &Expr);
 	fn string(&mut self, v: &str);
 	fn text(&mut self, v: &Text);
 	fn menu(&mut self, v: &[String]);
+	fn quests(&mut self, v: &[u16]);
 	fn emote(&mut self, v: &(u8, u8, u32, u8));
 
 	fn flags(&mut self, v: &u32);
@@ -219,6 +222,7 @@ pub trait InsnVisitor {
 	fn char_flags(&mut self, v: &u16);
 	fn quest_task(&mut self, v: &u16);
 	fn member(&mut self, v: &u8);
+	fn element(&mut self, v: &u8);
 
 	fn var(&mut self, v: &u16);
 	fn attr(&mut self, v: &u8);
@@ -259,6 +263,7 @@ fn read(i: &mut CodeParser) -> Result<Self> {
 			0x01 => Show(),
 			0x02 => Set(i32, Pos2, FileRef),
 		}),
+		0x17 => Save(),
 		0x19 => EventBegin(u8),
 		0x1A => EventEnd(u8),
 		0x1B => _1B(u16, u16),
@@ -278,10 +283,39 @@ fn read(i: &mut CodeParser) -> Result<Self> {
 			0x00 => FlagsGet(quest_flag/u8),
 			0x01 => TaskGet(quest_task/u16),
 		}),
-		0x2D => PartyAdd(member/u8, char/{i.u8()? as u16} as u16), // FC only
+		0x2A => QuestList(quests/{
+			let mut quests = Vec::new();
+			loop {
+				match i.u16()? {
+					0xFFFF => break,
+					q => quests.push(q)
+				}
+			}
+			quests
+		} as Vec<u16>),
+		0x2D => PartyAdd(member/u8, char/{i.u8()? as u16} as u16),
+		0x2E => PartyRemove(member/u8, char/{i.u8()? as u16} as u16),
 		0x30 => _Party30(u8),
+		0x31 => PartySetAttr(member/u8, u8, u16), // what types is this?
+		0x34 => PartyAddArt(member/u8, magic/u16),
+		0x35 => PartyAddCraft(member/u8, magic/u16),
+		0x36 => PartyAddSCraft(member/u8, magic/u16),
+		0x37 => PartySet(member/u8, u8, u8),
+		0x38 => SepithAdd(element/u8, u16),
+		0x39 => SepithRemove(element/u8, u16),
+		0x3A => MiraAdd(u16),
+		0x3B => MiraSub(u16),
+		0x3C => BpAdd(u16),
+		// I have a guess what 3D is
 		0x3E => ItemAdd(item/u16, u16),
 		0x3F => ItemRemove(item/u16, u16),
+		0x41 => PartyEquip(member/u8, item/u16, {
+			if (600..800).contains(&_1) {
+				i.i8()?
+			} else {
+				-1
+			}
+		} as i8),
 		0x43 => CharForkFunc(char/u16, fork_id/u8, FuncRef),
 		0x44 => CharForkQuit(char/u16, fork_id/u8),
 		0x45 => CharFork(char/u16, fork_id/u8, u8, fork/{
@@ -328,9 +362,11 @@ fn read(i: &mut CodeParser) -> Result<Self> {
 		0x5E => MenuWait(menu_id/u16),
 		0x5F => _Menu5F(menu_id/u16), // MenuClose?
 		0x60 => TextSetName(String),
+		0x61 => _61(char/u16),
 		0x62 => Emote(char/u16, i32, time/u32, emote/{(i.u8()?, i.u8()?, i.u32()?, i.u8()?)} as (u8, u8, u32, u8)),
 		0x63 => EmoteStop(char/u16),
 		0x64 => _64(u8, u16),
+		0x66 => _Cam66(u16),
 		0x6E => _Cam6E(data/{i.array()?} as [u8; 4], time/u32),
 		0x67 => CamOffset(i32, i32, i32, time/u32),
 		0x69 => CamLookAt(char/u16, time/u32),
@@ -340,9 +376,11 @@ fn read(i: &mut CodeParser) -> Result<Self> {
 		0x6D => CamPos(Pos3, time/u32),
 		0x6F => _Obj6F(object/u16, u32),
 		0x70 => _Obj70(object/u16, u32),
+		0x72 => _Obj72(object/u16, u16),
 		0x86 => CharSetChcp(char/u16, chcp/u16),
 		0x87 => CharSetFrame(char/u16, u16),
 		0x88 => CharSetPos(char/u16, Pos3, angle/u16),
+		0x89 => _Char89(char/u16, Pos3, u16),
 		0x8A => CharLookAt(char/u16, char/u16, time16/u16),
 		0x8C => CharSetAngle(char/u16, angle/u16, time16/u16),
 		0x8D => CharIdle(char/u16, Pos2, Pos2, speed/u32),
@@ -356,14 +394,24 @@ fn read(i: &mut CodeParser) -> Result<Self> {
 		0x99 => CharAnimation(char/u16, u8, u8, time/u32),
 		0x9A => CharFlagsSet(char/u16, char_flags/u16),
 		0x9B => CharFlagsUnset(char/u16, char_flags/u16),
+		0x9C => _Char9C(char/u16, u16),
+		0x9D => _Char9D(char/u16, u16),
 		0x9F => CharColor(char/u16, color/u32, time/u32),
+		0xA1 => _A1(u16, u16),
 		0xA2 => FlagSet(flag/u16),
 		0xA3 => FlagUnset(flag/u16),
 		0xA5 => AwaitFlagUnset(flag/u16),
 		0xA6 => AwaitFlagSet(flag/u16),
+		0xA9 => ShopOpen(shop/u8),
 		0xB1 => OpLoad(String),
 		0xB2 => _B2(u8, u8, u16),
+		0xB3 => Show(match u8 {
+			0x00 => Video0(String),
+			0x01 => Video1(u8),
+		}),
 		0xB4 => ReturnToTitle(u8),
+		0xB9 => ReadBook(item/u16, u16), // FC only
+		0xDE => SaveClearData(), // FC only
 	}
 }
 

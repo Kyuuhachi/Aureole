@@ -144,11 +144,16 @@ pub enum TextSegment {
 	String(String),
 	Wait,
 	Page,
-	Face(u16 /*Face*/),
-	Pos(u16),
 	_05,
+	_06,
 	Color(u8),
 	Item(u16 /*Item*/),
+	A(u16),
+	Face(u16 /*Face*/),
+	Pos(u16),
+	Ruby(u16, String),
+	Size(u16),
+	W(u16),
 }
 
 impl Text {
@@ -168,7 +173,7 @@ impl Text {
 			0x02 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::Wait) }
 			0x03 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::Page) }
 			0x05 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::_05) }
-			// 0x06 =>
+			0x06 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::_06) }
 			0x07 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::Color(i.u8()?)) }
 			// 0x09 =>
 			// 0x18 =>
@@ -178,16 +183,25 @@ impl Text {
 				drain(&mut segments, &mut curr)?;
 				let mut n = 0;
 				segments.push(loop { match i.u8()? {
-					// XXX this can panic
+					// XXX this can panic on overflow
 					ch@(b'0'..=b'9') => n = n * 10 + (ch - b'0') as u16,
+					b'A' => break TextSegment::A(n),
 					b'F' => break TextSegment::Face(n),
 					b'P' => break TextSegment::Pos(n),
+					b'R' => break TextSegment::Ruby(n, {
+						let mut ruby = Vec::new();
+						loop { match i.u8()? {
+							b'#' => break,
+							ch => ruby.push(ch),
+						} }
+						decode(&ruby)?
+					}),
+					b'S' => break TextSegment::Size(n),
+					b'W' => break TextSegment::W(n),
 					op => eyre::bail!("Unknown TextSegment: #{}{}", n, char::from(op)),
 				} })
 			}
-			ch => {
-				curr.push(ch);
-			}
+			ch => curr.push(ch)
 		} }
 		Ok(Text(segments))
 	}

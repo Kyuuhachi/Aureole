@@ -51,7 +51,8 @@ pub struct Object {
 #[derive(Debug, Clone)]
 pub struct CameraAngle {
 	pub pos: Pos3,
-	pub _1: u32,
+	pub _1: u16,
+	pub _1b: u16,
 	pub _2: u32,
 	pub _3: u32,
 	pub _4: i32,
@@ -180,7 +181,8 @@ pub fn read(i: &[u8]) -> Result<Scena> {
 	while i.pos() < head_end {
 		camera_angles.push(CameraAngle {
 			pos: i.pos3()?,
-			_1: i.u32()?,
+			_1: i.u16()?,
+			_1b: i.u16()?,
 			_2: i.u32()?,
 			_3: i.u32()?,
 			_4: i.i32()?,

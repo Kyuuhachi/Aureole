@@ -145,20 +145,73 @@ impl<E: Clone, I: Clone> Decompiler<'_, E, I> {
 					.chain(std::iter::once((None, default)))
 					.for_each(|(k, addr)| groups.entry(addr).or_insert_with(Vec::new).push(k));
 
-				let mut end = *groups.keys().next_back().unwrap();
-				for jump in groups.keys() {
-					if let Some((_, outer)) = self.find_jump_before(*jump, None) {
-						end = end.max(outer);
-					}
+				// It's tricky to know when a switch ends.
+				// First, check if there exists a break.
+				// There exist no labeled break, so any jump from [here..last_case] must be a break, so let's try to find that.
+				let last_case = *groups.keys().next_back().unwrap();
+				let mut end = None;
+				for (_, insn) in self.asm.range(range.start..last_case) {
+					insn.labels(|a| if a >= last_case { end = end.max(Some(a)) });
 				}
 
 				let mut branches = Vec::new();
-				for (values, inner) in groups.values().zip(util::ranges(groups.keys().copied(), end)) {
-					branches.push((values.clone(), self.block(inner, Some(end))?));
+
+				// Skip empty trailing default case.
+				let ranges = util::ranges(groups.keys().copied(), end.unwrap_or(last_case));
+				for (values, inner) in groups.values().zip(ranges) {
+					let body = self.block(inner, end)?;
+					branches.push((values.clone(), body));
 				}
 
-				range.start = end;
-				Stmt::Switch(expr.clone(), branches)
+				// If we found a break, no problem, we're done.
+				if let Some(end) = end {
+					// But let's remove empty trailing default blocks.
+					if let Some((lastk, lastv)) = branches.last() {
+						if lastk == &[None] && lastv.is_empty() {
+							branches.pop();
+						}
+					}
+					range.start = end;
+					return Ok(Stmt::Switch(expr.clone(), branches))
+				}
+
+				// No luck, we'll need less precise heuristics.
+				// There are cases where the last case contains a break. No, I don't know why.
+				// But we need to look forward through the whole range to find that.
+
+				let mut range2 = range.clone();
+				while range2.start < range2.end {
+					let mut iter = self.asm.range(range2.clone());
+					if let Some((_, FlowInsn::Goto(a))) = iter.next() {
+						if let Some((b, _)) = iter.next() {
+							if *a == *b {
+								end = Some(*a);
+								break;
+							}
+						}
+					}
+					if self.stmt(&mut range2, None).is_err() {
+						break;
+					}
+				}
+
+				if let Some(end) = end {
+					// We did find a break; parse until there. Shame that we need to parse twice, but oh well.
+					let body = self.block(last_case..end, Some(end))?;
+					branches.last_mut().unwrap().1 = body;
+					range.start = end;
+					return Ok(Stmt::Switch(expr.clone(), branches))
+				} else {
+					// No break, last case is empty.
+					// Remove it if it's default.
+					if let Some((lastk, lastv)) = branches.last() {
+						if lastk == &[None] && lastv.is_empty() {
+							branches.pop();
+						}
+					}
+					range.start = last_case;
+					return Ok(Stmt::Switch(expr.clone(), branches))
+				}
 			}
 
 			FlowInsn::Insn(ref insn) => Stmt::Insn(insn.clone()),

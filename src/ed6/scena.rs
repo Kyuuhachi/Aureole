@@ -142,19 +142,7 @@ impl RenderCode {
 	fn asm(&self, a: &mut Node, asm: &Asm) {
 		let mut labels = BTreeSet::<usize>::new();
 		for (_, insn) in &asm.code {
-			match insn {
-				FlowInsn::If(_, target) => {
-					labels.insert(*target);
-				}
-				FlowInsn::Goto(target) => {
-					labels.insert(*target);
-				}
-				FlowInsn::Switch(_, branches, default) => {
-					labels.extend(branches.iter().map(|a| a.1));
-					labels.insert(*default);
-				}
-				FlowInsn::Insn(_) => {}
-			}
+			insn.labels(|a| { labels.insert(a); });
 		}
 
 		let labels: BTreeMap<usize, String> =

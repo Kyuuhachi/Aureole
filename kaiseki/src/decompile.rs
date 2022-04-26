@@ -10,6 +10,22 @@ pub enum FlowInsn<E, I> {
 	Insn(I),
 }
 
+impl<E, I> FlowInsn<E, I> {
+	pub fn labels(&self, mut f: impl FnMut(usize)) {
+		match self {
+			FlowInsn::If(_, target) => f(*target),
+			FlowInsn::Goto(target) => f(*target),
+			FlowInsn::Switch(_, branches, default) => {
+				for (_, target) in branches {
+					f(*target);
+				}
+				f(*default);
+			}
+			FlowInsn::Insn(_) => {}
+		}
+	}
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Stmt<E, I> {
 	#[allow(clippy::type_complexity)]

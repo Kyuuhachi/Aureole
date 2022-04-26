@@ -390,7 +390,7 @@ fn read(i: &mut CodeParser) -> Result<Self> {
 		0x9C => _Char9C(char/u16, u16),
 		0x9D => _Char9D(char/u16, u16),
 		0x9F => CharColor(char/u16, color/u32, time/u32),
-		0xA1 => _A1(u16, u16),
+		0xA1 => _CharA1(char/u16, u16),
 		0xA2 => FlagSet(flag/u16),
 		0xA3 => FlagUnset(flag/u16),
 		0xA5 => AwaitFlagUnset(flag/u16),

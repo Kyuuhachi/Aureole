@@ -2,6 +2,7 @@ use std::collections::{BTreeSet, BTreeMap};
 
 use choubun::Node;
 use kaiseki::ed6::{scena::*, code::*};
+use kaiseki::Text;
 
 pub fn render(scena: &Scena, asm: bool) -> choubun::Node {
 	let Scena {
@@ -39,6 +40,11 @@ pub fn render(scena: &Scena, asm: bool) -> choubun::Node {
 			.code .attr        { color: #3F7F7F; }
 			.code .char        { color: #7F3F00; }
 			.code .char-attr   { color: #7F7F00; }
+
+			.code .time        { color: #00AF3F; }
+			.code .speed       { color: #00AF3F; }
+			.code .angle       { color: #00AF3F; }
+			.code .color       { color: #000000; }
 		"#));
 
 		doc.body.node("h1", |a| a.text(format!("{} (town: {}, bgm: {})", &name, town, bgm)));
@@ -403,27 +409,73 @@ impl RenderCode {
 		}
 	}
 
-	fn visitor<'a, 'b>(&'a self, a: &'b mut Node, name: &'static str) -> InsnVisitor<'a, 'b> {
+	fn visitor<'a, 'b>(&'a self, a: &'b mut Node, name: &'static str) -> InsnRenderer<'a, 'b> {
 		a.span_text("insn", name);
-		InsnVisitor { context: self, node: a }
+		InsnRenderer { context: self, node: a }
 	}
 
 	fn insn(&self, a: &mut Node, insn: &Insn) {
-		a.span_text("insn", format!("{:?}", insn));
+		let mut vis = self.visitor(a, insn.name());
+		insn.visit(&mut vis);
 	}
 }
 
-struct InsnVisitor<'a, 'b> {
+struct InsnRenderer<'a, 'b> {
 	context: &'a RenderCode,
 	node: &'b mut Node,
 }
 
 // This might seem a little convoluted right now, but it's necessary for when I add proper traversal
-impl InsnVisitor<'_, '_> {
+impl InsnRenderer<'_, '_> {
+}
+
+impl InsnVisitor for InsnRenderer<'_, '_> {
+	fn u8(&mut self, v: &u8) { self.node.text(" "); self.node.span_text("int", v); }
+	fn u16(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("int", v); }
+	fn u32(&mut self, v: &u32) { self.node.text(" "); self.node.span_text("int", v); }
+
+	fn i8(&mut self, v: &i8) { self.node.text(" "); self.node.span_text("int", v); }
+	fn i16(&mut self, v: &i16) { self.node.text(" "); self.node.span_text("int", v); }
+	fn i32(&mut self, v: &i32) { self.node.text(" "); self.node.span_text("int", v); }
+
+	fn func_ref(&mut self, v: &FuncRef) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn file_ref(&mut self, v: &FileRef) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+
+	fn pos2(&mut self, v: &Pos2) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn pos3(&mut self, v: &Pos3) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn relative(&mut self, v: &Pos3) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+
+	fn time(&mut self, v: &u32) { self.node.text(" "); self.node.span_text("time", format!("{}ms", v)); }
+	fn speed(&mut self, v: &u32) { self.node.text(" "); self.node.span_text("speed", format!("{}mm/s", v)); }
+	fn angle(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("angle", format!("{}°", v)); }
+	fn color(&mut self, v: &u32) { self.node.text(" "); self.node.span_text("color", format!("#{:08X}", v)); }
+
+	fn time16(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("time", format!("{}ms", v)); }
+	fn angle32(&mut self, v: &i32) { self.node.text(" "); self.node.span_text("angle", format!("{}m°", v)); }
+
+	fn battle(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn town(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn bgmtbl(&mut self, v: &u8) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn quest(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn sound(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn item(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 	fn flag(&mut self, v: &u16) {
 		self.node.text(" ");
 		self.node.span_text("flag", v);
 	}
+
+	fn fork(&mut self, v: &[Insn]) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn expr(&mut self, v: &Expr) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn string(&mut self, v: &str) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn text(&mut self, v: &Text) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn menu(&mut self, v: &[String]) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn emote(&mut self, v: &(u8, u8, u32, u8)) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+
+	fn flags(&mut self, v: &u32) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn quest_flag(&mut self, v: &u8) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn char_flags(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn quest_task(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn member(&mut self, v: &u8) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 
 	fn var(&mut self, v: &u16) {
 		self.node.text(" ");
@@ -435,12 +487,20 @@ impl InsnVisitor<'_, '_> {
 		self.node.span_text("attr", v);
 	}
 
+	fn char_attr(&mut self, v: &u8) {
+		self.node.span_text("char-attr", format!(":{}", v));
+	}
+
+
 	fn char(&mut self, v: &u16) {
 		self.node.text(" ");
 		self.node.span_text("char", v);
 	}
 
-	fn char_attr(&mut self, v: &u8) {
-		self.node.span_text("char-attr", format!(":{}", v));
-	}
+	fn chcp(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn fork_id(&mut self, v: &u8) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn menu_id(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn object(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+
+	fn data(&mut self, v: &[u8]) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 }

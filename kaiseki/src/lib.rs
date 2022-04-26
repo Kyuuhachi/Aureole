@@ -11,4 +11,4 @@ mod decompress;
 mod util;
 mod decompile;
 
-pub use util::ByteString;
+pub use util::{ByteString, Text};

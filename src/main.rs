@@ -78,5 +78,6 @@ fn rocket() -> _ {
 
 	rocket::build()
 		.manage(Archives::new("data/fc"))
+		.mount("/assets", rocket::fs::FileServer::from(rocket::fs::relative!("assets")))
 		.mount("/", rocket::routes![fc_magic, fc_scena])
 }

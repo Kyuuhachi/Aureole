@@ -19,33 +19,10 @@ pub fn render(scena: &Scena, asm: bool) -> choubun::Node {
 		doc.root.attr("lang", "en");
 		let name = format!("{}/{}", dir.decode(), fname.decode());
 		doc.head.node("title", |a| a.text(&name));
-		doc.head.node("style", |a| a.raw(r#"
-			.code { tab-size: 4; }
-			.code .indent::before { position: absolute; content: "⟩"; }
-
-			.code              { color: #FF0000; }
-			.code .indent      { color: #CFCFCF; }
-			.code .empty-block { color: #AFAFAF; }
-
-			.code .syntax      { color: #7F007F; }
-			.code .keyword     { color: #7F007F; font-weight: bold; }
-			.code .case        { color: #007F00; }
-			.code .label       { color: #007F00; }
-			.code .insn        { color: #000000; }
-			.code .expr-op     { color: #3F3F00; }
-
-			.code .int         { color: #007F3F; }
-			.code .flag        { color: #0000FF; }
-			.code .var         { color: #3F007F; }
-			.code .attr        { color: #3F7F7F; }
-			.code .char        { color: #7F3F00; }
-			.code .char-attr   { color: #7F7F00; }
-
-			.code .time        { color: #00AF3F; }
-			.code .speed       { color: #00AF3F; }
-			.code .angle       { color: #00AF3F; }
-			.code .color       { color: #000000; }
-		"#));
+		doc.head.node("link", |a| {
+			a.attr("rel", "stylesheet");
+			a.attr("href", rocket::uri!("/assets/style.css"));
+		});
 
 		doc.body.node("h1", |a| a.text(format!("{} (town: {}, bgm: {})", &name, town, bgm)));
 

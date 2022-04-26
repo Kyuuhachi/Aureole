@@ -1,4 +1,4 @@
-use std::{ops::Range, collections::BTreeMap, fmt::Debug};
+use std::{ops::Range, collections::{BTreeMap, BTreeSet}, fmt::Debug};
 use eyre::Result;
 use color_eyre::{Section, SectionExt};
 use crate::util;
@@ -83,23 +83,29 @@ impl<E: Clone, I: Clone> Decompiler<'_, E, I> {
 		*range = self.advance(range.clone());
 		match &self.asm[&start] {
 			&&FlowInsn::If(ref expr, jump) => {
-				let (inner, target) = self.find_target(range.start..jump, brk);
-				range.start = jump;
-				if target == Some(start) {
-					return Ok(Stmt::While(expr.clone(), self.block(inner, Some(jump))?))
-				}
-
-				let mut cases = vec![(Some(expr.clone()), self.block(inner, brk)?)];
-				if let Some(target) = target {
-					if target > jump {
-						range.start = target;
-						match &self.block(jump..target, brk)?[..] {
+				match self.find_jump_before(jump, brk) {
+					Some((inner, outer)) if outer == start => {
+						let body = self.block(range.start..inner, Some(jump))?;
+						range.start = jump;
+						Ok(Stmt::While(expr.clone(), body))
+					}
+					Some((inner, outer)) if outer > jump => {
+						let body = self.block(range.start..inner, brk)?;
+						let mut cases = vec![(Some(expr.clone()), body)];
+						match &self.block(jump..outer, brk)?[..] {
 							[Stmt::If(more_cases)] => cases.extend(more_cases.iter().cloned()),
 							a => cases.push((None, a.to_owned())),
 						}
+						range.start = outer;
+						Ok(Stmt::If(cases))
 					}
-				};
-				Ok(Stmt::If(cases))
+					_ => {
+						let body = self.block(range.start..jump, brk)?;
+						let cases = vec![(Some(expr.clone()), body)];
+						range.start = jump;
+						Ok(Stmt::If(cases))
+					}
+				}
 			}
 
 			&&FlowInsn::Goto(jump) => {
@@ -114,15 +120,19 @@ impl<E: Clone, I: Clone> Decompiler<'_, E, I> {
 					.chain(std::iter::once((None, default)))
 					.for_each(|(k, addr)| groups.entry(addr).or_insert_with(Vec::new).push(k));
 
-				eyre::ensure!(groups.values().next_back().unwrap() == &[None], "this switch statement is not supported");
-				let mut vals = groups.keys().copied();
-				let end = vals.next_back().unwrap();
+				let mut end = *groups.keys().next_back().unwrap();
+				for jump in groups.keys() {
+					if let Some((_, outer)) = self.find_jump_before(*jump, None) {
+						end = end.max(outer);
+					}
+				}
+
 				let mut branches = Vec::new();
-				for (values, inner) in groups.values().zip(util::ranges(vals, end)) {
+				for (values, inner) in groups.values().zip(util::ranges(groups.keys().copied(), end)) {
 					branches.push((values.clone(), self.block(inner, Some(end))?));
 				}
-				range.start = end;
 
+				range.start = end;
 				Ok(Stmt::Switch(expr.clone(), branches))
 			}
 
@@ -139,12 +149,12 @@ impl<E: Clone, I: Clone> Decompiler<'_, E, I> {
 	}
 
 	#[tracing::instrument(skip(self))]
-	fn find_target(&self, range: Range<usize>, brk: Option<usize>) -> (Range<usize>, Option<usize>) {
-		if let Some((addr, FlowInsn::Goto(target))) = self.asm.range(range.clone()).next_back() {
+	fn find_jump_before(&self, addr: usize, brk: Option<usize>) -> Option<(usize, usize)> {
+		if let Some((addr, FlowInsn::Goto(target))) = self.asm.range(..addr).next_back() {
 			if Some(*target) != brk {
-				return (range.start..*addr, Some(*target))
+				return Some((*addr, *target))
 			}
 		}
-		(range, None)
+		None
 	}
 }

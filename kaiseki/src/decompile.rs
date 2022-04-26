@@ -1,5 +1,6 @@
-use std::{ops::Range, collections::BTreeMap};
+use std::{ops::Range, collections::BTreeMap, fmt::Debug};
 use eyre::Result;
+use color_eyre::{Section, SectionExt};
 use crate::util;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,7 +38,25 @@ pub enum Stmt<E, I> {
 	Insn(I),
 }
 
-pub fn decompile<E: Clone, I: Clone>(asm: &[(usize, FlowInsn<E, I>)], end: usize) -> Result<Vec<Stmt<E, I>>> {
+pub fn decompile<E: Clone + Debug, I: Clone + Debug>(asm: &[(usize, FlowInsn<E, I>)], end: usize) -> Result<Vec<Stmt<E, I>>> {
+	decompile_inner(asm, end)
+		.with_section(|| {
+			let mut labels = BTreeSet::<usize>::new();
+			for (_, insn) in asm {
+				insn.labels(|a| { labels.insert(a); });
+			}
+			let mut out = Vec::new();
+			for (addr, insn) in asm {
+				if labels.contains(addr) {
+					out.push(format!("{addr}:"));
+				}
+				out.push(format!("  {insn:?}"));
+			}
+			out.join("\n").header("Code:")
+		})
+}
+
+pub fn decompile_inner<E: Clone, I: Clone>(asm: &[(usize, FlowInsn<E, I>)], end: usize) -> Result<Vec<Stmt<E, I>>> {
 	let asm = BTreeMap::from_iter(asm.iter().map(|(k, v)| (*k, v)));
 	let start = asm.keys().next().copied().unwrap_or(end);
 	Decompiler { asm }.block(start..end, None)

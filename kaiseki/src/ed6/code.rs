@@ -17,13 +17,6 @@ pub type Stmt = crate::decompile::Stmt<Expr, Insn>;
 
 pub fn decompile(asm: &Asm) -> Result<Vec<Stmt>> {
 	crate::decompile::decompile(&asm.code, asm.end)
-		.with_section(|| {
-			asm.code.iter()
-				.map(|(addr, op)| format!("{addr} {op:?}"))
-				.collect::<Vec<_>>()
-				.join("\n")
-				.header("Code:")
-		})
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, DebugCustom)]

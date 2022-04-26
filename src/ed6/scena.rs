@@ -449,7 +449,10 @@ impl InsnVisitor for InsnRenderer<'_, '_> {
 	}
 
 	fn fork(&mut self, v: &[Insn]) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-	fn expr(&mut self, v: &Expr) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn expr(&mut self, v: &Expr) {
+		self.node.text(" ");
+		self.context.expr(self.node, v);
+	}
 	fn string(&mut self, v: &str) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 	fn text(&mut self, v: &Text) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 	fn menu(&mut self, v: &[String]) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }

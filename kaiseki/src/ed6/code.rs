@@ -345,14 +345,14 @@ fn read(i: &mut CodeParser) -> Result<Self> {
 		0x88 => CharSetPos(char/u16, Pos3, angle/u16),
 		0x8A => CharLookAt(char/u16, char/u16, time16/u16),
 		0x8C => CharSetAngle(char/u16, angle/u16, time16/u16),
-		0x8D => CharIdle(char/u16, Pos2, Pos2, time/u32),
+		0x8D => CharIdle(char/u16, Pos2, Pos2, speed/u32),
 		0x8E => CharWalkTo(char/u16, Pos3, speed/u32, u8),
 		0x8F => CharWalkTo2(char/u16, Pos3, speed/u32, u8), // how are these two different?
 		0x90 => DontGoThere(u16, relative/Pos3, u32, u8),
 		0x91 => _Char91(char/u16, relative/Pos3, i32, u8),
 		0x92 => _Char92(char/u16, char/u16, u32, time/u32, u8),
 		0x95 => CharJump(char/u16, relative/Pos3, time/u32, u32),
-		0x97 => _Char97(char/u16, Pos2, i32, time/u32, u16), // used with pigeons
+		0x97 => _Char97(char/u16, Pos2, angle32/i32, time/u32, u16), // used with pigeons
 		0x99 => CharAnimation(char/u16, u8, u8, time/u32),
 		0x9A => CharFlagsSet(char/u16, char_flags/u16),
 		0x9B => CharFlagsUnset(char/u16, char_flags/u16),

@@ -30,3 +30,7 @@
 	height: 1cap;
 	width: 2ch;
 }
+
+*[title] {
+	text-decoration: underline dotted;
+}

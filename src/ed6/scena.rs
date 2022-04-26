@@ -163,9 +163,16 @@ impl RenderCode {
 			.map(|(i, a)| (a, format!("L{}", i)))
 			.collect();
 
+		let render_label = |a: &mut Node, addr: usize| {
+			a.span("label", |a| {
+				a.attr("title", addr);
+				a.text(&labels[&addr]);
+			});
+		};
+
 		for (addr, insn) in &asm.code {
-			if let Some(label) = labels.get(addr) {
-				a.span_text("label", label);
+			if labels.contains_key(addr) {
+				render_label(a, *addr);
 				a.span_text("syntax", ":");
 				a.text("\n");
 			}
@@ -179,13 +186,13 @@ impl RenderCode {
 					a.text(" ");
 					a.span_text("keyword", "GOTO");
 					a.text(" ");
-					a.span_text("label", &labels[target]);
+					render_label(a, *target);
 				}
 
 				FlowInsn::Goto(target) => {
 					a.span_text("keyword", "GOTO");
 					a.text(" ");
-					a.span_text("label", &labels[target]);
+					render_label(a, *target);
 				}
 
 				FlowInsn::Switch(expr, branches, default) => {
@@ -198,14 +205,14 @@ impl RenderCode {
 						a.span_text("case", case);
 						a.span_text("syntax", ":");
 						a.text(" ");
-						a.span_text("label", &labels[target]);
+						render_label(a, *target);
 						a.span_text("syntax", ",");
 						a.text(" ");
 					}
 					a.span_text("keyword", "default");
 					a.span_text("syntax", ":");
 					a.text(" ");
-					a.span_text("label", &labels[default]);
+					render_label(a, *default);
 					a.span_text("syntax", "]");
 				}
 

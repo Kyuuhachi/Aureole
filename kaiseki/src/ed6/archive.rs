@@ -122,7 +122,7 @@ pub struct Archives {
 }
 
 impl Archives {
-    pub fn new(path: impl AsRef<Path>) -> Self {
+	pub fn new(path: impl AsRef<Path>) -> Self {
 		Self {
 			path: path.as_ref().to_owned(),
 			archives: Default::default()

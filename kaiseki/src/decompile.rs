@@ -81,7 +81,7 @@ impl<E: Clone, I: Clone> Decompiler<'_, E, I> {
 	fn stmt(&self, range: &mut Range<usize>, brk: Option<usize>) -> Result<Stmt<E, I>> {
 		let start = range.start;
 		*range = self.advance(range.clone());
-		match *self.asm[&start] {
+		Ok(match *self.asm[&start] {
 			FlowInsn::If(ref expr, l1) => {
 				match self.find_jump_before(l1, brk) {
 					// While
@@ -94,7 +94,7 @@ impl<E: Clone, I: Clone> Decompiler<'_, E, I> {
 					Some((inner, l0)) if l0 == start => {
 						let body = self.block(range.start..inner, Some(l1))?;
 						range.start = l1;
-						Ok(Stmt::While(expr.clone(), body))
+						Stmt::While(expr.clone(), body)
 					}
 
 					// If/else (flattened for convenience)
@@ -115,7 +115,7 @@ impl<E: Clone, I: Clone> Decompiler<'_, E, I> {
 							[Stmt::If(more_cases)] => cases.extend(more_cases.iter().cloned()),
 							a => cases.push((None, a.to_owned())),
 						}
-						Ok(Stmt::If(cases))
+						Stmt::If(cases)
 					}
 
 					// If
@@ -128,14 +128,14 @@ impl<E: Clone, I: Clone> Decompiler<'_, E, I> {
 						range.start = l1;
 
 						let cases = vec![(Some(expr.clone()), body)];
-						Ok(Stmt::If(cases))
+						Stmt::If(cases)
 					}
 				}
 			}
 
 			FlowInsn::Goto(l1) => {
 				eyre::ensure!(Some(l1) == brk, "invalid goto {:?}", l1);
-				Ok(Stmt::Break)
+				Stmt::Break
 			}
 
 			FlowInsn::Switch(ref expr, ref clauses, default) => {
@@ -158,11 +158,11 @@ impl<E: Clone, I: Clone> Decompiler<'_, E, I> {
 				}
 
 				range.start = end;
-				Ok(Stmt::Switch(expr.clone(), branches))
+				Stmt::Switch(expr.clone(), branches)
 			}
 
-			FlowInsn::Insn(ref insn) => Ok(Stmt::Insn(insn.clone())),
-		}
+			FlowInsn::Insn(ref insn) => Stmt::Insn(insn.clone()),
+		})
 	}
 
 	#[tracing::instrument(skip(self))]

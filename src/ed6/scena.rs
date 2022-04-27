@@ -21,7 +21,7 @@ pub fn render(scena: &Scena, asm: bool) -> choubun::Node {
 		doc.head.node("title", |a| a.text(&name));
 		doc.head.node("link", |a| {
 			a.attr("rel", "stylesheet");
-			a.attr("href", rocket::uri!("/assets/style.css"));
+			a.attr("href", "/assets/style.css"); // XXX absoute url
 		});
 
 		doc.body.node("h1", |a| a.text(format!("{} (town: {}, bgm: {})", &name, town, bgm)));
@@ -422,7 +422,7 @@ impl InsnVisitor for InsnRenderer<'_, '_> {
 		self.node.text(" ");
 		self.node.span("color", |a| {
 			a.attr("style", format!("--splat-color: #{:06X}; --splat-alpha: {}", v&0xFFFFFF, (v>>24) as f32 / 255.0));
-			a.node_class("svg", "color-splat", |a| a.node("use", |a| a.attr("href", rocket::uri!("/assets/color-splat.svg#splat"))));
+			a.node_class("svg", "color-splat", |a| a.node("use", |a| a.attr("href", "/assets/color-splat.svg#splat"))); // XXX absolute url
 			a.text(format!("#{:08X}", v));
 		});
 	}

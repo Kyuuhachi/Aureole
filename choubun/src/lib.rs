@@ -204,7 +204,7 @@ impl Node {
 	}
 
 	pub fn render_fragment(&self, out: &mut impl fmt::Write, indent: usize) -> fmt::Result {
-		self.leaf.render_fragment(out)?;
+		self.leaf.render_fragment(out, false)?;
 		self.body.render_fragment(out, self.indent, indent+1)?;
 		if self.indent {
 			write!(out, "\n{}", "\t".repeat(indent))?;
@@ -215,14 +215,18 @@ impl Node {
 }
 
 impl Leaf {
-	fn render_fragment(&self, out: &mut impl fmt::Write) -> fmt::Result {
+	fn render_fragment(&self, out: &mut impl fmt::Write, slash: bool) -> fmt::Result {
 		write!(out, "<{}", self.name)?;
 		for (k, v) in &self.attrs {
 			write!(out, " {k}=\"")?;
 			escape(out, v)?;
 			write!(out, "\"")?;
 		}
-		write!(out, ">")?;
+		if slash {
+			write!(out, " />")?;
+		} else {
+			write!(out, ">")?;
+		}
 		Ok(())
 	}
 }
@@ -239,7 +243,7 @@ impl Body {
 		for item in &self.0 {
 			match item {
 				Item::Node(v) => { indent_(out)?; v.render_fragment(out, indent)? },
-				Item::Leaf(v) => { indent_(out)?; v.render_fragment(out)? },
+				Item::Leaf(v) => { indent_(out)?; v.render_fragment(out, true)? },
 				Item::Text(v) => { indent_(out)?; escape(out, v)? },
 				Item::Raw(v)  => { indent_(out)?; write!(out, "{}", v)? },
 				Item::Rc(v) => v.borrow().render_fragment(out, do_indent, indent)?,

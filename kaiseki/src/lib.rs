@@ -8,8 +8,7 @@ pub mod ed6 {
 	pub use archive::{Archive,Archives};
 }
 pub mod image;
-mod decompress;
-mod util;
-mod decompile;
+pub mod util;
 
-pub use util::{ByteString, Text};
+mod decompress;
+mod decompile;

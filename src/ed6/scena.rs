@@ -2,7 +2,7 @@ use std::collections::{BTreeSet, BTreeMap};
 
 use choubun::Node;
 use kaiseki::ed6::{scena::*, code::*};
-use kaiseki::Text;
+use kaiseki::util::Text;
 
 pub fn render(scena: &Scena, asm: bool) -> choubun::Node {
 	let Scena {
@@ -33,14 +33,14 @@ pub fn render(scena: &Scena, asm: bool) -> choubun::Node {
 				a.indent();
 				a.attr("id", "ch");
 				for ch in ch {
-					a.node("option", |a| a.text(format!("{:?}", ch)));
+					a.node("option", |a| a.text(format_file_ref(ch)));
 				}
 			});
 			a.node("select", |a| {
 				a.indent();
 				a.attr("id", "cp");
 				for cp in cp {
-					a.node("option", |a| a.text(format!("{:?}", cp)));
+					a.node("option", |a| a.text(format_file_ref(cp)));
 				}
 			});
 		});
@@ -397,7 +397,13 @@ struct InsnRenderer<'a, 'b> {
 	node: &'b mut Node,
 }
 
-impl InsnRenderer<'_, '_> { }
+fn format_file_ref(v: &FileRef) -> String {
+	let name = kaiseki::util::decode_lossy(&*v.name);
+	let (prefix, suffix) = name.split_once('.').unwrap_or((&name, ""));
+	let prefix = prefix.trim_end_matches(|a| a == ' ');
+	let suffix = suffix.trim_start_matches(|a| a == '_');
+	format!("{:02}/{}.{}", v.archive, prefix, suffix)
+}
 
 impl InsnVisitor for InsnRenderer<'_, '_> {
 	fn u8(&mut self, v: &u8) { self.node.text(" "); self.node.span_text("int", v); }
@@ -409,7 +415,10 @@ impl InsnVisitor for InsnRenderer<'_, '_> {
 	fn i32(&mut self, v: &i32) { self.node.text(" "); self.node.span_text("int", v); }
 
 	fn func_ref(&mut self, v: &FuncRef) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-	fn file_ref(&mut self, v: &FileRef) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn file_ref(&mut self, v: &FileRef) {
+		self.node.text(" ");
+		self.node.span_text("file-ref", format_file_ref(v));
+	}
 
 	fn pos2(&mut self, v: &Pos2) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 	fn pos3(&mut self, v: &Pos3) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }

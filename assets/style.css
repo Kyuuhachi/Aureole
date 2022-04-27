@@ -24,6 +24,8 @@
 .code .angle       { color: #00AF3F; }
 .code .color       { color: #000000; }
 
+.code .file-ref    { color: #000000; }
+
 .code .color-splat {
 	display: inline-block;
 	height: 1em;

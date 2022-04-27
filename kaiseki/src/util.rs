@@ -28,10 +28,14 @@ pub impl In<'_> where Self: Sized {
 	}
 }
 
-fn decode(s: &[u8]) -> Result<String> {
+pub fn decode(s: &[u8]) -> Result<String> {
 	let (out, _, error) = SHIFT_JIS.decode(s);
 	eyre::ensure!(!error, "Invalid string: {:?}", out);
 	Ok(out.into_owned())
+}
+
+pub fn decode_lossy(s: &[u8]) -> String {
+	SHIFT_JIS.decode(s).0.into_owned()
 }
 
 pub fn toc<A>(i: &[u8], f: impl FnMut(&mut In, usize) -> Result<A>) -> Result<Vec<A>> {

@@ -3,7 +3,9 @@ use eyre::Result;
 use color_eyre::{Section, SectionExt};
 use derive_more::*;
 use hamu::read::{In, Le};
-use crate::util::{self, Text, InExt};
+use crate::util::{self, Text, InExt, ByteString};
+
+use super::Archives;
 
 #[derive(Debug, Clone)]
 pub struct Asm {
@@ -19,9 +21,30 @@ pub fn decompile(asm: &Asm) -> Result<Vec<Stmt>> {
 	crate::decompile::decompile(&asm.code, asm.end)
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, DebugCustom)]
-#[debug(fmt = "FileRef({_0}, {_1:#02X})")]
-pub struct FileRef(pub u16, pub u16); // (index, arch)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FileRef {
+	pub archive: u8,
+	pub name: ByteString<12>,
+}
+
+impl FileRef {
+	pub fn read(i: &mut In, archives: &Archives) -> Result<Self> {
+		Ok(Self::read_opt(i, archives)?.ok_or_else(|| eyre::eyre!("invalid empty file ref"))?)
+	}
+
+	pub fn read_opt(i: &mut In, archives: &Archives) -> Result<Option<Self>> {
+		let file = i.u16()?;
+		let arch = i.u16()?;
+		if (file, arch) == (0xFFFF, 0xFFFF) {
+			Ok(None)
+		} else {
+			let archive = archives.archive(arch as u8)?;
+			let ent = archive.entries().get(file as usize)
+				.ok_or_else(|| eyre::eyre!("invalid file ref {arch:02X}/{file}"))?;
+			Ok(Some(FileRef { archive: arch as u8, name: ent.name }))
+		}
+	}
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, DebugCustom)]
 #[debug(fmt = "FuncRef({_0}, {_1})")]
@@ -61,8 +84,8 @@ pub enum Expr {
 	Rand,
 }
 
-pub fn read(i: In, end: usize) -> Result<Asm> {
-	let code = CodeParser::new(i).func(end)?;
+pub fn read(i: In, end: usize, archives: &Archives) -> Result<Asm> {
+	let code = CodeParser::new(i, archives).func(end)?;
 	Ok(Asm { code, end })
 }
 
@@ -72,14 +95,16 @@ struct CodeParser<'a> {
 	#[deref]
 	#[deref_mut]
 	inner: In<'a>,
+	archives: &'a Archives,
 }
 
 impl<'a> CodeParser<'a> {
 	#[allow(clippy::new_without_default)]
-	fn new(i: In<'a>) -> Self {
+	fn new(i: In<'a>, archives: &'a Archives) -> Self {
 		CodeParser {
 			marks: HashMap::new(),
 			inner: i,
+			archives
 		}
 	}
 
@@ -151,8 +176,8 @@ impl<'a> CodeParser<'a> {
 		Ok(v)
 	}
 
-	fn file_ref(&mut self) -> hamu::read::Result<FileRef> {
-		Ok(FileRef(self.u16()?, self.u16()?))
+	fn file_ref(&mut self) -> Result<FileRef> {
+		FileRef::read(&mut self.inner, self.archives)
 	}
 
 	fn func_ref(&mut self) -> hamu::read::Result<FuncRef> {

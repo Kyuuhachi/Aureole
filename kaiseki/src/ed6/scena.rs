@@ -1,7 +1,7 @@
 use eyre::Result;
 use hamu::read::{In, Le};
 use crate::util::{self, ByteString, InExt};
-use super::code::{self, FileRef, FuncRef, Pos3, Asm};
+use super::{code::{self, FileRef, FuncRef, Pos3, Asm}, Archives};
 
 #[derive(Debug, Clone)]
 pub struct Npc {
@@ -73,7 +73,7 @@ pub struct Scena {
 	pub town: u16 /*town*/,
 	pub bgm: u16 /*bgmtbl*/,
 	pub entry_func: FuncRef,
-	pub includes: [FileRef; 8],
+	pub includes: [Option<FileRef>; 8],
 	pub ch: Vec<FileRef>,
 	pub cp: Vec<FileRef>,
 	pub npcs: Vec<Npc>,
@@ -86,10 +86,6 @@ pub struct Scena {
 
 #[extend::ext(name=InExtForScena)]
 impl In<'_> {
-	fn file_ref(&mut self) -> hamu::read::Result<FileRef> {
-		Ok(FileRef(self.u16()?, self.u16()?))
-	}
-
 	fn func_ref(&mut self) -> hamu::read::Result<FuncRef> {
 		Ok(FuncRef(self.u16()?, self.u16()?))
 	}
@@ -99,7 +95,7 @@ impl In<'_> {
 	}
 }
 
-pub fn read(i: &[u8]) -> Result<Scena> {
+pub fn read(i: &[u8], archives: &Archives) -> Result<Scena> {
 	let mut i = In::new(i);
 
 	let dir = i.bytestring::<10>()?;
@@ -107,10 +103,10 @@ pub fn read(i: &[u8]) -> Result<Scena> {
 	let town = i.u16()?;
 	let bgm = i.u16()?;
 	let entry_func = i.func_ref()?;
-	let includes = [
-		i.file_ref()?, i.file_ref()?, i.file_ref()?, i.file_ref()?,
-		i.file_ref()?, i.file_ref()?, i.file_ref()?, i.file_ref()?,
-	];
+	let includes = {
+		let mut r = || FileRef::read_opt(&mut i, archives);
+		[ r()?, r()?, r()?, r()?, r()?, r()?, r()?, r()? ]
+	};
 	i.check_u16(0)?;
 
 	let head_end = i.clone().u16()? as usize;
@@ -130,8 +126,8 @@ pub fn read(i: &[u8]) -> Result<Scena> {
 
 	eyre::ensure!(strings.string()? == "@FileName", stringify!(strings.string()? == "@FileName"));
 
-	let ch = chcp_list(ch)?;
-	let cp = chcp_list(cp)?;
+	let ch = chcp_list(ch, archives)?;
+	let cp = chcp_list(cp, archives)?;
 
 	let npcs = list(npcs, |i| Ok(Npc {
 		name: strings.string()?,
@@ -199,7 +195,7 @@ pub fn read(i: &[u8]) -> Result<Scena> {
 	eyre::ensure!(i.pos() == head_end, "Overshot: {:X} > {:X}", i.pos(), head_end);
 
 	let functions = util::multiple(&i, &func_table, code_end, |i, len| {
-		Ok(code::read(i.clone(), i.pos() + len)?)
+		Ok(code::read(i.clone(), i.pos() + len, archives)?)
 	})?;
 
 	i.dump_uncovered(|a| a.to_stderr())?;
@@ -217,10 +213,10 @@ pub fn read(i: &[u8]) -> Result<Scena> {
 	})
 }
 
-fn chcp_list((mut i, count): (In, u16)) -> Result<Vec<FileRef>> {
+fn chcp_list((mut i, count): (In, u16), archives: &Archives) -> Result<Vec<FileRef>> {
 	let mut out = Vec::with_capacity(count as usize);
 	for _ in 0..count {
-		out.push(i.file_ref()?);
+		out.push(FileRef::read(&mut i, archives)?);
 	}
 	i.check_u8(0xFF)?; // Nope, no idea what this is for
 	Ok(out)

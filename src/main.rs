@@ -1,5 +1,5 @@
 use actix_web::{HttpServer, App, get, web::{self, Data, Path}, middleware, Responder, HttpResponse, HttpRequest, body::BoxBody, ResponseError};
-use kaiseki::ed6::Archives;
+use kaiseki::{ed6::Archives, util::ByteString};
 
 pub mod ed6 {
 	pub mod magic;
@@ -21,8 +21,7 @@ impl<E: Into<eyre::Error>> From<E> for Error {
 	}
 }
 
-impl ResponseError for Error {
-}
+impl ResponseError for Error {}
 
 pub type Result<T, E=Error> = std::result::Result<T, E>;
 
@@ -51,7 +50,7 @@ impl Responder for Image {
 }
 
 #[get("/magic")]
-#[tracing::instrument]
+#[tracing::instrument(skip(arch))]
 async fn magic(arch: Data<Archives>) -> Result<Html> {
 	let data = arch.get_compressed_by_name(0x2, b"T_MAGIC ._DT")?.1;
 	let magics = kaiseki::ed6::magic::Magic::read(&data)?;
@@ -60,10 +59,10 @@ async fn magic(arch: Data<Archives>) -> Result<Html> {
 }
 
 #[get("/scena/{name:\\w{1,8}}")]
-#[tracing::instrument]
+#[tracing::instrument(skip(arch))]
 async fn scena(arch: Data<Archives>, name: Path<String>) -> Result<Option<Html>> {
 	let asm = false;
-	let mut s = kaiseki::ByteString(*b"        ._SN");
+	let mut s = ByteString(*b"        ._SN");
 	s[..name.len()].copy_from_slice(name.as_bytes());
 	let data = match arch.get_compressed_by_name(0x1, s) {
 		Ok(d) => d,
@@ -71,13 +70,13 @@ async fn scena(arch: Data<Archives>, name: Path<String>) -> Result<Option<Html>>
 		Err(e) => return Err(e.into()),
 	}.1;
 
-	let scena = kaiseki::ed6::scena::read(&data)?;
+	let scena = kaiseki::ed6::scena::read(&data, &arch)?;
 	let doc = ed6::scena::render(&scena, asm);
 	Ok(Some(Html(doc.render_to_string())))
 }
 
 #[get("/ui/{name}.png")]
-#[tracing::instrument]
+#[tracing::instrument(skip(arch))]
 async fn ui_png(arch: Data<Archives>, name: Path<String>) -> Result<Option<Image>> {
 	let low = false;
 	use kaiseki::image::{self, Format};
@@ -89,7 +88,7 @@ async fn ui_png(arch: Data<Archives>, name: Path<String>) -> Result<Option<Image
 
 	let (name, width, height, format) = if low { info1 } else { info2 };
 
-	let data = arch.get_compressed_by_name(0x0, kaiseki::ByteString(*name))?.1;
+	let data = arch.get_compressed_by_name(0x0, ByteString(*name))?.1;
 	let image = image::read(&data, width, height, format)?;
 	Ok(Some(Image(image)))
 }

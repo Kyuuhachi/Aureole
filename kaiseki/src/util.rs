@@ -57,7 +57,7 @@ pub fn multiple<A>(i: &In, pos: &[usize], end: usize, mut f: impl FnMut(&mut In,
 	for (idx, range) in ranges(pos.iter().copied(), end).enumerate() {
 		match f(&mut i.clone().at(range.start)?, range.end-range.start) {
 			Ok(v) => out.push(v),
-			Err(e) => errors.push(e.wrap_err(eyre::eyre!("Item {}", idx))),
+			Err(e) => errors.push((idx, e)),
 		}
 	}
 
@@ -65,14 +65,19 @@ pub fn multiple<A>(i: &In, pos: &[usize], end: usize, mut f: impl FnMut(&mut In,
 	use color_eyre::{Section, SectionExt};
 	match errors.len() {
 		0 => Ok(out),
-		1 => Err(errors.pop().unwrap()),
-		_ => Err(eyre::eyre!("Multiple errors").section({
-			let mut s = String::new();
-			for e in errors {
-				write!(s, "{:?}", e).unwrap();
+		_ => Err({
+			let mut s = Vec::new();
+			for (idx, e) in &errors {
+				s.push(format!("  {}: {}", idx, e));
 			}
-			s.header("Errors:")
-		})),
+			eyre::eyre!(s.join("\n")).section({
+				let mut s = String::new();
+				for (idx, e) in errors {
+					write!(s, "{:?}", e.wrap_err(eyre::eyre!("Item {}", idx))).unwrap();
+				}
+				s.header("Errors:")
+			})
+		}),
 	}
 }
 

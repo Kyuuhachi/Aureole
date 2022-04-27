@@ -287,10 +287,14 @@ fn read(i: &mut CodeParser) -> Result<Self> {
 		0x1B => _1B(u16, u16),
 		0x1C => _1C(u16, u16),
 		0x1D => BgmSet(bgmtbl/u8),
+		0x1E => _1E(),
+		0x1F => BgmSetVolume(u8, time/u32),
 		0x20 => _20(time/u32),
+		0x21 => _21(), // Always paired with _20
 		0x22 => SoundPlay(sound/u16, u8, u8),
 		0x23 => SoundStop(sound/u16),
 		0x24 => SoundLoop(sound/u16, u8),
+		0x26 => _Sound26(sound/u16),
 		0x28 => Quest(quest/u16, match u8 {
 			0x01 => TaskSet(quest_task/u16),
 			0x02 => TaskUnset(quest_task/u16),
@@ -311,6 +315,8 @@ fn read(i: &mut CodeParser) -> Result<Self> {
 			}
 			quests
 		} as Vec<u16>),
+		0x2B => QuestBonusBp(quest/u16, u16),
+		0x2C => QuestBonusMira(quest/u16, u16),
 		0x2D => PartyAdd(member/u8, char/{i.u8()? as u16} as u16),
 		0x2E => PartyRemove(member/u8, char/{i.u8()? as u16} as u16),
 		0x30 => _Party30(u8),
@@ -324,9 +330,10 @@ fn read(i: &mut CodeParser) -> Result<Self> {
 		0x3A => MiraAdd(u16),
 		0x3B => MiraSub(u16),
 		0x3C => BpAdd(u16),
-		// I have a guess what 3D is
+		// I have a guess what 3D is, but it doesn't exist in any scripts
 		0x3E => ItemAdd(item/u16, u16),
 		0x3F => ItemRemove(item/u16, u16),
+		0x40 => ItemHas(item/u16), // or is it ItemGetCount?
 		0x41 => PartyEquip(member/u8, item/u16, {
 			if (600..800).contains(&_1) {
 				i.i8()?
@@ -357,11 +364,12 @@ fn read(i: &mut CodeParser) -> Result<Self> {
 				insns.push((i.insn())?);
 			}
 			eyre::ensure!(i.pos() == pos+len, "Overshot: {:X} > {:X}", i.pos(), pos+len);
-			eyre::ensure!(i.flow_insn()? == FlowInsn::Insn(Insn::_48()), "Invalid loop");
+			eyre::ensure!(i.flow_insn()? == FlowInsn::Insn(Insn::Yield()), "Invalid loop");
 			eyre::ensure!(i.flow_insn()? == FlowInsn::Goto(pos), "Invalid loop");
 			insns
 		} as Vec<Insn>),
-		0x48 => _48(),
+		0x47 => CharForkAwait(char/u16, fork_id/u8, u8),
+		0x48 => Yield(), // Used in tight loops, probably wait until next frame
 		0x49 => Event(FuncRef), // Not sure how this differs from Call
 		0x4A => _Char4A(char/u16, u8),
 		0x4B => _Char4B(char/u16, u8),
@@ -373,6 +381,7 @@ fn read(i: &mut CodeParser) -> Result<Self> {
 		0x54 => TextMessage(Text),
 		0x56 => TextReset(u8),
 		0x58 => TextWait(),
+		0x59 => _59(),
 		0x5A => TextSetPos(i16, i16, i16, i16),
 		0x5B => TextTalk(char/u16, Text),
 		0x5C => TextTalkNamed(char/u16, String, Text),
@@ -384,6 +393,7 @@ fn read(i: &mut CodeParser) -> Result<Self> {
 		0x62 => Emote(char/u16, i32, time/u32, emote/{(i.u8()?, i.u8()?, i.u32()?, i.u8()?)} as (u8, u8, u32, u8)),
 		0x63 => EmoteStop(char/u16),
 		0x64 => _64(u8, u16),
+		0x65 => _65(u8, u16),
 		0x66 => _Cam66(u16),
 		0x6E => _Cam6E(data/{i.array()?} as [u8; 4], time/u32),
 		0x67 => CamOffset(i32, i32, i32, time/u32),
@@ -394,7 +404,16 @@ fn read(i: &mut CodeParser) -> Result<Self> {
 		0x6D => CamPos(Pos3, time/u32),
 		0x6F => _Obj6F(object/u16, u32),
 		0x70 => _Obj70(object/u16, u32),
+		0x71 => _Obj71(object/u16, u16),
 		0x72 => _Obj72(object/u16, u16),
+		0x73 => _Obj73(object/u16),
+		0x77 => _77(color/u32, time/u32),
+		0x7C => Shake(u32, u32, u32, time/u32),
+		0x7F => EffLoad(u8, String),
+		0x80 => EffPlay(u8, u8, i16, Pos3, u16, u16, u16, u32, u32, u32, u16, u32, u32, u32, u32),
+		0x81 => EffPlay2(u16, u8, String, Pos3, u16, u16, u16, u32, u32, u32, u32),
+		0x82 => _82(u16),
+		0x83 => Achievement(u8, u8),
 		0x86 => CharSetChcp(char/u16, chcp/u16),
 		0x87 => CharSetFrame(char/u16, u16),
 		0x88 => CharSetPos(char/u16, Pos3, angle/u16),
@@ -407,6 +426,7 @@ fn read(i: &mut CodeParser) -> Result<Self> {
 		0x90 => DontGoThere(u16, relative/Pos3, u32, u8),
 		0x91 => _Char91(char/u16, relative/Pos3, i32, u8),
 		0x92 => _Char92(char/u16, char/u16, u32, time/u32, u8),
+		0x94 => _94(u8, char/u16, u16, u32, u32, u8), // used with chickens
 		0x95 => CharJump(char/u16, relative/Pos3, time/u32, u32),
 		0x97 => _Char97(char/u16, Pos2, angle32/i32, time/u32, u16), // used with pigeons
 		0x99 => CharAnimation(char/u16, u8, u8, time/u32),
@@ -414,14 +434,18 @@ fn read(i: &mut CodeParser) -> Result<Self> {
 		0x9B => CharFlagsUnset(char/u16, char_flags/u16),
 		0x9C => _Char9C(char/u16, u16),
 		0x9D => _Char9D(char/u16, u16),
+		0x9E => CharShake(char/u16, u32, u32, u32, time/u32),
 		0x9F => CharColor(char/u16, color/u32, time/u32),
 		0xA1 => _CharA1(char/u16, u16),
 		0xA2 => FlagSet(flag/u16),
 		0xA3 => FlagUnset(flag/u16),
-		0xA5 => AwaitFlagUnset(flag/u16),
-		0xA6 => AwaitFlagSet(flag/u16),
+		0xA5 => FlagAwaitUnset(flag/u16),
+		0xA6 => FlagAwaitSet(flag/u16),
 		0xA9 => ShopOpen(shop/u8),
 		0xAC => RecipeLearn(u16), // TODO check type
+		0xAD => ImageShow(FileRef, u16, u16, time/u32),
+		0xAE => ImageHide(time/u32),
+		0xAF => QuestSubmit(shop/u8, quest/u16),
 		0xB1 => OpLoad(String),
 		0xB2 => _B2(u8, u8, u16),
 		0xB3 => Show(match u8 {
@@ -431,6 +455,8 @@ fn read(i: &mut CodeParser) -> Result<Self> {
 		0xB4 => ReturnToTitle(u8),
 		0xB5 => PartySlot(member/u8, u8, u8), // FC only
 		0xB9 => ReadBook(item/u16, u16), // FC only
+		0xBA => PartyHasSpell(member/u8, magic/u16),
+		0xBB => PartyHasSlot(member/u8, u8), // FC only
 		0xDE => SaveClearData(), // FC only
 	}
 }

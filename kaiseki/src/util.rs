@@ -155,10 +155,12 @@ pub enum TextSegment {
 	Page,
 	_05,
 	_06,
+	_09,
 	Color(u8),
 	Item(u16 /*Item*/),
 	A(u16),
 	Face(u16 /*Face*/),
+	K(u16),
 	Pos(u16),
 	Ruby(u16, String),
 	Size(u16),
@@ -184,7 +186,7 @@ impl Text {
 			0x05 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::_05) }
 			0x06 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::_06) }
 			0x07 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::Color(i.u8()?)) }
-			// 0x09 =>
+			0x09 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::_09) }
 			// 0x18 =>
 			0x1F => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::Item(i.u16()?)) }
 			op@(0x00..=0x1F) => eyre::bail!("Unknown TextSegment: b{:?}", char::from(op)),
@@ -196,6 +198,7 @@ impl Text {
 					ch@(b'0'..=b'9') => n = n * 10 + (ch - b'0') as u16,
 					b'A' => break TextSegment::A(n),
 					b'F' => break TextSegment::Face(n),
+					b'K' => break TextSegment::K(n),
 					b'P' => break TextSegment::Pos(n),
 					b'R' => break TextSegment::Ruby(n, {
 						let mut ruby = Vec::new();

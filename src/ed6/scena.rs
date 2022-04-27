@@ -1,7 +1,7 @@
 use std::collections::{BTreeSet, BTreeMap};
 
 use choubun::Node;
-use kaiseki::ed6::{scena::*, code::*};
+use kaiseki::ed6::scena::*;
 use kaiseki::util::Text;
 
 pub fn render(scena: &Scena, asm: bool) -> choubun::Node {

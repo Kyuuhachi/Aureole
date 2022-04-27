@@ -1,7 +1,69 @@
+use std::collections::HashMap;
+
 use eyre::Result;
+use color_eyre::{Section, SectionExt};
+use derive_more::*;
+
 use hamu::read::{In, Le};
-use crate::util::{self, ByteString, InExt};
-use super::{code::{self, FileRef, FuncRef, Pos3, Asm}, Archives};
+use crate::util::{self, ByteString, InExt, Text};
+use super::archive::Archives;
+
+mod code;
+pub use code::{Insn, InsnVisitor};
+
+#[derive(Clone, Copy, PartialEq, Eq, DebugCustom)]
+#[debug(fmt = "FuncRef({_0}, {_1})")]
+pub struct FuncRef(pub u16, pub u16);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FileRef {
+	pub archive: u8,
+	pub name: ByteString<12>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, DebugCustom)]
+#[debug(fmt = "Pos2({_0}, {_1})")]
+pub struct Pos2(pub i32, pub i32);
+
+#[derive(Clone, Copy, PartialEq, Eq, DebugCustom)]
+#[debug(fmt = "Pos3({_0}, {_1}, {_2})")]
+pub struct Pos3(pub i32, pub i32, pub i32);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExprBinop {
+	Eq, Ne, Lt, Gt, Le, Ge,
+	BoolAnd, And, Or,
+	Add, Sub, Xor, Mul, Div, Mod,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExprUnop {
+	Not, Neg, Inv,
+	Ass, MulAss, DivAss, ModAss, AddAss, SubAss, AndAss, XorAss, OrAss
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Expr {
+	Const(u32),
+	Binop(ExprBinop, Box<Expr>, Box<Expr>),
+	Unop(ExprUnop, Box<Expr>),
+	Exec(Box<Insn>),
+	Flag(u16 /*Flag*/),
+	Var(u16 /*Var*/),
+	Attr(u8 /*Attr*/),
+	CharAttr(u16 /*Char*/, u8 /*CharAttr*/),
+	Rand,
+}
+
+pub type FlowInsn = crate::decompile::FlowInsn<Expr, Insn>;
+
+pub type Stmt = crate::decompile::Stmt<Expr, Insn>;
+
+#[derive(Debug, Clone)]
+pub struct Asm {
+	pub code: Vec<(usize, FlowInsn)>,
+	pub end: usize,
+}
 
 #[derive(Debug, Clone)]
 pub struct Npc {
@@ -88,6 +150,10 @@ pub struct Scena {
 impl In<'_> {
 	fn func_ref(&mut self) -> hamu::read::Result<FuncRef> {
 		Ok(FuncRef(self.u16()?, self.u16()?))
+	}
+
+	fn pos2(&mut self) -> hamu::read::Result<Pos2> {
+		Ok(Pos2(self.i32()?, self.i32()?))
 	}
 
 	fn pos3(&mut self) -> hamu::read::Result<Pos3> {
@@ -195,7 +261,9 @@ pub fn read(i: &[u8], archives: &Archives) -> Result<Scena> {
 	eyre::ensure!(i.pos() == head_end, "Overshot: {:X} > {:X}", i.pos(), head_end);
 
 	let functions = util::multiple(&i, &func_table, code_end, |i, len| {
-		Ok(code::read(i.clone(), i.pos() + len, archives)?)
+		let end = i.pos() + len;
+		let code = CodeParser::new(i.clone(), archives).func(end)?;
+		Ok(Asm { code, end })
 	})?;
 
 	i.dump_uncovered(|a| a.to_stderr())?;
@@ -228,4 +296,209 @@ fn list<A>((mut i, count): (In, u16), mut f: impl FnMut(&mut In) -> Result<A>) -
 		out.push(f(&mut i)?);
 	}
 	Ok(out)
+}
+
+pub fn decompile(asm: &Asm) -> Result<Vec<Stmt>> {
+	crate::decompile::decompile(&asm.code, asm.end)
+}
+
+impl FileRef {
+	pub fn read(i: &mut In, archives: &Archives) -> Result<Self> {
+		Ok(Self::read_opt(i, archives)?.ok_or_else(|| eyre::eyre!("invalid empty file ref"))?)
+	}
+
+	pub fn read_opt(i: &mut In, archives: &Archives) -> Result<Option<Self>> {
+		let file = i.u16()?;
+		let arch = i.u16()?;
+		if (file, arch) == (0xFFFF, 0xFFFF) {
+			Ok(None)
+		} else {
+			let archive = archives.archive(arch as u8)?;
+			let ent = archive.entries().get(file as usize)
+				.ok_or_else(|| eyre::eyre!("invalid file ref {arch:02X}/{file}"))?;
+			Ok(Some(FileRef { archive: arch as u8, name: ent.name }))
+		}
+	}
+}
+
+#[derive(Deref, DerefMut)]
+struct CodeParser<'a> {
+	marks: HashMap<usize, String>,
+	#[deref]
+	#[deref_mut]
+	inner: In<'a>,
+	archives: &'a Archives,
+}
+
+impl<'a> CodeParser<'a> {
+	#[allow(clippy::new_without_default)]
+	fn new(i: In<'a>, archives: &'a Archives) -> Self {
+		CodeParser {
+			marks: HashMap::new(),
+			inner: i,
+			archives
+		}
+	}
+
+	fn func(&mut self, end: usize) -> Result<Vec<(usize, FlowInsn)>> {
+		let start = self.inner.clone();
+		let mut ops = Vec::new();
+		(|| -> Result<_> {
+			self.marks.insert(self.pos(), "\x1B[0;7m[".to_owned());
+			while self.pos() < end {
+				ops.push((self.pos(), self.flow_insn()?));
+				self.marks.insert(self.pos(), "\x1B[0;7m•".to_owned());
+			}
+			self.marks.insert(self.pos(), "\x1B[0;7m]".to_owned());
+			eyre::ensure!(self.pos() == end, "Overshot: {:X} > {:X}", self.pos(), end);
+			Ok(())
+		})().map_err(|e| {
+			use std::fmt::Write;
+			e.section({
+				let mut s = String::new();
+				for (addr, op) in &ops {
+					writeln!(s, "{:04X}: {:?}", addr, op).unwrap();
+				}
+				s.pop(); // remove newline
+				s.header("Code:")
+			}).section({
+				start.dump().end(end)
+					.marks(self.marks.iter())
+					.mark(self.pos()-1, "\x1B[0;7m ")
+					.number_width(4)
+					.newline(false)
+					.to_string()
+					.header("Dump:")
+			})
+		})?;
+		Ok(ops)
+	}
+
+	fn flow_insn(&mut self) -> Result<FlowInsn> {
+		let pos = self.pos();
+		Ok(match self.u8()? {
+			0x02 => FlowInsn::If(self.expr()?, self.u16()? as usize),
+			0x03 => FlowInsn::Goto(self.u16()? as usize),
+			0x04 => FlowInsn::Switch(self.expr()?, {
+				let mut out = Vec::new();
+				for _ in 0..self.u16()? {
+					out.push((self.u16()?, self.u16()? as usize));
+				}
+				out
+			}, self.u16()? as usize),
+			_ => {
+				self.seek(pos).unwrap();
+				FlowInsn::Insn(self.insn()?)
+			}
+		})
+	}
+
+	fn insn(&mut self) -> Result<Insn> {
+		Insn::read(self)
+	}
+
+	fn expr(&mut self) -> Result<Expr> {
+		ExprParser::new(self).expr()
+	}
+
+	fn text(&mut self) -> Result<Text> {
+		self.marks.insert(self.pos(), "\x1B[0;7;2m\"".to_owned());
+		let v = util::Text::read(self)?;
+		self.marks.insert(self.pos(), "\x1B[0;7;2m\"".to_owned());
+		Ok(v)
+	}
+
+	fn file_ref(&mut self) -> Result<FileRef> {
+		FileRef::read(&mut self.inner, self.archives)
+	}
+
+	fn func_ref(&mut self) -> hamu::read::Result<FuncRef> {
+		Ok(FuncRef(self.u8()? as u16, self.u16()?))
+	}
+}
+
+#[derive(Deref, DerefMut)]
+struct ExprParser<'a, 'b> {
+	stack: Vec<Expr>,
+	#[deref]
+	#[deref_mut]
+	inner: &'a mut CodeParser<'b>,
+}
+
+impl<'a, 'b> ExprParser<'a, 'b> {
+	fn new(inner: &'a mut CodeParser<'b>) -> ExprParser<'a, 'b> {
+		ExprParser {
+			stack: Vec::new(),
+			inner,
+		}
+	}
+
+	fn expr(mut self) -> Result<Expr> {
+		self.inner.marks.insert(self.inner.pos(), "\x1B[0;7;2m[".to_owned());
+		while let Some(op) = self.op()? {
+			self.stack.push(op);
+			self.inner.marks.insert(self.inner.pos(), "\x1B[0;7;2m•".to_owned());
+		}
+		self.inner.marks.insert(self.inner.pos(), "\x1B[0;7;2m]".to_owned());
+		match self.stack.len() {
+			1 => Ok(self.pop()?),
+			_ => eyre::bail!("Invalid Expr: {:?}", self.stack)
+		}
+	}
+
+	fn op(&mut self) -> Result<Option<Expr>> {
+		Ok(Some(match self.u8()? {
+			0x00 => Expr::Const(self.u32()?),
+			0x01 => return Ok(None),
+			0x02 => self.binop(ExprBinop::Eq)?,
+			0x03 => self.binop(ExprBinop::Ne)?,
+			0x04 => self.binop(ExprBinop::Lt)?,
+			0x05 => self.binop(ExprBinop::Gt)?,
+			0x06 => self.binop(ExprBinop::Le)?,
+			0x07 => self.binop(ExprBinop::Ge)?,
+			0x08 => self.unop(ExprUnop::Not)?,
+			0x09 => self.binop(ExprBinop::BoolAnd)?,
+			0x0A => self.binop(ExprBinop::And)?,
+			0x0B => self.binop(ExprBinop::Or)?,
+			0x0C => self.binop(ExprBinop::Add)?,
+			0x0D => self.binop(ExprBinop::Sub)?,
+			0x0E => self.unop(ExprUnop::Neg)?,
+			0x0F => self.binop(ExprBinop::Xor)?,
+			0x10 => self.binop(ExprBinop::Mul)?,
+			0x11 => self.binop(ExprBinop::Div)?,
+			0x12 => self.binop(ExprBinop::Mod)?,
+			0x13 => self.unop(ExprUnop::Ass)?,
+			0x14 => self.unop(ExprUnop::MulAss)?,
+			0x15 => self.unop(ExprUnop::DivAss)?,
+			0x16 => self.unop(ExprUnop::ModAss)?,
+			0x17 => self.unop(ExprUnop::AddAss)?,
+			0x18 => self.unop(ExprUnop::SubAss)?,
+			0x19 => self.unop(ExprUnop::AndAss)?,
+			0x1A => self.unop(ExprUnop::XorAss)?,
+			0x1B => self.unop(ExprUnop::OrAss)?,
+			0x1C => Expr::Exec(Box::new(self.insn()?)),
+			0x1D => self.unop(ExprUnop::Inv)?,
+			0x1E => Expr::Flag(self.u16()?),
+			0x1F => Expr::Var(self.u16()?),
+			0x20 => Expr::Attr(self.u8()?),
+			0x21 => Expr::CharAttr(self.u16()?, self.u8()?),
+			0x22 => Expr::Rand,
+			op => eyre::bail!("Unknown Expr: {:02X}", op)
+		}))
+	}
+
+	fn binop(&mut self, op: ExprBinop) -> Result<Expr> {
+		let r = Box::new(self.pop()?);
+		let l = Box::new(self.pop()?);
+		Ok(Expr::Binop(op, l, r))
+	}
+
+	fn unop(&mut self, op: ExprUnop) -> Result<Expr> {
+		let v = Box::new(self.pop()?);
+		Ok(Expr::Unop(op, v))
+	}
+
+	fn pop(&mut self) -> Result<Expr> {
+		Ok(self.stack.pop().ok_or_else(|| eyre::eyre!("Empty expr stack"))?)
+	}
 }

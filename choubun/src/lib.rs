@@ -85,7 +85,7 @@ impl Leaf {
 	pub fn class(&mut self, class: &str) {
 		if let Some(v) = self.attrs.get_mut("class") {
 			v.push(' ');
-			v.push_str(class.as_ref());
+			v.push_str(class);
 		} else {
 			self.attr("class", class);
 		}

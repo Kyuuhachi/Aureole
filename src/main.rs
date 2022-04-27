@@ -51,6 +51,7 @@ impl Responder for Image {
 }
 
 #[get("/magic")]
+#[tracing::instrument]
 async fn magic(arch: Data<Archives>) -> Result<Html> {
 	let data = arch.get_compressed_by_name(0x2, b"T_MAGIC ._DT")?.1;
 	let magics = kaiseki::ed6::magic::Magic::read(&data)?;
@@ -59,6 +60,7 @@ async fn magic(arch: Data<Archives>) -> Result<Html> {
 }
 
 #[get("/scena/{name:\\w{1,8}}")]
+#[tracing::instrument]
 async fn scena(arch: Data<Archives>, name: Path<String>) -> Result<Option<Html>> {
 	let asm = false;
 	let mut s = kaiseki::ByteString(*b"        ._SN");
@@ -74,7 +76,8 @@ async fn scena(arch: Data<Archives>, name: Path<String>) -> Result<Option<Html>>
 	Ok(Some(Html(doc.render_to_string())))
 }
 
-#[get("/fc/ui/{name}.png")]
+#[get("/ui/{name}.png")]
+#[tracing::instrument]
 async fn ui_png(arch: Data<Archives>, name: Path<String>) -> Result<Option<Image>> {
 	let low = false;
 	use kaiseki::image::{self, Format};
@@ -93,11 +96,11 @@ async fn ui_png(arch: Data<Archives>, name: Path<String>) -> Result<Option<Image
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-	use tracing_subscriber::{prelude::*, EnvFilter};
+	use tracing_subscriber::prelude::*;
 
 	tracing_subscriber::registry()
 		.with(tracing_subscriber::fmt::layer())
-		.with(EnvFilter::from_default_env())
+		.with(tracing_subscriber::EnvFilter::from_default_env())
 		.with(tracing_error::ErrorLayer::default())
 		.init();
 
@@ -111,6 +114,8 @@ async fn main() -> std::io::Result<()> {
 	HttpServer::new(|| {
 		App::new()
 			.wrap(middleware::Compress::default())
+			.wrap(tracing_actix_web::TracingLogger::default())
+			.wrap(middleware::Logger::default())
 			.service(
 				actix_files::Files::new("/assets", concat!(env!("CARGO_MANIFEST_DIR"), "/assets"))
 				.show_files_listing()

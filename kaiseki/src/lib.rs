@@ -7,6 +7,7 @@ pub mod ed6 {
 	pub mod code;
 	pub use archive::{Archive,Archives};
 }
+pub mod image;
 mod decompress;
 mod util;
 mod decompile;

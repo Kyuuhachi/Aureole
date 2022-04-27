@@ -35,6 +35,16 @@ impl<'r> Responder<'r, 'static> for Error {
 
 pub type Result<T, E=Error> = std::result::Result<T, E>;
 
+#[derive(Debug)]
+pub struct Image(image::RgbaImage);
+impl<'r> Responder<'r, 'static> for Image {
+	fn respond_to(self, req: &'r rocket::Request<'_>) -> rocket::response::Result<'static> {
+		let mut data = Vec::new();
+		self.0.write_to(&mut std::io::Cursor::new(&mut data), image::ImageOutputFormat::Png).unwrap();
+		rocket::response::content::Custom(rocket::http::ContentType::PNG, data).respond_to(req)
+	}
+}
+
 #[rocket::get("/fc/magic")]
 fn fc_magic(arch: &State<Archives>) -> Result<Html<String>> {
 	let data = arch.get_compressed_by_name(0x2, b"T_MAGIC ._DT")?.1;
@@ -59,6 +69,22 @@ fn fc_scena(arch: &State<Archives>, name: &str, asm: bool) -> Result<Html<String
 	Ok(Html(doc.render_to_string()))
 }
 
+#[rocket::get("/fc/ui/<name>?<low>")]
+fn fc_ui_png(arch: &State<Archives>, name: &str, low: bool) -> Result<Image> {
+	use kaiseki::image::{self, Format};
+	let (info1, info2) = match name {
+		"icon1.png" => ((b"C_ICON1 ._CH", 256, 256, Format::Rgba4444), (b"H_ICON1 ._CH", 512, 512, Format::Rgba4444)),
+		"icon2.png" => ((b"C_ICON2 ._CH", 256, 256, Format::Rgba4444), (b"H_ICON2 ._CH", 512, 512, Format::Rgba4444)),
+		_ => return Err(Error::NotFound)
+	};
+
+	let (name, width, height, format) = if low { info1 } else { info2 };
+
+	let data = arch.get_compressed_by_name(0x0, kaiseki::ByteString(*name))?.1;
+	let image = image::read(&data, width, height, format)?;
+	Ok(Image(image))
+}
+
 #[rocket::launch]
 fn rocket() -> _ {
 	use tracing_subscriber::{prelude::*, EnvFilter};
@@ -79,5 +105,5 @@ fn rocket() -> _ {
 	rocket::build()
 		.manage(Archives::new("data/fc"))
 		.mount("/assets", rocket::fs::FileServer::from(rocket::fs::relative!("assets")))
-		.mount("/", rocket::routes![fc_magic, fc_scena])
+		.mount("/", rocket::routes![fc_magic, fc_scena, fc_ui_png])
 }

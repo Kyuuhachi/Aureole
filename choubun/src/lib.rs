@@ -182,13 +182,9 @@ impl Document {
 }
 
 pub fn document(body: impl FnOnce(&mut Document)) -> Node {
-	document_(body).0
-}
-
-pub fn document_<A>(body: impl FnOnce(&mut Document) -> A) -> (Node, A) {
 	let mut doc = Document::new();
-	let v = body(&mut doc);
-	(doc.into_node(), v)
+	body(&mut doc);
+	doc.into_node()
 }
 
 impl Node {

@@ -48,7 +48,7 @@ pub fn render(scena: &Scena, asm: bool) -> choubun::Node {
 		doc.body.node("h2", |a| a.text("NPCs"));
 		doc.body.node("ol", |a| {
 			a.indent();
-			a.attr("start", "0");
+			a.attr("start", 8);
 			for npc in npcs {
 				a.node("li", |a| a.text(format!("{:?}", npc)));
 			}
@@ -57,7 +57,7 @@ pub fn render(scena: &Scena, asm: bool) -> choubun::Node {
 		doc.body.node("h2", |a| a.text("Monsters"));
 		doc.body.node("ol", |a| {
 			a.indent();
-			a.attr("start", npcs.len().to_string());
+			a.attr("start", 8+npcs.len());
 			for monster in monsters {
 				a.node("li", |a| a.text(format!("{:?}", monster)));
 			}
@@ -66,7 +66,7 @@ pub fn render(scena: &Scena, asm: bool) -> choubun::Node {
 		doc.body.node("h2", |a| a.text("Triggers"));
 		doc.body.node("ol", |a| {
 			a.indent();
-			a.attr("start", "0");
+			a.attr("start", 0);
 			for trigger in triggers {
 				a.node("li", |a| a.text(format!("{:?}", trigger)));
 			}
@@ -75,7 +75,7 @@ pub fn render(scena: &Scena, asm: bool) -> choubun::Node {
 		doc.body.node("h2", |a| a.text("Object"));
 		doc.body.node("ol", |a| {
 			a.indent();
-			a.attr("start", "0");
+			a.attr("start", 0);
 			for object in objects {
 				a.node("li", |a| a.text(format!("{:?}", object)));
 			}

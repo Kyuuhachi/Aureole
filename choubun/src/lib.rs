@@ -115,18 +115,16 @@ impl Node {
 }
 
 impl Body {
-	pub fn node<A>(&mut self, name: &str, body: impl FnOnce(&mut Node) -> A) -> A {
+	pub fn node(&mut self, name: &str, body: impl FnOnce(&mut Node)) {
 		let mut node = Node::new(name);
-		let v = body(&mut node);
+		body(&mut node);
 		self.0.push(Item::Node(node));
-		v
 	}
 
-	pub fn leaf<A>(&mut self, name: &str, body: impl FnOnce(&mut Leaf) -> A) -> A {
+	pub fn leaf(&mut self, name: &str, body: impl FnOnce(&mut Leaf)) {
 		let mut node = Leaf::new(name);
-		let v = body(&mut node);
+		body(&mut node);
 		self.0.push(Item::Leaf(node));
-		v
 	}
 
 	pub fn text(&mut self, text: impl ToString) {
@@ -145,13 +143,9 @@ impl Body {
 }
 
 pub fn node(name: &str, body: impl FnOnce(&mut Node)) -> Node {
-	node_(name, body).0
-}
-
-pub fn node_<A>(name: &str, body: impl FnOnce(&mut Node) -> A) -> (Node, A) {
 	let mut node = Node::new(name);
-	let v = body(&mut node);
-	(node, v)
+	body(&mut node);
+	node
 }
 
 #[derive(Debug, Clone)]

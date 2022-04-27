@@ -118,14 +118,14 @@ pub fn render(scena: &Scena, asm: bool) -> choubun::Node {
 
 #[extend::ext]
 impl Node {
-	fn node_class<A>(&mut self, name: &str, class: &str, body: impl FnOnce(&mut Node) -> A) -> A {
+	fn node_class(&mut self, name: &str, class: &str, body: impl FnOnce(&mut Node)) {
 		self.node(name, |a| {
 			a.class(class);
-			body(a)
+			body(a);
 		})
 	}
 
-	fn span<A>(&mut self, class: &str, body: impl FnOnce(&mut Node) -> A) -> A {
+	fn span(&mut self, class: &str, body: impl FnOnce(&mut Node)) {
 		self.node_class("span", class, body)
 	}
 

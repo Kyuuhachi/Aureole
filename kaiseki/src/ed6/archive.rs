@@ -35,6 +35,12 @@ pub struct Entry {
 	range: Range<usize>,
 }
 
+impl Entry {
+	pub fn is_real(&self) -> bool {
+		self.timestamp.timestamp() != 0
+	}
+}
+
 impl std::fmt::Debug for Entry {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("Entry")

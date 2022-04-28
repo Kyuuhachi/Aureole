@@ -34,10 +34,6 @@ pub fn decode(s: &[u8]) -> Result<String> {
 	Ok(out.into_owned())
 }
 
-pub fn decode_lossy(s: &[u8]) -> String {
-	SHIFT_JIS.decode(s).0.into_owned()
-}
-
 pub fn toc<A>(i: &[u8], f: impl FnMut(&mut In, usize) -> Result<A>) -> Result<Vec<A>> {
 	let mut i = In::new(i);
 	let start = i.clone().u16()? as usize;

@@ -114,7 +114,7 @@ pub fn render(scena: &Scena, archives: &Archives, raw: bool) -> choubun::Node {
 impl ScenaRenderer<'_> {
 	fn file_name(&self, FileRef(arch, index): FileRef) -> String {
 		if let Ok(file) = self.archives.get(arch as u8, index as usize) {
-			let name = kaiseki::util::decode_lossy(&*file.0.name);
+			let name = file.0.name.decode();
 			let (prefix, suffix) = name.split_once('.').unwrap_or((&name, ""));
 			let prefix = prefix.trim_end_matches(|a| a == ' ');
 			let suffix = suffix.trim_start_matches(|a| a == '_');

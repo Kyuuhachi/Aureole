@@ -462,7 +462,7 @@ impl CodeRenderer<'_> {
 
 	fn visitor<'a, 'b>(&'a self, a: &'b mut Node, name: &'static str) -> InsnRenderer<'a, 'b> {
 		a.span_text("insn", name);
-		InsnRenderer { inner: self, node: a }
+		InsnRenderer { inner: self.indent(), node: a }
 	}
 
 	fn insn(&self, a: &mut Node, insn: &Insn) {
@@ -474,7 +474,7 @@ impl CodeRenderer<'_> {
 #[derive(Deref)]
 struct InsnRenderer<'a, 'b> {
 	#[deref]
-	inner: &'a CodeRenderer<'a>,
+	inner: CodeRenderer<'a>,
 	node: &'b mut Node,
 }
 
@@ -560,11 +560,10 @@ impl InsnVisitor for InsnRenderer<'_, '_> {
 			self.node.span_text("syntax", "[");
 		}
 
-		let inner = self.inner.indent();
 		for insn in v {
 			self.node.text("\n");
-			inner.line(self.node);
-			inner.insn(self.node, insn);
+			self.inner.line(self.node);
+			self.inner.insn(self.node, insn);
 		}
 
 		if self.inner.raw {

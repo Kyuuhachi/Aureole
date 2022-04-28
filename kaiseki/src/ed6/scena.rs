@@ -6,7 +6,6 @@ use derive_more::*;
 
 use hamu::read::{In, Le};
 use crate::util::{self, ByteString, InExt, Text};
-use super::archive::Archives;
 
 mod code;
 pub use code::{Insn, InsnVisitor};
@@ -16,10 +15,7 @@ pub use code::{Insn, InsnVisitor};
 pub struct FuncRef(pub u16, pub u16);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct FileRef {
-	pub archive: u8,
-	pub name: ByteString<12>,
-}
+pub struct FileRef(pub u16, pub u16);
 
 #[derive(Clone, Copy, PartialEq, Eq, DebugCustom)]
 #[debug(fmt = "Pos2({_0}, {_1})")]
@@ -161,7 +157,7 @@ impl In<'_> {
 	}
 }
 
-pub fn read(i: &[u8], archives: &Archives) -> Result<Scena> {
+pub fn read(i: &[u8]) -> Result<Scena> {
 	let mut i = In::new(i);
 
 	let dir = i.bytestring::<10>()?;
@@ -170,7 +166,7 @@ pub fn read(i: &[u8], archives: &Archives) -> Result<Scena> {
 	let bgm = i.u16()?;
 	let entry_func = i.func_ref()?;
 	let includes = {
-		let mut r = || FileRef::read_opt(&mut i, archives);
+		let mut r = || FileRef::read_opt(&mut i);
 		[ r()?, r()?, r()?, r()?, r()?, r()?, r()?, r()? ]
 	};
 	i.check_u16(0)?;
@@ -192,8 +188,8 @@ pub fn read(i: &[u8], archives: &Archives) -> Result<Scena> {
 
 	eyre::ensure!(strings.string()? == "@FileName", stringify!(strings.string()? == "@FileName"));
 
-	let ch = chcp_list(ch, archives)?;
-	let cp = chcp_list(cp, archives)?;
+	let ch = chcp_list(ch)?;
+	let cp = chcp_list(cp)?;
 
 	let npcs = list(npcs, |i| Ok(Npc {
 		name: strings.string()?,
@@ -262,7 +258,7 @@ pub fn read(i: &[u8], archives: &Archives) -> Result<Scena> {
 
 	let functions = util::multiple(&i, &func_table, code_end, |i, len| {
 		let end = i.pos() + len;
-		let code = CodeParser::new(i.clone(), archives).func(end)?;
+		let code = CodeParser::new(i.clone()).func(end)?;
 		Ok(Asm { code, end })
 	})?;
 
@@ -281,10 +277,10 @@ pub fn read(i: &[u8], archives: &Archives) -> Result<Scena> {
 	})
 }
 
-fn chcp_list((mut i, count): (In, u16), archives: &Archives) -> Result<Vec<FileRef>> {
+fn chcp_list((mut i, count): (In, u16)) -> Result<Vec<FileRef>> {
 	let mut out = Vec::with_capacity(count as usize);
 	for _ in 0..count {
-		out.push(FileRef::read(&mut i, archives)?);
+		out.push(FileRef::read(&mut i)?);
 	}
 	i.check_u8(0xFF)?; // Nope, no idea what this is for
 	Ok(out)
@@ -303,20 +299,17 @@ pub fn decompile(asm: &Asm) -> Result<Vec<Stmt>> {
 }
 
 impl FileRef {
-	pub fn read(i: &mut In, archives: &Archives) -> Result<Self> {
-		Ok(Self::read_opt(i, archives)?.ok_or_else(|| eyre::eyre!("invalid empty file ref"))?)
+	pub fn read(i: &mut In) -> Result<Self> {
+		Ok(Self::read_opt(i)?.ok_or_else(|| eyre::eyre!("invalid empty file ref"))?)
 	}
 
-	pub fn read_opt(i: &mut In, archives: &Archives) -> Result<Option<Self>> {
+	pub fn read_opt(i: &mut In) -> Result<Option<Self>> {
 		let file = i.u16()?;
 		let arch = i.u16()?;
 		if (file, arch) == (0xFFFF, 0xFFFF) {
 			Ok(None)
 		} else {
-			let archive = archives.archive(arch as u8)?;
-			let ent = archive.entries().get(file as usize)
-				.ok_or_else(|| eyre::eyre!("invalid file ref {arch:02X}/{file}"))?;
-			Ok(Some(FileRef { archive: arch as u8, name: ent.name }))
+			Ok(Some(FileRef(arch, file)))
 		}
 	}
 }
@@ -327,16 +320,14 @@ struct CodeParser<'a> {
 	#[deref]
 	#[deref_mut]
 	inner: In<'a>,
-	archives: &'a Archives,
 }
 
 impl<'a> CodeParser<'a> {
 	#[allow(clippy::new_without_default)]
-	fn new(i: In<'a>, archives: &'a Archives) -> Self {
+	fn new(i: In<'a>) -> Self {
 		CodeParser {
 			marks: HashMap::new(),
 			inner: i,
-			archives
 		}
 	}
 
@@ -409,7 +400,7 @@ impl<'a> CodeParser<'a> {
 	}
 
 	fn file_ref(&mut self) -> Result<FileRef> {
-		FileRef::read(&mut self.inner, self.archives)
+		FileRef::read(&mut self.inner)
 	}
 
 	fn func_ref(&mut self) -> hamu::read::Result<FuncRef> {

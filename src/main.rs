@@ -70,8 +70,8 @@ async fn scena(arch: Data<Archives>, name: Path<String>) -> Result<Option<Html>>
 		Err(e) => return Err(e.into()),
 	}.1;
 
-	let scena = kaiseki::ed6::scena::read(&data, &arch)?;
-	let doc = ed6::scena::render(&scena, asm);
+	let scena = kaiseki::ed6::scena::read(&data)?;
+	let doc = ed6::scena::render(&scena, &arch, asm);
 	Ok(Some(Html(doc.render_to_string())))
 }
 

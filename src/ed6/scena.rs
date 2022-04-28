@@ -1,30 +1,27 @@
 use std::collections::{BTreeSet, BTreeMap};
 
 use choubun::Node;
-use kaiseki::ed6::scena::*;
+use kaiseki::ed6::{scena::*, Archives};
 use kaiseki::util::Text;
 
-pub fn render(scena: &Scena, asm: bool) -> choubun::Node {
-	let Scena {
-		dir, fname, town, bgm,
-		entry_func,
-		includes,
-		ch, cp,
-		npcs, monsters, triggers, objects,
-		camera_angles,
-		functions,
-	} = scena;
+struct ScenaRenderer<'a> {
+	scena: &'a Scena,
+	archives: &'a Archives,
+	raw: bool,
+}
+
+pub fn render(scena: &Scena, archives: &Archives, raw: bool) -> choubun::Node {
+	let renderer = ScenaRenderer { scena, archives, raw };
 
 	choubun::document(|doc| {
-		doc.root.attr("lang", "en");
-		let name = format!("{}/{}", dir.decode(), fname.decode());
+		let name = format!("{}/{}", scena.dir.decode(), scena.fname.decode());
 		doc.head.node("title", |a| a.text(&name));
 		doc.head.node("link", |a| {
 			a.attr("rel", "stylesheet");
 			a.attr("href", "/assets/style.css"); // XXX absoute url
 		});
 
-		doc.body.node("h1", |a| a.text(format!("{} (town: {}, bgm: {})", &name, town, bgm)));
+		doc.body.node("h1", |a| a.text(format!("{} (town: {}, bgm: {})", &name, scena.town, scena.bgm)));
 
 		doc.body.node("div", |a| {
 			a.indent();
@@ -32,15 +29,15 @@ pub fn render(scena: &Scena, asm: bool) -> choubun::Node {
 			a.node("select", |a| {
 				a.indent();
 				a.attr("id", "ch");
-				for ch in ch {
-					a.node("option", |a| a.text(format_file_ref(ch)));
+				for &ch in &scena.ch {
+					a.node("option", |a| a.text(renderer.file_name(ch)));
 				}
 			});
 			a.node("select", |a| {
 				a.indent();
 				a.attr("id", "cp");
-				for cp in cp {
-					a.node("option", |a| a.text(format_file_ref(cp)));
+				for &cp in &scena.cp {
+					a.node("option", |a| a.text(renderer.file_name(cp)));
 				}
 			});
 		});
@@ -48,8 +45,8 @@ pub fn render(scena: &Scena, asm: bool) -> choubun::Node {
 		doc.body.node("h2", |a| a.text("NPCs"));
 		doc.body.node("ol", |a| {
 			a.indent();
-			a.attr("start", 8);
-			for npc in npcs {
+			a.attr("start", 8usize);
+			for npc in &scena.npcs {
 				a.node("li", |a| a.text(format!("{:?}", npc)));
 			}
 		});
@@ -57,8 +54,8 @@ pub fn render(scena: &Scena, asm: bool) -> choubun::Node {
 		doc.body.node("h2", |a| a.text("Monsters"));
 		doc.body.node("ol", |a| {
 			a.indent();
-			a.attr("start", 8+npcs.len());
-			for monster in monsters {
+			a.attr("start", 8usize+scena.npcs.len());
+			for monster in &scena.monsters {
 				a.node("li", |a| a.text(format!("{:?}", monster)));
 			}
 		});
@@ -66,8 +63,8 @@ pub fn render(scena: &Scena, asm: bool) -> choubun::Node {
 		doc.body.node("h2", |a| a.text("Triggers"));
 		doc.body.node("ol", |a| {
 			a.indent();
-			a.attr("start", 0);
-			for trigger in triggers {
+			a.attr("start", 0usize);
+			for trigger in &scena.triggers {
 				a.node("li", |a| a.text(format!("{:?}", trigger)));
 			}
 		});
@@ -75,8 +72,8 @@ pub fn render(scena: &Scena, asm: bool) -> choubun::Node {
 		doc.body.node("h2", |a| a.text("Object"));
 		doc.body.node("ol", |a| {
 			a.indent();
-			a.attr("start", 0);
-			for object in objects {
+			a.attr("start", 0usize);
+			for object in &scena.objects {
 				a.node("li", |a| a.text(format!("{:?}", object)));
 			}
 		});
@@ -84,19 +81,17 @@ pub fn render(scena: &Scena, asm: bool) -> choubun::Node {
 		doc.body.node("h2", |a| a.text("Camera angles (?)"));
 		doc.body.node("ol", |a| {
 			a.indent();
-			a.attr("start", "0");
-			for camera_angle in camera_angles {
+			a.attr("start", 0usize);
+			for camera_angle in &scena.camera_angles {
 				a.node("li", |a| a.text(format!("{:?}", camera_angle)));
 			}
 		});
 
 		doc.body.node("h2", |a| a.text("Code"));
-		for (i, func) in functions.iter().enumerate() {
+		for (i, func) in scena.functions.iter().enumerate() {
 			doc.body.node("h3", |a| a.text(format!("Function {}", i)));
-			let render = RenderCode {
-				raw: asm,
-			};
-			if asm {
+			let render = CodeRenderer { inner: &renderer };
+			if raw {
 				doc.body.node_class("pre", "code asm", |a| render.asm(a, func));
 			} else {
 				match decompile(func) {
@@ -114,6 +109,20 @@ pub fn render(scena: &Scena, asm: bool) -> choubun::Node {
 			}
 		}
 	})
+}
+
+impl ScenaRenderer<'_> {
+	fn file_name(&self, FileRef(arch, index): FileRef) -> String {
+		if let Ok(file) = self.archives.get(arch as u8, index as usize) {
+			let name = kaiseki::util::decode_lossy(&*file.0.name);
+			let (prefix, suffix) = name.split_once('.').unwrap_or((&name, ""));
+			let prefix = prefix.trim_end_matches(|a| a == ' ');
+			let suffix = suffix.trim_start_matches(|a| a == '_');
+			format!("{:02}/{}.{}", arch, prefix, suffix)
+		} else {
+			format!("{:02}/<{}>", arch, index)
+		}
+	}
 }
 
 #[extend::ext]
@@ -134,11 +143,11 @@ impl Node {
 	}
 }
 
-struct RenderCode {
-	raw: bool,
+struct CodeRenderer<'a> {
+	inner: &'a ScenaRenderer<'a>
 }
 
-impl RenderCode {
+impl CodeRenderer<'_> {
 	fn asm(&self, a: &mut Node, asm: &Asm) {
 		let mut labels = BTreeSet::<usize>::new();
 		for (_, insn) in &asm.code {
@@ -322,13 +331,13 @@ impl RenderCode {
 					ExprBinop::Div     => ("/", 6),
 					ExprBinop::Mod     => ("%", 6),
 				};
-				if prio2 < prio || self.raw { a.span_text("syntax", "("); }
+				if prio2 < prio || self.inner.raw { a.span_text("syntax", "("); }
 				self.expr_inner(a, l, prio2);
 				a.text(" ");
 				a.span_text("expr-op", text);
 				a.text(" ");
 				self.expr_inner(a, r, prio2+1);
-				if prio2 < prio || self.raw { a.span_text("syntax", ")"); }
+				if prio2 < prio || self.inner.raw { a.span_text("syntax", ")"); }
 			}
 
 			Expr::Unop(op, v) => {
@@ -383,7 +392,7 @@ impl RenderCode {
 
 	fn visitor<'a, 'b>(&'a self, a: &'b mut Node, name: &'static str) -> InsnRenderer<'a, 'b> {
 		a.span_text("insn", name);
-		InsnRenderer { context: self, node: a }
+		InsnRenderer { inner: self, node: a }
 	}
 
 	fn insn(&self, a: &mut Node, insn: &Insn) {
@@ -393,16 +402,8 @@ impl RenderCode {
 }
 
 struct InsnRenderer<'a, 'b> {
-	context: &'a RenderCode,
+	inner: &'a CodeRenderer<'a>,
 	node: &'b mut Node,
-}
-
-fn format_file_ref(v: &FileRef) -> String {
-	let name = kaiseki::util::decode_lossy(&*v.name);
-	let (prefix, suffix) = name.split_once('.').unwrap_or((&name, ""));
-	let prefix = prefix.trim_end_matches(|a| a == ' ');
-	let suffix = suffix.trim_start_matches(|a| a == '_');
-	format!("{:02}/{}.{}", v.archive, prefix, suffix)
 }
 
 impl InsnVisitor for InsnRenderer<'_, '_> {
@@ -416,15 +417,15 @@ impl InsnVisitor for InsnRenderer<'_, '_> {
 
 	fn scena_file(&mut self, v: &FileRef) {
 		self.node.text(" ");
-		self.node.span_text("file-ref", format_file_ref(v));
+		self.node.span_text("file-ref", self.inner.inner.file_name(*v));
 	}
 	fn map_file(&mut self, v: &FileRef) {
 		self.node.text(" ");
-		self.node.span_text("file-ref", format_file_ref(v));
+		self.node.span_text("file-ref", self.inner.inner.file_name(*v));
 	}
 	fn vis_file(&mut self, v: &FileRef) {
 		self.node.text(" ");
-		self.node.span_text("file-ref", format_file_ref(v));
+		self.node.span_text("file-ref", self.inner.inner.file_name(*v));
 	}
 	fn eff_file(&mut self, v: &str) {
 		self.node.text(" ");
@@ -474,7 +475,7 @@ impl InsnVisitor for InsnRenderer<'_, '_> {
 	fn fork(&mut self, v: &[Insn]) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 	fn expr(&mut self, v: &Expr) {
 		self.node.text(" ");
-		self.context.expr(self.node, v);
+		self.inner.expr(self.node, v);
 	}
 	fn string(&mut self, v: &str) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 	fn text(&mut self, v: &Text) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }

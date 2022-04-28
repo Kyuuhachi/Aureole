@@ -561,8 +561,31 @@ impl InsnVisitor for InsnRenderer<'_, '_> {
 		self.node.text(" ");
 		self.node.span_text("attr", v);
 	}
+
 	fn char_attr(&mut self, v: &u8) {
-		self.node.span_text("char-attr", format!(":{}", v));
+		self.node.span("char-attr", |a| {
+			a.text(":");
+
+			let name = match *v {
+				1 => Some("x"),
+				2 => Some("y"),
+				3 => Some("z"),
+				4 => Some("angle"),
+				_ => None,
+			};
+			match name {
+				Some(name) => a.node("span", |a| {
+					if self.inner.raw {
+						a.attr("title", name);
+						a.text(v);
+					} else {
+						a.attr("title", v);
+						a.text(name);
+					}
+				}),
+				None => a.text(v),
+			}
+		});
 	}
 
 	fn char(&mut self, v: &u16) {

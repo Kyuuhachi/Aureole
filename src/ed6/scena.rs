@@ -109,7 +109,7 @@ impl ScenaRenderer<'_> {
 			doc.body.node("h2", |a| a.text("Code"));
 			for (i, func) in self.functions.iter().enumerate() {
 				doc.body.node("h3", |a| a.text(format!("Function {}", i)));
-				let mut render = CodeRenderer { inner: self, indent: 0 };
+				let render = CodeRenderer { inner: self, indent: 0 };
 				if self.raw {
 					doc.body.node_class("pre", "code asm", |a| render.asm(a, func));
 				} else {
@@ -206,7 +206,11 @@ struct CodeRenderer<'a> {
 }
 
 impl CodeRenderer<'_> {
-	fn asm(&mut self, a: &mut Node, asm: &Asm) {
+	fn indent(&self) -> Self {
+		CodeRenderer { inner: self.inner, indent: self.indent + 1 }
+	}
+
+	fn asm(&self, a: &mut Node, asm: &Asm) {
 		let mut labels = BTreeSet::<usize>::new();
 		for (_, insn) in &asm.code {
 			insn.labels(|a| { labels.insert(a); });
@@ -285,7 +289,7 @@ impl CodeRenderer<'_> {
 		}
 	}
 
-	fn code(&mut self, a: &mut Node, code: &[Stmt]) {
+	fn code(&self, a: &mut Node, code: &[Stmt]) {
 		if code.is_empty() {
 			self.line(a);
 			a.span_text("empty-block", "(empty)");
@@ -299,9 +303,9 @@ impl CodeRenderer<'_> {
 					a.span_text("keyword", "IF");
 					a.text("\n");
 
-					self.indent += 1;
+					let inner = self.indent();
 					for (expr, body) in cases {
-						self.line(a);
+						inner.line(a);
 						match expr {
 							Some(expr) => self.expr(a, expr),
 							None => a.span_text("keyword", "ELSE"),
@@ -310,11 +314,8 @@ impl CodeRenderer<'_> {
 						a.span_text("syntax", "=>");
 						a.text("\n");
 
-						self.indent += 1;
-						self.code(a, body);
-						self.indent -= 1;
+						inner.indent().code(a, body);
 					}
-					self.indent -= 1;
 				}
 
 				Stmt::Switch(expr, cases) => {
@@ -324,9 +325,9 @@ impl CodeRenderer<'_> {
 					self.expr(a, expr);
 					a.text("\n");
 
-					self.indent += 1;
+					let inner = self.indent();
 					for (cases, body) in cases {
-						self.line(a);
+						inner.line(a);
 						let mut first = true;
 						for case in cases {
 							if !first {
@@ -343,9 +344,7 @@ impl CodeRenderer<'_> {
 						a.span_text("syntax", "=>");
 						a.text("\n");
 
-						self.indent += 1;
-						self.code(a, body);
-						self.indent -= 1;
+						inner.indent().code(a, body);
 					}
 				}
 
@@ -356,9 +355,7 @@ impl CodeRenderer<'_> {
 					self.expr(a, expr);
 					a.text("\n");
 
-					self.indent += 1;
-					self.code(a, body);
-					self.indent -= 1;
+					self.indent().code(a, body);
 				}
 
 				Stmt::Break => {
@@ -369,7 +366,7 @@ impl CodeRenderer<'_> {
 
 				Stmt::Insn(insn) => {
 					self.line(a);
-					self.insn(a, insn);
+					self.indent().insn(a, insn);
 					a.text("\n");
 				}
 			}

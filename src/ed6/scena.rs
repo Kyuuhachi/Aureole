@@ -1,10 +1,14 @@
 use std::collections::{BTreeSet, BTreeMap};
 
+use derive_more::*;
+
 use choubun::Node;
 use kaiseki::ed6::{scena::*, Archives};
 use kaiseki::util::Text;
 
+#[derive(Deref)]
 struct ScenaRenderer<'a> {
+	#[deref]
 	scena: &'a Scena,
 	archives: &'a Archives,
 	raw: bool,
@@ -17,14 +21,14 @@ pub fn render(scena: &Scena, archives: &Archives, raw: bool) -> choubun::Node {
 impl ScenaRenderer<'_> {
 	fn render(&self) -> Node {
 		choubun::document(|doc| {
-			let name = format!("{}/{}", self.scena.dir.decode(), self.scena.fname.decode());
+			let name = format!("{}/{}", self.dir.decode(), self.fname.decode());
 			doc.head.node("title", |a| a.text(&name));
 			doc.head.node("link", |a| {
 				a.attr("rel", "stylesheet");
 				a.attr("href", "/assets/style.css"); // XXX absoute url
 			});
 
-			doc.body.node("h1", |a| a.text(format!("{} (town: {}, bgm: {})", &name, self.scena.town, self.scena.bgm)));
+			doc.body.node("h1", |a| a.text(format!("{} (town: {}, bgm: {})", &name, self.town, self.bgm)));
 
 			doc.body.node("div", |a| {
 				a.indent();
@@ -32,14 +36,14 @@ impl ScenaRenderer<'_> {
 				a.node("select", |a| {
 					a.indent();
 					a.attr("id", "ch");
-					for &ch in &self.scena.ch {
+					for &ch in &self.ch {
 						a.node("option", |a| a.text(self.file_name(ch)));
 					}
 				});
 				a.node("select", |a| {
 					a.indent();
 					a.attr("id", "cp");
-					for &cp in &self.scena.cp {
+					for &cp in &self.cp {
 						a.node("option", |a| a.text(self.file_name(cp)));
 					}
 				});
@@ -49,7 +53,7 @@ impl ScenaRenderer<'_> {
 			doc.body.node("ol", |a| {
 				a.indent();
 				a.attr("start", 8usize);
-				for npc in &self.scena.npcs {
+				for npc in &self.npcs {
 					a.node("li", |a| a.text(format!("{:?}", npc)));
 				}
 			});
@@ -57,8 +61,8 @@ impl ScenaRenderer<'_> {
 			doc.body.node("h2", |a| a.text("Monsters"));
 			doc.body.node("ol", |a| {
 				a.indent();
-				a.attr("start", 8usize+self.scena.npcs.len());
-				for monster in &self.scena.monsters {
+				a.attr("start", 8usize+self.npcs.len());
+				for monster in &self.monsters {
 					a.node("li", |a| a.text(format!("{:?}", monster)));
 				}
 			});
@@ -67,7 +71,7 @@ impl ScenaRenderer<'_> {
 			doc.body.node("ol", |a| {
 				a.indent();
 				a.attr("start", 0usize);
-				for trigger in &self.scena.triggers {
+				for trigger in &self.triggers {
 					a.node("li", |a| a.text(format!("{:?}", trigger)));
 				}
 			});
@@ -76,7 +80,7 @@ impl ScenaRenderer<'_> {
 			doc.body.node("ol", |a| {
 				a.indent();
 				a.attr("start", 0usize);
-				for object in &self.scena.objects {
+				for object in &self.objects {
 					a.node("li", |a| a.text(format!("{:?}", object)));
 				}
 			});
@@ -85,13 +89,13 @@ impl ScenaRenderer<'_> {
 			doc.body.node("ol", |a| {
 				a.indent();
 				a.attr("start", 0usize);
-				for camera_angle in &self.scena.camera_angles {
+				for camera_angle in &self.camera_angles {
 					a.node("li", |a| a.text(format!("{:?}", camera_angle)));
 				}
 			});
 
 			doc.body.node("h2", |a| a.text("Code"));
-			for (i, func) in self.scena.functions.iter().enumerate() {
+			for (i, func) in self.functions.iter().enumerate() {
 				doc.body.node("h3", |a| a.text(format!("Function {}", i)));
 				let render = CodeRenderer { inner: self };
 				if self.raw {
@@ -145,7 +149,9 @@ impl Node {
 	}
 }
 
+#[derive(Deref)]
 struct CodeRenderer<'a> {
+	#[deref]
 	inner: &'a ScenaRenderer<'a>
 }
 
@@ -333,13 +339,13 @@ impl CodeRenderer<'_> {
 					ExprBinop::Div     => ("/", 6),
 					ExprBinop::Mod     => ("%", 6),
 				};
-				if prio2 < prio || self.inner.raw { a.span_text("syntax", "("); }
+				if prio2 < prio || self.raw { a.span_text("syntax", "("); }
 				self.expr_inner(a, l, prio2);
 				a.text(" ");
 				a.span_text("expr-op", text);
 				a.text(" ");
 				self.expr_inner(a, r, prio2+1);
-				if prio2 < prio || self.inner.raw { a.span_text("syntax", ")"); }
+				if prio2 < prio || self.raw { a.span_text("syntax", ")"); }
 			}
 
 			Expr::Unop(op, v) => {
@@ -403,7 +409,9 @@ impl CodeRenderer<'_> {
 	}
 }
 
+#[derive(Deref)]
 struct InsnRenderer<'a, 'b> {
+	#[deref]
 	inner: &'a CodeRenderer<'a>,
 	node: &'b mut Node,
 }
@@ -419,15 +427,15 @@ impl InsnVisitor for InsnRenderer<'_, '_> {
 
 	fn scena_file(&mut self, v: &FileRef) {
 		self.node.text(" ");
-		self.node.span_text("file-ref", self.inner.inner.file_name(*v));
+		self.node.span_text("file-ref", self.file_name(*v));
 	}
 	fn map_file(&mut self, v: &FileRef) {
 		self.node.text(" ");
-		self.node.span_text("file-ref", self.inner.inner.file_name(*v));
+		self.node.span_text("file-ref", self.file_name(*v));
 	}
 	fn vis_file(&mut self, v: &FileRef) {
 		self.node.text(" ");
-		self.node.span_text("file-ref", self.inner.inner.file_name(*v));
+		self.node.span_text("file-ref", self.file_name(*v));
 	}
 	fn eff_file(&mut self, v: &str) {
 		self.node.text(" ");

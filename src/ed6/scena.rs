@@ -163,9 +163,9 @@ impl ScenaRenderer<'_> {
 		}
 
 		if id == 0 {
-			(CharKind::Party, "[party lead]".into())
+			(CharKind::Party, "[lead]".into())
 		} else if (1..4).contains(&id) {
-			(CharKind::Party, format!("[party {}]", id).into())
+			(CharKind::Party, format!("[party {}]", id+1).into())
 		} else if (npc_start..monster_start).contains(&id) {
 			(CharKind::Npc, get_name(id-npc_start, &self.npcs, |a| &*a.name))
 		} else if (monster_start..monster_end).contains(&id) {

@@ -109,13 +109,13 @@ impl ScenaRenderer<'_> {
 			doc.body.node("h2", |a| a.text("Code"));
 			for (i, func) in self.functions.iter().enumerate() {
 				doc.body.node("h3", |a| a.text(format!("Function {}", i)));
-				let render = CodeRenderer { inner: self };
+				let mut render = CodeRenderer { inner: self, indent: 0 };
 				if self.raw {
 					doc.body.node_class("pre", "code asm", |a| render.asm(a, func));
 				} else {
 					match decompile(func) {
 						Ok(code) => {
-							doc.body.node_class("pre", "code", |a| render.code(a, 0, &code));
+							doc.body.node_class("pre", "code", |a| render.code(a, &code));
 						},
 						Err(e) => {
 							tracing::error!("{:?}", e);
@@ -201,11 +201,12 @@ impl Node {
 #[derive(Deref)]
 struct CodeRenderer<'a> {
 	#[deref]
-	inner: &'a ScenaRenderer<'a>
+	inner: &'a ScenaRenderer<'a>,
+	indent: u32,
 }
 
 impl CodeRenderer<'_> {
-	fn asm(&self, a: &mut Node, asm: &Asm) {
+	fn asm(&mut self, a: &mut Node, asm: &Asm) {
 		let mut labels = BTreeSet::<usize>::new();
 		for (_, insn) in &asm.code {
 			insn.labels(|a| { labels.insert(a); });
@@ -278,15 +279,15 @@ impl CodeRenderer<'_> {
 		}
 	}
 
-	fn code(&self, a: &mut Node, indent: usize, code: &[Stmt]) {
-		fn line(a: &mut Node, indent: usize) {
-			for _ in 0..indent {
-				a.span_text("indent", "\t");
-			}
+	fn line(&self, a: &mut Node) {
+		for _ in 0..self.indent {
+			a.span_text("indent", "\t");
 		}
+	}
 
+	fn code(&mut self, a: &mut Node, code: &[Stmt]) {
 		if code.is_empty() {
-			line(a, indent);
+			self.line(a);
 			a.span_text("empty-block", "(empty)");
 			a.text("\n");
 		}
@@ -294,12 +295,13 @@ impl CodeRenderer<'_> {
 		for stmt in code {
 			match stmt {
 				Stmt::If(cases) => {
-					line(a, indent);
+					self.line(a);
 					a.span_text("keyword", "IF");
 					a.text("\n");
 
+					self.indent += 1;
 					for (expr, body) in cases {
-						line(a, indent+1);
+						self.line(a);
 						match expr {
 							Some(expr) => self.expr(a, expr),
 							None => a.span_text("keyword", "ELSE"),
@@ -308,19 +310,23 @@ impl CodeRenderer<'_> {
 						a.span_text("syntax", "=>");
 						a.text("\n");
 
-						self.code(a, indent+2, body);
+						self.indent += 1;
+						self.code(a, body);
+						self.indent -= 1;
 					}
+					self.indent -= 1;
 				}
 
 				Stmt::Switch(expr, cases) => {
-					line(a, indent);
+					self.line(a);
 					a.span_text("keyword", "SWITCH");
 					a.text(" ");
 					self.expr(a, expr);
 					a.text("\n");
 
+					self.indent += 1;
 					for (cases, body) in cases {
-						line(a, indent+1);
+						self.line(a);
 						let mut first = true;
 						for case in cases {
 							if !first {
@@ -337,28 +343,32 @@ impl CodeRenderer<'_> {
 						a.span_text("syntax", "=>");
 						a.text("\n");
 
-						self.code(a, indent+2, body);
+						self.indent += 1;
+						self.code(a, body);
+						self.indent -= 1;
 					}
 				}
 
 				Stmt::While(expr, body) => {
-					line(a, indent);
+					self.line(a);
 					a.span_text("keyword", "WHILE");
 					a.text(" ");
 					self.expr(a, expr);
 					a.text("\n");
 
-					self.code(a, indent+1, body);
+					self.indent += 1;
+					self.code(a, body);
+					self.indent -= 1;
 				}
 
 				Stmt::Break => {
-					line(a, indent);
+					self.line(a);
 					a.span_text("keyword", "BREAK");
 					a.text("\n");
 				}
 
 				Stmt::Insn(insn) => {
-					line(a, indent);
+					self.line(a);
 					self.insn(a, insn);
 					a.text("\n");
 				}

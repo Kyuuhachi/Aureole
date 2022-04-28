@@ -414,10 +414,29 @@ impl InsnVisitor for InsnRenderer<'_, '_> {
 	fn i16(&mut self, v: &i16) { self.node.text(" "); self.node.span_text("int", v); }
 	fn i32(&mut self, v: &i32) { self.node.text(" "); self.node.span_text("int", v); }
 
-	fn func_ref(&mut self, v: &FuncRef) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-	fn file_ref(&mut self, v: &FileRef) {
+	fn scena_file(&mut self, v: &FileRef) {
 		self.node.text(" ");
 		self.node.span_text("file-ref", format_file_ref(v));
+	}
+	fn map_file(&mut self, v: &FileRef) {
+		self.node.text(" ");
+		self.node.span_text("file-ref", format_file_ref(v));
+	}
+	fn vis_file(&mut self, v: &FileRef) {
+		self.node.text(" ");
+		self.node.span_text("file-ref", format_file_ref(v));
+	}
+	fn eff_file(&mut self, v: &str) {
+		self.node.text(" ");
+		self.node.span_text("file-ref", v);
+	}
+	fn op_file(&mut self, v: &str) {
+		self.node.text(" ");
+		self.node.span_text("file-ref", v);
+	}
+	fn avi_file(&mut self, v: &str) {
+		self.node.text(" ");
+		self.node.span_text("file-ref", v);
 	}
 
 	fn pos2(&mut self, v: &Pos2) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
@@ -478,12 +497,10 @@ impl InsnVisitor for InsnRenderer<'_, '_> {
 		self.node.text(" ");
 		self.node.span_text("var", v);
 	}
-
 	fn attr(&mut self, v: &u8) {
 		self.node.text(" ");
 		self.node.span_text("attr", v);
 	}
-
 	fn char_attr(&mut self, v: &u8) {
 		self.node.span_text("char-attr", format!(":{}", v));
 	}
@@ -493,11 +510,11 @@ impl InsnVisitor for InsnRenderer<'_, '_> {
 		self.node.text(" ");
 		self.node.span_text("char", v);
 	}
-
 	fn chcp(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 	fn fork_id(&mut self, v: &u8) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 	fn menu_id(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 	fn object(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn func_ref(&mut self, v: &FuncRef) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 
 	fn data(&mut self, v: &[u8]) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 }

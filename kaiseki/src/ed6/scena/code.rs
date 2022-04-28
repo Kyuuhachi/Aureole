@@ -10,7 +10,13 @@ pub trait InsnVisitor {
 	fn i32(&mut self, v: &i32);
 
 	fn func_ref(&mut self, v: &FuncRef);
-	fn file_ref(&mut self, v: &FileRef);
+
+	fn scena_file(&mut self, v: &FileRef);
+	fn map_file(&mut self, v: &FileRef);
+	fn vis_file(&mut self, v: &FileRef);
+	fn eff_file(&mut self, v: &str);
+	fn op_file(&mut self, v: &str);
+	fn avi_file(&mut self, v: &str);
 
 	fn pos2(&mut self, v: &Pos2);
 	fn pos3(&mut self, v: &Pos3);
@@ -72,7 +78,7 @@ pub(super) fn read(i: &mut CodeParser) -> Result<Self> {
 	match u8 {
 		0x01 => Return(),
 		0x05 => Call(FuncRef),
-		0x06 => NewScene(FileRef, u8, u8, u8, u8),
+		0x06 => NewScene(scena_file/FileRef, u8, u8, u8, u8),
 		0x08 => Sleep(time/u32),
 		0x09 => FlagsSet(flags/u32),
 		0x0A => FlagsUnset(flags/u32),
@@ -86,7 +92,7 @@ pub(super) fn read(i: &mut CodeParser) -> Result<Self> {
 		0x16 => Map(match u8 {
 			0x00 => Hide(),
 			0x01 => Show(),
-			0x02 => Set(i32, Pos2, FileRef),
+			0x02 => Set(i32, Pos2, map_file/FileRef),
 		}),
 		0x17 => Save(),
 		0x19 => EventBegin(u8),
@@ -216,9 +222,9 @@ pub(super) fn read(i: &mut CodeParser) -> Result<Self> {
 		0x73 => _Obj73(object/u16),
 		0x77 => _77(color/u32, time/u32),
 		0x7C => Shake(u32, u32, u32, time/u32),
-		0x7F => EffLoad(u8, String),
+		0x7F => EffLoad(u8, eff_file/String),
 		0x80 => EffPlay(u8, u8, i16, Pos3, u16, u16, u16, u32, u32, u32, u16, u32, u32, u32, u32),
-		0x81 => EffPlay2(u16, u8, String, Pos3, u16, u16, u16, u32, u32, u32, u32),
+		0x81 => EffPlay2(u16, u8, eff_file/String, Pos3, u16, u16, u16, u32, u32, u32, u32),
 		0x82 => _82(u16),
 		0x83 => Achievement(u8, u8),
 		0x86 => CharSetChcp(char/u16, chcp/u16),
@@ -250,14 +256,14 @@ pub(super) fn read(i: &mut CodeParser) -> Result<Self> {
 		0xA6 => FlagAwaitSet(flag/u16),
 		0xA9 => ShopOpen(shop/u8),
 		0xAC => RecipeLearn(u16), // TODO check type
-		0xAD => ImageShow(FileRef, u16, u16, time/u32),
+		0xAD => ImageShow(vis_file/FileRef, u16, u16, time/u32),
 		0xAE => ImageHide(time/u32),
 		0xAF => QuestSubmit(shop/u8, quest/u16),
-		0xB1 => OpLoad(String),
+		0xB1 => OpLoad(op_file/String),
 		0xB2 => _B2(u8, u8, u16),
-		0xB3 => Show(match u8 {
-			0x00 => Video0(String),
-			0x01 => Video1(u8),
+		0xB3 => Video(match u8 {
+			0x00 => Show0(avi_file/String),
+			0x01 => Show1(u8),
 		}),
 		0xB4 => ReturnToTitle(u8),
 		0xB5 => PartySlot(member/u8, u8, u8), // FC only

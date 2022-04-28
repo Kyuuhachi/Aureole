@@ -279,82 +279,88 @@ impl CodeRenderer<'_> {
 	}
 
 	fn code(&self, a: &mut Node, indent: usize, code: &[Stmt]) {
-		fn line<A>(a: &mut Node, indent: usize, body: impl FnOnce(&mut Node) -> A) -> A {
+		fn line(a: &mut Node, indent: usize) {
 			for _ in 0..indent {
 				a.span_text("indent", "\t");
 			}
-			let v = body(a);
-			a.text("\n");
-			v
 		}
+
 		if code.is_empty() {
-			line(a, indent, |a| a.span_text("empty-block", "(empty)"));
+			line(a, indent);
+			a.span_text("empty-block", "(empty)");
+			a.text("\n");
 		}
+
 		for stmt in code {
 			match stmt {
 				Stmt::If(cases) => {
-					line(a, indent, |a| {
-						a.span_text("keyword", "IF");
-					});
+					line(a, indent);
+					a.span_text("keyword", "IF");
+					a.text("\n");
+
 					for (expr, body) in cases {
-						line(a, indent+1, |a| {
-							match expr {
-								Some(expr) => self.expr(a, expr),
-								None => a.span_text("keyword", "ELSE"),
-							}
-							a.text(" ");
-							a.span_text("syntax", "=>");
-						});
+						line(a, indent+1);
+						match expr {
+							Some(expr) => self.expr(a, expr),
+							None => a.span_text("keyword", "ELSE"),
+						}
+						a.text(" ");
+						a.span_text("syntax", "=>");
+						a.text("\n");
+
 						self.code(a, indent+2, body);
 					}
 				}
 
 				Stmt::Switch(expr, cases) => {
-					line(a, indent, |a| {
-						a.span_text("keyword", "SWITCH");
-						a.text(" ");
-						self.expr(a, expr);
-					});
+					line(a, indent);
+					a.span_text("keyword", "SWITCH");
+					a.text(" ");
+					self.expr(a, expr);
+					a.text("\n");
+
 					for (cases, body) in cases {
-						line(a, indent+1, |a| {
-							let mut first = true;
-							for case in cases {
-								if !first {
-									a.span_text("syntax", ",");
-									a.text(" ");
-								}
-								first = false;
-								match case {
-									Some(case) => a.span_text("case", case),
-									None => a.span_text("keyword", "default"),
-								}
+						line(a, indent+1);
+						let mut first = true;
+						for case in cases {
+							if !first {
+								a.span_text("syntax", ",");
+								a.text(" ");
 							}
-							a.text(" ");
-							a.span_text("syntax", "=>");
-						});
+							first = false;
+							match case {
+								Some(case) => a.span_text("case", case),
+								None => a.span_text("keyword", "default"),
+							}
+						}
+						a.text(" ");
+						a.span_text("syntax", "=>");
+						a.text("\n");
+
 						self.code(a, indent+2, body);
 					}
 				}
 
 				Stmt::While(expr, body) => {
-					line(a, indent, |a| {
-						a.span_text("keyword", "WHILE");
-						a.text(" ");
-						self.expr(a, expr);
-					});
+					line(a, indent);
+					a.span_text("keyword", "WHILE");
+					a.text(" ");
+					self.expr(a, expr);
+					a.text("\n");
+
 					self.code(a, indent+1, body);
 				}
 
 				Stmt::Break => {
-					line(a, indent, |a| {
-						a.span_text("keyword", "BREAK");
-					});
+					line(a, indent);
+					a.span_text("keyword", "BREAK");
+					a.text("\n");
 				}
 
 				Stmt::Insn(insn) => {
-					line(a, indent, |a| {
-						self.insn(a, insn);
-					});
+					line(a, indent);
+					self.insn(a, insn);
+					a.text("\n");
 				}
 			}
 		}

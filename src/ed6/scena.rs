@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::{BTreeSet, BTreeMap};
 
 use derive_more::*;
@@ -5,6 +6,19 @@ use derive_more::*;
 use choubun::Node;
 use kaiseki::ed6::{scena::*, Archives};
 use kaiseki::util::Text;
+
+pub fn render(scena: &Scena, archives: &Archives, raw: bool) -> choubun::Node {
+	ScenaRenderer { scena, archives, raw }.render()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CharType {
+	Npc,
+	Monster,
+	Self_,
+	Pc,
+	Unknown,
+}
 
 #[derive(Deref)]
 struct ScenaRenderer<'a> {
@@ -14,9 +28,6 @@ struct ScenaRenderer<'a> {
 	raw: bool,
 }
 
-pub fn render(scena: &Scena, archives: &Archives, raw: bool) -> choubun::Node {
-	ScenaRenderer { scena, archives, raw }.render()
-}
 
 impl ScenaRenderer<'_> {
 	fn render(&self) -> Node {
@@ -127,6 +138,39 @@ impl ScenaRenderer<'_> {
 			format!("{:02}/{}.{}", arch, prefix, suffix)
 		} else {
 			format!("{:02}/<{}>", arch, index)
+		}
+	}
+
+	fn char_name(&self, id: usize) -> (CharType, Cow<str>) {
+		let pc_names = &["Estelle", "Joshua", "Scherazard", "Olivier", "Kloe", "Agate", "Tita", "Zin"];
+
+		let npc_start = 8;
+		let monster_start = npc_start + self.npcs.len();
+		let monster_end = monster_start + self.monsters.len();
+		let pc_start = 0x101;
+		let pc_end = pc_start + pc_names.len();
+		
+		fn get_name<T>(idx: usize, items: &[T], f: impl Fn(&T) -> &str) -> Cow<str> {
+			let name = f(&items[idx]);
+			let mut dups = items.iter().enumerate().filter(|a| f(a.1) == name);
+			if dups.clone().count() == 1 {
+				name.into()
+			} else {
+				let dup_idx = dups.position(|a| a.0 == idx).unwrap();
+				format!("{} [{}]", name, dup_idx+1).into()
+			}
+		}
+
+		if id == 0xFE {
+			(CharType::Self_, "self".into())
+		} else if (npc_start..monster_start).contains(&id) {
+			(CharType::Npc, get_name(id-npc_start, &self.npcs, |a| &*a.name))
+		} else if (monster_start..monster_end).contains(&id) {
+			(CharType::Monster, get_name(id-monster_start, &self.monsters, |a| &*a.name))
+		} else if (pc_start..pc_end).contains(&id) {
+			(CharType::Pc, pc_names[id-pc_start].into())
+		} else {
+			(CharType::Unknown, format!("[unknown {}]", id).into())
 		}
 	}
 }
@@ -519,7 +563,24 @@ impl InsnVisitor for InsnRenderer<'_, '_> {
 
 	fn char(&mut self, v: &u16) {
 		self.node.text(" ");
-		self.node.span_text("char", v);
+
+		let (ty, name) = self.char_name(*v as usize);
+		self.node.span("char", |a| {
+			a.class(match ty {
+				CharType::Npc => "char-npc",
+				CharType::Monster => "char-monster",
+				CharType::Self_ => "char-self",
+				CharType::Pc => "char-pc",
+				CharType::Unknown => "char-unknown",
+			});
+			if self.inner.raw {
+				a.attr("title", name);
+				a.text(v);
+			} else {
+				a.attr("title", v);
+				a.text(name);
+			}
+		});
 	}
 	fn chcp(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 	fn fork_id(&mut self, v: &u8) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }

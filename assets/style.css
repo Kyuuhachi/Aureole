@@ -16,7 +16,6 @@
 .code .flag        { color: #0000FF; }
 .code .var         { color: #3F007F; }
 .code .attr        { color: #3F7F7F; }
-.code .char        { color: #7F3F00; }
 .code .char-attr   { color: #7F7F00; }
 
 .code .time        { color: #00AF3F; }
@@ -25,6 +24,12 @@
 .code .color       { color: #000000; }
 
 .code .file-ref    { color: #000000; }
+
+.code .char        { color: #7F3F00; }
+.code .char.char-npc     { background: #0000FF1F; }
+.code .char.char-monster { background: #FF00001F; }
+.code .char.char-pc      { background: #00FF001F; }
+.code .char.char-self    { background: #7F7F7F1F; }
 
 .code .color-splat {
 	display: inline-block;

@@ -12,7 +12,8 @@ pub fn render(scena: &Scena, archives: &Archives, raw: bool) -> choubun::Node {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum CharType {
+enum CharKind {
+	Party,
 	Npc,
 	Monster,
 	Self_,
@@ -141,7 +142,7 @@ impl ScenaRenderer<'_> {
 		}
 	}
 
-	fn char_name(&self, id: usize) -> (CharType, Cow<str>) {
+	fn char_name(&self, id: usize) -> (CharKind, Cow<str>) {
 		let pc_names = &["Estelle", "Joshua", "Scherazard", "Olivier", "Kloe", "Agate", "Tita", "Zin"];
 
 		let npc_start = 8;
@@ -161,16 +162,20 @@ impl ScenaRenderer<'_> {
 			}
 		}
 
-		if id == 0xFE {
-			(CharType::Self_, "self".into())
+		if id == 0 {
+			(CharKind::Party, "[party lead]".into())
+		} else if (1..4).contains(&id) {
+			(CharKind::Party, format!("[party {}]", id).into())
 		} else if (npc_start..monster_start).contains(&id) {
-			(CharType::Npc, get_name(id-npc_start, &self.npcs, |a| &*a.name))
+			(CharKind::Npc, get_name(id-npc_start, &self.npcs, |a| &*a.name))
 		} else if (monster_start..monster_end).contains(&id) {
-			(CharType::Monster, get_name(id-monster_start, &self.monsters, |a| &*a.name))
+			(CharKind::Monster, get_name(id-monster_start, &self.monsters, |a| &*a.name))
+		} else if id == 0xFE {
+			(CharKind::Self_, "self".into())
 		} else if (pc_start..pc_end).contains(&id) {
-			(CharType::Pc, pc_names[id-pc_start].into())
+			(CharKind::Pc, pc_names[id-pc_start].into())
 		} else {
-			(CharType::Unknown, format!("[unknown {}]", id).into())
+			(CharKind::Unknown, format!("[unknown {}]", id).into())
 		}
 	}
 }
@@ -564,20 +569,22 @@ impl InsnVisitor for InsnRenderer<'_, '_> {
 	fn char(&mut self, v: &u16) {
 		self.node.text(" ");
 
-		let (ty, name) = self.char_name(*v as usize);
+		let (kind, name) = self.char_name(*v as usize);
+		let kind = match kind {
+			CharKind::Party => "party",
+			CharKind::Npc => "npc",
+			CharKind::Monster => "monster",
+			CharKind::Self_ => "self",
+			CharKind::Pc => "pc",
+			CharKind::Unknown => "unknown",
+		};
 		self.node.span("char", |a| {
-			a.class(match ty {
-				CharType::Npc => "char-npc",
-				CharType::Monster => "char-monster",
-				CharType::Self_ => "char-self",
-				CharType::Pc => "char-pc",
-				CharType::Unknown => "char-unknown",
-			});
+			a.class(&format!("char-{}", kind));
 			if self.inner.raw {
-				a.attr("title", name);
+				a.attr("title", format!("{} ({})", name, kind));
 				a.text(v);
 			} else {
-				a.attr("title", v);
+				a.attr("title", format!("{} ({})", v, kind));
 				a.text(name);
 			}
 		});

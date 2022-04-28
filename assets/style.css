@@ -44,12 +44,12 @@ body {
 .code .indent      { color: var(--whitespace); }
 .code .empty-block { color: var(--unimportant); }
 
-.code .syntax      { color: var(--frost3); }
-.code .keyword     { color: var(--frost3); font-weight: bold; }
+.code .syntax      { color: var(--frost2); }
+.code .keyword     { color: var(--frost2); font-weight: bold; }
+.code .expr-op     { color: var(--frost2); }
 .code .case        { color: var(--aurora4); }
 .code .label       { color: var(--aurora1); }
 .code .insn        { color: var(--base-text); }
-.code .expr-op     { color: var(--frost3); }
 
 .code .int         { color: var(--aurora4); }
 .code .speed       { color: var(--aurora4); }
@@ -66,8 +66,9 @@ body {
 
 .code .file-ref    { color: var(--base-text); }
 
-.code .char.char-npc     { text-decoration-color: var(--aurora2); }
+.code .char.char-npc     { text-decoration-color: var(--aurora1); }
 .code .char.char-monster { text-decoration-color: var(--aurora0); }
+.code .char.char-self    { color: var(--aurora4); }
 
 .code .color-splat {
 	display: inline-block;

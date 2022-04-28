@@ -64,7 +64,7 @@ body {
 
 .code .color       { color: var(--base-text); }
 
-.code .file-ref    { color: var(--base-text); }
+.code a            { color: var(--frost3); }
 
 .code .char.char-npc     { text-decoration-color: var(--aurora1); }
 .code .char.char-monster { text-decoration-color: var(--aurora0); }

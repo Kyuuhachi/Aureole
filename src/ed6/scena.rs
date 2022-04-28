@@ -37,7 +37,7 @@ impl ScenaRenderer<'_> {
 			doc.head.node("title", |a| a.text(&name));
 			doc.head.node("link", |a| {
 				a.attr("rel", "stylesheet");
-				a.attr("href", "/assets/style.css"); // XXX absoute url
+				a.attr("href", "/assets/style.css"); // XXX url
 			});
 
 			doc.body.node("h1", |a| a.text(format!("{} (town: {}, bgm: {})", &name, self.town, self.bgm)));
@@ -476,8 +476,18 @@ impl InsnVisitor for InsnRenderer<'_, '_> {
 
 	fn scena_file(&mut self, v: &FileRef) {
 		self.node.text(" ");
-		self.node.span_text("file-ref", self.file_name(*v));
+		let text = self.file_name(*v);
+		if text.get(2..3) == Some("/") && text.ends_with(".SN") {
+			self.node.node("a", |a| {
+				a.class("file-ref");
+				a.attr("href", &text[3..text.len()-3]); // XXX url
+				a.text(text);
+			});
+		} else {
+			self.node.span_text("file-ref", text);
+		}
 	}
+
 	fn map_file(&mut self, v: &FileRef) {
 		self.node.text(" ");
 		self.node.span_text("file-ref", self.file_name(*v));
@@ -510,7 +520,7 @@ impl InsnVisitor for InsnRenderer<'_, '_> {
 		self.node.text(" ");
 		self.node.span("color", |a| {
 			a.attr("style", format!("--splat-color: #{:06X}; --splat-alpha: {}", v&0xFFFFFF, (v>>24) as f32 / 255.0));
-			a.node_class("svg", "color-splat", |a| a.node("use", |a| a.attr("href", "/assets/color-splat.svg#splat"))); // XXX absolute url
+			a.node_class("svg", "color-splat", |a| a.node("use", |a| a.attr("href", "/assets/color-splat.svg#splat"))); // XXX url
 			a.text(format!("#{:08X}", v));
 		});
 	}

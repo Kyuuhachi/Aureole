@@ -366,7 +366,7 @@ impl CodeRenderer<'_> {
 
 				Stmt::Insn(insn) => {
 					self.line(a);
-					self.indent().insn(a, insn);
+					self.insn(a, insn);
 					a.text("\n");
 				}
 			}
@@ -554,11 +554,31 @@ impl InsnVisitor for InsnRenderer<'_, '_> {
 	fn shop(&mut self, v: &u8) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 	fn magic(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 
-	fn fork(&mut self, v: &[Insn]) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+	fn fork(&mut self, v: &[Insn]) {
+		if self.inner.raw {
+			self.node.text(" ");
+			self.node.span_text("syntax", "[");
+		}
+
+		let inner = self.inner.indent();
+		for insn in v {
+			self.node.text("\n");
+			inner.line(self.node);
+			inner.insn(self.node, insn);
+		}
+
+		if self.inner.raw {
+			self.node.text("\n");
+			self.inner.line(self.node);
+			self.node.span_text("syntax", "]");
+		}
+	}
+
 	fn expr(&mut self, v: &Expr) {
 		self.node.text(" ");
 		self.inner.expr(self.node, v);
 	}
+
 	fn string(&mut self, v: &str) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 	fn text(&mut self, v: &Text) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 	fn menu(&mut self, v: &[String]) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }

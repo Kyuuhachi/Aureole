@@ -565,7 +565,6 @@ impl InsnVisitor for InsnRenderer<'_, '_> {
 		self.node.span_text("char-attr", format!(":{}", v));
 	}
 
-
 	fn char(&mut self, v: &u16) {
 		self.node.text(" ");
 
@@ -589,6 +588,7 @@ impl InsnVisitor for InsnRenderer<'_, '_> {
 			}
 		});
 	}
+
 	fn chcp(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 	fn fork_id(&mut self, v: &u8) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 	fn menu_id(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }

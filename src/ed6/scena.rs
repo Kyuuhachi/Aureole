@@ -11,107 +11,109 @@ struct ScenaRenderer<'a> {
 }
 
 pub fn render(scena: &Scena, archives: &Archives, raw: bool) -> choubun::Node {
-	let renderer = ScenaRenderer { scena, archives, raw };
-
-	choubun::document(|doc| {
-		let name = format!("{}/{}", scena.dir.decode(), scena.fname.decode());
-		doc.head.node("title", |a| a.text(&name));
-		doc.head.node("link", |a| {
-			a.attr("rel", "stylesheet");
-			a.attr("href", "/assets/style.css"); // XXX absoute url
-		});
-
-		doc.body.node("h1", |a| a.text(format!("{} (town: {}, bgm: {})", &name, scena.town, scena.bgm)));
-
-		doc.body.node("div", |a| {
-			a.indent();
-			a.attr("id", "chcp");
-			a.node("select", |a| {
-				a.indent();
-				a.attr("id", "ch");
-				for &ch in &scena.ch {
-					a.node("option", |a| a.text(renderer.file_name(ch)));
-				}
-			});
-			a.node("select", |a| {
-				a.indent();
-				a.attr("id", "cp");
-				for &cp in &scena.cp {
-					a.node("option", |a| a.text(renderer.file_name(cp)));
-				}
-			});
-		});
-
-		doc.body.node("h2", |a| a.text("NPCs"));
-		doc.body.node("ol", |a| {
-			a.indent();
-			a.attr("start", 8usize);
-			for npc in &scena.npcs {
-				a.node("li", |a| a.text(format!("{:?}", npc)));
-			}
-		});
-
-		doc.body.node("h2", |a| a.text("Monsters"));
-		doc.body.node("ol", |a| {
-			a.indent();
-			a.attr("start", 8usize+scena.npcs.len());
-			for monster in &scena.monsters {
-				a.node("li", |a| a.text(format!("{:?}", monster)));
-			}
-		});
-
-		doc.body.node("h2", |a| a.text("Triggers"));
-		doc.body.node("ol", |a| {
-			a.indent();
-			a.attr("start", 0usize);
-			for trigger in &scena.triggers {
-				a.node("li", |a| a.text(format!("{:?}", trigger)));
-			}
-		});
-
-		doc.body.node("h2", |a| a.text("Object"));
-		doc.body.node("ol", |a| {
-			a.indent();
-			a.attr("start", 0usize);
-			for object in &scena.objects {
-				a.node("li", |a| a.text(format!("{:?}", object)));
-			}
-		});
-
-		doc.body.node("h2", |a| a.text("Camera angles (?)"));
-		doc.body.node("ol", |a| {
-			a.indent();
-			a.attr("start", 0usize);
-			for camera_angle in &scena.camera_angles {
-				a.node("li", |a| a.text(format!("{:?}", camera_angle)));
-			}
-		});
-
-		doc.body.node("h2", |a| a.text("Code"));
-		for (i, func) in scena.functions.iter().enumerate() {
-			doc.body.node("h3", |a| a.text(format!("Function {}", i)));
-			let render = CodeRenderer { inner: &renderer };
-			if raw {
-				doc.body.node_class("pre", "code asm", |a| render.asm(a, func));
-			} else {
-				match decompile(func) {
-					Ok(code) => {
-						doc.body.node_class("pre", "code", |a| render.code(a, 0, &code));
-					},
-					Err(e) => {
-						tracing::error!("{:?}", e);
-						doc.body.node_class("div", "decompile-error", |a| {
-							a.text("Decompilation failed. This is a bug.");
-						});
-						doc.body.node_class("pre", "code asm", |a| render.asm(a, func));
-					},
-				}
-			}
-		}
-	})
+	ScenaRenderer { scena, archives, raw }.render()
 }
 
 impl ScenaRenderer<'_> {
+	fn render(&self) -> Node {
+		choubun::document(|doc| {
+			let name = format!("{}/{}", self.scena.dir.decode(), self.scena.fname.decode());
+			doc.head.node("title", |a| a.text(&name));
+			doc.head.node("link", |a| {
+				a.attr("rel", "stylesheet");
+				a.attr("href", "/assets/style.css"); // XXX absoute url
+			});
+
+			doc.body.node("h1", |a| a.text(format!("{} (town: {}, bgm: {})", &name, self.scena.town, self.scena.bgm)));
+
+			doc.body.node("div", |a| {
+				a.indent();
+				a.attr("id", "chcp");
+				a.node("select", |a| {
+					a.indent();
+					a.attr("id", "ch");
+					for &ch in &self.scena.ch {
+						a.node("option", |a| a.text(self.file_name(ch)));
+					}
+				});
+				a.node("select", |a| {
+					a.indent();
+					a.attr("id", "cp");
+					for &cp in &self.scena.cp {
+						a.node("option", |a| a.text(self.file_name(cp)));
+					}
+				});
+			});
+
+			doc.body.node("h2", |a| a.text("NPCs"));
+			doc.body.node("ol", |a| {
+				a.indent();
+				a.attr("start", 8usize);
+				for npc in &self.scena.npcs {
+					a.node("li", |a| a.text(format!("{:?}", npc)));
+				}
+			});
+
+			doc.body.node("h2", |a| a.text("Monsters"));
+			doc.body.node("ol", |a| {
+				a.indent();
+				a.attr("start", 8usize+self.scena.npcs.len());
+				for monster in &self.scena.monsters {
+					a.node("li", |a| a.text(format!("{:?}", monster)));
+				}
+			});
+
+			doc.body.node("h2", |a| a.text("Triggers"));
+			doc.body.node("ol", |a| {
+				a.indent();
+				a.attr("start", 0usize);
+				for trigger in &self.scena.triggers {
+					a.node("li", |a| a.text(format!("{:?}", trigger)));
+				}
+			});
+
+			doc.body.node("h2", |a| a.text("Object"));
+			doc.body.node("ol", |a| {
+				a.indent();
+				a.attr("start", 0usize);
+				for object in &self.scena.objects {
+					a.node("li", |a| a.text(format!("{:?}", object)));
+				}
+			});
+
+			doc.body.node("h2", |a| a.text("Camera angles (?)"));
+			doc.body.node("ol", |a| {
+				a.indent();
+				a.attr("start", 0usize);
+				for camera_angle in &self.scena.camera_angles {
+					a.node("li", |a| a.text(format!("{:?}", camera_angle)));
+				}
+			});
+
+			doc.body.node("h2", |a| a.text("Code"));
+			for (i, func) in self.scena.functions.iter().enumerate() {
+				doc.body.node("h3", |a| a.text(format!("Function {}", i)));
+				let render = CodeRenderer { inner: self };
+				if self.raw {
+					doc.body.node_class("pre", "code asm", |a| render.asm(a, func));
+				} else {
+					match decompile(func) {
+						Ok(code) => {
+							doc.body.node_class("pre", "code", |a| render.code(a, 0, &code));
+						},
+						Err(e) => {
+							tracing::error!("{:?}", e);
+							doc.body.node_class("div", "decompile-error", |a| {
+								a.text("Decompilation failed. This is a bug.");
+							});
+							doc.body.node_class("pre", "code asm", |a| render.asm(a, func));
+						},
+					}
+				}
+			}
+		})
+	}
+
 	fn file_name(&self, FileRef(arch, index): FileRef) -> String {
 		if let Ok(file) = self.archives.get(arch as u8, index as usize) {
 			let name = file.0.name.decode();

@@ -23,6 +23,10 @@
 	--base-text: var(--snow2);
 	--whitespace: var(--night3);
 	--unimportant: var(--snow0);
+
+	--base-font: sans-serif;
+	font-family: var(--base-font);
+	font-size: 12px;
 }
 
 @media (prefers-color-scheme: light) { :root {
@@ -41,11 +45,21 @@ a {
 	color: var(--frost3);
 }
 
+*[title] {
+	text-decoration: underline dotted;
+}
+
 .code { tab-size: 4; }
-.code .indent::before { position: absolute; content: "⟩"; }
+.code .indent      {
+	color: var(--whitespace);
+	position: relative;
+}
+.code .indent::before {
+	content: "⟩";
+	position: absolute;
+}
 
 /* .code              { color: #FF0000; } */
-.code .indent      { color: var(--whitespace); }
 .code .empty-block { color: var(--unimportant); }
 
 .code .syntax      { color: var(--frost2); }
@@ -79,6 +93,13 @@ a {
 	width: 2ch;
 }
 
-*[title] {
-	text-decoration: underline dotted;
+.code .block {
+	margin-left: calc(var(--indent) * 4ch);
+	width: max-content;
+	font-family: var(--base-font);
+	vertical-align: middle;
 }
+
+.code .menu { display: table; }
+.code .menu-row { display: table-row; }
+.code .menu-idx { display: table-cell; text-align: right; color: var(--unimportant); }

@@ -205,7 +205,7 @@ struct CodeRenderer<'a> {
 	indent: u32,
 }
 
-impl CodeRenderer<'_> {
+impl<'a> CodeRenderer<'a> {
 	fn indent(&self) -> Self {
 		CodeRenderer { inner: self.inner, indent: self.indent + 1 }
 	}
@@ -276,7 +276,7 @@ impl CodeRenderer<'_> {
 				}
 
 				FlowInsn::Insn(insn) => {
-					self.insn(a, insn);
+					self.insn(a, insn).end();
 				}
 			}
 			a.text("\n");
@@ -366,8 +366,7 @@ impl CodeRenderer<'_> {
 
 				Stmt::Insn(insn) => {
 					self.line(a);
-					self.insn(a, insn);
-					a.text("\n");
+					self.insn(a, insn).end();
 				}
 			}
 		}
@@ -460,14 +459,15 @@ impl CodeRenderer<'_> {
 		}
 	}
 
-	fn visitor<'a, 'b>(&'a self, a: &'b mut Node, name: &'static str) -> InsnRenderer<'a, 'b> {
+	fn visitor<'b>(&self, a: &'b mut Node, name: &'static str) -> InsnRenderer<'a, 'b> {
 		a.span_text("insn", name);
-		InsnRenderer { inner: self.indent(), node: a }
+		InsnRenderer { inner: self.indent(), node: a, is_block: false }
 	}
 
-	fn insn(&self, a: &mut Node, insn: &Insn) {
+	fn insn<'b>(&self, a: &'b mut Node, insn: &Insn) -> InsnRenderer<'a, 'b> {
 		let mut vis = self.visitor(a, insn.name());
 		insn.visit(&mut vis);
+		vis
 	}
 }
 
@@ -476,6 +476,16 @@ struct InsnRenderer<'a, 'b> {
 	#[deref]
 	inner: CodeRenderer<'a>,
 	node: &'b mut Node,
+	is_block: bool,
+}
+
+impl InsnRenderer<'_, '_> {
+	fn end(&mut self) {
+		if !self.is_block {
+			self.node.text("\n");
+		}
+		self.is_block = true;
+	}
 }
 
 impl InsnVisitor for InsnRenderer<'_, '_> {
@@ -558,16 +568,15 @@ impl InsnVisitor for InsnRenderer<'_, '_> {
 		if self.inner.raw {
 			self.node.text(" ");
 			self.node.span_text("syntax", "[");
+			self.node.text("\n");
 		}
 
 		for insn in v {
-			self.node.text("\n");
 			self.inner.line(self.node);
-			self.inner.insn(self.node, insn);
+			self.inner.insn(self.node, insn).end();
 		}
 
 		if self.inner.raw {
-			self.node.text("\n");
 			self.inner.line(self.node);
 			self.node.span_text("syntax", "]");
 		}
@@ -580,12 +589,34 @@ impl InsnVisitor for InsnRenderer<'_, '_> {
 
 	fn string(&mut self, v: &str) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 	fn text(&mut self, v: &Text) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-	fn menu(&mut self, v: &[String]) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+
+	fn menu(&mut self, v: &[String]) {
+		self.end();
+		self.node.node("div", |a| {
+			a.attr("role", "list");
+			a.class("block menu");
+			a.attr("style", format!("--indent: {}", self.inner.indent));
+			for (idx, line) in v.iter().enumerate() {
+				a.node("div", |a| {
+					a.class("menu-row");
+					a.span_text("menu-idx", format!("({})", idx));
+					a.text(" ");
+					a.span("menu-label", |a| {
+						a.attr("role", "listitem");
+						a.text(line);
+					});
+					a.text("\n");
+				});
+			}
+		});
+	}
+
 	fn quests(&mut self, v: &[u16]) {
 		for q in v {
 			self.quest(q)
 		}
 	}
+
 	fn emote(&mut self, v: &(u8, u8, u32, u8)) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 
 	fn flags(&mut self, v: &u32) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }

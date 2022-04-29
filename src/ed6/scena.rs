@@ -486,11 +486,10 @@ impl InsnRenderer<'_, '_> {
 
 	fn accept(&mut self, arg: InsnArg) {
 		match arg {
-			InsnArg::u8(v) => { self.node.text(" "); self.node.span_text("int", v); }
+			InsnArg::u8(v)  => { self.node.text(" "); self.node.span_text("int", v); }
 			InsnArg::u16(v) => { self.node.text(" "); self.node.span_text("int", v); }
 			InsnArg::u32(v) => { self.node.text(" "); self.node.span_text("int", v); }
-
-			InsnArg::i8(v) => { self.node.text(" "); self.node.span_text("int", v); }
+			InsnArg::i8(v)  => { self.node.text(" "); self.node.span_text("int", v); }
 			InsnArg::i16(v) => { self.node.text(" "); self.node.span_text("int", v); }
 			InsnArg::i32(v) => { self.node.text(" "); self.node.span_text("int", v); }
 

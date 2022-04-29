@@ -436,36 +436,31 @@ impl<'a> CodeRenderer<'a> {
 				self.insn(a, insn);
 			}
 			Expr::Flag(flag) => {
-				let mut r = self.visitor(a, "Flag");
-				r.accept(InsnArg::flag(flag));
+				self.insn_parts(a, "Flag", &[InsnArg::flag(flag)]);
 			}
 			Expr::Var(var) => {
-				let mut r = self.visitor(a, "Var");
-				r.accept(InsnArg::var(var));
+				self.insn_parts(a, "Var", &[InsnArg::var(var)]);
 			}
 			Expr::Attr(attr) => {
-				let mut r = self.visitor(a, "Attr");
-				r.accept(InsnArg::attr(attr));
+				self.insn_parts(a, "Attr", &[InsnArg::attr(attr)]);
 			}
 			Expr::CharAttr(char, attr) => {
-				let mut r = self.visitor(a, "CharAttr");
-				r.accept(InsnArg::char(char));
-				r.accept(InsnArg::char_attr(attr));
-			},
+				self.insn_parts(a, "CharAttr", &[InsnArg::char(char), InsnArg::char_attr(attr)]);
+			}
 			Expr::Rand => {
-				self.visitor(a, "Rand");
+				self.insn_parts(a, "Rand", &[]);
 			}
 		}
 	}
 
-	fn visitor<'b>(&self, a: &'b mut Node, name: &'static str) -> InsnRenderer<'a, 'b> {
-		a.span_text("insn", name);
-		InsnRenderer { inner: self.indent(), node: a, is_block: false }
-	}
-
 	fn insn<'b>(&self, a: &'b mut Node, insn: &Insn) -> InsnRenderer<'a, 'b> {
 		let (name, args) = insn.parts();
-		let mut vis = self.visitor(a, name);
+		self.insn_parts(a, name, &args)
+	}
+
+	fn insn_parts<'b>(&self, a: &'b mut Node, name: &str, args: &[InsnArg]) -> InsnRenderer<'a, 'b> {
+		a.span_text("insn", name);
+		let mut vis = InsnRenderer { inner: self.indent(), node: a, is_block: false };
 		for arg in args.iter() {
 			vis.accept(*arg)
 		}

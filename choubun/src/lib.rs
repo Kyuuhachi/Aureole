@@ -1,8 +1,4 @@
-use std::{
-	rc::Rc,
-	cell::RefCell,
-	fmt,
-};
+use std::fmt;
 
 use linked_hash_map::LinkedHashMap;
 
@@ -12,7 +8,6 @@ enum Item {
 	Leaf(Leaf),
 	Text(String),
 	Raw(String),
-	Rc(Rc<RefCell<Body>>),
 }
 
 impl fmt::Debug for Item {
@@ -22,7 +17,6 @@ impl fmt::Debug for Item {
 			Self::Leaf(v) => { fmt::Debug::fmt(v, f)?; }
 			Self::Text(v) => { write!(f, "Text(")?;fmt::Debug::fmt(v, f)?; write!(f, ")")?; }
 			Self::Raw(v)  => { write!(f, "Raw(")?; fmt::Debug::fmt(v, f)?; write!(f, ")")?; }
-			Self::Rc(v)   => { write!(f, "Rc(")?;  fmt::Debug::fmt(v, f)?; write!(f, ")")?; }
 		}
 		Ok(())
 	}
@@ -119,10 +113,6 @@ impl Node {
 	pub fn raw(&mut self, text: &str) {
 		self.body.raw(text)
 	}
-
-	pub fn here(&mut self) -> Rc<RefCell<Body>> {
-		self.body.here()
-	}
 }
 
 impl Body {
@@ -144,12 +134,6 @@ impl Body {
 
 	pub fn raw(&mut self, text: &str) {
 		self.0.push(Item::Raw(text.to_owned()));
-	}
-
-	pub fn here(&mut self) -> Rc<RefCell<Body>> {
-		let v = Default::default();
-		self.0.push(Item::Rc(Rc::clone(&v)));
-		v
 	}
 }
 
@@ -240,20 +224,15 @@ impl Leaf {
 
 impl Body {
 	fn render_fragment<W: fmt::Write>(&self, out: &mut W, do_indent: bool, indent: usize) -> fmt::Result {
-		let indent_ = |out: &mut W| {
-			if do_indent {
-				write!(out, "\n{}", "\t".repeat(indent))
-			} else {
-				Ok(())
-			}
-		};
 		for item in &self.0 {
+			if do_indent {
+				write!(out, "\n{}", "\t".repeat(indent))?;
+			}
 			match item {
-				Item::Node(v) => { indent_(out)?; v.render_fragment(out, indent)? },
-				Item::Leaf(v) => { indent_(out)?; v.render_fragment(out, true)? },
-				Item::Text(v) => { indent_(out)?; escape(out, v)? },
-				Item::Raw(v)  => { indent_(out)?; write!(out, "{}", v)? },
-				Item::Rc(v) => v.borrow().render_fragment(out, do_indent, indent)?,
+				Item::Node(v) => v.render_fragment(out, indent)?,
+				Item::Leaf(v) => v.render_fragment(out, true)?,
+				Item::Text(v) => escape(out, v)?,
+				Item::Raw(v)  => write!(out, "{}", v)?,
 			}
 		}
 		Ok(())

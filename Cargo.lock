@@ -889,7 +889,6 @@ dependencies = [
  "choubun",
  "color-eyre",
  "convert_case 0.5.0",
- "derive_more",
  "extend",
  "eyre",
  "image",

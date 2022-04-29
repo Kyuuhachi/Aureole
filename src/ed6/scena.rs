@@ -1,8 +1,6 @@
 use std::borrow::Cow;
 use std::collections::{BTreeSet, BTreeMap};
 
-use derive_more::*;
-
 use choubun::Node;
 use kaiseki::ed6::{scena::*, Archives};
 
@@ -20,26 +18,23 @@ enum CharKind {
 	Unknown,
 }
 
-#[derive(Deref)]
 struct ScenaRenderer<'a> {
-	#[deref]
 	scena: &'a Scena,
 	archives: &'a Archives,
 	raw: bool,
 }
 
-
 impl ScenaRenderer<'_> {
 	fn render(&self) -> Node {
 		choubun::document(|doc| {
-			let name = format!("{}/{}", self.dir.decode(), self.fname.decode());
+			let name = format!("{}/{}", self.scena.dir.decode(), self.scena.fname.decode());
 			doc.head.node("title", |a| a.text(&name));
 			doc.head.node("link", |a| {
 				a.attr("rel", "stylesheet");
 				a.attr("href", "/assets/style.css"); // XXX url
 			});
 
-			doc.body.node("h1", |a| a.text(format!("{} (town: {}, bgm: {})", &name, self.town, self.bgm)));
+			doc.body.node("h1", |a| a.text(format!("{} (town: {}, bgm: {})", &name, self.scena.town, self.scena.bgm)));
 
 			doc.body.node("div", |a| {
 				a.indent();
@@ -47,14 +42,14 @@ impl ScenaRenderer<'_> {
 				a.node("select", |a| {
 					a.indent();
 					a.attr("id", "ch");
-					for &ch in &self.ch {
+					for &ch in &self.scena.ch {
 						a.node("option", |a| a.text(self.file_name(ch)));
 					}
 				});
 				a.node("select", |a| {
 					a.indent();
 					a.attr("id", "cp");
-					for &cp in &self.cp {
+					for &cp in &self.scena.cp {
 						a.node("option", |a| a.text(self.file_name(cp)));
 					}
 				});
@@ -64,7 +59,7 @@ impl ScenaRenderer<'_> {
 			doc.body.node("ol", |a| {
 				a.indent();
 				a.attr("start", 8usize);
-				for npc in &self.npcs {
+				for npc in &self.scena.npcs {
 					a.node("li", |a| a.text(format!("{:?}", npc)));
 				}
 			});
@@ -72,8 +67,8 @@ impl ScenaRenderer<'_> {
 			doc.body.node("h2", |a| a.text("Monsters"));
 			doc.body.node("ol", |a| {
 				a.indent();
-				a.attr("start", 8usize+self.npcs.len());
-				for monster in &self.monsters {
+				a.attr("start", 8usize+self.scena.npcs.len());
+				for monster in &self.scena.monsters {
 					a.node("li", |a| a.text(format!("{:?}", monster)));
 				}
 			});
@@ -82,7 +77,7 @@ impl ScenaRenderer<'_> {
 			doc.body.node("ol", |a| {
 				a.indent();
 				a.attr("start", 0usize);
-				for trigger in &self.triggers {
+				for trigger in &self.scena.triggers {
 					a.node("li", |a| a.text(format!("{:?}", trigger)));
 				}
 			});
@@ -91,7 +86,7 @@ impl ScenaRenderer<'_> {
 			doc.body.node("ol", |a| {
 				a.indent();
 				a.attr("start", 0usize);
-				for object in &self.objects {
+				for object in &self.scena.objects {
 					a.node("li", |a| a.text(format!("{:?}", object)));
 				}
 			});
@@ -100,13 +95,13 @@ impl ScenaRenderer<'_> {
 			doc.body.node("ol", |a| {
 				a.indent();
 				a.attr("start", 0usize);
-				for camera_angle in &self.camera_angles {
+				for camera_angle in &self.scena.camera_angles {
 					a.node("li", |a| a.text(format!("{:?}", camera_angle)));
 				}
 			});
 
 			doc.body.node("h2", |a| a.text("Code"));
-			for (i, func) in self.functions.iter().enumerate() {
+			for (i, func) in self.scena.functions.iter().enumerate() {
 				doc.body.node("h3", |a| a.text(format!("Function {}", i)));
 				let render = CodeRenderer { inner: self, indent: 0 };
 				if self.raw {
@@ -145,8 +140,8 @@ impl ScenaRenderer<'_> {
 		let pc_names = &["Estelle", "Joshua", "Scherazard", "Olivier", "Kloe", "Agate", "Tita", "Zin"];
 
 		let npc_start = 8;
-		let monster_start = npc_start + self.npcs.len();
-		let monster_end = monster_start + self.monsters.len();
+		let monster_start = npc_start + self.scena.npcs.len();
+		let monster_end = monster_start + self.scena.monsters.len();
 		let pc_start = 0x101;
 		let pc_end = pc_start + pc_names.len();
 		
@@ -166,9 +161,9 @@ impl ScenaRenderer<'_> {
 		} else if (1..4).contains(&id) {
 			(CharKind::Party, format!("[party {}]", id+1).into())
 		} else if (npc_start..monster_start).contains(&id) {
-			(CharKind::Npc, get_name(id-npc_start, &self.npcs, |a| &*a.name))
+			(CharKind::Npc, get_name(id-npc_start, &self.scena.npcs, |a| &*a.name))
 		} else if (monster_start..monster_end).contains(&id) {
-			(CharKind::Monster, get_name(id-monster_start, &self.monsters, |a| &*a.name))
+			(CharKind::Monster, get_name(id-monster_start, &self.scena.monsters, |a| &*a.name))
 		} else if id == 0xFE {
 			(CharKind::Self_, "self".into())
 		} else if (pc_start..pc_end).contains(&id) {
@@ -197,9 +192,7 @@ impl Node {
 	}
 }
 
-#[derive(Deref)]
 struct CodeRenderer<'a> {
-	#[deref]
 	inner: &'a ScenaRenderer<'a>,
 	indent: u32,
 }
@@ -400,13 +393,13 @@ impl<'a> CodeRenderer<'a> {
 					ExprBinop::Div     => ("/", 6),
 					ExprBinop::Mod     => ("%", 6),
 				};
-				if prio2 < prio || self.raw { a.span_text("syntax", "("); }
+				if prio2 < prio || self.inner.raw { a.span_text("syntax", "("); }
 				self.expr_inner(a, l, prio2);
 				a.text(" ");
 				a.span_text("expr-op", text);
 				a.text(" ");
 				self.expr_inner(a, r, prio2+1);
-				if prio2 < prio || self.raw { a.span_text("syntax", ")"); }
+				if prio2 < prio || self.inner.raw { a.span_text("syntax", ")"); }
 			}
 
 			Expr::Unop(op, v) => {
@@ -478,7 +471,7 @@ impl<'a> CodeRenderer<'a> {
 
 			InsnArg::scena_file(v) => {
 				a.text(" ");
-				let text = self.file_name(*v);
+				let text = self.inner.file_name(*v);
 				if text.get(2..3) == Some("/") && text.ends_with(".SN") {
 					a.node("a", |a| {
 						a.class("file-ref");
@@ -492,11 +485,11 @@ impl<'a> CodeRenderer<'a> {
 
 			InsnArg::map_file(v) => {
 				a.text(" ");
-				a.span_text("file-ref", self.file_name(*v));
+				a.span_text("file-ref", self.inner.file_name(*v));
 			}
 			InsnArg::vis_file(v) => {
 				a.text(" ");
-				a.span_text("file-ref", self.file_name(*v));
+				a.span_text("file-ref", self.inner.file_name(*v));
 			}
 			InsnArg::eff_file(v) => {
 				a.text(" ");
@@ -544,7 +537,7 @@ impl<'a> CodeRenderer<'a> {
 			InsnArg::magic(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 
 			InsnArg::fork(v) => {
-				if self.raw {
+				if self.inner.raw {
 					a.text(" ");
 					a.span_text("syntax", "[");
 					a.node("div", |_|{});
@@ -554,7 +547,7 @@ impl<'a> CodeRenderer<'a> {
 					self.line(a, |a| self.insn(a, insn));
 				}
 
-				if self.raw {
+				if self.inner.raw {
 					self.line(a, |a| a.span_text("syntax", "]"));
 				}
 			}
@@ -623,7 +616,7 @@ impl<'a> CodeRenderer<'a> {
 					};
 					match name {
 						Some(name) => a.node("span", |a| {
-							if self.raw {
+							if self.inner.raw {
 								a.attr("title", name);
 								a.text(v);
 							} else {
@@ -639,7 +632,7 @@ impl<'a> CodeRenderer<'a> {
 			InsnArg::char(v) => {
 				a.text(" ");
 
-				let (kind, name) = self.char_name(*v as usize);
+				let (kind, name) = self.inner.char_name(*v as usize);
 				let kind = match kind {
 					CharKind::Party => "party",
 					CharKind::Npc => "npc",
@@ -650,7 +643,7 @@ impl<'a> CodeRenderer<'a> {
 				};
 				a.span("char", |a| {
 					a.class(&format!("char-{}", kind));
-					if self.raw {
+					if self.inner.raw {
 						a.attr("title", format!("{} ({})", name, kind));
 						a.text(v);
 					} else {

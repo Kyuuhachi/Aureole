@@ -1,5 +1,7 @@
 #![feature(proc_macro_diagnostic)]
 
+use std::collections::BTreeMap;
+
 use either::Either;
 use convert_case::{Case, Casing, Boundary};
 use proc_macro::{TokenStream as TS, Diagnostic, Level};
@@ -178,10 +180,11 @@ macro_rules! make {
 }
 
 struct Gen {
-	enum_name: String,
-	variants: Vec<Variant>,
-	visit_arms: Vec<Arm>,
-	name_arms: Vec<Arm>,
+	insn_name: String,
+	arg_name: String,
+	insn_variants: Vec<Variant>,
+	arg_variants: BTreeMap<Ident, Box<Type>>,
+	parts_arms: Vec<Arm>,
 }
 
 impl Gen {
@@ -212,23 +215,30 @@ impl Gen {
 				vars.push((field_name, field));
 			}
 
-			let last: Expr = match &arm.tail {
+			let last = match &arm.tail {
 				Some(tail) => self.process_table(tail, name.to_string(), &vars),
 				None => {
-					let names = vars.iter().map(|a|&a.0).collect::<Vec<_>>();
-					let types = vars.iter().map(|a|&a.1.ty).collect::<Vec<_>>();
-					let aliases = vars.iter().map(|a|&a.1.alias).collect::<Vec<_>>();
-					self.variants.push(make!(Variant, arm.span; #name(#(#types),*)));
-					self.visit_arms.push(make!(Arm, arm.span;
-						Self::#name(#(#names),*) => {
-							#(vis.#aliases(#names);)*
+					let insn_name = Ident::new(&self.insn_name, arm.span);
+					let arg_name = Ident::new(&self.arg_name, arm.span);
+					let varnames = vars.iter().map(|a|&a.0).collect::<Vec<_>>();
+					let vartypes = vars.iter().map(|a|&a.1.ty).collect::<Vec<_>>();
+					let aliases  = vars.iter().map(|a|&a.1.alias).collect::<Vec<_>>();
+
+					self.insn_variants.push(make!(Variant, arm.span;
+						#name(#(#vartypes),*)
+					));
+
+					for a in vars.iter().map(|a| a.1) {
+						self.arg_variants.insert(a.alias.clone(), a.ty.clone());
+					}
+
+					self.parts_arms.push(make!(Arm, arm.span;
+						#insn_name::#name(#(#varnames),*) => {
+							(stringify!(#name), Box::new([ #(#arg_name::#aliases(#varnames),)* ]))
 						}
 					));
-					let name_str = name.to_string();
-					self.name_arms.push(make!(Arm, arm.span;
-						Self::#name(#(#names),*) => #name_str,
-					));
-					make!(Expr, arm.span; Self::#name(#(#names),*))
+
+					make!(Expr, arm.span; #insn_name::#name(#(#varnames),*))
 				}
 			};
 
@@ -236,9 +246,9 @@ impl Gen {
 		}
 
 		let description = if prefix.is_empty() {
-			self.enum_name.clone()
+			self.insn_name.clone()
 		} else {
-			format!("{}::{}*", self.enum_name, prefix)
+			format!("{}::{}*", self.insn_name, prefix)
 		};
 		let fallback = make!(Arm, table.span; op => eyre::bail!("Unknown {}: {:02X}", #description, op));
 
@@ -258,28 +268,24 @@ pub fn bytecode(attr: TS, item: TS) -> TS {
 }
 
 fn run(attr: TokenStream, item: TokenStream) -> Result<TokenStream> {
-	let (mut the_enum, mut visit_fn, mut name_fn) = Parser::parse2(move |content: ParseStream| {
+	let (mut insn_enum, mut arg_enum, mut parts_fn) = Parser::parse2(move |content: ParseStream| {
 		Ok((
 			content.parse::<ItemEnum>()?,
-			content.parse::<ItemFn>()?,
+			content.parse::<ItemEnum>()?,
 			content.parse::<ItemFn>()?,
 		))
 	}, attr)?;
 
 	let mut func = parse2::<ItemFn>(item)?;
 
-	let visit_arg = cast!(Some, visit_fn.sig.inputs.iter().nth(1))?;
-	let visit_arg = cast!(FnArg::Typed, visit_arg)?;
-	let visit_arg = cast!(Pat::Ident, &*visit_arg.pat)?;
-	let visit_arg = &visit_arg.ident;
-
 	let (read_arg, table) = parse_fn(&func)?;
 
 	let mut gen = Gen {
-		enum_name: the_enum.ident.to_string(),
-		variants: Vec::new(),
-		visit_arms: Vec::new(),
-		name_arms: Vec::new(),
+		insn_name: insn_enum.ident.to_string(),
+		insn_variants: Vec::new(),
+		arg_name: arg_enum.ident.to_string(),
+		arg_variants: BTreeMap::new(),
+		parts_arms: Vec::new(),
 	};
 
 	let body = gen.process_table(&table, String::new(), &[]);
@@ -288,26 +294,25 @@ fn run(attr: TokenStream, item: TokenStream) -> Result<TokenStream> {
 		Ok(#body)
 	}));
 
-	the_enum.variants = gen.variants.into_iter().collect();
+	insn_enum.variants = gen.insn_variants.into_iter().collect();
 
-	let arms = gen.visit_arms;
-	visit_fn.block = Box::new(make!(Block, Span::call_site(); {
-		let mut vis = #visit_arg;
+	arg_enum.variants = gen.arg_variants.into_iter().map(|(name, ty)| {
+		let lifetime = arg_enum.generics.lifetimes().next().expect("Need a lifetime");
+		make!(Variant, Span::call_site(); #name(&#lifetime #ty))
+	}).collect();
+
+	let arms = gen.parts_arms;
+	parts_fn.block = Box::new(make!(Block, Span::call_site(); {
 		match self { #(#arms)* }
 	}));
 
-	let arms = gen.name_arms;
-	name_fn.block = Box::new(make!(Block, Span::call_site(); {
-		match self { #(#arms)* }
-	}));
-
-	let enum_name = &the_enum.ident;
+	let enum_name = &insn_enum.ident;
 	Ok(quote! {
-		#the_enum
+		#insn_enum
+		#arg_enum
 		impl #enum_name {
 			#func
-			#visit_fn
-			#name_fn
+			#parts_fn
 		}
 	})
 }

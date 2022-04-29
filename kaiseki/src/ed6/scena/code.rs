@@ -1,78 +1,14 @@
 use super::*;
 
-pub trait InsnVisitor {
-	fn u8(&mut self, v: &u8);
-	fn u16(&mut self, v: &u16);
-	fn u32(&mut self, v: &u32);
-
-	fn i8(&mut self, v: &i8);
-	fn i16(&mut self, v: &i16);
-	fn i32(&mut self, v: &i32);
-
-	fn func_ref(&mut self, v: &FuncRef);
-
-	fn scena_file(&mut self, v: &FileRef);
-	fn map_file(&mut self, v: &FileRef);
-	fn vis_file(&mut self, v: &FileRef);
-	fn eff_file(&mut self, v: &str);
-	fn op_file(&mut self, v: &str);
-	fn avi_file(&mut self, v: &str);
-
-	fn pos2(&mut self, v: &Pos2);
-	fn pos3(&mut self, v: &Pos3);
-	fn relative(&mut self, v: &Pos3);
-
-	fn time(&mut self, v: &u32);
-	fn speed(&mut self, v: &u32);
-	fn angle(&mut self, v: &u16);
-	fn color(&mut self, v: &u32);
-
-	fn time16(&mut self, v: &u16);
-	fn angle32(&mut self, v: &i32);
-
-	fn battle(&mut self, v: &u16);
-	fn town(&mut self, v: &u16);
-	fn bgmtbl(&mut self, v: &u8);
-	fn quest(&mut self, v: &u16);
-	fn sound(&mut self, v: &u16);
-	fn item(&mut self, v: &u16);
-	fn flag(&mut self, v: &u16);
-	fn shop(&mut self, v: &u8);
-	fn magic(&mut self, v: &u16);
-
-	fn fork(&mut self, v: &[Insn]);
-	fn expr(&mut self, v: &Expr);
-	fn string(&mut self, v: &str);
-	fn text(&mut self, v: &Text);
-	fn menu(&mut self, v: &[String]);
-	fn quests(&mut self, v: &[u16]);
-	fn emote(&mut self, v: &(u8, u8, u32, u8));
-
-	fn flags(&mut self, v: &u32);
-	fn quest_flag(&mut self, v: &u8);
-	fn char_flags(&mut self, v: &u16);
-	fn quest_task(&mut self, v: &u16);
-	fn member(&mut self, v: &u8);
-	fn element(&mut self, v: &u8);
-
-	fn var(&mut self, v: &u16);
-	fn attr(&mut self, v: &u8);
-	fn char_attr(&mut self, v: &u8);
-
-	fn char(&mut self, v: &u16);
-	fn chcp(&mut self, v: &u16);
-	fn fork_id(&mut self, v: &u8);
-	fn menu_id(&mut self, v: &u16);
-	fn object(&mut self, v: &u16);
-
-	fn data(&mut self, v: &[u8]);
-}
-
 #[kaiseki_macros::bytecode(
 	#[derive(Debug, Clone, PartialEq, Eq)]
 	pub enum Insn {}
-	pub fn visit(&self, vis: &mut impl InsnVisitor) {}
-	pub fn name(&self) -> &'static str {}
+
+	#[allow(non_camel_case_types)]
+	#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+	pub enum InsnArg<'a> {}
+
+	pub fn parts(&self) -> (&'static str, Box<[InsnArg]>) {}
 )]
 pub(super) fn read(i: &mut CodeParser) -> Result<Self> {
 	match u8 {

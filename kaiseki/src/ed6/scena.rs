@@ -8,7 +8,7 @@ use hamu::read::{In, Le};
 use crate::util::{self, ByteString, InExt, Text};
 
 mod code;
-pub use code::{Insn, InsnVisitor};
+pub use code::{Insn, InsnArg};
 
 #[derive(Clone, Copy, PartialEq, Eq, DebugCustom)]
 #[debug(fmt = "FuncRef({_0}, {_1})")]

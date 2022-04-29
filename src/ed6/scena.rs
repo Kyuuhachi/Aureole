@@ -5,7 +5,6 @@ use derive_more::*;
 
 use choubun::Node;
 use kaiseki::ed6::{scena::*, Archives};
-use kaiseki::util::Text;
 
 pub fn render(scena: &Scena, archives: &Archives, raw: bool) -> choubun::Node {
 	ScenaRenderer { scena, archives, raw }.render()
@@ -438,20 +437,20 @@ impl<'a> CodeRenderer<'a> {
 			}
 			Expr::Flag(flag) => {
 				let mut r = self.visitor(a, "Flag");
-				r.flag(flag);
+				r.accept(InsnArg::flag(flag));
 			}
 			Expr::Var(var) => {
 				let mut r = self.visitor(a, "Var");
-				r.var(var);
+				r.accept(InsnArg::var(var));
 			}
 			Expr::Attr(attr) => {
 				let mut r = self.visitor(a, "Attr");
-				r.attr(attr);
+				r.accept(InsnArg::attr(attr));
 			}
 			Expr::CharAttr(char, attr) => {
 				let mut r = self.visitor(a, "CharAttr");
-				r.char(char);
-				r.char_attr(attr);
+				r.accept(InsnArg::char(char));
+				r.accept(InsnArg::char_attr(attr));
 			},
 			Expr::Rand => {
 				self.visitor(a, "Rand");
@@ -465,8 +464,11 @@ impl<'a> CodeRenderer<'a> {
 	}
 
 	fn insn<'b>(&self, a: &'b mut Node, insn: &Insn) -> InsnRenderer<'a, 'b> {
-		let mut vis = self.visitor(a, insn.name());
-		insn.visit(&mut vis);
+		let (name, args) = insn.parts();
+		let mut vis = self.visitor(a, name);
+		for arg in args.iter() {
+			vis.accept(*arg)
+		}
 		vis
 	}
 }
@@ -486,210 +488,212 @@ impl InsnRenderer<'_, '_> {
 		}
 		self.is_block = true;
 	}
-}
 
-impl InsnVisitor for InsnRenderer<'_, '_> {
-	fn u8(&mut self, v: &u8) { self.node.text(" "); self.node.span_text("int", v); }
-	fn u16(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("int", v); }
-	fn u32(&mut self, v: &u32) { self.node.text(" "); self.node.span_text("int", v); }
+	fn accept(&mut self, arg: InsnArg) {
+		match arg {
+			InsnArg::u8(v) => { self.node.text(" "); self.node.span_text("int", v); }
+			InsnArg::u16(v) => { self.node.text(" "); self.node.span_text("int", v); }
+			InsnArg::u32(v) => { self.node.text(" "); self.node.span_text("int", v); }
 
-	fn i8(&mut self, v: &i8) { self.node.text(" "); self.node.span_text("int", v); }
-	fn i16(&mut self, v: &i16) { self.node.text(" "); self.node.span_text("int", v); }
-	fn i32(&mut self, v: &i32) { self.node.text(" "); self.node.span_text("int", v); }
+			InsnArg::i8(v) => { self.node.text(" "); self.node.span_text("int", v); }
+			InsnArg::i16(v) => { self.node.text(" "); self.node.span_text("int", v); }
+			InsnArg::i32(v) => { self.node.text(" "); self.node.span_text("int", v); }
 
-	fn scena_file(&mut self, v: &FileRef) {
-		self.node.text(" ");
-		let text = self.file_name(*v);
-		if text.get(2..3) == Some("/") && text.ends_with(".SN") {
-			self.node.node("a", |a| {
-				a.class("file-ref");
-				a.attr("href", &text[3..text.len()-3]); // XXX url
-				a.text(text);
-			});
-		} else {
-			self.node.span_text("file-ref", text);
-		}
-	}
-
-	fn map_file(&mut self, v: &FileRef) {
-		self.node.text(" ");
-		self.node.span_text("file-ref", self.file_name(*v));
-	}
-	fn vis_file(&mut self, v: &FileRef) {
-		self.node.text(" ");
-		self.node.span_text("file-ref", self.file_name(*v));
-	}
-	fn eff_file(&mut self, v: &str) {
-		self.node.text(" ");
-		self.node.span_text("file-ref", v);
-	}
-	fn op_file(&mut self, v: &str) {
-		self.node.text(" ");
-		self.node.span_text("file-ref", v);
-	}
-	fn avi_file(&mut self, v: &str) {
-		self.node.text(" ");
-		self.node.span_text("file-ref", v);
-	}
-
-	fn pos2(&mut self, v: &Pos2) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-	fn pos3(&mut self, v: &Pos3) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-	fn relative(&mut self, v: &Pos3) { self.node.text(" "); self.node.span_text("unknown", format!("relative{:?}", v)); }
-
-	fn time(&mut self, v: &u32) { self.node.text(" "); self.node.span_text("time", format!("{}ms", v)); }
-	fn speed(&mut self, v: &u32) { self.node.text(" "); self.node.span_text("speed", format!("{}mm/s", v)); }
-	fn angle(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("angle", format!("{}°", v)); }
-	fn color(&mut self, v: &u32) {
-		self.node.text(" ");
-		self.node.span("color", |a| {
-			a.attr("style", format!("--splat-color: #{:06X}; --splat-alpha: {}", v&0xFFFFFF, (v>>24) as f32 / 255.0));
-			a.node_class("svg", "color-splat", |a| a.node("use", |a| a.attr("href", "/assets/color-splat.svg#splat"))); // XXX url
-			a.text(format!("#{:08X}", v));
-		});
-	}
-
-	fn time16(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("time", format!("{}ms", v)); }
-	fn angle32(&mut self, v: &i32) { self.node.text(" "); self.node.span_text("angle", format!("{}m°", v)); }
-
-	fn battle(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-	fn town(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-	fn bgmtbl(&mut self, v: &u8) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-	fn quest(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-	fn sound(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-	fn item(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-	fn flag(&mut self, v: &u16) {
-		self.node.text(" ");
-		self.node.span_text("flag", v);
-	}
-	fn shop(&mut self, v: &u8) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-	fn magic(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-
-	fn fork(&mut self, v: &[Insn]) {
-		if self.inner.raw {
-			self.node.text(" ");
-			self.node.span_text("syntax", "[");
-			self.node.text("\n");
-		}
-
-		for insn in v {
-			self.inner.line(self.node);
-			self.inner.insn(self.node, insn).end();
-		}
-
-		if self.inner.raw {
-			self.inner.line(self.node);
-			self.node.span_text("syntax", "]");
-		}
-	}
-
-	fn expr(&mut self, v: &Expr) {
-		self.node.text(" ");
-		self.inner.expr(self.node, v);
-	}
-
-	fn string(&mut self, v: &str) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-	fn text(&mut self, v: &Text) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-
-	fn menu(&mut self, v: &[String]) {
-		self.end();
-		self.node.node("div", |a| {
-			a.attr("role", "list");
-			a.class("block menu");
-			a.attr("style", format!("--indent: {}", self.inner.indent));
-			for (idx, line) in v.iter().enumerate() {
-				a.node("div", |a| {
-					a.class("menu-row");
-					a.span_text("menu-idx", format!("({})", idx));
-					a.text(" ");
-					a.span("menu-label", |a| {
-						a.attr("role", "listitem");
-						a.text(line);
+			InsnArg::scena_file(v) => {
+				self.node.text(" ");
+				let text = self.file_name(*v);
+				if text.get(2..3) == Some("/") && text.ends_with(".SN") {
+					self.node.node("a", |a| {
+						a.class("file-ref");
+						a.attr("href", &text[3..text.len()-3]); // XXX url
+						a.text(text);
 					});
-					a.text("\n");
+				} else {
+					self.node.span_text("file-ref", text);
+				}
+			}
+
+			InsnArg::map_file(v) => {
+				self.node.text(" ");
+				self.node.span_text("file-ref", self.file_name(*v));
+			}
+			InsnArg::vis_file(v) => {
+				self.node.text(" ");
+				self.node.span_text("file-ref", self.file_name(*v));
+			}
+			InsnArg::eff_file(v) => {
+				self.node.text(" ");
+				self.node.span_text("file-ref", v);
+			}
+			InsnArg::op_file(v) => {
+				self.node.text(" ");
+				self.node.span_text("file-ref", v);
+			}
+			InsnArg::avi_file(v) => {
+				self.node.text(" ");
+				self.node.span_text("file-ref", v);
+			}
+
+			InsnArg::pos2(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::pos3(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::relative(v) => { self.node.text(" "); self.node.span_text("unknown", format!("relative{:?}", v)); }
+
+			InsnArg::time(v) => { self.node.text(" "); self.node.span_text("time", format!("{}ms", v)); }
+			InsnArg::speed(v) => { self.node.text(" "); self.node.span_text("speed", format!("{}mm/s", v)); }
+			InsnArg::angle(v) => { self.node.text(" "); self.node.span_text("angle", format!("{}°", v)); }
+			InsnArg::color(v) => {
+				self.node.text(" ");
+				self.node.span("color", |a| {
+					a.attr("style", format!("--splat-color: #{:06X}; --splat-alpha: {}", v&0xFFFFFF, (v>>24) as f32 / 255.0));
+					a.node_class("svg", "color-splat", |a| a.node("use", |a| a.attr("href", "/assets/color-splat.svg#splat"))); // XXX url
+					a.text(format!("#{:08X}", v));
 				});
 			}
-		});
-	}
 
-	fn quests(&mut self, v: &[u16]) {
-		for q in v {
-			self.quest(q)
-		}
-	}
+			InsnArg::time16(v) => { self.node.text(" "); self.node.span_text("time", format!("{}ms", v)); }
+			InsnArg::angle32(v) => { self.node.text(" "); self.node.span_text("angle", format!("{}m°", v)); }
 
-	fn emote(&mut self, v: &(u8, u8, u32, u8)) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::battle(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::town(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::bgmtbl(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::quest(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::sound(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::item(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::flag(v) => {
+				self.node.text(" ");
+				self.node.span_text("flag", v);
+			}
+			InsnArg::shop(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::magic(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 
-	fn flags(&mut self, v: &u32) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-	fn quest_flag(&mut self, v: &u8) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-	fn char_flags(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-	fn quest_task(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-	fn member(&mut self, v: &u8) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-	fn element(&mut self, v: &u8) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::fork(v) => {
+				if self.inner.raw {
+					self.node.text(" ");
+					self.node.span_text("syntax", "[");
+					self.node.text("\n");
+				}
 
-	fn var(&mut self, v: &u16) {
-		self.node.text(" ");
-		self.node.span_text("var", v);
-	}
-	fn attr(&mut self, v: &u8) {
-		self.node.text(" ");
-		self.node.span_text("attr", v);
-	}
+				for insn in v {
+					self.inner.line(self.node);
+					self.inner.insn(self.node, insn).end();
+				}
 
-	fn char_attr(&mut self, v: &u8) {
-		self.node.span("char-attr", |a| {
-			a.text(":");
+				if self.inner.raw {
+					self.inner.line(self.node);
+					self.node.span_text("syntax", "]");
+				}
+			}
 
-			let name = match *v {
-				1 => Some("x"),
-				2 => Some("y"),
-				3 => Some("z"),
-				4 => Some("angle"),
-				_ => None,
-			};
-			match name {
-				Some(name) => a.node("span", |a| {
+			InsnArg::expr(v) => {
+				self.node.text(" ");
+				self.inner.expr(self.node, v);
+			}
+
+			InsnArg::string(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::text(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+
+			InsnArg::menu(v) => {
+				self.end();
+				self.node.node("div", |a| {
+					a.attr("role", "list");
+					a.class("block menu");
+					a.attr("style", format!("--indent: {}", self.inner.indent));
+					for (idx, line) in v.iter().enumerate() {
+						a.node("div", |a| {
+							a.class("menu-row");
+							a.span_text("menu-idx", format!("({})", idx));
+							a.text(" ");
+							a.span("menu-label", |a| {
+								a.attr("role", "listitem");
+								a.text(line);
+							});
+							a.text("\n");
+						});
+					}
+				});
+			}
+
+			InsnArg::quests(v) => {
+				for q in v {
+					self.accept(InsnArg::quest(q))
+				}
+			}
+
+			InsnArg::emote(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+
+			InsnArg::flags(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::quest_flag(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::char_flags(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::quest_task(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::member(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::element(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+
+			InsnArg::var(v) => {
+				self.node.text(" ");
+				self.node.span_text("var", v);
+			}
+			InsnArg::attr(v) => {
+				self.node.text(" ");
+				self.node.span_text("attr", v);
+			}
+
+			InsnArg::char_attr(v) => {
+				self.node.span("char-attr", |a| {
+					a.text(":");
+
+					let name = match *v {
+						1 => Some("x"),
+						2 => Some("y"),
+						3 => Some("z"),
+						4 => Some("angle"),
+						_ => None,
+					};
+					match name {
+						Some(name) => a.node("span", |a| {
+							if self.inner.raw {
+								a.attr("title", name);
+								a.text(v);
+							} else {
+								a.attr("title", v);
+								a.text(name);
+							}
+						}),
+						None => a.text(v),
+					}
+				});
+			}
+
+			InsnArg::char(v) => {
+				self.node.text(" ");
+
+				let (kind, name) = self.char_name(*v as usize);
+				let kind = match kind {
+					CharKind::Party => "party",
+					CharKind::Npc => "npc",
+					CharKind::Monster => "monster",
+					CharKind::Self_ => "self",
+					CharKind::Pc => "pc",
+					CharKind::Unknown => "unknown",
+				};
+				self.node.span("char", |a| {
+					a.class(&format!("char-{}", kind));
 					if self.inner.raw {
-						a.attr("title", name);
+						a.attr("title", format!("{} ({})", name, kind));
 						a.text(v);
 					} else {
-						a.attr("title", v);
+						a.attr("title", format!("{} ({})", v, kind));
 						a.text(name);
 					}
-				}),
-				None => a.text(v),
+				});
 			}
-		});
+
+			InsnArg::chcp(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::fork_id(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::menu_id(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::object(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::func_ref(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+
+			InsnArg::data(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+		}
 	}
-
-	fn char(&mut self, v: &u16) {
-		self.node.text(" ");
-
-		let (kind, name) = self.char_name(*v as usize);
-		let kind = match kind {
-			CharKind::Party => "party",
-			CharKind::Npc => "npc",
-			CharKind::Monster => "monster",
-			CharKind::Self_ => "self",
-			CharKind::Pc => "pc",
-			CharKind::Unknown => "unknown",
-		};
-		self.node.span("char", |a| {
-			a.class(&format!("char-{}", kind));
-			if self.inner.raw {
-				a.attr("title", format!("{} ({})", name, kind));
-				a.text(v);
-			} else {
-				a.attr("title", format!("{} ({})", v, kind));
-				a.text(name);
-			}
-		});
-	}
-
-	fn chcp(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-	fn fork_id(&mut self, v: &u8) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-	fn menu_id(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-	fn object(&mut self, v: &u16) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-	fn func_ref(&mut self, v: &FuncRef) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-
-	fn data(&mut self, v: &[u8]) { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
 }

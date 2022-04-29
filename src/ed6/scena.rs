@@ -275,7 +275,7 @@ impl<'a> CodeRenderer<'a> {
 				}
 
 				FlowInsn::Insn(insn) => {
-					self.insn(a, insn).end();
+					self.insn(a, insn).end(a);
 				}
 			}
 			a.text("\n");
@@ -365,7 +365,7 @@ impl<'a> CodeRenderer<'a> {
 
 				Stmt::Insn(insn) => {
 					self.line(a);
-					self.insn(a, insn).end();
+					self.insn(a, insn).end(a);
 				}
 			}
 		}
@@ -453,142 +453,141 @@ impl<'a> CodeRenderer<'a> {
 		}
 	}
 
-	fn insn<'b>(&self, a: &'b mut Node, insn: &Insn) -> InsnRenderer<'a, 'b> {
+	fn insn(&self, a: &mut Node, insn: &Insn) -> InsnRenderer<'a> {
 		let (name, args) = insn.parts();
 		self.insn_parts(a, name, &args)
 	}
 
-	fn insn_parts<'b>(&self, a: &'b mut Node, name: &str, args: &[InsnArg]) -> InsnRenderer<'a, 'b> {
+	fn insn_parts(&self, a: &mut Node, name: &str, args: &[InsnArg]) -> InsnRenderer<'a> {
 		a.span_text("insn", name);
-		let mut vis = InsnRenderer { inner: self.indent(), node: a, is_block: false };
+		let mut vis = InsnRenderer { inner: self.indent(), is_block: false };
 		for arg in args.iter() {
-			vis.accept(*arg)
+			vis.accept(a, *arg)
 		}
 		vis
 	}
 }
 
 #[derive(Deref)]
-struct InsnRenderer<'a, 'b> {
+struct InsnRenderer<'a> {
 	#[deref]
 	inner: CodeRenderer<'a>,
-	node: &'b mut Node,
 	is_block: bool,
 }
 
-impl InsnRenderer<'_, '_> {
-	fn end(&mut self) {
+impl InsnRenderer<'_> {
+	fn end(&mut self, a: &mut Node) {
 		if !self.is_block {
-			self.node.text("\n");
+			a.text("\n");
 		}
 		self.is_block = true;
 	}
 
-	fn accept(&mut self, arg: InsnArg) {
+	fn accept(&mut self, a: &mut Node, arg: InsnArg) {
 		match arg {
-			InsnArg::u8(v)  => { self.node.text(" "); self.node.span_text("int", v); }
-			InsnArg::u16(v) => { self.node.text(" "); self.node.span_text("int", v); }
-			InsnArg::u32(v) => { self.node.text(" "); self.node.span_text("int", v); }
-			InsnArg::i8(v)  => { self.node.text(" "); self.node.span_text("int", v); }
-			InsnArg::i16(v) => { self.node.text(" "); self.node.span_text("int", v); }
-			InsnArg::i32(v) => { self.node.text(" "); self.node.span_text("int", v); }
+			InsnArg::u8(v)  => { a.text(" "); a.span_text("int", v); }
+			InsnArg::u16(v) => { a.text(" "); a.span_text("int", v); }
+			InsnArg::u32(v) => { a.text(" "); a.span_text("int", v); }
+			InsnArg::i8(v)  => { a.text(" "); a.span_text("int", v); }
+			InsnArg::i16(v) => { a.text(" "); a.span_text("int", v); }
+			InsnArg::i32(v) => { a.text(" "); a.span_text("int", v); }
 
 			InsnArg::scena_file(v) => {
-				self.node.text(" ");
+				a.text(" ");
 				let text = self.file_name(*v);
 				if text.get(2..3) == Some("/") && text.ends_with(".SN") {
-					self.node.node("a", |a| {
+					a.node("a", |a| {
 						a.class("file-ref");
 						a.attr("href", &text[3..text.len()-3]); // XXX url
 						a.text(text);
 					});
 				} else {
-					self.node.span_text("file-ref", text);
+					a.span_text("file-ref", text);
 				}
 			}
 
 			InsnArg::map_file(v) => {
-				self.node.text(" ");
-				self.node.span_text("file-ref", self.file_name(*v));
+				a.text(" ");
+				a.span_text("file-ref", self.file_name(*v));
 			}
 			InsnArg::vis_file(v) => {
-				self.node.text(" ");
-				self.node.span_text("file-ref", self.file_name(*v));
+				a.text(" ");
+				a.span_text("file-ref", self.file_name(*v));
 			}
 			InsnArg::eff_file(v) => {
-				self.node.text(" ");
-				self.node.span_text("file-ref", v);
+				a.text(" ");
+				a.span_text("file-ref", v);
 			}
 			InsnArg::op_file(v) => {
-				self.node.text(" ");
-				self.node.span_text("file-ref", v);
+				a.text(" ");
+				a.span_text("file-ref", v);
 			}
 			InsnArg::avi_file(v) => {
-				self.node.text(" ");
-				self.node.span_text("file-ref", v);
+				a.text(" ");
+				a.span_text("file-ref", v);
 			}
 
-			InsnArg::pos2(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::pos3(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::relative(v) => { self.node.text(" "); self.node.span_text("unknown", format!("relative{:?}", v)); }
+			InsnArg::pos2(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::pos3(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::relative(v) => { a.text(" "); a.span_text("unknown", format!("relative{:?}", v)); }
 
-			InsnArg::time(v) => { self.node.text(" "); self.node.span_text("time", format!("{}ms", v)); }
-			InsnArg::speed(v) => { self.node.text(" "); self.node.span_text("speed", format!("{}mm/s", v)); }
-			InsnArg::angle(v) => { self.node.text(" "); self.node.span_text("angle", format!("{}°", v)); }
+			InsnArg::time(v) => { a.text(" "); a.span_text("time", format!("{}ms", v)); }
+			InsnArg::speed(v) => { a.text(" "); a.span_text("speed", format!("{}mm/s", v)); }
+			InsnArg::angle(v) => { a.text(" "); a.span_text("angle", format!("{}°", v)); }
 			InsnArg::color(v) => {
-				self.node.text(" ");
-				self.node.span("color", |a| {
+				a.text(" ");
+				a.span("color", |a| {
 					a.attr("style", format!("--splat-color: #{:06X}; --splat-alpha: {}", v&0xFFFFFF, (v>>24) as f32 / 255.0));
 					a.node_class("svg", "color-splat", |a| a.node("use", |a| a.attr("href", "/assets/color-splat.svg#splat"))); // XXX url
 					a.text(format!("#{:08X}", v));
 				});
 			}
 
-			InsnArg::time16(v) => { self.node.text(" "); self.node.span_text("time", format!("{}ms", v)); }
-			InsnArg::angle32(v) => { self.node.text(" "); self.node.span_text("angle", format!("{}m°", v)); }
+			InsnArg::time16(v) => { a.text(" "); a.span_text("time", format!("{}ms", v)); }
+			InsnArg::angle32(v) => { a.text(" "); a.span_text("angle", format!("{}m°", v)); }
 
-			InsnArg::battle(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::town(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::bgmtbl(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::quest(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::sound(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::item(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::battle(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::town(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::bgmtbl(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::quest(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::sound(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::item(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 			InsnArg::flag(v) => {
-				self.node.text(" ");
-				self.node.span_text("flag", v);
+				a.text(" ");
+				a.span_text("flag", v);
 			}
-			InsnArg::shop(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::magic(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::shop(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::magic(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 
 			InsnArg::fork(v) => {
 				if self.inner.raw {
-					self.node.text(" ");
-					self.node.span_text("syntax", "[");
-					self.node.text("\n");
+					a.text(" ");
+					a.span_text("syntax", "[");
+					a.text("\n");
 				}
 
 				for insn in v {
-					self.inner.line(self.node);
-					self.inner.insn(self.node, insn).end();
+					self.inner.line(a);
+					self.inner.insn(a, insn).end(a);
 				}
 
 				if self.inner.raw {
-					self.inner.line(self.node);
-					self.node.span_text("syntax", "]");
+					self.inner.line(a);
+					a.span_text("syntax", "]");
 				}
 			}
 
 			InsnArg::expr(v) => {
-				self.node.text(" ");
-				self.inner.expr(self.node, v);
+				a.text(" ");
+				self.inner.expr(a, v);
 			}
 
-			InsnArg::string(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::text(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::string(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::text(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 
 			InsnArg::menu(v) => {
-				self.end();
-				self.node.node("div", |a| {
+				self.end(a);
+				a.node("div", |a| {
 					a.attr("role", "list");
 					a.class("block menu");
 					a.attr("style", format!("--indent: {}", self.inner.indent));
@@ -609,30 +608,30 @@ impl InsnRenderer<'_, '_> {
 
 			InsnArg::quests(v) => {
 				for q in v {
-					self.accept(InsnArg::quest(q))
+					self.accept(a, InsnArg::quest(q))
 				}
 			}
 
-			InsnArg::emote(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::emote(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 
-			InsnArg::flags(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::quest_flag(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::char_flags(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::quest_task(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::member(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::element(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::flags(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::quest_flag(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::char_flags(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::quest_task(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::member(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::element(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 
 			InsnArg::var(v) => {
-				self.node.text(" ");
-				self.node.span_text("var", v);
+				a.text(" ");
+				a.span_text("var", v);
 			}
 			InsnArg::attr(v) => {
-				self.node.text(" ");
-				self.node.span_text("attr", v);
+				a.text(" ");
+				a.span_text("attr", v);
 			}
 
 			InsnArg::char_attr(v) => {
-				self.node.span("char-attr", |a| {
+				a.span("char-attr", |a| {
 					a.text(":");
 
 					let name = match *v {
@@ -658,7 +657,7 @@ impl InsnRenderer<'_, '_> {
 			}
 
 			InsnArg::char(v) => {
-				self.node.text(" ");
+				a.text(" ");
 
 				let (kind, name) = self.char_name(*v as usize);
 				let kind = match kind {
@@ -669,7 +668,7 @@ impl InsnRenderer<'_, '_> {
 					CharKind::Pc => "pc",
 					CharKind::Unknown => "unknown",
 				};
-				self.node.span("char", |a| {
+				a.span("char", |a| {
 					a.class(&format!("char-{}", kind));
 					if self.inner.raw {
 						a.attr("title", format!("{} ({})", name, kind));
@@ -681,13 +680,13 @@ impl InsnRenderer<'_, '_> {
 				});
 			}
 
-			InsnArg::chcp(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::fork_id(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::menu_id(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::object(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::func_ref(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::chcp(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::fork_id(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::menu_id(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::object(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::func_ref(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 
-			InsnArg::data(v) => { self.node.text(" "); self.node.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::data(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 		}
 	}
 }

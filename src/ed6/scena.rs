@@ -564,7 +564,7 @@ impl<'a> CodeRenderer<'a> {
 				self.expr(a, v);
 			}
 
-			InsnArg::string(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::text_title(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 			InsnArg::text(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 
 			InsnArg::menu(v) => {

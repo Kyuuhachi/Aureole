@@ -236,52 +236,52 @@ impl<'a> CodeRenderer<'a> {
 				});
 			}
 
-			self.line(a, |a| {
-				a.text("  ");
+			match insn {
+				FlowInsn::If(expr, target) => self.line(a, |a| {
+					a.text("  ");
+					a.span_text("keyword", "UNLESS");
+					a.text(" ");
+					self.expr(a, expr);
+					a.text(" ");
+					a.span_text("keyword", "GOTO");
+					a.text(" ");
+					render_label(a, *target);
+				}),
 
-				match insn {
-					FlowInsn::If(expr, target) => {
-						a.span_text("keyword", "UNLESS");
-						a.text(" ");
-						self.expr(a, expr);
-						a.text(" ");
-						a.span_text("keyword", "GOTO");
-						a.text(" ");
-						render_label(a, *target);
-					}
+				FlowInsn::Goto(target) => self.line(a, |a| {
+					a.text("  ");
+					a.span_text("keyword", "GOTO");
+					a.text(" ");
+					render_label(a, *target);
+				}),
 
-					FlowInsn::Goto(target) => {
-						a.span_text("keyword", "GOTO");
-						a.text(" ");
-						render_label(a, *target);
-					}
-
-					FlowInsn::Switch(expr, branches, default) => {
-						a.span_text("keyword", "SWITCH");
-						a.text(" ");
-						self.expr(a, expr);
-						a.text(" ");
-						a.span_text("syntax", "[");
-						for (case, target) in branches {
-							a.span_text("case", case);
-							a.span_text("syntax", ":");
-							a.text(" ");
-							render_label(a, *target);
-							a.span_text("syntax", ",");
-							a.text(" ");
-						}
-						a.span_text("keyword", "default");
+				FlowInsn::Switch(expr, branches, default) => self.line(a, |a| {
+					a.text("  ");
+					a.span_text("keyword", "SWITCH");
+					a.text(" ");
+					self.expr(a, expr);
+					a.text(" ");
+					a.span_text("syntax", "[");
+					for (case, target) in branches {
+						a.span_text("case", case);
 						a.span_text("syntax", ":");
 						a.text(" ");
-						render_label(a, *default);
-						a.span_text("syntax", "]");
+						render_label(a, *target);
+						a.span_text("syntax", ",");
+						a.text(" ");
 					}
+					a.span_text("keyword", "default");
+					a.span_text("syntax", ":");
+					a.text(" ");
+					render_label(a, *default);
+					a.span_text("syntax", "]");
+				}),
 
-					FlowInsn::Insn(insn) => {
-						self.insn(a, insn);
-					}
-				}
-			});
+				FlowInsn::Insn(insn) => self.line(a, |a| {
+					a.text("  ");
+					self.insn(a, insn);
+				}),
+			}
 		}
 	}
 

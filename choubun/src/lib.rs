@@ -61,15 +61,6 @@ impl fmt::Debug for Node {
 	}
 }
 
-impl std::ops::Deref for Node {
-	type Target = Body;
-	fn deref(&self) -> &Body { &self.body }
-}
-
-impl std::ops::DerefMut for Node {
-	fn deref_mut(&mut self) -> &mut Body { &mut self.body }
-}
-
 impl Leaf {
 	fn new(name: &str) -> Leaf {
 		Leaf {
@@ -111,6 +102,26 @@ impl Node {
 
 	pub fn class(&mut self, class: &str) {
 		self.leaf.class(class);
+	}
+
+	pub fn node(&mut self, name: &str, body: impl FnOnce(&mut Node)) {
+		self.body.node(name, body)
+	}
+
+	pub fn leaf(&mut self, name: &str, body: impl FnOnce(&mut Leaf)) {
+		self.body.leaf(name, body)
+	}
+
+	pub fn text(&mut self, text: impl ToString) {
+		self.body.text(text)
+	}
+
+	pub fn raw(&mut self, text: &str) {
+		self.body.raw(text)
+	}
+
+	pub fn here(&mut self) -> Rc<RefCell<Body>> {
+		self.body.here()
 	}
 }
 

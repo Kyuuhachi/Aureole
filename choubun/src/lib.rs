@@ -28,20 +28,11 @@ pub struct Leaf {
 	attrs: LinkedHashMap<String, String>,
 }
 
-#[derive(Clone, Default)]
-pub struct Body(Vec<Item>);
-
-impl fmt::Debug for Body {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		fmt::Debug::fmt(&self.0, f)
-	}
-}
-
 #[derive(Clone)]
 pub struct Node {
 	leaf: Leaf,
 	indent: bool,
-	body: Body,
+	body: Vec<Item>,
 }
 
 impl fmt::Debug for Node {
@@ -82,7 +73,7 @@ impl Node {
 		Node {
 			indent: false,
 			leaf: Leaf::new(name),
-			body: Body::default(),
+			body: Vec::new(),
 		}
 	}
 
@@ -99,41 +90,23 @@ impl Node {
 	}
 
 	pub fn node(&mut self, name: &str, body: impl FnOnce(&mut Node)) {
-		self.body.node(name, body)
-	}
-
-	pub fn leaf(&mut self, name: &str, body: impl FnOnce(&mut Leaf)) {
-		self.body.leaf(name, body)
-	}
-
-	pub fn text(&mut self, text: impl ToString) {
-		self.body.text(text)
-	}
-
-	pub fn raw(&mut self, text: &str) {
-		self.body.raw(text)
-	}
-}
-
-impl Body {
-	pub fn node(&mut self, name: &str, body: impl FnOnce(&mut Node)) {
 		let mut node = Node::new(name);
 		body(&mut node);
-		self.0.push(Item::Node(node));
+		self.body.push(Item::Node(node));
 	}
 
 	pub fn leaf(&mut self, name: &str, body: impl FnOnce(&mut Leaf)) {
 		let mut node = Leaf::new(name);
 		body(&mut node);
-		self.0.push(Item::Leaf(node));
+		self.body.push(Item::Leaf(node));
 	}
 
 	pub fn text(&mut self, text: impl ToString) {
-		self.0.push(Item::Text(text.to_string()));
+		self.body.push(Item::Text(text.to_string()));
 	}
 
 	pub fn raw(&mut self, text: &str) {
-		self.0.push(Item::Raw(text.to_owned()));
+		self.body.push(Item::Raw(text.to_owned()));
 	}
 }
 
@@ -168,10 +141,10 @@ impl Document {
 		Node {
 			leaf: self.root,
 			indent: true,
-			body: Body(vec![
+			body: vec![
 				Item::Node(self.head),
 				Item::Node(self.body),
-			]),
+			],
 		}
 	}
 }
@@ -196,7 +169,17 @@ impl Node {
 
 	pub fn render_fragment(&self, out: &mut impl fmt::Write, indent: usize) -> fmt::Result {
 		self.leaf.render_fragment(out, false)?;
-		self.body.render_fragment(out, self.indent, indent+1)?;
+		for item in &self.body {
+			if self.indent {
+				write!(out, "\n{}", "\t".repeat(indent))?;
+			}
+			match item {
+				Item::Node(v) => v.render_fragment(out, indent+1)?,
+				Item::Leaf(v) => v.render_fragment(out, true)?,
+				Item::Text(v) => escape(out, v)?,
+				Item::Raw(v)  => write!(out, "{}", v)?,
+			}
+		}
 		if self.indent {
 			write!(out, "\n{}", "\t".repeat(indent))?;
 		}
@@ -217,23 +200,6 @@ impl Leaf {
 			write!(out, " />")?;
 		} else {
 			write!(out, ">")?;
-		}
-		Ok(())
-	}
-}
-
-impl Body {
-	fn render_fragment<W: fmt::Write>(&self, out: &mut W, do_indent: bool, indent: usize) -> fmt::Result {
-		for item in &self.0 {
-			if do_indent {
-				write!(out, "\n{}", "\t".repeat(indent))?;
-			}
-			match item {
-				Item::Node(v) => v.render_fragment(out, indent)?,
-				Item::Leaf(v) => v.render_fragment(out, true)?,
-				Item::Text(v) => escape(out, v)?,
-				Item::Raw(v)  => write!(out, "{}", v)?,
-			}
 		}
 		Ok(())
 	}

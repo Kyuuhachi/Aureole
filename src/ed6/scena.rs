@@ -230,142 +230,143 @@ impl<'a> CodeRenderer<'a> {
 
 		for (addr, insn) in &asm.code {
 			if labels.contains_key(addr) {
-				render_label(a, *addr);
-				a.span_text("syntax", ":");
-				a.text("\n");
+				self.line(a, |a| {
+					render_label(a, *addr);
+					a.span_text("syntax", ":");
+				});
 			}
-			a.text("  ");
 
-			match insn {
-				FlowInsn::If(expr, target) => {
-					a.span_text("keyword", "UNLESS");
-					a.text(" ");
-					self.expr(a, expr);
-					a.text(" ");
-					a.span_text("keyword", "GOTO");
-					a.text(" ");
-					render_label(a, *target);
-				}
+			self.line(a, |a| {
+				a.text("  ");
 
-				FlowInsn::Goto(target) => {
-					a.span_text("keyword", "GOTO");
-					a.text(" ");
-					render_label(a, *target);
-				}
-
-				FlowInsn::Switch(expr, branches, default) => {
-					a.span_text("keyword", "SWITCH");
-					a.text(" ");
-					self.expr(a, expr);
-					a.text(" ");
-					a.span_text("syntax", "[");
-					for (case, target) in branches {
-						a.span_text("case", case);
-						a.span_text("syntax", ":");
+				match insn {
+					FlowInsn::If(expr, target) => {
+						a.span_text("keyword", "UNLESS");
+						a.text(" ");
+						self.expr(a, expr);
+						a.text(" ");
+						a.span_text("keyword", "GOTO");
 						a.text(" ");
 						render_label(a, *target);
-						a.span_text("syntax", ",");
-						a.text(" ");
 					}
-					a.span_text("keyword", "default");
-					a.span_text("syntax", ":");
-					a.text(" ");
-					render_label(a, *default);
-					a.span_text("syntax", "]");
-				}
 
-				FlowInsn::Insn(insn) => {
-					self.insn(a, insn).end(a);
+					FlowInsn::Goto(target) => {
+						a.span_text("keyword", "GOTO");
+						a.text(" ");
+						render_label(a, *target);
+					}
+
+					FlowInsn::Switch(expr, branches, default) => {
+						a.span_text("keyword", "SWITCH");
+						a.text(" ");
+						self.expr(a, expr);
+						a.text(" ");
+						a.span_text("syntax", "[");
+						for (case, target) in branches {
+							a.span_text("case", case);
+							a.span_text("syntax", ":");
+							a.text(" ");
+							render_label(a, *target);
+							a.span_text("syntax", ",");
+							a.text(" ");
+						}
+						a.span_text("keyword", "default");
+						a.span_text("syntax", ":");
+						a.text(" ");
+						render_label(a, *default);
+						a.span_text("syntax", "]");
+					}
+
+					FlowInsn::Insn(insn) => {
+						self.insn(a, insn);
+					}
 				}
-			}
-			a.text("\n");
+			});
 		}
 	}
 
-	fn line(&self, a: &mut Node) {
-		for _ in 0..self.indent {
-			a.span_text("indent", "\t");
-		}
+	fn line(&self, a: &mut Node, body: impl Fn(&mut Node)) {
+		a.node("div", |a| {
+			a.class("code-line");
+			for _ in 0..self.indent {
+				a.span_text("indent", "\t");
+			}
+			body(a);
+		})
 	}
 
 	fn code(&self, a: &mut Node, code: &[Stmt]) {
 		if code.is_empty() {
-			self.line(a);
-			a.span_text("empty-block", "(empty)");
-			a.text("\n");
+			self.line(a, |a| a.span_text("empty-block", "(empty)"));
 		}
 
 		for stmt in code {
 			match stmt {
 				Stmt::If(cases) => {
-					self.line(a);
-					a.span_text("keyword", "IF");
-					a.text("\n");
+					self.line(a, |a| a.span_text("keyword", "IF"));
+					a.node("div", |_|{});
 
 					let inner = self.indent();
 					for (expr, body) in cases {
-						inner.line(a);
-						match expr {
-							Some(expr) => self.expr(a, expr),
-							None => a.span_text("keyword", "ELSE"),
-						}
-						a.text(" ");
-						a.span_text("syntax", "=>");
-						a.text("\n");
+						inner.line(a, |a| {
+							match expr {
+								Some(expr) => self.expr(a, expr),
+								None => a.span_text("keyword", "ELSE"),
+							}
+							a.text(" ");
+							a.span_text("syntax", "=>");
+						});
 
 						inner.indent().code(a, body);
 					}
 				}
 
 				Stmt::Switch(expr, cases) => {
-					self.line(a);
-					a.span_text("keyword", "SWITCH");
-					a.text(" ");
-					self.expr(a, expr);
-					a.text("\n");
+					self.line(a, |a| {
+						a.span_text("keyword", "SWITCH");
+						a.text(" ");
+						self.expr(a, expr);
+					});
 
 					let inner = self.indent();
 					for (cases, body) in cases {
-						inner.line(a);
-						let mut first = true;
-						for case in cases {
-							if !first {
-								a.span_text("syntax", ",");
-								a.text(" ");
+						inner.line(a, |a| {
+							let mut first = true;
+							for case in cases {
+								if !first {
+									a.span_text("syntax", ",");
+									a.text(" ");
+								}
+								first = false;
+								match case {
+									Some(case) => a.span_text("case", case),
+									None => a.span_text("keyword", "default"),
+								}
 							}
-							first = false;
-							match case {
-								Some(case) => a.span_text("case", case),
-								None => a.span_text("keyword", "default"),
-							}
-						}
-						a.text(" ");
-						a.span_text("syntax", "=>");
-						a.text("\n");
+							a.text(" ");
+							a.span_text("syntax", "=>");
+						});
 
 						inner.indent().code(a, body);
 					}
 				}
 
 				Stmt::While(expr, body) => {
-					self.line(a);
-					a.span_text("keyword", "WHILE");
-					a.text(" ");
-					self.expr(a, expr);
-					a.text("\n");
+					self.line(a, |a| {
+						a.span_text("keyword", "WHILE");
+						a.text(" ");
+						self.expr(a, expr);
+					});
 
 					self.indent().code(a, body);
 				}
 
 				Stmt::Break => {
-					self.line(a);
-					a.span_text("keyword", "BREAK");
-					a.text("\n");
+					self.line(a, |a| a.span_text("keyword", "BREAK"));
 				}
 
 				Stmt::Insn(insn) => {
-					self.line(a);
-					self.insn(a, insn).end(a);
+					self.line(a, |a| self.insn(a, insn));
 				}
 			}
 		}
@@ -453,18 +454,17 @@ impl<'a> CodeRenderer<'a> {
 		}
 	}
 
-	fn insn(&self, a: &mut Node, insn: &Insn) -> InsnRenderer<'a> {
+	fn insn(&self, a: &mut Node, insn: &Insn) {
 		let (name, args) = insn.parts();
-		self.insn_parts(a, name, &args)
+		self.insn_parts(a, name, &args);
 	}
 
-	fn insn_parts(&self, a: &mut Node, name: &str, args: &[InsnArg]) -> InsnRenderer<'a> {
+	fn insn_parts(&self, a: &mut Node, name: &str, args: &[InsnArg]) {
 		a.span_text("insn", name);
-		let mut vis = InsnRenderer { inner: self.indent(), is_block: false };
+		let mut vis = InsnRenderer { inner: self.indent() };
 		for arg in args.iter() {
 			vis.accept(a, *arg)
 		}
-		vis
 	}
 }
 
@@ -472,17 +472,9 @@ impl<'a> CodeRenderer<'a> {
 struct InsnRenderer<'a> {
 	#[deref]
 	inner: CodeRenderer<'a>,
-	is_block: bool,
 }
 
 impl InsnRenderer<'_> {
-	fn end(&mut self, a: &mut Node) {
-		if !self.is_block {
-			a.text("\n");
-		}
-		self.is_block = true;
-	}
-
 	fn accept(&mut self, a: &mut Node, arg: InsnArg) {
 		match arg {
 			InsnArg::u8(v)  => { a.text(" "); a.span_text("int", v); }
@@ -563,17 +555,15 @@ impl InsnRenderer<'_> {
 				if self.inner.raw {
 					a.text(" ");
 					a.span_text("syntax", "[");
-					a.text("\n");
+					a.node("div", |_|{});
 				}
 
 				for insn in v {
-					self.inner.line(a);
-					self.inner.insn(a, insn).end(a);
+					self.inner.line(a, |a| self.inner.insn(a, insn));
 				}
 
 				if self.inner.raw {
-					self.inner.line(a);
-					a.span_text("syntax", "]");
+					self.inner.line(a, |a| a.span_text("syntax", "]"));
 				}
 			}
 
@@ -586,7 +576,6 @@ impl InsnRenderer<'_> {
 			InsnArg::text(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 
 			InsnArg::menu(v) => {
-				self.end(a);
 				a.node("div", |a| {
 					a.attr("role", "list");
 					a.class("block menu");
@@ -600,7 +589,6 @@ impl InsnRenderer<'_> {
 								a.attr("role", "listitem");
 								a.text(line);
 							});
-							a.text("\n");
 						});
 					}
 				});

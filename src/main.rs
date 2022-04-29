@@ -1,4 +1,15 @@
-use actix_web::{HttpServer, App, get, web::{self, Data, Path}, middleware, Responder, HttpResponse, HttpRequest, body::BoxBody, ResponseError};
+use actix_web::{
+	HttpServer,
+	App,
+	get,
+	Responder,
+	ResponseError,
+	HttpResponse,
+	HttpRequest,
+	web,
+	middleware,
+	body::BoxBody,
+};
 use kaiseki::{ed6::Archives, util::ByteString};
 
 pub mod ed6 {
@@ -51,7 +62,7 @@ impl Responder for Image {
 
 #[get("/magic")]
 #[tracing::instrument(skip(arch))]
-async fn magic(arch: Data<Archives>) -> Result<Html> {
+async fn magic(arch: web::Data<Archives>) -> Result<Html> {
 	let data = arch.get_compressed_by_name(0x2, b"T_MAGIC ._DT")?.1;
 	let magics = kaiseki::ed6::magic::Magic::read(&data)?;
 	let doc = ed6::magic::render(&magics);
@@ -60,7 +71,7 @@ async fn magic(arch: Data<Archives>) -> Result<Html> {
 
 #[get("/scena/{name:\\w{1,8}}")]
 #[tracing::instrument(skip(arch))]
-async fn scena(arch: Data<Archives>, name: Path<String>) -> Result<Option<Html>> {
+async fn scena(arch: web::Data<Archives>, name: web::Path<String>) -> Result<Option<Html>> {
 	let asm = false;
 	let mut s = ByteString(*b"        ._SN");
 	s[..name.len()].copy_from_slice(name.as_bytes());
@@ -77,7 +88,7 @@ async fn scena(arch: Data<Archives>, name: Path<String>) -> Result<Option<Html>>
 
 #[get("/ui/{name}.png")]
 #[tracing::instrument(skip(arch))]
-async fn ui_png(arch: Data<Archives>, name: Path<String>) -> Result<Option<Image>> {
+async fn ui_png(arch: web::Data<Archives>, name: web::Path<String>) -> Result<Option<Image>> {
 	let low = false;
 	use kaiseki::image::{self, Format};
 	let (info1, info2) = match &name[..] {
@@ -122,7 +133,7 @@ async fn main() -> std::io::Result<()> {
 			)
 			.service(
 				web::scope("/fc")
-				.app_data(Data::new(Archives::new("data/fc")))
+				.app_data(web::Data::new(Archives::new("data/fc")))
 				.service(magic)
 				.service(scena)
 				.service(ui_png)

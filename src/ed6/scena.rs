@@ -461,21 +461,13 @@ impl<'a> CodeRenderer<'a> {
 
 	fn insn_parts(&self, a: &mut Node, name: &str, args: &[InsnArg]) {
 		a.span_text("insn", name);
-		let mut vis = InsnRenderer { inner: self.indent() };
+		let inner = self.indent();
 		for arg in args.iter() {
-			vis.accept(a, *arg)
+			inner.arg(a, *arg)
 		}
 	}
-}
 
-#[derive(Deref)]
-struct InsnRenderer<'a> {
-	#[deref]
-	inner: CodeRenderer<'a>,
-}
-
-impl InsnRenderer<'_> {
-	fn accept(&mut self, a: &mut Node, arg: InsnArg) {
+	fn arg(&self, a: &mut Node, arg: InsnArg) {
 		match arg {
 			InsnArg::u8(v)  => { a.text(" "); a.span_text("int", v); }
 			InsnArg::u16(v) => { a.text(" "); a.span_text("int", v); }
@@ -552,24 +544,24 @@ impl InsnRenderer<'_> {
 			InsnArg::magic(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 
 			InsnArg::fork(v) => {
-				if self.inner.raw {
+				if self.raw {
 					a.text(" ");
 					a.span_text("syntax", "[");
 					a.node("div", |_|{});
 				}
 
 				for insn in v {
-					self.inner.line(a, |a| self.inner.insn(a, insn));
+					self.line(a, |a| self.insn(a, insn));
 				}
 
-				if self.inner.raw {
-					self.inner.line(a, |a| a.span_text("syntax", "]"));
+				if self.raw {
+					self.line(a, |a| a.span_text("syntax", "]"));
 				}
 			}
 
 			InsnArg::expr(v) => {
 				a.text(" ");
-				self.inner.expr(a, v);
+				self.expr(a, v);
 			}
 
 			InsnArg::string(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
@@ -579,7 +571,7 @@ impl InsnRenderer<'_> {
 				a.node("div", |a| {
 					a.attr("role", "list");
 					a.class("block menu");
-					a.attr("style", format!("--indent: {}", self.inner.indent));
+					a.attr("style", format!("--indent: {}", self.indent));
 					for (idx, line) in v.iter().enumerate() {
 						a.node("div", |a| {
 							a.class("menu-row");
@@ -596,7 +588,7 @@ impl InsnRenderer<'_> {
 
 			InsnArg::quests(v) => {
 				for q in v {
-					self.accept(a, InsnArg::quest(q))
+					self.arg(a, InsnArg::quest(q))
 				}
 			}
 
@@ -631,7 +623,7 @@ impl InsnRenderer<'_> {
 					};
 					match name {
 						Some(name) => a.node("span", |a| {
-							if self.inner.raw {
+							if self.raw {
 								a.attr("title", name);
 								a.text(v);
 							} else {
@@ -658,7 +650,7 @@ impl InsnRenderer<'_> {
 				};
 				a.span("char", |a| {
 					a.class(&format!("char-{}", kind));
-					if self.inner.raw {
+					if self.raw {
 						a.attr("title", format!("{} ({})", name, kind));
 						a.text(v);
 					} else {

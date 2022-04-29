@@ -294,12 +294,12 @@ fn run(attr: TokenStream, item: TokenStream) -> Result<TokenStream> {
 		Ok(#body)
 	}));
 
-	insn_enum.variants = gen.insn_variants.into_iter().collect();
+	insn_enum.variants.extend(gen.insn_variants.into_iter());
 
-	arg_enum.variants = gen.arg_variants.into_iter().map(|(name, ty)| {
+	arg_enum.variants.extend(gen.arg_variants.into_iter().map(|(name, ty)| {
 		let lifetime = arg_enum.generics.lifetimes().next().expect("Need a lifetime");
 		make!(Variant, Span::call_site(); #name(&#lifetime #ty))
-	}).collect();
+	}));
 
 	let arms = gen.parts_arms;
 	parts_fn.block = Box::new(make!(Block, Span::call_site(); {

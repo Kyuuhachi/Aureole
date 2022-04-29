@@ -209,6 +209,16 @@ impl<'a> CodeRenderer<'a> {
 		CodeRenderer { inner: self.inner, indent: self.indent + 1 }
 	}
 
+	fn line(&self, a: &mut Node, body: impl Fn(&mut Node)) {
+		a.node("div", |a| {
+			a.class("code-line");
+			for _ in 0..self.indent {
+				a.span_text("indent", "\t");
+			}
+			body(a);
+		})
+	}
+
 	fn asm(&self, a: &mut Node, asm: &Asm) {
 		let mut labels = BTreeSet::<usize>::new();
 		for (_, insn) in &asm.code {
@@ -283,16 +293,6 @@ impl<'a> CodeRenderer<'a> {
 				}),
 			}
 		}
-	}
-
-	fn line(&self, a: &mut Node, body: impl Fn(&mut Node)) {
-		a.node("div", |a| {
-			a.class("code-line");
-			for _ in 0..self.indent {
-				a.span_text("indent", "\t");
-			}
-			body(a);
-		})
 	}
 
 	fn code(&self, a: &mut Node, code: &[Stmt]) {

@@ -1,5 +1,5 @@
 use eyre::Result;
-use image::RgbaImage;
+use image::{RgbaImage, GenericImage, GenericImageView};
 use hamu::read::{In, Le};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,4 +49,19 @@ fn read_buf(i: &mut In, width: u32, height: u32, format: Format) -> Result<RgbaI
 		}
 	}
 	Ok(img)
+}
+
+pub fn linearize(src: RgbaImage, w1: u32, h1: u32, w2: u32, h2: u32) -> RgbaImage {
+	let (w, h) = src.dimensions();
+	assert_eq!(w % w1, 0);
+	assert_eq!(h % h1, 0);
+	assert_eq!(w1*h1, w2*h2);
+	let cw = w/w1;
+	let ch = h/h1;
+	let mut dst = RgbaImage::new(w / w1 * w2, h * w1 / w2);
+	for i in 0..w1*h1 {
+		let src = src.view(i%w1*cw, i/w1*ch, cw, ch);
+		dst.copy_from(&*src, i%w2*cw, i/w2*ch).unwrap();
+	}
+	dst
 }

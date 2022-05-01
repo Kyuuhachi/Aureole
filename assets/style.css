@@ -129,6 +129,26 @@ a[href] {
 .code .sepith-element-space::before   { --icon-x: 14; --icon-y: 11; }
 .code .sepith-element-mirage::before  { --icon-x: 15; --icon-y: 11; }
 
+.code .emote::before {
+	content: "";
+	display: inline-block;
+	height: 1em; height: 1cap;
+	width: 1em; width: 1cap;
+	vertical-align: -5%;
+
+	--icon-x: 4; --icon-y: 4;
+	background: url("/fc/ui/emotio.png");
+	animation: emote infinite;
+	animation-duration: calc((var(--emote-end) - var(--emote-start)) * var(--emote-time));
+	animation-timing-function: steps(calc(var(--emote-end) - var(--emote-start)), end);
+	background-size: 6400% 100%;
+}
+
+@keyframes emote {
+	from { background-position-x: calc(var(--emote-start)/63 * 100%) }
+	to   { background-position-x: calc(var(--emote-end)/63 * 100%) }
+}
+
 .code .block {
 	margin-left: calc(var(--indent) * 4ch);
 	width: max-content;

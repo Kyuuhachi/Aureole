@@ -99,11 +99,15 @@ impl App {
 			_ => return Ok(None)
 		};
 
-		let (arch, name, width, height, format) = if low { info1 } else { info2 };
+		let (arch, fname, width, height, format) = if low { info1 } else { info2 };
 
-		let data = self.arch.get_compressed_by_name(arch, ByteString(*name))?.1;
+		let data = self.arch.get_compressed_by_name(arch, ByteString(*fname))?.1;
 		let image = image::read(&data, width, height, format)?;
-		Ok(Some(Image(image)))
+		if name == "emotio" {
+			Ok(Some(Image(image::linearize(image, 8, 8, 64, 1))))
+		} else {
+			Ok(Some(Image(image)))
+		}
 	}
 
 	#[tracing::instrument(skip(self))]

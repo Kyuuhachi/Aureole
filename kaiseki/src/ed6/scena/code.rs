@@ -139,7 +139,7 @@ pub(super) fn read(i: &mut CodeParser) -> Result<Self> {
 		0x5F => MenuClose(menu_id/u16),
 		0x60 => TextSetName(text_title/String),
 		0x61 => _61(char/u16),
-		0x62 => Emote(char/u16, i32, time/u32, emote/{(i.u8()?, i.u8()?, i.u32()?, i.u8()?)} as (u8, u8, u32, u8)),
+		0x62 => Emote(char/u16, i32, time/u32, emote/{(i.u8()?, i.u8()?, i.u32()?)} as (u8, u8, u32), u8),
 		0x63 => EmoteStop(char/u16),
 		0x64 => _64(u8, u16),
 		0x65 => _65(u8, u16),

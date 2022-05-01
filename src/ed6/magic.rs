@@ -2,7 +2,6 @@ use kaiseki::ed6::magic::*;
 
 pub fn render(magics: &Vec<Magic>) -> choubun::Node {
 	choubun::document(|doc| {
-		doc.root.attr("lang", "en");
 		doc.head.node("title", |a| a.text("Arts list"));
 		doc.head.node("style", |a| a.raw(r#"
 			table { border-collapse: collapse; }

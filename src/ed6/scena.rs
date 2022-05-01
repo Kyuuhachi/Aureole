@@ -548,6 +548,7 @@ impl<'a> CodeRenderer<'a> {
 				let magic = self.inner.tables.magic.get(*v as usize);
 				let name: Cow<str> = magic.map_or(Cow::Owned(format!("[unknown {}]", v)), |a| Cow::Borrowed(&a.name));
 				let kind = if let Some(magic) = magic {
+					#[allow(clippy::zero_prefixed_literal)]
 					match magic.base.id {
 						000..=009 => Cow::Borrowed("unknown"),
 						010..=149 => Cow::Owned(magic.base.element.to_string().to_lowercase()),

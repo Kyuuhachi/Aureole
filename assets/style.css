@@ -41,7 +41,7 @@ body {
 	color: var(--base-text);
 }
 
-a {
+a[href] {
 	color: var(--frost3);
 }
 

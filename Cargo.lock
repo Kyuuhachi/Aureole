@@ -893,6 +893,7 @@ dependencies = [
  "eyre",
  "image",
  "kaiseki",
+ "percent-encoding",
  "tracing",
  "tracing-actix-web",
  "tracing-error",

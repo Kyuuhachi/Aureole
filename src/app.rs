@@ -1,3 +1,6 @@
+use std::{borrow::Cow, str::FromStr};
+
+use percent_encoding::percent_decode_str;
 use kaiseki::{ed6::Archives, util::ByteString};
 use crate::{Result, Html, Image, ed6};
 
@@ -46,24 +49,107 @@ impl App {
 	}
 }
 
+trait QueryArg: Default {
+	fn parse(&mut self, val: Option<&str>) -> Option<()>;
+}
+
+impl QueryArg for bool {
+	fn parse(&mut self, val: Option<&str>) -> Option<()> {
+		*self = match val {
+			None | Some("1") => Some(true),
+			Some("0") => Some(false),
+			_ => None,
+		}?;
+		Some(())
+	}
+}
+
+impl<T: FromStr> QueryArg for Option<T> {
+	fn parse(&mut self, val: Option<&str>) -> Option<()> {
+		*self = Some(val?.parse().ok()?);
+		Some(())
+	}
+}
+
+impl<T: FromStr> QueryArg for Vec<T> {
+	fn parse(&mut self, val: Option<&str>) -> Option<()> {
+		self.push(val?.parse().ok()?);
+		Some(())
+	}
+}
+
 impl App {
 	pub fn into_actix(self, path: &str) -> actix_web::Scope {
-		use actix_web::{HttpRequest, web};
+		fn urldecode(v: &str) -> Option<Cow<str>> {
+			percent_decode_str(v).decode_utf8().ok()
+		}
+
+		use actix_web::{HttpRequest, web, error, Responder};
 		web::scope(path)
 		.app_data(self)
-		.route("/magic", web::get().to(|req: HttpRequest| async move {
-			let app: &Self = req.app_data().unwrap();
-			app.magic().await
+
+		.route("/magic", web::get().to({
+			async fn magic(req: HttpRequest) -> Result<impl Responder, error::Error> {
+				let app = req.app_data::<App>().unwrap();
+				Ok(app.magic().await)
+			}
+			magic
 		}))
-		.route("/scena/{name:\\w{1,8}}", web::get().to(|req: HttpRequest| async move {
-			let app: &Self = req.app_data().unwrap();
-			let name = req.match_info().get("name").unwrap();
-			app.scena(name, false).await
+
+		.route("/scena/{name:\\w{1,8}}", web::get().to({
+			async fn scena(req: HttpRequest) -> Result<impl Responder, error::Error> {
+				let _name = req.match_info().get("name").unwrap();
+				let mut _asm = <bool as Default>::default();
+
+				if let Some(query) = req.uri().query() {
+					for part in query.split('&') {
+						(|| -> Option<()> {
+							let mut iter = part.splitn(2, '=');
+							let k = urldecode(iter.next().unwrap())?;
+							if k == "asm" {
+								let v = match iter.next() {
+									Some(v) => Some(urldecode(v)?),
+									None => None,
+								};
+								_asm.parse(v.as_deref())?;
+							}
+							Some(())
+						})().ok_or_else(|| error::ErrorBadRequest(part.to_owned()))?;
+					}
+				}
+
+				let app = req.app_data::<App>().unwrap();
+				Ok(app.scena(_name, _asm).await)
+			}
+			scena
 		}))
-		.route("/ui/{name}.png", web::get().to(|req: HttpRequest| async move {
-			let app: &Self = req.app_data().unwrap();
-			let name = req.match_info().get("name").unwrap();
-			app.ui_png(name, false).await
+
+		.route("/ui/{name}.png", web::get().to({
+			async fn ui_png(req: HttpRequest) -> Result<impl Responder, error::Error> {
+				let _name = req.match_info().get("name").unwrap();
+				let mut _low = <bool as Default>::default();
+
+				if let Some(query) = req.uri().query() {
+					for part in query.split('&') {
+						(|| -> Option<()> {
+							let mut iter = part.splitn(2, '=');
+							let k = urldecode(iter.next().unwrap())?;
+							if k == "low" {
+								let v = match iter.next() {
+									Some(v) => Some(urldecode(v)?),
+									None => None,
+								};
+								_low.parse(v.as_deref())?;
+							}
+							Some(())
+						})().ok_or_else(|| error::ErrorBadRequest(part.to_owned()))?;
+					}
+				}
+
+				let app = req.app_data::<App>().unwrap();
+				Ok(app.ui_png(_name, _low).await)
+			}
+			ui_png
 		}))
 	}
 }

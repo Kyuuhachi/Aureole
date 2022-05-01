@@ -18,6 +18,7 @@ tracing-subscriber = { version = "0.3.11", features = ["env-filter"] }
 tracing-actix-web = "0.5.1"
 extend = "1.1.2"
 image = { version = "0.24.2", default-features = false, features = ["png"] }
+percent-encoding = "2.1.0"
 
 [workspace]
 members = [

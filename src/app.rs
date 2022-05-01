@@ -5,10 +5,16 @@ use kaiseki::{ed6::Archives, util::ByteString};
 use crate::{Result, Html, Image, ed6};
 
 pub struct App {
-	pub arch: Archives,
+	arch: Archives,
 }
 
 impl App {
+	pub fn new(path: &str) -> Result<Self> {
+		Ok(Self {
+			arch: Archives::new(path),
+		})
+	}
+
 	#[tracing::instrument(skip(self))]
 	pub async fn magic(&self) -> Result<Html> {
 		let data = self.arch.get_compressed_by_name(0x2, b"T_MAGIC ._DT")?.1;

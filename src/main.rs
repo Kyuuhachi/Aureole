@@ -8,7 +8,6 @@ use actix_web::{
 	middleware,
 	body::BoxBody,
 };
-use kaiseki::ed6::Archives;
 
 pub mod ed6 {
 	pub mod magic;
@@ -87,9 +86,7 @@ async fn main() -> std::io::Result<()> {
 				.show_files_listing()
 				.redirect_to_slash_directory()
 			)
-			.service(app::App {
-				arch: Archives::new("data/fc")
-			}.into_actix("/fc"))
+			.service(app::App::new("data/fc").unwrap().into_actix("/fc"))
 	})
 	.bind(("127.0.0.1", 8000))?
 	.run()

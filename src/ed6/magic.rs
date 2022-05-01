@@ -1,6 +1,6 @@
 use kaiseki::ed6::magic::*;
 
-pub fn render(magics: &Vec<Magic<String>>) -> choubun::Node {
+pub fn render(magics: &Vec<Magic>) -> choubun::Node {
 	choubun::document(|doc| {
 		doc.root.attr("lang", "en");
 		doc.head.node("title", |a| a.text("Arts list"));
@@ -22,14 +22,14 @@ pub fn render(magics: &Vec<Magic<String>>) -> choubun::Node {
 
 		doc.body.node("table", |a| {
 			a.indent();
-			for Magic {
-				id, name, desc,
+			for Magic { name, desc, base: BaseMagic {
+				id,
 				flags, element,
 				target, effect1, effect2,
 				target_p1, target_p2,
 				warmup, cooldown, cost, sort,
 				effect_p1, effect_p2, effect_p3, effect_p4,
-			} in magics {
+			} } in magics {
 				a.node("tr", |a| {
 					a.indent();
 					a.class(&format!("el-{}", element.to_string().to_lowercase()));

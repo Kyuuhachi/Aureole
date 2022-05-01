@@ -149,10 +149,8 @@ mod magicflags { bitflags::bitflags! {
 pub use magicflags::MagicFlags;
 
 #[derive(Debug)]
-pub struct Magic<T> {
+pub struct BaseMagic {
 	pub id: u16,
-	pub name: T,
-	pub desc: T,
 	pub flags: MagicFlags,
 	pub element: Element,
 	pub target: MagicTarget,
@@ -170,8 +168,15 @@ pub struct Magic<T> {
 	pub effect_p4: i16,
 }
 
-impl<A> Magic<A> {
-	pub fn read_base(i: &mut In, read_str: &mut impl FnMut(&mut In) -> Result<A>) -> Result<Self> {
+#[derive(Debug)]
+pub struct Magic {
+	pub name: String, // todo should be Text
+	pub desc: String,
+	pub base: BaseMagic,
+}
+
+impl BaseMagic {
+	pub fn read_one(i: &mut In) -> Result<Self> {
 		let id = i.u16()?;
 		let flags = MagicFlags::from_bits(i.u16()?).ok_or_else(|| eyre!("invalid flags"))?;
 
@@ -200,13 +205,8 @@ impl<A> Magic<A> {
 		let effect_p3 = i.i16()?;
 		let effect_p4 = i.i16()?;
 
-		let name = read_str(i)?;
-		let desc = read_str(i)?;
-
-		Ok(Magic {
+		Ok(BaseMagic {
 			id,
-			name,
-			desc,
 			flags,
 			element,
 			target,
@@ -226,16 +226,12 @@ impl<A> Magic<A> {
 	}
 }
 
-impl Magic<()> {
+impl Magic {
 	pub fn read_one(i: &mut In) -> Result<Self> {
-		Magic::read_base(i, &mut |_| Ok(()))
-	}
-}
-
-impl Magic<String> {
-	pub fn read_one(i: &mut In) -> Result<Self> {
-		// This can be made slightly less hacky with #[feature(type_changing_struct_update)]
-		Magic::read_base(i, &mut |i| i.ptr_u16()?.string())
+		let base = BaseMagic::read_one(i)?;
+		let name = i.ptr_u16()?.string()?;
+		let desc = i.ptr_u16()?.string()?;
+		Ok(Magic { base, name, desc })
 	}
 
 	pub fn read(i: &[u8]) -> Result<Vec<Self>> {

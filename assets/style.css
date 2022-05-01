@@ -106,8 +106,6 @@ a[href] {
 	--icon-x: 4; --icon-y: 4;
 	background: url("/fc/ui/icon1.png");
 	background-position: calc(var(--icon-x)/15*100%) calc(var(--icon-y)/15*100%);
-	background-origin: content-box;
-	background-clip:   content-box;
 	background-size: 1600%;
 }
 

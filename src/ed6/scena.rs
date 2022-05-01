@@ -614,10 +614,10 @@ impl<'a> CodeRenderer<'a> {
 
 			InsnArg::emote(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 
-			InsnArg::flags(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::quest_flag(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::char_flags(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::quest_task(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::flags(v)      => { a.text(" "); a.span_text("unknown", format!("0x{:08X}", v)); }
+			InsnArg::quest_flag(v) => { a.text(" "); a.span_text("unknown", format!("0x{:02X}", v)); }
+			InsnArg::char_flags(v) => { a.text(" "); a.span_text("unknown", format!("0x{:04X}", v)); }
+			InsnArg::quest_task(v) => { a.text(" "); a.span_text("unknown", format!("0x{:04X}", v)); }
 			InsnArg::member(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 			InsnArg::element(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 

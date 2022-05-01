@@ -17,6 +17,8 @@ pub mod ed6 {
 	pub mod scena;
 }
 
+pub mod app;
+
 #[derive(Debug)]
 pub struct Error(eyre::Error);
 
@@ -60,50 +62,6 @@ impl Responder for Image {
 	}
 }
 
-#[get("/magic")]
-#[tracing::instrument(skip(arch))]
-async fn magic(arch: web::Data<Archives>) -> Result<Html> {
-	let data = arch.get_compressed_by_name(0x2, b"T_MAGIC ._DT")?.1;
-	let magics = kaiseki::ed6::magic::Magic::read(&data)?;
-	let doc = ed6::magic::render(&magics);
-	Ok(Html(doc.render_to_string()))
-}
-
-#[get("/scena/{name:\\w{1,8}}")]
-#[tracing::instrument(skip(arch))]
-async fn scena(arch: web::Data<Archives>, name: web::Path<String>) -> Result<Option<Html>> {
-	let asm = false;
-	let mut s = ByteString(*b"        ._SN");
-	s[..name.len()].copy_from_slice(name.as_bytes());
-	let data = match arch.get_compressed_by_name(0x1, s) {
-		Ok(d) => d,
-		Err(kaiseki::ed6::archive::Error::InvalidName { .. } ) => return Ok(None),
-		Err(e) => return Err(e.into()),
-	}.1;
-
-	let scena = kaiseki::ed6::scena::read(&data)?;
-	let doc = ed6::scena::render(&scena, &arch, asm);
-	Ok(Some(Html(doc.render_to_string())))
-}
-
-#[get("/ui/{name}.png")]
-#[tracing::instrument(skip(arch))]
-async fn ui_png(arch: web::Data<Archives>, name: web::Path<String>) -> Result<Option<Image>> {
-	let low = false;
-	use kaiseki::image::{self, Format};
-	let (info1, info2) = match &name[..] {
-		"icon1" => ((b"C_ICON1 ._CH", 256, 256, Format::Rgba4444), (b"H_ICON1 ._CH", 512, 512, Format::Rgba4444)),
-		"icon2" => ((b"C_ICON2 ._CH", 256, 256, Format::Rgba4444), (b"H_ICON2 ._CH", 512, 512, Format::Rgba4444)),
-		_ => return Ok(None)
-	};
-
-	let (name, width, height, format) = if low { info1 } else { info2 };
-
-	let data = arch.get_compressed_by_name(0x0, ByteString(*name))?.1;
-	let image = image::read(&data, width, height, format)?;
-	Ok(Some(Image(image)))
-}
-
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
 	use tracing_subscriber::prelude::*;
@@ -131,13 +89,9 @@ async fn main() -> std::io::Result<()> {
 				.show_files_listing()
 				.redirect_to_slash_directory()
 			)
-			.service(
-				web::scope("/fc")
-				.app_data(web::Data::new(Archives::new("data/fc")))
-				.service(magic)
-				.service(scena)
-				.service(ui_png)
-			)
+			.service(app::App {
+				arch: Archives::new("data/fc")
+			}.into_actix("/fc"))
 	})
 	.bind(("127.0.0.1", 8000))?
 	.run()

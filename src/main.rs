@@ -36,13 +36,13 @@ impl ResponseError for Error {}
 pub type Result<T, E=Error> = std::result::Result<T, E>;
 
 #[derive(Debug)]
-pub struct Html(String);
+pub struct Html(choubun::Node);
 impl Responder for Html {
 	type Body = BoxBody;
 	fn respond_to(self, _: &HttpRequest) -> HttpResponse<Self::Body> {
 		HttpResponse::Ok()
 			.content_type("text/html")
-			.body(self.0)
+			.body(self.0.render_to_string())
 	}
 }
 

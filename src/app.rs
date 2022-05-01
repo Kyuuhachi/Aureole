@@ -33,7 +33,7 @@ impl App {
 	#[tracing::instrument(skip(self))]
 	pub async fn magic(&self) -> Result<Html> {
 		let doc = ed6::magic::render(&self.tables.magic);
-		Ok(Html(doc.render_to_string()))
+		Ok(Html(doc))
 	}
 
 	#[tracing::instrument(skip(self))]
@@ -48,7 +48,7 @@ impl App {
 
 		let scena = kaiseki::ed6::scena::read(&data)?;
 		let doc = ed6::scena::render(&scena, &self.arch, &self.tables, asm);
-		Ok(Some(Html(doc.render_to_string())))
+		Ok(Some(Html(doc)))
 	}
 
 	#[tracing::instrument(skip(self))]

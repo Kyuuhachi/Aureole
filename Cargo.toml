@@ -28,19 +28,13 @@ members = [
 	"kaiseki_macros",
 ]
 
-[profile.dev.package.hamu]
-opt-level = 3
-[profile.dev.package.choubun]
-opt-level = 3
+[profile.dev]
+package.hamu.opt-level = 3
+package.choubun.opt-level = 3
 
-[profile.dev.package.backtrace]
-opt-level = 3
+package.backtrace.opt-level = 3
 
-[profile.dev.package.png]
-opt-level = 3
-[profile.dev.package.crc32fast]
-opt-level = 3
-[profile.dev.package.deflate]
-opt-level = 3
-[profile.dev.package.adler32]
-opt-level = 3
+package.png.opt-level = 3
+package.crc32fast.opt-level = 3
+package.deflate.opt-level = 3
+package.adler32.opt-level = 3

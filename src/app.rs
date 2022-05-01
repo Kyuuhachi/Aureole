@@ -47,7 +47,7 @@ impl App {
 		}.1;
 
 		let scena = kaiseki::ed6::scena::read(&data)?;
-		let doc = ed6::scena::render(&scena, &self.arch, asm);
+		let doc = ed6::scena::render(&scena, &self.arch, &self.tables, asm);
 		Ok(Some(Html(doc.render_to_string())))
 	}
 

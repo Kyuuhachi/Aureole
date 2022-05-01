@@ -4,8 +4,10 @@ use std::collections::{BTreeSet, BTreeMap};
 use choubun::Node;
 use kaiseki::ed6::{scena::*, Archives};
 
-pub fn render(scena: &Scena, archives: &Archives, raw: bool) -> choubun::Node {
-	ScenaRenderer { scena, archives, raw }.render()
+use crate::app::Tables;
+
+pub fn render(scena: &Scena, archives: &Archives, tables: &Tables, raw: bool) -> choubun::Node {
+	ScenaRenderer { scena, archives, tables, raw }.render()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,6 +23,7 @@ enum CharKind {
 struct ScenaRenderer<'a> {
 	scena: &'a Scena,
 	archives: &'a Archives,
+	tables: &'a Tables,
 	raw: bool,
 }
 
@@ -534,13 +537,37 @@ impl<'a> CodeRenderer<'a> {
 				a.span_text("flag", v);
 			}
 			InsnArg::shop(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::magic(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::magic(v) => {
+				a.text(" ");
+				a.span("magic", |a| {
+					let magic = self.inner.tables.magic.get(*v as usize);
+					let name: Cow<str> = magic.map_or(Cow::Owned(format!("[unknown {}]", v)), |a| Cow::Borrowed(&a.name));
+					let kind = if let Some(magic) = magic {
+						match magic.base.id {
+							000..=009 => Cow::Borrowed("unknown"),
+							010..=149 => Cow::Owned(magic.base.element.to_string().to_lowercase()),
+							150..=229 => Cow::Borrowed("craft"),
+							230..=299 => Cow::Borrowed("scraft"),
+							300.. => Cow::Borrowed("unknown"),
+						}
+					} else {
+						Cow::Borrowed("unknown")
+					};
+					a.class(&format!("magic-{}", kind));
+					if self.inner.raw {
+						a.attr("title", format!("{} ({})", name, kind));
+						a.text(v);
+					} else {
+						a.attr("title", format!("{} ({})", v, kind));
+						a.text(name);
+					}
+				});
+			}
 
 			InsnArg::fork(v) => {
 				if self.inner.raw {
 					a.text(" ");
 					a.span_text("syntax", "[");
-					a.node("div", |_|{});
 				}
 
 				for insn in v {

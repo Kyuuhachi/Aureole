@@ -65,8 +65,8 @@ impl App {
 			              (0x00, b"H_CAMP02._CH", 512, 512, Format::Rgba1555)),
 			"camp03"  => ((0x00, b"C_CAMP03._CH", 256, 256, Format::Rgba1555),
 			              (0x00, b"H_CAMP03._CH", 512, 512, Format::Rgba1555)),
-			"camp04"  => ((0x00, b"C_CAMP04._CH", 256, 256, Format::Rgba4444),
-			              (0x00, b"H_CAMP04._CH", 512, 512, Format::Rgba4444)),
+			"camp04"  => ((0x00, b"C_CAMP04._CH", 256, 256, Format::Rgba1555),
+			              (0x00, b"H_CAMP04._CH", 512, 512, Format::Rgba1555)),
 			"cmps"    => ((0x00, b"C_CMPS  ._CH", 256, 256, Format::Rgba4444),
 			              (0x00, b"H_CMPS  ._CH", 512, 512, Format::Rgba4444)),
 			"cook"    => ((0x00, b"C_COOK  ._CH", 256, 256, Format::Rgba4444),
@@ -83,6 +83,8 @@ impl App {
 			              (0x00, b"H_NOTE1 ._CH", 512, 512, Format::Rgba4444)),
 			"waku1"   => ((0x00, b"C_WAKU1 ._CH", 256, 256, Format::Rgba4444),
 			              (0x00, b"H_WAKU1 ._CH", 512, 512, Format::Rgba4444)),
+			"waku3"   => ((0x00, b"C_WAKU3 ._CH", 256, 256, Format::Rgba4444),
+			              (0x00, b"C_WAKU3 ._CH", 256, 256, Format::Rgba4444)),
 
 			"battle"  => ((0x0F, b"BATTLE  ._CH", 256, 256, Format::Rgba4444),
 			              (0x0F, b"HBATTLE ._CH", 512, 512, Format::Rgba4444)),
@@ -102,6 +104,29 @@ impl App {
 		let data = self.arch.get_compressed_by_name(arch, ByteString(*name))?.1;
 		let image = image::read(&data, width, height, format)?;
 		Ok(Some(Image(image)))
+	}
+
+	#[tracing::instrument(skip(self))]
+	pub async fn ui_index(&self) -> Result<Html> {
+		let doc = choubun::document(|doc| {
+			for s in [
+				"btn01", "btn02",
+				"camp01", "camp02", "camp03", "camp04",
+				"cmps",
+				"cook",
+				"emotio",
+				"icon1", "icon2",
+				"mouse",
+				"note1",
+				"waku1", "waku3",
+				"battle", "battle2", "battle3",
+				"btlinfo", "btlmenu",
+			] {
+				doc.body.node("h1", |a| a.text(s));
+				doc.body.leaf("img", |a| a.attr("src", format!("{s}.png")));
+			}
+		});
+		Ok(Html(doc))
 	}
 }
 
@@ -206,6 +231,14 @@ impl App {
 				Ok(app.ui_png(_name, _low).await)
 			}
 			ui_png
+		}))
+
+		.route("/ui/", web::get().to({
+			async fn ui_index(req: HttpRequest) -> Result<impl Responder, error::Error> {
+				let app = req.app_data::<App>().unwrap();
+				Ok(app.ui_index().await)
+			}
+			ui_index
 		}))
 	}
 }

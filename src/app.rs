@@ -50,18 +50,18 @@ impl App {
 	pub fn into_actix(self, path: &str) -> actix_web::Scope {
 		use actix_web::{HttpRequest, web};
 		web::scope(path)
-		.app_data(web::Data::new(self))
+		.app_data(self)
 		.route("/magic", web::get().to(|req: HttpRequest| async move {
-			let app = req.app_data::<web::Data<Self>>().unwrap();
+			let app: &Self = req.app_data().unwrap();
 			app.magic().await
 		}))
 		.route("/scena/{name:\\w{1,8}}", web::get().to(|req: HttpRequest| async move {
-			let app = req.app_data::<web::Data<Self>>().unwrap();
+			let app: &Self = req.app_data().unwrap();
 			let name = req.match_info().get("name").unwrap();
 			app.scena(name, false).await
 		}))
 		.route("/ui/{name}.png", web::get().to(|req: HttpRequest| async move {
-			let app = req.app_data::<web::Data<Self>>().unwrap();
+			let app: &Self = req.app_data().unwrap();
 			let name = req.match_info().get("name").unwrap();
 			app.ui_png(name, false).await
 		}))

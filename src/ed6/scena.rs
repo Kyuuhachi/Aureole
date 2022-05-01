@@ -545,29 +545,20 @@ impl<'a> CodeRenderer<'a> {
 			InsnArg::shop(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 			InsnArg::magic(v) => {
 				a.text(" ");
-				a.span("magic", |a| {
-					let magic = self.inner.tables.magic.get(*v as usize);
-					let name: Cow<str> = magic.map_or(Cow::Owned(format!("[unknown {}]", v)), |a| Cow::Borrowed(&a.name));
-					let kind = if let Some(magic) = magic {
-						match magic.base.id {
-							000..=009 => Cow::Borrowed("unknown"),
-							010..=149 => Cow::Owned(magic.base.element.to_string().to_lowercase()),
-							150..=229 => Cow::Borrowed("craft"),
-							230..=299 => Cow::Borrowed("scraft"),
-							300.. => Cow::Borrowed("unknown"),
-						}
-					} else {
-						Cow::Borrowed("unknown")
-					};
-					a.class(&format!("magic-{}", kind));
-					if self.inner.raw {
-						a.attr("title", format!("{} ({})", name, kind));
-						a.text(v);
-					} else {
-						a.attr("title", format!("{} ({})", v, kind));
-						a.text(name);
+				let magic = self.inner.tables.magic.get(*v as usize);
+				let name: Cow<str> = magic.map_or(Cow::Owned(format!("[unknown {}]", v)), |a| Cow::Borrowed(&a.name));
+				let kind = if let Some(magic) = magic {
+					match magic.base.id {
+						000..=009 => Cow::Borrowed("unknown"),
+						010..=149 => Cow::Owned(magic.base.element.to_string().to_lowercase()),
+						150..=229 => Cow::Borrowed("craft"),
+						230..=299 => Cow::Borrowed("scraft"),
+						300..     => Cow::Borrowed("unknown"),
 					}
-				});
+				} else {
+					Cow::Borrowed("unknown")
+				};
+				self.named(a, "magic", *v as usize, &name, Some(&kind));
 			}
 
 			InsnArg::fork(v) => {
@@ -653,29 +644,15 @@ impl<'a> CodeRenderer<'a> {
 			}
 
 			InsnArg::char_attr(v) => {
-				a.span("char-attr", |a| {
-					a.text(":");
-
-					let name = match *v {
-						1 => Some("x"),
-						2 => Some("y"),
-						3 => Some("z"),
-						4 => Some("angle"),
-						_ => None,
-					};
-					match name {
-						Some(name) => a.node("span", |a| {
-							if self.inner.raw {
-								a.attr("title", name);
-								a.text(v);
-							} else {
-								a.attr("title", v);
-								a.text(name);
-							}
-						}),
-						None => a.text(v),
-					}
-				});
+				a.text(":");
+				let name = match *v {
+					1 => Cow::Borrowed("x"),
+					2 => Cow::Borrowed("y"),
+					3 => Cow::Borrowed("z"),
+					4 => Cow::Borrowed("angle"),
+					_ => Cow::Owned(format!("[unknown {}]", v)),
+				};
+				self.named(a, "char-attr", *v as usize, &name, None);
 			}
 
 			InsnArg::char(v) => {
@@ -690,30 +667,13 @@ impl<'a> CodeRenderer<'a> {
 					CharKind::Member => "member",
 					CharKind::Unknown => "unknown",
 				};
-				a.span("char", |a| {
-					a.class(&format!("char-{}", kind));
-					if self.inner.raw {
-						a.attr("title", format!("{} ({})", name, kind));
-						a.text(v);
-					} else {
-						a.attr("title", format!("{} ({})", v, kind));
-						a.text(name);
-					}
-				});
+				self.named(a, "char", *v as usize, &name, Some(kind));
 			}
 
 			InsnArg::member(v) => {
 				a.text(" ");
 				let name = self.inner.member_name(*v as usize);
-				a.span("member", |a| {
-					if self.inner.raw {
-						a.attr("title", format!("{}", name));
-						a.text(v);
-					} else {
-						a.attr("title", format!("{}", v));
-						a.text(name);
-					}
-				});
+				self.named(a, "member", *v as usize, &name, None);
 			}
 
 			InsnArg::chcp(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
@@ -724,5 +684,26 @@ impl<'a> CodeRenderer<'a> {
 
 			InsnArg::data(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 		}
+	}
+
+	fn named(&self, a: &mut Node, class: &str, v: usize, name: &str, kind: Option<&str>) {
+		a.span(class, |a| {
+			if let Some(kind) = kind {
+				a.class(&format!("{}-{}", class, kind));
+			}
+
+			let suffix = match kind {
+				Some(kind) => Cow::Owned(format!(" ({})", kind)),
+				None => Cow::Borrowed(""),
+			};
+
+			if self.inner.raw {
+				a.attr("title", format!("{} {}{}", class, name, suffix));
+				a.text(v);
+			} else {
+				a.attr("title", format!("{} {}{}", class, v, suffix));
+				a.text(name);
+			}
+		});
 	}
 }

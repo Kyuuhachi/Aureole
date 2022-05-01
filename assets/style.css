@@ -91,9 +91,9 @@ a[href] {
 
 .code .color-splat {
 	display: inline-block;
-	height: 1em;
-	height: 1cap;
-	width: 2ch;
+	height: 1em; height: 1cap;
+	width: 1em; width: 1cap;
+	vertical-align: -5%;
 }
 
 .code .magic::before, .code .sepith-element::before {
@@ -101,7 +101,7 @@ a[href] {
 	display: inline-block;
 	height: 1em; height: 1cap;
 	width: 1em; width: 1cap;
-	padding: 0 calc(1ch - 0.5em); padding: 0 calc(1ch - 0.5cap);
+	vertical-align: -5%;
 
 	--icon-x: 4; --icon-y: 4;
 	background: url("/fc/ui/icon1.png");

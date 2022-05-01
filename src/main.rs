@@ -1,16 +1,14 @@
 use actix_web::{
 	HttpServer,
 	App,
-	get,
 	Responder,
 	ResponseError,
 	HttpResponse,
 	HttpRequest,
-	web,
 	middleware,
 	body::BoxBody,
 };
-use kaiseki::{ed6::Archives, util::ByteString};
+use kaiseki::ed6::Archives;
 
 pub mod ed6 {
 	pub mod magic;

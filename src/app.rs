@@ -1,25 +1,38 @@
 use std::{borrow::Cow, str::FromStr};
 
 use percent_encoding::percent_decode_str;
-use kaiseki::{ed6::Archives, util::ByteString};
+use kaiseki::{ed6::{Archives, magic::Magic}, util::ByteString};
 use crate::{Result, Html, Image, ed6};
 
 pub struct App {
 	arch: Archives,
+	tables: Tables,
+}
+
+pub struct Tables {
+	pub magic: Vec<Magic>,
+}
+
+impl Tables {
+	pub fn read(arch: &Archives) -> Result<Self> {
+		Ok(Tables {
+			magic: Magic::read(&arch.get_compressed_by_name(0x2, b"T_MAGIC ._DT")?.1)?,
+		})
+	}
 }
 
 impl App {
 	pub fn new(path: &str) -> Result<Self> {
+		let arch = Archives::new(path);
 		Ok(Self {
-			arch: Archives::new(path),
+			tables: Tables::read(&arch)?,
+			arch,
 		})
 	}
 
 	#[tracing::instrument(skip(self))]
 	pub async fn magic(&self) -> Result<Html> {
-		let data = self.arch.get_compressed_by_name(0x2, b"T_MAGIC ._DT")?.1;
-		let magics = kaiseki::ed6::magic::Magic::read(&data)?;
-		let doc = ed6::magic::render(&magics);
+		let doc = ed6::magic::render(&self.tables.magic);
 		Ok(Html(doc.render_to_string()))
 	}
 

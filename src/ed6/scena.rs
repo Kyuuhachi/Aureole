@@ -639,6 +639,7 @@ impl<'a> CodeRenderer<'a> {
 				a.text(" ");
 				a.span_text("var", v);
 			}
+
 			InsnArg::attr(v) => {
 				a.text(" ");
 				a.span_text("attr", v);
@@ -654,6 +655,17 @@ impl<'a> CodeRenderer<'a> {
 					_ => Cow::Owned(format!("[unknown {}]", v)),
 				};
 				self.named(a, "char-attr", *v as usize, &name, None);
+			}
+
+			InsnArg::member_attr(v) => {
+				a.text(":");
+				let name = match *v {
+					0 => Cow::Borrowed("level"),
+					5 => Cow::Borrowed("cp"),
+					254 => Cow::Borrowed("full_heal"),
+					_ => Cow::Owned(format!("[unknown {}]", v)),
+				};
+				self.named(a, "member-attr", *v as usize, &name, None);
 			}
 
 			InsnArg::char(v) => {

@@ -78,6 +78,7 @@ a[href] {
 .code .var         { color: var(--aurora2); }
 .code .attr        { color: var(--aurora2); }
 .code .char-attr   { color: var(--aurora2); }
+.code .member-attr { color: var(--aurora2); }
 
 .code .char        { color: var(--aurora3); }
 .code .member      { color: var(--aurora3); }

@@ -69,7 +69,7 @@ pub(super) fn read(i: &mut CodeParser) -> Result<Self> {
 		0x2D => PartyAdd(member/u8, char/{i.u8()? as u16} as u16),
 		0x2E => PartyRemove(member/u8, char/{i.u8()? as u16} as u16),
 		0x30 => _Party30(u8),
-		0x31 => PartySetAttr(member/u8, u8, u16), // what types is this?
+		0x31 => PartySetAttr(member/u8, member_attr/u8, u16),
 		0x34 => PartyAddArt(member/u8, magic/u16),
 		0x35 => PartyAddCraft(member/u8, magic/u16),
 		0x36 => PartyAddSCraft(member/u8, magic/u16),

@@ -80,6 +80,7 @@ a[href] {
 .code .char-attr   { color: var(--aurora2); }
 
 .code .char        { color: var(--aurora3); }
+.code .member      { color: var(--aurora3); }
 .code .color       { color: var(--base-text); }
 .code .magic       { color: var(--aurora2); }
 .code .sepith-element { color: var(--aurora3); }

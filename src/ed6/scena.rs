@@ -16,7 +16,7 @@ enum CharKind {
 	Npc,
 	Monster,
 	Self_,
-	Pc,
+	Member,
 	Unknown,
 }
 
@@ -139,14 +139,20 @@ impl ScenaRenderer<'_> {
 		}
 	}
 
-	fn char_name(&self, id: usize) -> (CharKind, Cow<str>) {
-		let pc_names = &["Estelle", "Joshua", "Scherazard", "Olivier", "Kloe", "Agate", "Tita", "Zin"];
+	fn member_name(&self, id: usize) -> Cow<str> {
+		let member_names = &["Estelle", "Joshua", "Scherazard", "Olivier", "Kloe", "Agate", "Tita", "Zin"];
+		if id < member_names.len() {
+			Cow::Borrowed(member_names[id])
+		} else {
+			Cow::Owned(format!("[unknown {}]", id))
+		}
+	}
 
+	fn char_name(&self, id: usize) -> (CharKind, Cow<str>) {
 		let npc_start = 8;
 		let monster_start = npc_start + self.scena.npcs.len();
 		let monster_end = monster_start + self.scena.monsters.len();
-		let pc_start = 0x101;
-		let pc_end = pc_start + pc_names.len();
+		let member_start = 0x101;
 		
 		fn get_name<T>(idx: usize, items: &[T], f: impl Fn(&T) -> &str) -> Cow<str> {
 			let name = f(&items[idx]);
@@ -169,8 +175,8 @@ impl ScenaRenderer<'_> {
 			(CharKind::Monster, get_name(id-monster_start, &self.scena.monsters, |a| &*a.name))
 		} else if id == 0xFE {
 			(CharKind::Self_, "self".into())
-		} else if (pc_start..pc_end).contains(&id) {
-			(CharKind::Pc, pc_names[id-pc_start].into())
+		} else if id >= member_start {
+			(CharKind::Member, self.member_name(id - member_start))
 		} else {
 			(CharKind::Unknown, format!("[unknown {}]", id).into())
 		}
@@ -618,7 +624,6 @@ impl<'a> CodeRenderer<'a> {
 			InsnArg::quest_flag(v) => { a.text(" "); a.span_text("unknown", format!("0x{:02X}", v)); }
 			InsnArg::char_flags(v) => { a.text(" "); a.span_text("unknown", format!("0x{:04X}", v)); }
 			InsnArg::quest_task(v) => { a.text(" "); a.span_text("unknown", format!("0x{:04X}", v)); }
-			InsnArg::member(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 
 			InsnArg::sepith_element(v) => {
 				a.text(" ");
@@ -682,7 +687,7 @@ impl<'a> CodeRenderer<'a> {
 					CharKind::Npc => "npc",
 					CharKind::Monster => "monster",
 					CharKind::Self_ => "self",
-					CharKind::Pc => "pc",
+					CharKind::Member => "member",
 					CharKind::Unknown => "unknown",
 				};
 				a.span("char", |a| {
@@ -692,6 +697,20 @@ impl<'a> CodeRenderer<'a> {
 						a.text(v);
 					} else {
 						a.attr("title", format!("{} ({})", v, kind));
+						a.text(name);
+					}
+				});
+			}
+
+			InsnArg::member(v) => {
+				a.text(" ");
+				let name = self.inner.member_name(*v as usize);
+				a.span("member", |a| {
+					if self.inner.raw {
+						a.attr("title", format!("{}", name));
+						a.text(v);
+					} else {
+						a.attr("title", format!("{}", v));
 						a.text(name);
 					}
 				});

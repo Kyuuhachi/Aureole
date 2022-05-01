@@ -368,7 +368,7 @@ impl<'a> CodeParser<'a> {
 	fn flow_insn(&mut self) -> Result<FlowInsn> {
 		let pos = self.pos();
 		Ok(match self.u8()? {
-			0x02 => FlowInsn::If(self.expr()?, self.u16()? as usize),
+			0x02 => FlowInsn::Unless(self.expr()?, self.u16()? as usize),
 			0x03 => FlowInsn::Goto(self.u16()? as usize),
 			0x04 => FlowInsn::Switch(self.expr()?, {
 				let mut out = Vec::new();

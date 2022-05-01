@@ -5,7 +5,7 @@ use crate::util;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FlowInsn<E, I> {
-	If(E, usize),
+	Unless(E, usize),
 	Goto(usize),
 	Switch(E, Vec<(u16, usize)>, usize),
 	Insn(I),
@@ -14,7 +14,7 @@ pub enum FlowInsn<E, I> {
 impl<E, I> FlowInsn<E, I> {
 	pub fn labels(&self, mut f: impl FnMut(usize)) {
 		match self {
-			FlowInsn::If(_, target) => f(*target),
+			FlowInsn::Unless(_, target) => f(*target),
 			FlowInsn::Goto(target) => f(*target),
 			FlowInsn::Switch(_, branches, default) => {
 				for (_, target) in branches {
@@ -82,7 +82,7 @@ impl<E: Clone, I: Clone> Decompiler<'_, E, I> {
 		let start = range.start;
 		*range = self.advance(range.clone());
 		Ok(match *self.asm[&start] {
-			FlowInsn::If(ref expr, l1) => {
+			FlowInsn::Unless(ref expr, l1) => {
 				match self.find_jump_before(l1, brk) {
 					// While
 					// =====

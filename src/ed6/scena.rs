@@ -240,7 +240,7 @@ impl<'a> CodeRenderer<'a> {
 			}
 
 			match insn {
-				FlowInsn::If(expr, target) => self.line(a, |a| {
+				FlowInsn::Unless(expr, target) => self.line(a, |a| {
 					a.text("  ");
 					a.span_text("keyword", "UNLESS");
 					a.text(" ");

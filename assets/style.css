@@ -82,6 +82,7 @@ a {
 .code .char        { color: var(--aurora3); }
 .code .color       { color: var(--base-text); }
 .code .magic       { color: var(--aurora2); }
+.code .sepith-element { color: var(--aurora3); }
 
 .code .char.char-npc     { text-decoration-color: var(--aurora1); }
 .code .char.char-monster { text-decoration-color: var(--aurora0); }
@@ -94,31 +95,39 @@ a {
 	width: 2ch;
 }
 
-.code .magic::before {
+.code .magic::before, .code .sepith-element::before {
 	content: "";
 	display: inline-block;
 	height: 1em; height: 1cap;
 	width: 1em; width: 1cap;
-	background: url("/fc/ui/icon1.png");
+	padding: 0 calc(1ch - 0.5em); padding: 0 calc(1ch - 0.5cap);
 
+	--icon-x: 4; --icon-y: 4;
+	background: url("/fc/ui/icon1.png");
 	background-position: calc(var(--icon-x)/15*100%) calc(var(--icon-y)/15*100%);
 	background-origin: content-box;
 	background-clip:   content-box;
-	padding-left:  calc(1ch - 0.5em); padding-left:  calc(1ch - 0.5cap);
-	padding-right: calc(1ch - 0.5em); padding-right: calc(1ch - 0.5cap);
 	background-size: 1600%;
 }
 
-.code .magic-unknown::before { --icon-x: 7; --icon-y: 3; }
+.code .magic-unknown::before { --icon-x:  7; --icon-y: 3; }
 .code .magic-craft::before   { --icon-x: 12; --icon-y: 2; }
 .code .magic-scraft::before  { --icon-x: 10; --icon-y: 2; }
-.code .magic-earth::before   { --icon-x: 8; --icon-y: 3 }
-.code .magic-water::before   { --icon-x: 9; --icon-y: 3 }
-.code .magic-fire::before    { --icon-x: 10; --icon-y: 3 }
-.code .magic-wind::before    { --icon-x: 11; --icon-y: 3 }
-.code .magic-time::before    { --icon-x: 14; --icon-y: 3 }
-.code .magic-space::before   { --icon-x: 12; --icon-y: 3 }
-.code .magic-mirage::before  { --icon-x: 13; --icon-y: 3 }
+.code .magic-earth::before   { --icon-x:  8; --icon-y: 3; }
+.code .magic-water::before   { --icon-x:  9; --icon-y: 3; }
+.code .magic-fire::before    { --icon-x: 10; --icon-y: 3; }
+.code .magic-wind::before    { --icon-x: 11; --icon-y: 3; }
+.code .magic-time::before    { --icon-x: 14; --icon-y: 3; }
+.code .magic-space::before   { --icon-x: 12; --icon-y: 3; }
+.code .magic-mirage::before  { --icon-x: 13; --icon-y: 3; }
+
+.code .sepith-element-earth::before   { --icon-x: 9;  --icon-y: 11; }
+.code .sepith-element-water::before   { --icon-x: 10; --icon-y: 11; }
+.code .sepith-element-fire::before    { --icon-x: 11; --icon-y: 11; }
+.code .sepith-element-wind::before    { --icon-x: 12; --icon-y: 11; }
+.code .sepith-element-time::before    { --icon-x: 13; --icon-y: 11; }
+.code .sepith-element-space::before   { --icon-x: 14; --icon-y: 11; }
+.code .sepith-element-mirage::before  { --icon-x: 15; --icon-y: 11; }
 
 .code .block {
 	margin-left: calc(var(--indent) * 4ch);

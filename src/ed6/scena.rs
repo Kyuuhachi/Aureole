@@ -619,7 +619,24 @@ impl<'a> CodeRenderer<'a> {
 			InsnArg::char_flags(v) => { a.text(" "); a.span_text("unknown", format!("0x{:04X}", v)); }
 			InsnArg::quest_task(v) => { a.text(" "); a.span_text("unknown", format!("0x{:04X}", v)); }
 			InsnArg::member(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::element(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+
+			InsnArg::sepith_element(v) => {
+				a.text(" ");
+				a.span("sepith-element", |a| {
+					a.attr("title", format!("{:?}", v));
+					match v {
+						// Not sure about these indices
+						0 => { a.class("sepith-element-earth");  a.text("earth");  }
+						1 => { a.class("sepith-element-water");  a.text("water");  }
+						2 => { a.class("sepith-element-fire");   a.text("fire");   }
+						3 => { a.class("sepith-element-wind");   a.text("wind");   }
+						4 => { a.class("sepith-element-time");   a.text("time");   }
+						5 => { a.class("sepith-element-space");  a.text("space");  }
+						6 => { a.class("sepith-element-mirage"); a.text("mirage"); }
+						_ => { a.text(format!("[unknown {}]", v)); }
+					}
+				});
+			}
 
 			InsnArg::var(v) => {
 				a.text(" ");

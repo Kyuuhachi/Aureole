@@ -5,6 +5,7 @@ use hamu::read::{In, Le};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Format {
 	Rgba4444,
+	Rgba1555,
 }
 
 pub fn read(data: &[u8], width: u32, height: u32, format: Format) -> Result<RgbaImage> {
@@ -12,6 +13,11 @@ pub fn read(data: &[u8], width: u32, height: u32, format: Format) -> Result<Rgba
 	let img = read_buf(&mut i, width, height, format)?;
 	i.dump_uncovered(|a| a.to_stderr())?;
 	Ok(img)
+}
+
+#[inline]
+fn part(x: u16, mask: u16, mul: u32, shift: u32) -> u8 {
+	(((x&mask) as u32 * mul) >> shift) as u8
 }
 
 fn read_buf(i: &mut In, width: u32, height: u32, format: Format) -> Result<RgbaImage> {
@@ -23,10 +29,19 @@ fn read_buf(i: &mut In, width: u32, height: u32, format: Format) -> Result<RgbaI
 				Format::Rgba4444 => {
 					let px = i.u16()?;
 					[
-						((px & 0x0F00) >> 8) as u8 * 0x11,
-						((px & 0x00F0) >> 4) as u8 * 0x11,
-						((px & 0x000F) >> 0) as u8 * 0x11,
-						((px & 0xF000) >> 12) as u8 * 0x11,
+						part(px, 0x0F00, 0x11, 8),
+						part(px, 0x00F0, 0x11, 4),
+						part(px, 0x000F, 0x11, 0),
+						part(px, 0xF000, 0x11, 12),
+					]
+				}
+				Format::Rgba1555 => {
+					let px = i.u16()?;
+					[
+						part(px, 0x7C00, 0x21, 12),
+						part(px, 0x03E0, 0x21, 7),
+						part(px, 0x001F, 0x21, 2),
+						part(px, 0x8000, 0xFF, 15),
 					]
 				}
 			};

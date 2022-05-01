@@ -55,14 +55,51 @@ impl App {
 	pub async fn ui_png(&self, name: &str, low: bool) -> Result<Option<Image>> {
 		use kaiseki::image::{self, Format};
 		let (info1, info2) = match name {
-			"icon1" => ((b"C_ICON1 ._CH", 256, 256, Format::Rgba4444), (b"H_ICON1 ._CH", 512, 512, Format::Rgba4444)),
-			"icon2" => ((b"C_ICON2 ._CH", 256, 256, Format::Rgba4444), (b"H_ICON2 ._CH", 512, 512, Format::Rgba4444)),
+			"btn01"   => ((0x00, b"C_BTN01 ._CH", 256, 256, Format::Rgba4444),
+			              (0x00, b"H_BTN01 ._CH", 512, 512, Format::Rgba4444)),
+			"btn02"   => ((0x00, b"C_BTN02 ._CH", 256, 256, Format::Rgba4444),
+			              (0x00, b"H_BTN02 ._CH", 512, 512, Format::Rgba4444)),
+			"camp01"  => ((0x00, b"C_CAMP01._CH", 256, 256, Format::Rgba4444),
+			              (0x00, b"H_CAMP01._CH", 512, 512, Format::Rgba4444)),
+			"camp02"  => ((0x00, b"C_CAMP02._CH", 256, 256, Format::Rgba1555),
+			              (0x00, b"H_CAMP02._CH", 512, 512, Format::Rgba1555)),
+			"camp03"  => ((0x00, b"C_CAMP03._CH", 256, 256, Format::Rgba1555),
+			              (0x00, b"H_CAMP03._CH", 512, 512, Format::Rgba1555)),
+			"camp04"  => ((0x00, b"C_CAMP04._CH", 256, 256, Format::Rgba4444),
+			              (0x00, b"H_CAMP04._CH", 512, 512, Format::Rgba4444)),
+			"cmps"    => ((0x00, b"C_CMPS  ._CH", 256, 256, Format::Rgba4444),
+			              (0x00, b"H_CMPS  ._CH", 512, 512, Format::Rgba4444)),
+			"cook"    => ((0x00, b"C_COOK  ._CH", 256, 256, Format::Rgba4444),
+			              (0x00, b"C_COOK  ._CH", 256, 256, Format::Rgba4444)), // no H exists
+			"emotio"  => ((0x00, b"C_EMOTIO._CH", 256, 256, Format::Rgba4444),
+			              (0x00, b"H_EMOTIO._CH", 512, 512, Format::Rgba4444)),
+			"icon1"   => ((0x00, b"C_ICON1 ._CH", 256, 256, Format::Rgba4444),
+			              (0x00, b"H_ICON1 ._CH", 512, 512, Format::Rgba4444)),
+			"icon2"   => ((0x00, b"C_ICON2 ._CH", 256, 256, Format::Rgba4444),
+			              (0x00, b"H_ICON2 ._CH", 512, 512, Format::Rgba4444)),
+			"mouse"   => ((0x00, b"C_MOUSE ._CH", 256, 256, Format::Rgba4444),
+			              (0x00, b"H_MOUSE ._CH", 512, 512, Format::Rgba4444)),
+			"note1"   => ((0x00, b"C_NOTE1 ._CH", 256, 256, Format::Rgba4444),
+			              (0x00, b"H_NOTE1 ._CH", 512, 512, Format::Rgba4444)),
+			"waku1"   => ((0x00, b"C_WAKU1 ._CH", 256, 256, Format::Rgba4444),
+			              (0x00, b"H_WAKU1 ._CH", 512, 512, Format::Rgba4444)),
+
+			"battle"  => ((0x0F, b"BATTLE  ._CH", 256, 256, Format::Rgba4444),
+			              (0x0F, b"HBATTLE ._CH", 512, 512, Format::Rgba4444)),
+			"battle2" => ((0x0F, b"BATTLE2 ._CH", 256, 256, Format::Rgba4444),
+			              (0x0F, b"HBATTLE2._CH", 512, 512, Format::Rgba4444)),
+			"battle3" => ((0x0F, b"BATTLE3 ._CH", 256, 256, Format::Rgba4444),
+			              (0x0F, b"HBATTLE3._CH", 512, 512, Format::Rgba4444)),
+			"btlinfo" => ((0x0F, b"BTLINFO ._CH", 256, 256, Format::Rgba4444),
+			              (0x0F, b"HBTLINFO._CH", 512, 512, Format::Rgba4444)),
+			"btlmenu" => ((0x0F, b"BTLMENU ._CH", 256, 256, Format::Rgba4444),
+			              (0x0F, b"HBTLMENU._CH", 512, 512, Format::Rgba4444)),
 			_ => return Ok(None)
 		};
 
-		let (name, width, height, format) = if low { info1 } else { info2 };
+		let (arch, name, width, height, format) = if low { info1 } else { info2 };
 
-		let data = self.arch.get_compressed_by_name(0x0, ByteString(*name))?.1;
+		let data = self.arch.get_compressed_by_name(arch, ByteString(*name))?.1;
 		let image = image::read(&data, width, height, format)?;
 		Ok(Some(Image(image)))
 	}

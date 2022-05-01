@@ -51,25 +51,19 @@ impl App {
 		use actix_web::{HttpRequest, web};
 		web::scope(path)
 		.app_data(web::Data::new(self))
-		.route("/magic",
-			web::get().to(|req: HttpRequest| async move {
-				let app = req.app_data::<web::Data<Self>>().unwrap();
-				app.magic().await
-			})
-		)
-		.route("/scena/{name:\\w{1,8}}",
-			web::get().to(|req: HttpRequest| async move {
-				let app = req.app_data::<web::Data<Self>>().unwrap();
-				let name = req.match_info().get("name").unwrap();
-				app.scena(name, false).await
-			})
-		)
-		.route("/ui/{name}.png",
-			web::get().to(|req: HttpRequest| async move {
-				let app = req.app_data::<web::Data<Self>>().unwrap();
-				let name = req.match_info().get("name").unwrap();
-				app.ui_png(name, false).await
-			})
-		)
+		.route("/magic", web::get().to(|req: HttpRequest| async move {
+			let app = req.app_data::<web::Data<Self>>().unwrap();
+			app.magic().await
+		}))
+		.route("/scena/{name:\\w{1,8}}", web::get().to(|req: HttpRequest| async move {
+			let app = req.app_data::<web::Data<Self>>().unwrap();
+			let name = req.match_info().get("name").unwrap();
+			app.scena(name, false).await
+		}))
+		.route("/ui/{name}.png", web::get().to(|req: HttpRequest| async move {
+			let app = req.app_data::<web::Data<Self>>().unwrap();
+			let name = req.match_info().get("name").unwrap();
+			app.ui_png(name, false).await
+		}))
 	}
 }

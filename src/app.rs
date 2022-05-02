@@ -109,6 +109,23 @@ impl App {
 		});
 		Ok(Html(doc))
 	}
+
+	#[tracing::instrument(skip(self))]
+	pub async fn face(&self, n: u16) -> Result<Option<Image>> {
+		use kaiseki::image::{self, Format};
+
+		let mut fname = *b"H_KAO000._CH";
+		let n = n.to_string();
+		fname[8-n.len()..8].copy_from_slice(n.as_bytes());
+
+		let data = match self.arch.get_compressed_by_name(0x5, ByteString(fname)) {
+			Ok(d) => d,
+			Err(kaiseki::ed6::archive::Error::InvalidName { .. } ) => return Ok(None),
+			Err(e) => return Err(e.into()),
+		}.1;
+		let image = image::read(&data, 256, 256, Format::Rgba1555)?;
+		Ok(Some(Image(image)))
+	}
 }
 
 trait QueryArg: Default {
@@ -220,6 +237,17 @@ impl App {
 				Ok(app.ui_index().await)
 			}
 			ui_index
+		}))
+
+		.route("/face/{n}.png", web::get().to({
+			async fn face(req: HttpRequest) -> Result<impl Responder, error::Error> {
+				let _n = req.match_info().get("n").unwrap();
+				let _n = _n.parse().map_err(|_| error::ErrorBadRequest(_n.to_owned()))?;
+
+				let app = req.app_data::<App>().unwrap();
+				Ok(app.face(_n).await)
+			}
+			face
 		}))
 	}
 }

@@ -71,6 +71,9 @@ a[href] {
 	text-decoration: underline dotted;
 }
 
+ruby { ruby-align: center; }
+rt { white-space: pre; }
+
 .code {
 	tab-size: 4;
 	.indent      {

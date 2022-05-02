@@ -746,21 +746,51 @@ impl<'a> CodeRenderer<'a> {
 		for page in v.0.split(|s| s == &TextSegment::Page) {
 			a.node("div", |a| {
 				a.class("talk-page");
-				for item in page {
+				let mut iter = page.iter().peekable();
+				while let Some(item) = iter.next() {
 					match item {
 						TextSegment::Page => unreachable!(),
-						TextSegment::String(s) => a.span("text", |a| {
-							a.class(&format!("text-color-{color}"));
-							a.class(&format!("text-size-{size}"));
-							a.text(s)
-						}),
+						TextSegment::String(s) => {
+							let (s, ruby) = if let Some(TextSegment::Ruby(width, rt)) = iter.peek() {
+								iter.next();
+								let mut w = 0;
+								let split_pos = s.char_indices().rfind(|(_, ch)| {
+									match unicode_width::UnicodeWidthChar::width_cjk(*ch) {
+										Some(cw) => {
+											w += cw;
+											w >= *width as usize
+										}
+										None => true
+									}
+								}).map_or(0, |a| a.0);
+								(&s[..split_pos], Some((&s[split_pos..], rt)))
+							} else {
+								(&s[..], None)
+							};
+
+							if !s.is_empty() {
+								a.node("span", |a| {
+									a.class(&format!("text text-color-{color}, text-size-{size}"));
+									a.text(s)
+								});
+							}
+							if let Some((rb, rt)) = ruby {
+								a.node("ruby", |a| {
+									a.class(&format!("text text-color-{color}, text-size-{size}"));
+									a.text(rb);
+									a.node("rp", |a| a.text("（"));
+									a.node("rt", |a| a.text(rt));
+									a.node("rp", |a| a.text("）"));
+								});
+							}
+						}
 						TextSegment::Wait => {},
 						TextSegment::Speed(_) => {},
 						TextSegment::Pos(_) => {},
 						TextSegment::Color(c) => color = *c,
 						TextSegment::Size(s) => size = *s,
 						// TextSegment::Face(_) => todo!(),
-						TextSegment::Ruby(off, text) => {
+						TextSegment::Ruby(_, text) => {
 							a.node("ruby", |a| a.node("rt", |a| a.text(text)))
 						}
 						item => a.span_text("text-unknown", format!("{:?}", item)),

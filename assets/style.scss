@@ -36,6 +36,29 @@
 	--unimportant: var(--night4);
 } }
 
+%icon {
+	display: inline-block;
+	height: 1em; height: 1cap;
+	width: 1em; width: 1cap;
+	vertical-align: -5%;
+}
+
+%icon-sheet {
+	background-position:
+		calc(var(--icon-x) / (var(--icon-w) - 1) * 100%)
+		calc(var(--icon-y) / (var(--icon-h) - 1) * 100%);
+	background-size:
+		calc(var(--icon-w) * 100%)
+		calc(var(--icon-h) * 100%);
+}
+
+@mixin icon-sheet($url, $w, $h, $x, $y) {
+	@extend %icon-sheet;
+	background-image: url("/fc/ui/icon1.png");
+	--icon-w: #{$w}; --icon-h: #{$h};
+	--icon-x: #{$x}; --icon-y: #{$y};
+}
+
 body {
 	background: var(--base-bg);
 	color: var(--base-text);
@@ -91,23 +114,13 @@ a[href] {
 .code .char.char-self    { color: var(--aurora4); }
 
 .code .color-splat {
-	display: inline-block;
-	height: 1em; height: 1cap;
-	width: 1em; width: 1cap;
-	vertical-align: -5%;
+	@extend %icon;
 }
 
 .code .magic::before, .code .sepith-element::before {
 	content: "";
-	display: inline-block;
-	height: 1em; height: 1cap;
-	width: 1em; width: 1cap;
-	vertical-align: -5%;
-
-	--icon-x: 4; --icon-y: 4;
-	background: url("/fc/ui/icon1.png");
-	background-position: calc(var(--icon-x)/15*100%) calc(var(--icon-y)/15*100%);
-	background-size: 1600%;
+	@extend %icon;
+	@include icon-sheet("/fc/ui/icon1.png", 16, 16, 4, 4);
 }
 
 .code .magic-unknown::before { --icon-x:  7; --icon-y: 3; }
@@ -131,12 +144,8 @@ a[href] {
 
 .code .emote::before {
 	content: "";
-	display: inline-block;
-	height: 1em; height: 1cap;
-	width: 1em; width: 1cap;
-	vertical-align: -5%;
+	@extend %icon;
 
-	--icon-x: 4; --icon-y: 4;
 	background: url("/fc/ui/emotio.png");
 	animation: emote infinite;
 	animation-duration: calc((var(--emote-end) - var(--emote-start)) * var(--emote-time));

@@ -744,8 +744,7 @@ impl<'a> CodeRenderer<'a> {
 		let mut color = 0;
 		let mut size = 2;
 		for page in v.0.split(|s| s == &TextSegment::Page) {
-			a.node("div", |a| {
-				a.class("talk-page");
+			let body = choubun::node("div", |a| {
 				let mut iter = page.iter().peekable();
 				while let Some(item) = iter.next() {
 					match item {
@@ -796,6 +795,11 @@ impl<'a> CodeRenderer<'a> {
 						item => a.span_text("text-unknown", format!("{:?}", item)),
 					}
 				}
+			});
+
+			a.node("div", |a| {
+				a.class("talk-page");
+				a.add_node(body);
 			})
 		}
 	}

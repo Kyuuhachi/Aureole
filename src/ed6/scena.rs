@@ -802,10 +802,18 @@ impl<'a> CodeRenderer<'a> {
 			a.node("div", |a| {
 				a.class("talk-page");
 				if let Some(face) = face {
-					a.leaf("img", |a| {
-						a.class("talk-face");
-						a.attr("loading", "lazy");
-						a.attr("src", format!("/fc/face/{face}.png"));
+					a.node("div", |a| {
+						a.class("talk-face-wrapper");
+						a.leaf("img", |a| {
+							a.class("talk-face-visible");
+							a.attr("loading", "lazy");
+							a.attr("src", format!("/fc/face/{face}.png"));
+						});
+						a.leaf("img", |a| {
+							a.class("talk-face-click");
+							a.attr("loading", "lazy");
+							a.attr("src", format!("/fc/face/{face}.png"));
+						});
 					});
 				}
 				a.add_node(body);

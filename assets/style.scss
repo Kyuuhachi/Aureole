@@ -224,5 +224,21 @@ rt { white-space: pre; }
 		.text-color-14, .text-color-15 {
 			background: red;
 		}
+
+		.talk-face {
+			display: inline-block;
+			vertical-align: top;
+			width: 8em;
+			height: 8em;
+			margin-top: -3em;
+			margin-bottom: -0.5em;
+			margin-left: -1em;
+			transform: scaleX(-1);
+		}
+
+		.talk-text {
+			display: inline-block;
+			vertical-align: top;
+		}
 	}
 }

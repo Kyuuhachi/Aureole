@@ -743,8 +743,10 @@ impl<'a> CodeRenderer<'a> {
 	fn text(&self, a: &mut Node, v: &Text) {
 		let mut color = 0;
 		let mut size = 2;
+		let mut face = None;
 		for page in v.0.split(|s| s == &TextSegment::Page) {
 			let body = choubun::node("div", |a| {
+				a.class("talk-text");
 				let mut iter = page.iter().peekable();
 				while let Some(item) = iter.next() {
 					match item {
@@ -788,7 +790,7 @@ impl<'a> CodeRenderer<'a> {
 						TextSegment::Pos(_) => {},
 						TextSegment::Color(c) => color = *c,
 						TextSegment::Size(s) => size = *s,
-						// TextSegment::Face(_) => todo!(),
+						TextSegment::Face(f) => face = Some(*f),
 						TextSegment::Ruby(_, text) => {
 							a.node("ruby", |a| a.node("rt", |a| a.text(text)))
 						}
@@ -799,6 +801,12 @@ impl<'a> CodeRenderer<'a> {
 
 			a.node("div", |a| {
 				a.class("talk-page");
+				if let Some(face) = face {
+					a.leaf("img", |a| {
+						a.class("talk-face");
+						a.attr("src", format!("/fc/face/{face}.png"));
+					});
+				}
 				a.add_node(body);
 			})
 		}

@@ -72,99 +72,101 @@ a[href] {
 	text-decoration: underline dotted;
 }
 
-.code { tab-size: 4; }
-.code .indent      {
-	color: var(--whitespace);
-	position: relative;
+.code {
+	tab-size: 4;
+	.indent      {
+		color: var(--whitespace);
+		position: relative;
+	}
+	.indent::before {
+		content: "⟩";
+		position: absolute;
+	}
+
+	/*              { color: #FF0000; } */
+	.empty-block { color: var(--unimportant); }
+
+	.syntax      { color: var(--frost2); }
+	.keyword     { color: var(--frost2); font-weight: bold; }
+	.expr-op     { color: var(--frost2); }
+	.case        { color: var(--aurora4); }
+	.label       { color: var(--aurora1); }
+	.insn        { color: var(--base-text); }
+
+	.int         { color: var(--aurora4); }
+	.speed       { color: var(--aurora4); }
+	.angle       { color: var(--aurora4); }
+	.time        { color: var(--aurora4); }
+
+	.flag        { color: var(--aurora1); }
+	.var         { color: var(--aurora2); }
+	.attr        { color: var(--aurora2); }
+	.char-attr   { color: var(--aurora2); }
+	.member-attr { color: var(--aurora2); }
+
+	.char        { color: var(--aurora3); }
+	.member      { color: var(--aurora3); }
+	.color       { color: var(--base-text); }
+	.magic       { color: var(--aurora2); }
+	.sepith-element { color: var(--aurora3); }
+
+	.char-npc     { text-decoration-color: var(--aurora1); }
+	.char-monster { text-decoration-color: var(--aurora0); }
+	.char-self    { color: var(--aurora4); }
+
+	.color-splat {
+		@extend %icon;
+	}
+
+	.magic::before, .sepith-element::before {
+		content: "";
+		@extend %icon;
+		@include icon-sheet("/fc/ui/icon1.png", 16, 16, 4, 4);
+	}
+
+	.magic-unknown::before { --icon-x:  7; --icon-y: 3; }
+	.magic-craft::before   { --icon-x: 12; --icon-y: 2; }
+	.magic-scraft::before  { --icon-x: 10; --icon-y: 2; }
+	.magic-earth::before   { --icon-x:  8; --icon-y: 3; }
+	.magic-water::before   { --icon-x:  9; --icon-y: 3; }
+	.magic-fire::before    { --icon-x: 10; --icon-y: 3; }
+	.magic-wind::before    { --icon-x: 11; --icon-y: 3; }
+	.magic-time::before    { --icon-x: 14; --icon-y: 3; }
+	.magic-space::before   { --icon-x: 12; --icon-y: 3; }
+	.magic-mirage::before  { --icon-x: 13; --icon-y: 3; }
+
+	.sepith-element-earth::before   { --icon-x:  9; --icon-y: 11; }
+	.sepith-element-water::before   { --icon-x: 10; --icon-y: 11; }
+	.sepith-element-fire::before    { --icon-x: 11; --icon-y: 11; }
+	.sepith-element-wind::before    { --icon-x: 12; --icon-y: 11; }
+	.sepith-element-time::before    { --icon-x: 13; --icon-y: 11; }
+	.sepith-element-space::before   { --icon-x: 14; --icon-y: 11; }
+	.sepith-element-mirage::before  { --icon-x: 15; --icon-y: 11; }
+
+	.emote::before {
+		content: "";
+		@extend %icon;
+
+		background: url("/fc/ui/emotio.png");
+		animation: emote infinite;
+		animation-duration: calc((var(--emote-end) - var(--emote-start)) * var(--emote-time));
+		animation-timing-function: steps(calc(var(--emote-end) - var(--emote-start)), end);
+		background-size: 6400% 100%;
+	}
+
+	@keyframes emote {
+		from { background-position-x: calc(var(--emote-start)/63 * 100%) }
+		to   { background-position-x: calc(var(--emote-end)/63 * 100%) }
+	}
+
+	.block {
+		margin-left: calc(var(--indent) * 4ch);
+		width: max-content;
+		font-family: var(--base-font);
+		vertical-align: middle;
+	}
+
+	.menu { display: table; }
+	.menu-row { display: table-row; }
+	.menu-idx { display: table-cell; text-align: right; color: var(--unimportant); }
 }
-.code .indent::before {
-	content: "⟩";
-	position: absolute;
-}
-
-/* .code              { color: #FF0000; } */
-.code .empty-block { color: var(--unimportant); }
-
-.code .syntax      { color: var(--frost2); }
-.code .keyword     { color: var(--frost2); font-weight: bold; }
-.code .expr-op     { color: var(--frost2); }
-.code .case        { color: var(--aurora4); }
-.code .label       { color: var(--aurora1); }
-.code .insn        { color: var(--base-text); }
-
-.code .int         { color: var(--aurora4); }
-.code .speed       { color: var(--aurora4); }
-.code .angle       { color: var(--aurora4); }
-.code .time        { color: var(--aurora4); }
-
-.code .flag        { color: var(--aurora1); }
-.code .var         { color: var(--aurora2); }
-.code .attr        { color: var(--aurora2); }
-.code .char-attr   { color: var(--aurora2); }
-.code .member-attr { color: var(--aurora2); }
-
-.code .char        { color: var(--aurora3); }
-.code .member      { color: var(--aurora3); }
-.code .color       { color: var(--base-text); }
-.code .magic       { color: var(--aurora2); }
-.code .sepith-element { color: var(--aurora3); }
-
-.code .char.char-npc     { text-decoration-color: var(--aurora1); }
-.code .char.char-monster { text-decoration-color: var(--aurora0); }
-.code .char.char-self    { color: var(--aurora4); }
-
-.code .color-splat {
-	@extend %icon;
-}
-
-.code .magic::before, .code .sepith-element::before {
-	content: "";
-	@extend %icon;
-	@include icon-sheet("/fc/ui/icon1.png", 16, 16, 4, 4);
-}
-
-.code .magic-unknown::before { --icon-x:  7; --icon-y: 3; }
-.code .magic-craft::before   { --icon-x: 12; --icon-y: 2; }
-.code .magic-scraft::before  { --icon-x: 10; --icon-y: 2; }
-.code .magic-earth::before   { --icon-x:  8; --icon-y: 3; }
-.code .magic-water::before   { --icon-x:  9; --icon-y: 3; }
-.code .magic-fire::before    { --icon-x: 10; --icon-y: 3; }
-.code .magic-wind::before    { --icon-x: 11; --icon-y: 3; }
-.code .magic-time::before    { --icon-x: 14; --icon-y: 3; }
-.code .magic-space::before   { --icon-x: 12; --icon-y: 3; }
-.code .magic-mirage::before  { --icon-x: 13; --icon-y: 3; }
-
-.code .sepith-element-earth::before   { --icon-x: 9;  --icon-y: 11; }
-.code .sepith-element-water::before   { --icon-x: 10; --icon-y: 11; }
-.code .sepith-element-fire::before    { --icon-x: 11; --icon-y: 11; }
-.code .sepith-element-wind::before    { --icon-x: 12; --icon-y: 11; }
-.code .sepith-element-time::before    { --icon-x: 13; --icon-y: 11; }
-.code .sepith-element-space::before   { --icon-x: 14; --icon-y: 11; }
-.code .sepith-element-mirage::before  { --icon-x: 15; --icon-y: 11; }
-
-.code .emote::before {
-	content: "";
-	@extend %icon;
-
-	background: url("/fc/ui/emotio.png");
-	animation: emote infinite;
-	animation-duration: calc((var(--emote-end) - var(--emote-start)) * var(--emote-time));
-	animation-timing-function: steps(calc(var(--emote-end) - var(--emote-start)), end);
-	background-size: 6400% 100%;
-}
-
-@keyframes emote {
-	from { background-position-x: calc(var(--emote-start)/63 * 100%) }
-	to   { background-position-x: calc(var(--emote-end)/63 * 100%) }
-}
-
-.code .block {
-	margin-left: calc(var(--indent) * 4ch);
-	width: max-content;
-	font-family: var(--base-font);
-	vertical-align: middle;
-}
-
-.code .menu { display: table; }
-.code .menu-row { display: table-row; }
-.code .menu-idx { display: table-cell; text-align: right; color: var(--unimportant); }

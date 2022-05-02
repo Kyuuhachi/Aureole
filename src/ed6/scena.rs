@@ -642,11 +642,9 @@ impl<'a> CodeRenderer<'a> {
 						a.class(&format!("sepith-element-{kind}"));
 					}
 					if self.inner.raw {
-						a.attr("title", format!("sepith-element {name}"));
-						a.text(v);
-					} else {
-						a.text(name);
+						a.attr("title", format!("sepith-element {v}"));
 					}
+					a.text(name);
 				});
 			}
 
@@ -722,13 +720,11 @@ impl<'a> CodeRenderer<'a> {
 
 			if self.inner.raw {
 				a.attr("title", match kind {
-					Some(kind) => format!("{class}-{kind} {name}"),
-					None => format!("{class} {name}"),
+					Some(kind) => format!("{class}-{kind} {v}"),
+					None => format!("{class} {v}"),
 				});
-				a.text(v);
-			} else {
-				a.text(name);
 			}
+			a.text(name);
 		});
 	}
 }

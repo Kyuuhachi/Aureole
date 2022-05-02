@@ -614,8 +614,8 @@ impl<'a> CodeRenderer<'a> {
 				a.text(" ");
 				a.span("emote", |a| {
 					a.attr("style", format!("--emote-start: {}; --emote-end: {}; --emote-time: {}ms", n, m+1, time));
+					a.text(format!("{}..={}", n, m));
 				});
-				a.span_text("int", format!("{}..={}", n, m));
 				self.arg(a, InsnArg::time(time));
 			}
 

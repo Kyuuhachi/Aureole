@@ -90,14 +90,18 @@ impl Node {
 	}
 
 	pub fn node(&mut self, name: &str, body: impl FnOnce(&mut Node)) {
-		let mut node = Node::new(name);
-		body(&mut node);
-		self.body.push(Item::Node(node));
+		self.add_node(node(name, body));
 	}
 
 	pub fn leaf(&mut self, name: &str, body: impl FnOnce(&mut Leaf)) {
-		let mut node = Leaf::new(name);
-		body(&mut node);
+		self.add_leaf(leaf(name, body));
+	}
+
+	pub fn add_node(&mut self, node: Node) {
+		self.body.push(Item::Node(node));
+	}
+
+	pub fn add_leaf(&mut self, node: Leaf) {
 		self.body.push(Item::Leaf(node));
 	}
 
@@ -112,6 +116,12 @@ impl Node {
 
 pub fn node(name: &str, body: impl FnOnce(&mut Node)) -> Node {
 	let mut node = Node::new(name);
+	body(&mut node);
+	node
+}
+
+pub fn leaf(name: &str, body: impl FnOnce(&mut Leaf)) -> Leaf {
+	let mut node = Leaf::new(name);
 	body(&mut node);
 	node
 }

@@ -175,14 +175,14 @@ a[href] {
 		font-family: sans-serif;
 		color: #FFF;
 		text-shadow: 0.1em 0.1em 0.1em #333;
-		padding-left: 0.2em;
-		margin-left: -0.2em;
+		padding-left: 0.4em;
+		margin-left: -0.3em;
 		padding-right: 1em;
 		$w: 99;
 		$h: 20;
 		border-image-source: url("/fc/ui/waku3.png?edit=crop:10,141,#{$w},#{$h},256,256");
 		border-image-slice: (7/$h*100%) (50/$w*100%) (12/$h*100%) (7/$w*100%) fill;
-		border-image-width: 0.3em 50% 0.3em 0.3em;
+		border-image-width: 0.5em 50% 0.5em 0.5em;
 		border-image-repeat: stretch stretch;
 	}
 }

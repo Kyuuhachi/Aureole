@@ -15,6 +15,7 @@ pub mod ed6 {
 }
 
 pub mod app;
+pub mod imageedit;
 
 #[derive(Debug)]
 pub struct Error(eyre::Error);

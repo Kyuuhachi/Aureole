@@ -2,7 +2,7 @@ use std::{borrow::Cow, str::FromStr};
 
 use percent_encoding::percent_decode_str;
 use kaiseki::{ed6::{Archives, magic::Magic}, util::ByteString};
-use crate::{Result, Html, Image, ed6};
+use crate::{Result, Html, Image, ed6, imageedit::ImageEdit};
 
 pub struct App {
 	arch: Archives,
@@ -52,7 +52,7 @@ impl App {
 	}
 
 	#[tracing::instrument(skip(self))]
-	pub async fn ui_png(&self, name: &str, low: bool) -> Result<Option<Image>> {
+	pub async fn ui_png(&self, name: &str, low: bool, edit: Vec<ImageEdit>) -> Result<Option<Image>> {
 		use kaiseki::image::{self, Format};
 		let (info1, info2) = match name {
 			"btn01"   => ((0x00, b"C_BTN01 ._CH", 256, 256, Format::Rgba4444),
@@ -102,12 +102,11 @@ impl App {
 		let (arch, fname, width, height, format) = if low { info1 } else { info2 };
 
 		let data = self.arch.get_compressed_by_name(arch, ByteString(*fname))?.1;
-		let image = image::read(&data, width, height, format)?;
-		if name == "emotio" {
-			Ok(Some(Image(image::linearize(image, 8, 8, 64, 1))))
-		} else {
-			Ok(Some(Image(image)))
+		let mut image = image::read(&data, width, height, format)?;
+		for edit in edit {
+			image = edit.perform(image)?; // TODO 
 		}
+		Ok(Some(Image(image)))
 	}
 
 	#[tracing::instrument(skip(self))]
@@ -213,6 +212,7 @@ impl App {
 			async fn ui_png(req: HttpRequest) -> Result<impl Responder, error::Error> {
 				let _name = req.match_info().get("name").unwrap();
 				let mut _low = <bool as Default>::default();
+				let mut _edit = <Vec<ImageEdit> as Default>::default();
 
 				if let Some(query) = req.uri().query() {
 					for part in query.split('&') {
@@ -226,13 +226,20 @@ impl App {
 								};
 								_low.parse(v.as_deref())?;
 							}
+							if k == "edit" {
+								let v = match iter.next() {
+									Some(v) => Some(urldecode(v)?),
+									None => None,
+								};
+								_edit.parse(v.as_deref())?;
+							}
 							Some(())
 						})().ok_or_else(|| error::ErrorBadRequest(part.to_owned()))?;
 					}
 				}
 
 				let app = req.app_data::<App>().unwrap();
-				Ok(app.ui_png(_name, _low).await)
+				Ok(app.ui_png(_name, _low, _edit).await)
 			}
 			ui_png
 		}))

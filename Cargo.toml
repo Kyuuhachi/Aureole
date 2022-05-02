@@ -35,6 +35,7 @@ package.choubun.opt-level = 3
 
 package.backtrace.opt-level = 3
 
+package.image.opt-level = 3
 package.png.opt-level = 3
 package.crc32fast.opt-level = 3
 package.deflate.opt-level = 3

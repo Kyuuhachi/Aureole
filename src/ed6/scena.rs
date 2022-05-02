@@ -804,6 +804,7 @@ impl<'a> CodeRenderer<'a> {
 				if let Some(face) = face {
 					a.leaf("img", |a| {
 						a.class("talk-face");
+						a.attr("loading", "lazy");
 						a.attr("src", format!("/fc/face/{face}.png"));
 					});
 				}

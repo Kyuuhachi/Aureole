@@ -3,6 +3,7 @@ use std::collections::{BTreeSet, BTreeMap};
 
 use choubun::Node;
 use kaiseki::ed6::{scena::*, Archives};
+use kaiseki::util::{Text, TextSegment};
 
 use crate::app::Tables;
 
@@ -588,7 +589,12 @@ impl<'a> CodeRenderer<'a> {
 			}
 			InsnArg::text(v) => {
 				a.text(" ");
-				a.span_text("unknown", format!("{:?}", v));
+				a.node("div", |a| {
+					a.attr("role", "list");
+					a.class("block talk");
+					a.attr("style", format!("--indent: {}", self.indent));
+					self.text(a, v);
+				});
 			}
 
 			InsnArg::menu(v) => {
@@ -732,5 +738,14 @@ impl<'a> CodeRenderer<'a> {
 			}
 			a.text(name);
 		});
+	}
+
+	fn text(&self, a: &mut Node, v: &Text) {
+		for page in v.0.split(|s| s == &TextSegment::Page) {
+			a.node("div", |a| {
+				a.class("talk-page");
+				a.text(format!("{:?}", page))
+			})
+		}
 	}
 }

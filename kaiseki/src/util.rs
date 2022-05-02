@@ -142,7 +142,7 @@ impl<const N: usize> ByteString<N> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Text(Vec<TextSegment>);
+pub struct Text(pub Vec<TextSegment>);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TextSegment {

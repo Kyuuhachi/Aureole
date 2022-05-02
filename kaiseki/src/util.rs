@@ -160,7 +160,7 @@ pub enum TextSegment {
 	Pos(u16),
 	Ruby(u16, String),
 	Size(u16),
-	W(u16),
+	Speed(u16),
 }
 
 impl Text {
@@ -205,7 +205,7 @@ impl Text {
 						decode(&ruby)?
 					}),
 					b'S' => break TextSegment::Size(n),
-					b'W' => break TextSegment::W(n),
+					b'W' => break TextSegment::Speed(n),
 					op => eyre::bail!("Unknown TextSegment: #{}{}", n, char::from(op)),
 				} })
 			}

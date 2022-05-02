@@ -24,8 +24,7 @@
 	--whitespace: var(--night3);
 	--unimportant: var(--snow0);
 
-	--base-font: sans-serif;
-	font-family: var(--base-font);
+	font-family: sans-serif;
 	font-size: 12px;
 }
 
@@ -163,8 +162,7 @@ a[href] {
 	.block {
 		margin-left: calc(var(--indent) * 4ch);
 		width: max-content;
-		font-family: var(--base-font);
-		vertical-align: middle;
+		font-family: sans-serif;
 	}
 
 	.menu { display: table; }
@@ -187,17 +185,41 @@ a[href] {
 	}
 
 	.talk {
-		font-family: sans-serif;
 		color: #FFF;
 		text-shadow: 0.1em 0.1em 0.1em #333;
-	}
 
-	.talk-page {
-		// The real thing probably uses waku3, but no idea how to make use of that
-		border-image-source: url("/fc/ui/waku1.png?edit=crop:0,0,48,48,256,256");
-		border-image-slice: 33% fill;
-		border-image-width: 1em;
-		border-width: 1em;
-		border-style: solid;
+		.talk-page {
+			// The real thing probably uses waku3, but no idea how to make use of that
+			border-image-source: url("/fc/ui/waku1.png?edit=crop:0,0,48,48,256,256");
+			border-image-slice: 33% fill;
+			border-image-width: 1em;
+			border-width: 1em;
+			border-style: solid;
+		}
+
+		.text { line-height: 1.2em; }
+
+		.text-unknown { background: red; }
+
+		.text-size-0 { font-size:  50%; }
+		.text-size-1 { font-size:  75%; }
+		.text-size-2 { font-size: 100%; }
+		.text-size-3 { font-size: 125%; }
+		.text-size-3 { font-size: 150%; }
+		.text-size-4 { font-size: 175%; }
+		.text-size-5 { font-size: 200%; }
+
+		.text-color-0  { color: #FFFFFF; }
+		.text-color-2  { color: #FF5522; }
+		.text-color-4  { color: #FFBB44; }
+		.text-color-5  { color: #88FFAA; }
+		.text-color-12 { color: #AACCEE; }
+
+		.text-color-1, .text-color-3, .text-color-6,
+		.text-color-7, .text-color-8, .text-color-9,
+		.text-color-10, .text-color-11, .text-color-13,
+		.text-color-14, .text-color-15 {
+			background: red;
+		}
 	}
 }

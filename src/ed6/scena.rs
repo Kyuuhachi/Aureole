@@ -741,10 +741,31 @@ impl<'a> CodeRenderer<'a> {
 	}
 
 	fn text(&self, a: &mut Node, v: &Text) {
+		let mut color = 0;
+		let mut size = 2;
 		for page in v.0.split(|s| s == &TextSegment::Page) {
 			a.node("div", |a| {
 				a.class("talk-page");
-				a.text(format!("{:?}", page))
+				for item in page {
+					match item {
+						TextSegment::Page => unreachable!(),
+						TextSegment::String(s) => a.span("text", |a| {
+							a.class(&format!("text-color-{color}"));
+							a.class(&format!("text-size-{size}"));
+							a.text(s)
+						}),
+						TextSegment::Wait => {},
+						TextSegment::Speed(_) => {},
+						TextSegment::Pos(_) => {},
+						TextSegment::Color(c) => color = *c,
+						TextSegment::Size(s) => size = *s,
+						// TextSegment::Face(_) => todo!(),
+						TextSegment::Ruby(off, text) => {
+							a.node("ruby", |a| a.node("rt", |a| a.text(text)))
+						}
+						item => a.span_text("text-unknown", format!("{:?}", item)),
+					}
+				}
 			})
 		}
 	}

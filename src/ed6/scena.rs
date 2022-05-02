@@ -626,18 +626,26 @@ impl<'a> CodeRenderer<'a> {
 
 			InsnArg::sepith_element(v) => {
 				a.text(" ");
+				let (kind, name) = match v {
+					// Not sure about these indices
+					0 => (Some("earth"),  Cow::Borrowed("earth")),
+					1 => (Some("water"),  Cow::Borrowed("water")),
+					2 => (Some("fire"),   Cow::Borrowed("fire")),
+					3 => (Some("wind"),   Cow::Borrowed("wind")),
+					4 => (Some("time"),   Cow::Borrowed("time")),
+					5 => (Some("space"),  Cow::Borrowed("space")),
+					6 => (Some("mirage"), Cow::Borrowed("mirage")),
+					_ => (None, Cow::Owned(format!("[unknown {}]", v))),
+				};
 				a.span("sepith-element", |a| {
-					a.attr("title", format!("{:?}", v));
-					match v {
-						// Not sure about these indices
-						0 => { a.class("sepith-element-earth");  a.text("earth");  }
-						1 => { a.class("sepith-element-water");  a.text("water");  }
-						2 => { a.class("sepith-element-fire");   a.text("fire");   }
-						3 => { a.class("sepith-element-wind");   a.text("wind");   }
-						4 => { a.class("sepith-element-time");   a.text("time");   }
-						5 => { a.class("sepith-element-space");  a.text("space");  }
-						6 => { a.class("sepith-element-mirage"); a.text("mirage"); }
-						_ => { a.text(format!("[unknown {}]", v)); }
+					if let Some(kind) = kind {
+						a.class(&format!("sepith-element-{kind}"));
+					}
+					if self.inner.raw {
+						a.attr("title", format!("sepith-element {name}"));
+						a.text(v);
+					} else {
+						a.text(name);
 					}
 				});
 			}
@@ -709,19 +717,16 @@ impl<'a> CodeRenderer<'a> {
 	fn named(&self, a: &mut Node, class: &str, v: usize, name: &str, kind: Option<&str>) {
 		a.span(class, |a| {
 			if let Some(kind) = kind {
-				a.class(&format!("{}-{}", class, kind));
+				a.class(&format!("{class}-{kind}"));
 			}
 
-			let suffix = match kind {
-				Some(kind) => Cow::Owned(format!(" ({})", kind)),
-				None => Cow::Borrowed(""),
-			};
-
 			if self.inner.raw {
-				a.attr("title", format!("{} {}{}", class, name, suffix));
+				a.attr("title", match kind {
+					Some(kind) => format!("{class}-{kind} {name}"),
+					None => format!("{class} {name}"),
+				});
 				a.text(v);
 			} else {
-				a.attr("title", format!("{} {}{}", class, v, suffix));
 				a.text(name);
 			}
 		});

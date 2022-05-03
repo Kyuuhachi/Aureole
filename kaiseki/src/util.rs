@@ -151,7 +151,7 @@ impl<const N: usize> ByteString<N> {
 	pub fn decode(&self) -> String {
 		let len = self.iter().position(|&a| a == 0).unwrap_or(N);
 		let trimmed = self.split_at(len).0;
-		SHIFT_JIS.decode(trimmed).0.into_owned()
+		decode(trimmed).unwrap_or_else(|a| a.0)
 	}
 }
 

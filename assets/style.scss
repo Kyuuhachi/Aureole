@@ -182,7 +182,7 @@ rt { white-space: pre; }
 		$w: 99;
 		$h: 20;
 		border-image-source: url("/fc/ui/waku3.png?edit=crop:10,141,#{$w},#{$h},256,256");
-		border-image-slice: (7/$h*100%) (50/$w*100%) (12/$h*100%) (7/$w*100%) fill;
+		border-image-slice: calc(7/$h*100%) calc(50/$w*100%) calc(12/$h*100%) calc(7/$w*100%) fill;
 		border-image-width: 0.5em 50% 0.5em 0.5em;
 		border-image-repeat: stretch stretch;
 	}

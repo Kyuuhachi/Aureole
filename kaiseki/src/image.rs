@@ -1,5 +1,5 @@
 use eyre::Result;
-use image::{RgbaImage, GenericImage, GenericImageView};
+use image::RgbaImage;
 use hamu::read::{In, Le};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,7 +25,6 @@ fn read_buf(i: &mut In, width: u32, height: u32, format: Format) -> Result<RgbaI
 	let mut img = RgbaImage::new(width, height);
 	for y in 0..height {
 		for x in 0..width {
-			#[allow(clippy::identity_op)]
 			let px = match format {
 				Format::Rgba4444 => {
 					let px = i.u16()?;

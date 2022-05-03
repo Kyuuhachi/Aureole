@@ -27,7 +27,7 @@ members = [
 	"hamu",
 	"choubun",
 	"kaiseki",
-	"kaiseki_macros",
+	"kaiseki-macros",
 ]
 
 [profile.dev]

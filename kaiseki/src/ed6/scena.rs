@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use eyre::Result;
-use color_eyre::{Section, SectionExt};
 use derive_more::*;
 
 use hamu::read::{In, Le};
@@ -253,7 +252,10 @@ pub fn read(i: &[u8]) -> Result<Scena> {
 	}
 	eyre::ensure!(i.pos() == head_end, "Overshot: {:X} > {:X}", i.pos(), head_end);
 
+	let mut n = 0u32;
 	let functions = util::multiple(&i, &func_table, code_end, |i, len| {
+		let _span = tracing::info_span!("function", n, start = i.pos(), end = i.pos()+len).entered();
+		n += 1;
 		let end = i.pos() + len;
 		let code = CodeParser::new(i.clone()).func(end)?;
 		Ok(Asm { code, end })
@@ -344,23 +346,24 @@ impl<'a> CodeParser<'a> {
 			eyre::ensure!(self.pos() == end, "Overshot: {:X} > {:X}", self.pos(), end);
 			Ok(())
 		})().map_err(|e| {
-			use std::fmt::Write;
-			e.section({
-				let mut s = String::new();
-				for (addr, op) in &ops {
-					writeln!(s, "{:04X}: {:?}", addr, op).unwrap();
-				}
-				s.pop(); // remove newline
-				s.header("Code:")
-			}).section({
+			use std::fmt::Write as _;
+			let mut mess = e.to_string();
+			mess.push('\n');
+			mess.push('\n');
+			for (addr, op) in &ops {
+				writeln!(mess, "  {addr:04X} {addr}: {op:?}").unwrap();
+			}
+			mess.push('\n');
+			write!(mess, "{}", 
 				start.dump().end(end)
 					.marks(self.marks.iter())
 					.mark(self.pos()-1, "\x1B[0;7m ")
 					.number_width(4)
 					.newline(false)
-					.to_string()
-					.header("Dump:")
-			})
+			).unwrap();
+			tracing::error!("Parse error: {}", mess);
+
+			e
 		})?;
 		Ok(ops)
 	}

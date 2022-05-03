@@ -1,7 +1,64 @@
 use std::{ops::Range, collections::{BTreeMap, BTreeSet}, fmt::Debug};
-use eyre::Result;
-use color_eyre::{Section, SectionExt};
 use crate::util;
+
+#[derive(Debug)]
+pub enum Trace {
+	Goto {
+		addr: usize,
+		target: usize,
+		brk: Option<usize>,
+	},
+	Statement {
+		range: Range<usize>,
+		brk: Option<usize>,
+		next: Box<Trace>,
+	},
+}
+
+impl std::fmt::Display for Trace {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		fn write_brk(f: &mut std::fmt::Formatter, brk: &Option<usize>) -> std::fmt::Result {
+			if let Some(brk) = brk {
+				write!(f, " [{}]", brk)?;
+			}
+			Ok(())
+		}
+
+		match self {
+			Trace::Goto { addr, target, brk } => {
+				write!(f, "({addr}) {target}")?;
+				write_brk(f, brk)?;
+			},
+			Trace::Statement { range, brk, next } => {
+				write!(f, "({range:?})")?;
+				write_brk(f, brk)?;
+				write!(f, " → ")?;
+				std::fmt::Display::fmt(&next, f)?;
+			},
+		}
+		Ok(())
+	}
+}
+
+#[derive(Debug, thiserror::Error)]
+pub struct Error {
+	pub code: String,
+	pub trace: Box<Trace>,
+}
+
+impl std::fmt::Display for Error {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+		write!(f, "Decompilation error: ")?;
+		std::fmt::Display::fmt(&self.trace, f)?;
+		if f.alternate() {
+			write!(f, "\nCode:\n")?;
+			for l in self.code.lines() {
+				writeln!(f, "  {l}")?;
+			}
+		}
+		Ok(())
+	}
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FlowInsn<E, I> {
@@ -39,28 +96,24 @@ pub enum Stmt<E, I> {
 }
 
 #[tracing::instrument(skip(asm, end))]
-pub fn decompile<E: Clone + Debug, I: Clone + Debug>(asm: &[(usize, FlowInsn<E, I>)], end: usize) -> Result<Vec<Stmt<E, I>>> {
-	decompile_inner(asm, end)
-		.with_section(|| {
-			let mut labels = BTreeSet::<usize>::new();
-			for (_, insn) in asm {
-				insn.labels(|a| { labels.insert(a); });
+pub fn decompile<E: Clone + Debug, I: Clone + Debug>(asm: &[(usize, FlowInsn<E, I>)], end: usize) -> Result<Vec<Stmt<E, I>>, Error> {
+	let asm_map = BTreeMap::from_iter(asm.iter().map(|(k, v)| (*k, v)));
+	let start = asm_map.keys().next().copied().unwrap_or(end);
+	Decompiler { asm: asm_map }.block(start..end, None)
+	.map_err(|e| {
+		let mut labels = BTreeSet::<usize>::new();
+		for (_, insn) in asm {
+			insn.labels(|a| { labels.insert(a); });
+		}
+		let mut out = Vec::new();
+		for (addr, insn) in asm {
+			if labels.contains(addr) {
+				out.push(format!("{addr}:"));
 			}
-			let mut out = Vec::new();
-			for (addr, insn) in asm {
-				if labels.contains(addr) {
-					out.push(format!("{addr}:"));
-				}
-				out.push(format!("  {insn:?}"));
-			}
-			out.join("\n").header("Code:")
-		})
-}
-
-pub fn decompile_inner<E: Clone, I: Clone>(asm: &[(usize, FlowInsn<E, I>)], end: usize) -> Result<Vec<Stmt<E, I>>> {
-	let asm = BTreeMap::from_iter(asm.iter().map(|(k, v)| (*k, v)));
-	let start = asm.keys().next().copied().unwrap_or(end);
-	Decompiler { asm }.block(start..end, None)
+			out.push(format!("  {insn:?}"));
+		}
+		Error { code: out.join("\n"), trace: Box::new(e) }
+	})
 }
 
 #[derive(Clone)]
@@ -69,7 +122,7 @@ struct Decompiler<'a, E, I> {
 }
 
 impl<E: Clone, I: Clone> Decompiler<'_, E, I> {
-	fn block(&self, mut range: Range<usize>, brk: Option<usize>) -> Result<Vec<Stmt<E, I>>> {
+	fn block(&self, mut range: Range<usize>, brk: Option<usize>) -> Result<Vec<Stmt<E, I>>, Trace> {
 		let mut out = Vec::new();
 		while range.start < range.end {
 			out.push(self.stmt(&mut range, brk)?);
@@ -77,7 +130,14 @@ impl<E: Clone, I: Clone> Decompiler<'_, E, I> {
 		Ok(out)
 	}
 
-	fn stmt(&self, range: &mut Range<usize>, brk: Option<usize>) -> Result<Stmt<E, I>> {
+	fn stmt(&self, range: &mut Range<usize>, brk: Option<usize>) -> Result<Stmt<E, I>, Trace> {
+		let range_ = range.clone();
+		self.stmt_inner(range, brk)
+		.map_err(|e| Trace::Statement { range: range_, brk, next: Box::new(e) })
+	}
+
+	#[inline]
+	fn stmt_inner(&self, range: &mut Range<usize>, brk: Option<usize>) -> Result<Stmt<E, I>, Trace> {
 		let start = range.start;
 		*range = self.advance(range.clone());
 		Ok(match *self.asm[&start] {
@@ -133,8 +193,11 @@ impl<E: Clone, I: Clone> Decompiler<'_, E, I> {
 			}
 
 			FlowInsn::Goto(l1) => {
-				eyre::ensure!(Some(l1) == brk, "invalid goto {:?}", l1);
-				Stmt::Break
+				if Some(l1) == brk {
+					Stmt::Break
+				} else {
+					return Err(Trace::Goto { addr: start, target: l1, brk });
+				}
 			}
 
 			FlowInsn::Switch(ref expr, ref clauses, default) => {

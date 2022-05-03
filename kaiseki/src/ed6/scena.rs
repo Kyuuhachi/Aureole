@@ -51,10 +51,6 @@ pub enum Expr {
 	Rand,
 }
 
-pub type FlowInsn = crate::decompile::FlowInsn<Expr, Insn>;
-
-pub type Stmt = crate::decompile::Stmt<Expr, Insn>;
-
 #[derive(Debug, Clone)]
 pub struct Asm {
 	pub code: Vec<(usize, FlowInsn)>,
@@ -295,7 +291,10 @@ fn list<A>((mut i, count): (In, u16), mut f: impl FnMut(&mut In) -> Result<A>) -
 	Ok(out)
 }
 
-pub fn decompile(asm: &Asm) -> Result<Vec<Stmt>> {
+pub type FlowInsn = crate::decompile::FlowInsn<Expr, Insn>;
+pub type Stmt = crate::decompile::Stmt<Expr, Insn>;
+
+pub fn decompile(asm: &Asm) -> Result<Vec<Stmt>, crate::decompile::Error> {
 	crate::decompile::decompile(&asm.code, asm.end)
 }
 

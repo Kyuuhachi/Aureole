@@ -118,9 +118,9 @@ impl ScenaRenderer<'_> {
 							doc.body.node_class("pre", "code", |a| render.code(a, &code));
 						},
 						Err(e) => {
-							tracing::error!("{:?}", e);
+							tracing::error!("{:#}", e);
 							doc.body.node_class("div", "decompile-error", |a| {
-								a.text("Decompilation failed. This is a bug.");
+								a.text(e.to_string());
 							});
 							doc.body.node_class("pre", "code asm", |a| render.asm(a, func));
 						},

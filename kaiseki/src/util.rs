@@ -6,9 +6,17 @@ use itermore::Itermore;
 use derive_more::*;
 use hamu::read::{In, Le};
 
+#[derive(Debug, thiserror::Error)]
+pub enum StringError {
+	#[error("Read error")]
+	Read(#[from] hamu::read::Error),
+	#[error("Invalid SJIS string {0:?}")]
+	Invalid(String),
+}
+
 #[extend::ext(name=InExt)]
 pub impl In<'_> where Self: Sized {
-	fn string(&mut self) -> Result<String> {
+	fn string(&mut self) -> Result<String, StringError> {
 		let mut s = Vec::new();
 		loop {
 			match self.u8()? {
@@ -28,10 +36,13 @@ pub impl In<'_> where Self: Sized {
 	}
 }
 
-pub fn decode(s: &[u8]) -> Result<String> {
+pub fn decode(s: &[u8]) -> Result<String, StringError> {
 	let (out, _, error) = SHIFT_JIS.decode(s);
-	eyre::ensure!(!error, "Invalid string: {:?}", out);
-	Ok(out.into_owned())
+	if error {
+		Err(StringError::Invalid(out.into_owned()))
+	} else {
+		Ok(out.into_owned())
+	}
 }
 
 pub fn toc<A>(i: &[u8], f: impl FnMut(&mut In, usize) -> Result<A>) -> Result<Vec<A>> {

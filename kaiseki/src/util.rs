@@ -52,7 +52,7 @@ pub fn decode(s: &[u8]) -> Result<String, DecodeError> {
 pub enum MultiError<E: Display> {
 	#[error("read error")]
 	Read(#[from] hamu::read::Error),
-	#[error("{}", _0.iter().map(|(i,e)| format!("{i}: {e}")).collect::<Vec<_>>().join("\n"))] // TODO
+	#[error("{}", _0.iter().map(|(i,e)| format!("{i}: {e}")).collect::<Vec<_>>().join("\n"))]
 	Multiple(Vec<(usize, E)>),
 }
 

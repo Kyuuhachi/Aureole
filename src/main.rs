@@ -6,7 +6,7 @@ use actix_web::{
 	HttpResponse,
 	HttpRequest,
 	middleware,
-	body::BoxBody,
+	body::{BoxBody, MessageBody}, http::{self, header}, dev,
 };
 
 pub mod ed6 {
@@ -82,8 +82,11 @@ async fn main() -> std::io::Result<()> {
 
 	HttpServer::new(|| {
 		App::new()
-			.wrap(middleware::Compress::default())
 			.wrap(middleware::Logger::default())
+			.wrap(middleware::ErrorHandlers::new()
+				.handler(http::StatusCode::NOT_FOUND, handle_404)
+			)
+			.wrap(middleware::Compress::default())
 			.service(
 				actix_files::Files::new("/assets", concat!(env!("CARGO_MANIFEST_DIR"), "/assets"))
 				.show_files_listing()
@@ -94,4 +97,11 @@ async fn main() -> std::io::Result<()> {
 	.bind(("127.0.0.1", 8000))?
 	.run()
 	.await
+}
+
+fn handle_404<B: MessageBody>(mut res: dev::ServiceResponse<B>) -> actix_web::Result<middleware::ErrorHandlerResponse<B>> {
+	res.response_mut().headers_mut().insert(header::CONTENT_TYPE, header::HeaderValue::from_static("text/plain"));
+	let res = res.map_body(|_head, _| { "404" });
+	let res = res.map_into_boxed_body().map_into_right_body();
+	Ok(middleware::ErrorHandlerResponse::Response(res))
 }

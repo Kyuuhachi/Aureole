@@ -9,8 +9,8 @@ use hamu::read::{In, Le};
 pub enum StringError {
 	#[error("{0}")]
 	Read(#[from] hamu::read::Error),
-	#[error("Invalid SJIS string {0:?}")]
-	Invalid(String),
+	#[error("{0}")]
+	Decode(#[from] DecodeError),
 }
 
 #[extend::ext(name=InExt)]
@@ -35,10 +35,14 @@ pub impl In<'_> where Self: Sized {
 	}
 }
 
-pub fn decode(s: &[u8]) -> Result<String, StringError> {
+#[derive(Debug, thiserror::Error)]
+#[error("Invalid SJIS string {0:?}")]
+pub struct DecodeError(String);
+
+pub fn decode(s: &[u8]) -> Result<String, DecodeError> {
 	let (out, _, error) = SHIFT_JIS.decode(s);
 	if error {
-		Err(StringError::Invalid(out.into_owned()))
+		Err(DecodeError(out.into_owned()))
 	} else {
 		Ok(out.into_owned())
 	}
@@ -178,7 +182,7 @@ pub enum TextError {
 	#[error("{0}")]
 	Read(#[from] hamu::read::Error),
 	#[error("{0}")]
-	String(#[from] StringError),
+	Decode(#[from] DecodeError),
 	#[error("Unknown TextSegment at {pos}: {text}")]
 	Unknown {
 		pos: usize,
@@ -190,7 +194,7 @@ impl Text {
 	pub fn read(i: &mut In) -> Result<Text, TextError> {
 		let mut segments = Vec::new();
 		let mut curr = Vec::new();
-		fn drain(segments: &mut Vec<TextSegment>, curr: &mut Vec<u8>) -> Result<(), StringError> {
+		fn drain(segments: &mut Vec<TextSegment>, curr: &mut Vec<u8>) -> Result<(), DecodeError> {
 			if !curr.is_empty() {
 				segments.push(TextSegment::String(decode(curr)?));
 			}

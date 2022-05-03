@@ -7,9 +7,9 @@ use hamu::read::{In, Le};
 
 #[derive(Debug, thiserror::Error)]
 pub enum StringError {
-	#[error("{0}")]
+	#[error("read error")]
 	Read(#[from] hamu::read::Error),
-	#[error("{0}")]
+	#[error("decode error")]
 	Decode(#[from] DecodeError),
 }
 
@@ -50,7 +50,7 @@ pub fn decode(s: &[u8]) -> Result<String, DecodeError> {
 
 #[derive(Debug, thiserror::Error)]
 pub enum MultiError<E: Display> {
-	#[error("{0}")]
+	#[error("read error")]
 	Read(#[from] hamu::read::Error),
 	#[error("{}", _0.iter().map(|(i,e)| format!("{i}: {e}")).collect::<Vec<_>>().join("\n"))] // TODO
 	Multiple(Vec<(usize, E)>),
@@ -179,9 +179,9 @@ pub enum TextSegment {
 
 #[derive(Debug, thiserror::Error)]
 pub enum TextError {
-	#[error("{0}")]
+	#[error("read error")]
 	Read(#[from] hamu::read::Error),
-	#[error("{0}")]
+	#[error("decode error")]
 	Decode(#[from] DecodeError),
 	#[error("Unknown TextSegment at {pos}: {text}")]
 	Unknown {

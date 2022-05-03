@@ -7,13 +7,13 @@ use crate::util::{self, ByteString, InExt, Text};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-	#[error("{0}")]
+	#[error("read error")]
 	Read(#[from] hamu::read::Error),
-	#[error("{0}")]
+	#[error("decode error")]
 	Decode(#[from] util::DecodeError),
-	#[error("{0}")]
+	#[error("text error")]
 	Text(#[from] util::TextError),
-	#[error("{0}")]
+	#[error("multi error")]
 	Multi(#[from] util::MultiError<Error>),
 	#[error("Overshot: {pos:X} > {end:X}")]
 	Overshot { pos: usize, end: usize },

@@ -4,19 +4,22 @@ use crate::util::{self, InExt};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-	#[error("{0}")]
+	#[error("read error")]
 	Read(#[from] hamu::read::Error),
 	#[error("Invalid {0}: {1:X}")]
 	Enum(&'static str, u32),
-	#[error("{0}")]
-	String(#[from] util::StringError),
-	#[error("Multiple errors: {0}")]
-	Multi(util::MultiError<Error>),
+	#[error("decode error")]
+	Decode(#[from] util::DecodeError),
+	#[error("multiple errors")]
+	Multi(#[from] util::MultiError<Error>),
 }
 
-impl From<util::MultiError<Error>> for Error {
-	fn from(v: util::MultiError<Error>) -> Self {
-		Self::Multi(v)
+impl From<util::StringError> for Error {
+	fn from(e: util::StringError) -> Self {
+		match e {
+			util::StringError::Read(e) => e.into(),
+			util::StringError::Decode(e) => e.into(),
+		}
 	}
 }
 

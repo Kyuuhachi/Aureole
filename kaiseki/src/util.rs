@@ -57,8 +57,6 @@ pub fn multiple<A>(i: &In, pos: &[usize], end: usize, mut f: impl FnMut(&mut In,
 		}
 	}
 
-	use std::fmt::Write;
-	use color_eyre::{Section, SectionExt};
 	match errors.len() {
 		0 => Ok(out),
 		_ => Err({
@@ -66,13 +64,7 @@ pub fn multiple<A>(i: &In, pos: &[usize], end: usize, mut f: impl FnMut(&mut In,
 			for (idx, e) in &errors {
 				s.push(format!("  {}: {}", idx, e));
 			}
-			eyre::eyre!(s.join("\n")).section({
-				let mut s = String::new();
-				for (idx, e) in errors {
-					write!(s, "{:?}", e.wrap_err(eyre::eyre!("Item {}", idx))).unwrap();
-				}
-				s.header("Errors:")
-			})
+			eyre::eyre!(s.join("\n"))
 		}),
 	}
 }

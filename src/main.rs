@@ -83,7 +83,6 @@ async fn main() -> std::io::Result<()> {
 	HttpServer::new(|| {
 		App::new()
 			.wrap(middleware::Compress::default())
-			.wrap(tracing_actix_web::TracingLogger::default())
 			.wrap(middleware::Logger::default())
 			.service(
 				actix_files::Files::new("/assets", concat!(env!("CARGO_MANIFEST_DIR"), "/assets"))

@@ -1,10 +1,36 @@
 use std::collections::HashMap;
 
-use eyre::Result;
 use derive_more::*;
 
 use hamu::read::{In, Le};
 use crate::util::{self, ByteString, InExt, Text};
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+	#[error("{0}")]
+	Read(#[from] hamu::read::Error),
+	#[error("{0}")]
+	Decode(#[from] util::DecodeError),
+	#[error("{0}")]
+	Text(#[from] util::TextError),
+	#[error("{0}")]
+	Multi(#[from] util::MultiError<Error>),
+	#[error("Overshot: {pos:X} > {end:X}")]
+	Overshot { pos: usize, end: usize },
+	#[error("Unknown {ty}: {op:02X}")]
+	Unknown { ty: &'static str, op: u8 },
+	#[error("{0}")]
+	Misc(String),
+}
+impl From<util::StringError> for Error {
+	fn from(e: util::StringError) -> Self {
+		match e {
+			util::StringError::Read(e) => e.into(),
+			util::StringError::Decode(e) => e.into(),
+		}
+	}
+}
+pub type Result<T, E=Error> = std::result::Result<T, E>;
 
 mod code;
 pub use code::{Insn, InsnArg};
@@ -150,6 +176,15 @@ impl In<'_> {
 	fn pos3(&mut self) -> hamu::read::Result<Pos3> {
 		Ok(Pos3(self.i32()?, self.i32()?, self.i32()?))
 	}
+
+	fn check_pos(&self, end: usize) -> Result<()> {
+		assert!(self.pos() >= end);
+		if self.pos() == end {
+			Ok(())
+		} else {
+			Err(Error::Overshot { pos: self.pos(), end })
+		}
+	}
 }
 
 #[tracing::instrument(skip(i))]
@@ -182,7 +217,7 @@ pub fn read(i: &[u8]) -> Result<Scena> {
 	let code_end = i.clone().u16()? as usize;
 	let func_table = (i.ptr_u16()?, i.u16()? / 2);
 
-	eyre::ensure!(strings.string()? == "@FileName", stringify!(strings.string()? == "@FileName"));
+	check_eq(&*strings.string()?, "@FileName")?;
 
 	let ch = chcp_list(ch)?;
 	let cp = chcp_list(cp)?;
@@ -228,8 +263,9 @@ pub fn read(i: &[u8]) -> Result<Scena> {
 	}))?;
 
 	let func_table = list(func_table, |i| Ok(i.u16()? as usize))?;
-	eyre::ensure!(func_table.is_empty() || func_table[0] == code_start,
-		"Unexpected func table: {:X?} does not start with {:X?}", func_table, code_start);
+	if !func_table.is_empty() && func_table[0] != code_start {
+		return Err(Error::Misc(format!("Unexpected func table: {func_table:X?} does not start with {code_start:X?}")));
+	}
 
 	let mut camera_angles = Vec::new();
 	while i.pos() < head_end {
@@ -250,10 +286,10 @@ pub fn read(i: &[u8]) -> Result<Scena> {
 			_12: [i.u16()?, i.u16()?, i.u16()?, i.u16()?, i.u16()?, i.u16()?]
 		});
 	}
-	eyre::ensure!(i.pos() == head_end, "Overshot: {:X} > {:X}", i.pos(), head_end);
+	i.check_pos(head_end)?;
 
 	let mut n = 0u32;
-	let functions = util::multiple::<_, eyre::Report, _>(&i, &func_table, code_end, |i, len| {
+	let functions = util::multiple::<_, Error, _>(&i, &func_table, code_end, |i, len| {
 		let _span = tracing::info_span!("function", n, start = i.pos(), end = i.pos()+len).entered();
 		n += 1;
 		let end = i.pos() + len;
@@ -274,6 +310,14 @@ pub fn read(i: &[u8]) -> Result<Scena> {
 		camera_angles,
 		functions,
 	})
+}
+
+fn check_eq<T: Eq + std::fmt::Debug>(got: T, exp: T) -> Result<()> {
+	if exp == got {
+		Ok(())
+	} else {
+		Err(Error::Misc(format!("Expected {:?}, got {:?}", exp, got)))
+	}
 }
 
 fn chcp_list((mut i, count): (In, u16)) -> Result<Vec<FileRef>> {
@@ -302,7 +346,7 @@ pub fn decompile(asm: &Asm) -> Result<Vec<Stmt>, crate::decompile::Error> {
 
 impl FileRef {
 	pub fn read(i: &mut In) -> Result<Self> {
-		Ok(Self::read_opt(i)?.ok_or_else(|| eyre::eyre!("invalid empty file ref"))?)
+		Ok(Self::read_opt(i)?.ok_or_else(|| Error::Misc("invalid empty file ref".to_owned()))?)
 	}
 
 	pub fn read_opt(i: &mut In) -> Result<Option<Self>> {
@@ -342,8 +386,8 @@ impl<'a> CodeParser<'a> {
 				ops.push((self.pos(), self.flow_insn()?));
 				self.marks.insert(self.pos(), "\x1B[0;7m•".to_owned());
 			}
+			self.check_pos(end)?;
 			self.marks.insert(self.pos(), "\x1B[0;7m]".to_owned());
-			eyre::ensure!(self.pos() == end, "Overshot: {:X} > {:X}", self.pos(), end);
 			Ok(())
 		})().map_err(|e| {
 			use std::fmt::Write as _;
@@ -406,8 +450,12 @@ impl<'a> CodeParser<'a> {
 		FileRef::read(&mut self.inner)
 	}
 
-	fn func_ref(&mut self) -> hamu::read::Result<FuncRef> {
+	fn func_ref(&mut self) -> Result<FuncRef> {
 		Ok(FuncRef(self.u8()? as u16, self.u16()?))
+	}
+
+	fn unknown(&self, ty: &'static str, op: u8) -> Error {
+		Error::Unknown { ty, op }
 	}
 }
 
@@ -436,7 +484,7 @@ impl<'a, 'b> ExprParser<'a, 'b> {
 		self.inner.marks.insert(self.inner.pos(), "\x1B[0;7;2m]".to_owned());
 		match self.stack.len() {
 			1 => Ok(self.pop()?),
-			_ => eyre::bail!("Invalid Expr: {:?}", self.stack)
+			_ => return Err(Error::Misc(format!("invalid Expr: {:?}", self.stack))),
 		}
 	}
 
@@ -477,7 +525,7 @@ impl<'a, 'b> ExprParser<'a, 'b> {
 			0x20 => Expr::Attr(self.u8()?),
 			0x21 => Expr::CharAttr(self.u16()?, self.u8()?),
 			0x22 => Expr::Rand,
-			op => eyre::bail!("Unknown Expr: {:02X}", op)
+			op => return Err(self.unknown("Expr", op))
 		}))
 	}
 
@@ -493,6 +541,6 @@ impl<'a, 'b> ExprParser<'a, 'b> {
 	}
 
 	fn pop(&mut self) -> Result<Expr> {
-		Ok(self.stack.pop().ok_or_else(|| eyre::eyre!("Empty expr stack"))?)
+		Ok(self.stack.pop().ok_or_else(|| Error::Misc("empty Expr stack".to_owned()))?)
 	}
 }

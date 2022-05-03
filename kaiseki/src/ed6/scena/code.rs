@@ -100,7 +100,7 @@ pub(super) fn read(i: &mut CodeParser) -> Result<Self> {
 				i.marks.insert(i.pos(), "\x1B[0;7;2m•".to_owned());
 				insns.push(i.insn()?);
 			}
-			eyre::ensure!(i.pos() == pos+len, "Overshot: {:X} > {:X}", i.pos(), pos+len);
+			i.check_pos(pos+len)?;
 			i.check_u8(0)?;
 			insns
 		} as Vec<Insn>),
@@ -112,9 +112,9 @@ pub(super) fn read(i: &mut CodeParser) -> Result<Self> {
 				i.marks.insert(i.pos(), "\x1B[0;7;2m•".to_owned());
 				insns.push((i.insn())?);
 			}
-			eyre::ensure!(i.pos() == pos+len, "Overshot: {:X} > {:X}", i.pos(), pos+len);
-			eyre::ensure!(i.flow_insn()? == FlowInsn::Insn(Insn::Yield()), "Invalid loop");
-			eyre::ensure!(i.flow_insn()? == FlowInsn::Goto(pos), "Invalid loop");
+			i.check_pos(pos+len)?;
+			check_eq(i.flow_insn()?, FlowInsn::Insn(Insn::Yield()))?;
+			check_eq(i.flow_insn()?, FlowInsn::Goto(pos))?;
 			insns
 		} as Vec<Insn>),
 		0x47 => CharForkAwait(char/u16, fork_id/u8, u8),

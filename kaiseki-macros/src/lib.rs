@@ -250,7 +250,7 @@ impl Gen {
 		} else {
 			format!("{}::{}*", self.insn_name, prefix)
 		};
-		let fallback = make!(Arm, table.span; op => eyre::bail!("Unknown {}: {:02X}", #description, op));
+		let fallback = make!(Arm, table.span; op => return Err(i.unknown(#description, op)));
 
 		let name = &table.expr;
 		let expr = make!(Expr, name.span(); i.#name()?);

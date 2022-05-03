@@ -855,7 +855,6 @@ dependencies = [
  "derive_more",
  "encoding_rs",
  "extend",
- "eyre",
  "hamu",
  "image",
  "int-enum",

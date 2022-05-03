@@ -92,6 +92,7 @@ impl<'a> In<'a> {
 		let pos = self.pos();
 		let u = self.slice(v.len())?;
 		if u != v {
+			self.pos = pos;
 			let mut got = Vec::new();
 			let mut exp = Vec::new();
 			for (&g, &e) in std::iter::zip(u, v) {
@@ -127,6 +128,7 @@ macro_rules! primitives {
 				let pos = self.pos();
 				let u = $name::$type(self)?;
 				if u != v {
+					self.pos = pos;
 					return Err(Error::Check {
 						pos,
 						type_: stringify!($type).to_owned(),

@@ -152,6 +152,7 @@ pub fn decompress_chunk(data: &[u8]) -> Result<Vec<u8>> {
 	Ok(c_.out)
 }
 
+#[tracing::instrument(skip(data))]
 pub fn decompress(data: &[u8]) -> Result<Vec<u8>> {
 	let mut out = Vec::new();
 	let mut i = In::new(data);

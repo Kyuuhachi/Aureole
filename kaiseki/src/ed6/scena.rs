@@ -157,6 +157,7 @@ impl In<'_> {
 	}
 }
 
+#[tracing::instrument(skip(i))]
 pub fn read(i: &[u8]) -> Result<Scena> {
 	let mut i = In::new(i);
 

@@ -20,6 +20,7 @@ fn part(x: u16, mask: u16, mul: u32, shift: u32) -> u8 {
 	(((x&mask) as u32 * mul) >> shift) as u8
 }
 
+#[tracing::instrument(skip(i))]
 fn read_buf(i: &mut In, width: u32, height: u32, format: Format) -> Result<RgbaImage> {
 	let mut img = RgbaImage::new(width, height);
 	for y in 0..height {

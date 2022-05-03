@@ -22,6 +22,7 @@ impl Tables {
 }
 
 impl App {
+	#[tracing::instrument]
 	pub fn new(path: &str) -> Result<Self> {
 		let arch = Archives::new(path);
 		Ok(Self {

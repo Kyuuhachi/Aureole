@@ -38,6 +38,7 @@ pub enum Stmt<E, I> {
 	Insn(I),
 }
 
+#[tracing::instrument(skip(asm, end))]
 pub fn decompile<E: Clone + Debug, I: Clone + Debug>(asm: &[(usize, FlowInsn<E, I>)], end: usize) -> Result<Vec<Stmt<E, I>>> {
 	decompile_inner(asm, end)
 		.with_section(|| {
@@ -68,7 +69,6 @@ struct Decompiler<'a, E, I> {
 }
 
 impl<E: Clone, I: Clone> Decompiler<'_, E, I> {
-	#[tracing::instrument(skip(self))]
 	fn block(&self, mut range: Range<usize>, brk: Option<usize>) -> Result<Vec<Stmt<E, I>>> {
 		let mut out = Vec::new();
 		while range.start < range.end {
@@ -77,7 +77,6 @@ impl<E: Clone, I: Clone> Decompiler<'_, E, I> {
 		Ok(out)
 	}
 
-	#[tracing::instrument(skip(self))]
 	fn stmt(&self, range: &mut Range<usize>, brk: Option<usize>) -> Result<Stmt<E, I>> {
 		let start = range.start;
 		*range = self.advance(range.clone());
@@ -218,7 +217,6 @@ impl<E: Clone, I: Clone> Decompiler<'_, E, I> {
 		})
 	}
 
-	#[tracing::instrument(skip(self))]
 	fn advance(&self, range: Range<usize>) -> Range<usize> {
 		match self.asm.range(range.clone()).nth(1) {
 			Some((addr, _)) => *addr..range.end,
@@ -226,7 +224,6 @@ impl<E: Clone, I: Clone> Decompiler<'_, E, I> {
 		}
 	}
 
-	#[tracing::instrument(skip(self))]
 	fn find_jump_before(&self, addr: usize, brk: Option<usize>) -> Option<(usize, usize)> {
 		if let Some((addr, FlowInsn::Goto(target))) = self.asm.range(..addr).next_back() {
 			if Some(*target) != brk {

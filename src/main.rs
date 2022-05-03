@@ -40,7 +40,8 @@ pub type Result<T, E=Error> = std::result::Result<T, E>;
 pub struct Html(choubun::Node);
 impl Responder for Html {
 	type Body = BoxBody;
-	fn respond_to(self, _: &HttpRequest) -> HttpResponse<Self::Body> {
+	#[tracing::instrument(skip(self, _req))]
+	fn respond_to(self, _req: &HttpRequest) -> HttpResponse<Self::Body> {
 		HttpResponse::Ok()
 			.content_type("text/html")
 			.body(self.0.render_to_string())
@@ -51,7 +52,8 @@ impl Responder for Html {
 pub struct Image(image::RgbaImage);
 impl Responder for Image {
 	type Body = BoxBody;
-	fn respond_to(self, _: &HttpRequest) -> HttpResponse<Self::Body> {
+	#[tracing::instrument(skip(self, _req))]
+	fn respond_to(self, _req: &HttpRequest) -> HttpResponse<Self::Body> {
 		let mut data = Vec::new();
 		self.0.write_to(&mut std::io::Cursor::new(&mut data), image::ImageOutputFormat::Png).unwrap();
 		HttpResponse::Ok()
@@ -68,6 +70,7 @@ async fn main() -> std::io::Result<()> {
 		.with(tracing_subscriber::fmt::layer())
 		.with(tracing_subscriber::EnvFilter::from_default_env())
 		.with(tracing_error::ErrorLayer::default())
+		.with(tracing_span_tree::span_tree())
 		.init();
 
 	color_eyre::config::HookBuilder::default()

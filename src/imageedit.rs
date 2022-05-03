@@ -35,6 +35,7 @@ impl FromStr for ImageEdit {
 }
 
 impl ImageEdit {
+	#[tracing::instrument(skip(src))]
 	pub fn perform(&self, src: RgbaImage) -> eyre::Result<RgbaImage> {
 		match *self {
 			ImageEdit::ReGrid { w1, h1, w2, h2 } => {

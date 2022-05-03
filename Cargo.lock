@@ -897,6 +897,7 @@ dependencies = [
  "tracing",
  "tracing-actix-web",
  "tracing-error",
+ "tracing-span-tree",
  "tracing-subscriber",
  "unicode-width",
 ]
@@ -1671,6 +1672,16 @@ dependencies = [
  "lazy_static",
  "log",
  "tracing-core",
+]
+
+[[package]]
+name = "tracing-span-tree"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3809cda0328d505548af1ca24fac329f41c0c213d0a1e78908922d0b43e5c43"
+dependencies = [
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

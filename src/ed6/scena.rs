@@ -7,6 +7,7 @@ use kaiseki::util::{Text, TextSegment};
 
 use crate::app::Tables;
 
+#[tracing::instrument(skip(scena, archives, tables))]
 pub fn render(scena: &Scena, archives: &Archives, tables: &Tables, raw: bool) -> choubun::Node {
 	ScenaRenderer { scena, archives, tables, raw }.render()
 }
@@ -105,13 +106,14 @@ impl ScenaRenderer<'_> {
 			});
 
 			doc.body.node("h2", |a| a.text("Code"));
+			let decompile_span = tracing::info_span!("decompile");
 			for (i, func) in self.scena.functions.iter().enumerate() {
 				doc.body.node("h3", |a| a.text(format!("Function {}", i)));
 				let render = CodeRenderer { inner: self, indent: 0 };
 				if self.raw {
 					doc.body.node_class("pre", "code asm", |a| render.asm(a, func));
 				} else {
-					match decompile(func) {
+					match decompile_span.in_scope(|| decompile(func)) {
 						Ok(code) => {
 							doc.body.node_class("pre", "code", |a| render.code(a, &code));
 						},

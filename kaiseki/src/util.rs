@@ -52,8 +52,14 @@ pub fn decode(s: &[u8]) -> Result<String, DecodeError> {
 pub enum MultiError<E: Display> {
 	#[error("read error")]
 	Read(#[from] hamu::read::Error),
-	#[error("{}", _0.iter().map(|(i,e)| format!("{i}: {e}")).collect::<Vec<_>>().join("\n"))]
-	Multiple(Vec<(usize, E)>),
+	#[error("{}",
+		std::iter::once((_0, _1.as_ref()))
+		.chain(_2.iter().map(|(a,b)|(a,b)))
+		.map(|(i,e)| format!("{i}: {e}"))
+		.collect::<Vec<_>>()
+		.join("\n")
+	)]
+	Multiple(usize, #[source] Box<E>, Vec<(usize, E)>),
 }
 
 pub fn toc<A, E, F>(i: &[u8], f: F) -> Result<Vec<A>, MultiError<E>> where
@@ -77,17 +83,20 @@ pub fn multiple<A, E, F>(i: &In, pos: &[usize], end: usize, mut f: F) -> Result<
 	F: FnMut(&mut In, usize) -> Result<A, E>,
 {
 	let mut out = Vec::with_capacity(pos.len());
+	let mut first = None;
 	let mut errors = Vec::new();
 	for (idx, range) in ranges(pos.iter().copied(), end).enumerate() {
 		match f(&mut i.clone().at(range.start)?, range.end-range.start) {
 			Ok(v) => out.push(v),
+			Err(e) if first.is_none() => first = Some((idx, e)),
 			Err(e) => errors.push((idx, e)),
 		}
 	}
 
-	match errors.len() {
-		0 => Ok(out),
-		_ => Err(MultiError::Multiple(errors)),
+	if let Some((idx, e)) = first {
+		Err(MultiError::Multiple(idx, Box::new(e), errors))
+	} else {
+		Ok(out)
 	}
 }
 

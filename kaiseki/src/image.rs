@@ -1,6 +1,5 @@
-use eyre::Result;
 use image::RgbaImage;
-use hamu::read::{In, Le};
+use hamu::read::{In, Le, Result};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Format {

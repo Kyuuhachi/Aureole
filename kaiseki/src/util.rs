@@ -1,6 +1,5 @@
 use std::{ops::Range, fmt::Display};
 
-use eyre::Result;
 use encoding_rs::SHIFT_JIS;
 use itermore::Itermore;
 use derive_more::*;
@@ -8,7 +7,7 @@ use hamu::read::{In, Le};
 
 #[derive(Debug, thiserror::Error)]
 pub enum StringError {
-	#[error("Read error")]
+	#[error("{0}")]
 	Read(#[from] hamu::read::Error),
 	#[error("Invalid SJIS string {0:?}")]
 	Invalid(String),
@@ -174,11 +173,24 @@ pub enum TextSegment {
 	Speed(u16),
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum TextError {
+	#[error("{0}")]
+	Read(#[from] hamu::read::Error),
+	#[error("{0}")]
+	String(#[from] StringError),
+	#[error("Unknown TextSegment at {pos}: {text}")]
+	Unknown {
+		pos: usize,
+		text: String,
+	},
+}
+
 impl Text {
-	pub fn read(i: &mut In) -> Result<Text> {
+	pub fn read(i: &mut In) -> Result<Text, TextError> {
 		let mut segments = Vec::new();
 		let mut curr = Vec::new();
-		fn drain(segments: &mut Vec<TextSegment>, curr: &mut Vec<u8>) -> Result<()> {
+		fn drain(segments: &mut Vec<TextSegment>, curr: &mut Vec<u8>) -> Result<(), StringError> {
 			if !curr.is_empty() {
 				segments.push(TextSegment::String(decode(curr)?));
 			}
@@ -196,9 +208,10 @@ impl Text {
 			0x09 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::_09) }
 			// 0x18 =>
 			0x1F => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::Item(i.u16()?)) }
-			op@(0x00..=0x1F) => eyre::bail!("Unknown TextSegment: b{:?}", char::from(op)),
+			op@(0x00..=0x1F) => return Err(TextError::Unknown { pos: i.pos(), text: format!("b{:?}", char::from(op)) }),
 			b'#' => {
 				drain(&mut segments, &mut curr)?;
+				let start = i.pos() - 1;
 				let mut n = 0;
 				segments.push(loop { match i.u8()? {
 					// XXX this can panic on overflow
@@ -217,7 +230,7 @@ impl Text {
 					}),
 					b'S' => break TextSegment::Size(n),
 					b'W' => break TextSegment::Speed(n),
-					op => eyre::bail!("Unknown TextSegment: #{}{}", n, char::from(op)),
+					ch => return Err(TextError::Unknown { pos: start, text: format!("#{}{}", n, char::from(ch)) }),
 				} })
 			}
 			ch => curr.push(ch)

@@ -111,7 +111,7 @@ impl ScenaRenderer<'_> {
 				doc.body.node("h3", |a| a.text(format!("Function {}", i)));
 				let render = CodeRenderer { inner: self, indent: 0 };
 				if self.raw {
-					doc.body.node_class("pre", "code asm", |a| render.asm(a, func));
+					doc.body.node_class("pre", "code asm", |a| render.asm(a, func, false));
 				} else {
 					match decompile_span.in_scope(|| decompile(func)) {
 						Ok(code) => {
@@ -122,7 +122,7 @@ impl ScenaRenderer<'_> {
 							doc.body.node_class("div", "decompile-error", |a| {
 								a.text(e.to_string());
 							});
-							doc.body.node_class("pre", "code asm", |a| render.asm(a, func));
+							doc.body.node_class("pre", "code asm", |a| render.asm(a, func, true));
 						},
 					}
 				}
@@ -224,7 +224,7 @@ impl<'a> CodeRenderer<'a> {
 		})
 	}
 
-	fn asm(&self, a: &mut Node, asm: &Asm) {
+	fn asm(&self, a: &mut Node, asm: &Asm, show_addr: bool) {
 		let mut labels = BTreeSet::<usize>::new();
 		for (_, insn) in &asm.code {
 			insn.labels(|a| { labels.insert(a); });
@@ -233,7 +233,7 @@ impl<'a> CodeRenderer<'a> {
 		let labels: BTreeMap<usize, String> =
 			labels.into_iter()
 			.enumerate()
-			.map(|(i, a)| (a, format!("L{}", i)))
+			.map(|(i, a)| (a, if show_addr { a.to_string() } else { format!("L{}", i) }))
 			.collect();
 
 		let render_label = |a: &mut Node, addr: usize| {

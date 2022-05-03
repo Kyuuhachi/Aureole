@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::{ops::Range, fmt::Display};
 
 use eyre::Result;
 use encoding_rs::SHIFT_JIS;
@@ -45,7 +45,18 @@ pub fn decode(s: &[u8]) -> Result<String, StringError> {
 	}
 }
 
-pub fn toc<A>(i: &[u8], f: impl FnMut(&mut In, usize) -> Result<A>) -> Result<Vec<A>> {
+#[derive(Debug, thiserror::Error)]
+pub enum MultiError<E: Display> {
+	#[error("{0}")]
+	Read(#[from] hamu::read::Error),
+	#[error("{}", _0.iter().map(|(i,e)| format!("{i}: {e}")).collect::<Vec<_>>().join("\n"))] // TODO
+	Multiple(Vec<(usize, E)>),
+}
+
+pub fn toc<A, E, F>(i: &[u8], f: F) -> Result<Vec<A>, MultiError<E>> where
+	E: Display,
+	F: FnMut(&mut In, usize) -> Result<A, E>,
+{
 	let mut i = In::new(i);
 	let start = i.clone().u16()? as usize;
 	let mut pos = Vec::with_capacity(start/2);
@@ -58,7 +69,10 @@ pub fn toc<A>(i: &[u8], f: impl FnMut(&mut In, usize) -> Result<A>) -> Result<Ve
 	Ok(out)
 }
 
-pub fn multiple<A>(i: &In, pos: &[usize], end: usize, mut f: impl FnMut(&mut In, usize) -> Result<A>) -> Result<Vec<A>> {
+pub fn multiple<A, E, F>(i: &In, pos: &[usize], end: usize, mut f: F) -> Result<Vec<A>, MultiError<E>> where
+	E: Display,
+	F: FnMut(&mut In, usize) -> Result<A, E>,
+{
 	let mut out = Vec::with_capacity(pos.len());
 	let mut errors = Vec::new();
 	for (idx, range) in ranges(pos.iter().copied(), end).enumerate() {
@@ -70,13 +84,7 @@ pub fn multiple<A>(i: &In, pos: &[usize], end: usize, mut f: impl FnMut(&mut In,
 
 	match errors.len() {
 		0 => Ok(out),
-		_ => Err({
-			let mut s = Vec::new();
-			for (idx, e) in &errors {
-				s.push(format!("  {}: {}", idx, e));
-			}
-			eyre::eyre!(s.join("\n"))
-		}),
+		_ => Err(MultiError::Multiple(errors)),
 	}
 }
 

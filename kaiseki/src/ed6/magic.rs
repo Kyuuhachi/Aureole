@@ -1,7 +1,26 @@
 use int_enum::IntEnum;
-use eyre::{Result, eyre};
 use hamu::read::{In, Le};
 use crate::util::{self, InExt};
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+	#[error("{0}")]
+	Read(#[from] hamu::read::Error),
+	#[error("Invalid {0}: {1:X}")]
+	Enum(&'static str, u32),
+	#[error("{0}")]
+	String(#[from] util::StringError),
+	#[error("Multiple errors: {0}")]
+	Multi(util::MultiError<Error>),
+}
+
+impl From<util::MultiError<Error>> for Error {
+	fn from(v: util::MultiError<Error>) -> Self {
+		Self::Multi(v)
+	}
+}
+
+pub type Result<T, E=Error> = std::result::Result<T, E>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, strum_macros::Display)]
 pub enum Element {
@@ -178,7 +197,8 @@ pub struct Magic {
 impl BaseMagic {
 	pub fn read_one(i: &mut In) -> Result<Self> {
 		let id = i.u16()?;
-		let flags = MagicFlags::from_bits(i.u16()?).ok_or_else(|| eyre!("invalid flags"))?;
+		let flags = i.u16()?;
+		let flags = MagicFlags::from_bits(flags).ok_or(Error::Enum("MagicFlags", flags as u32))?;
 
 		let elements = &[
 			if flags.contains(MagicFlags::Magic) { Element::Time } else { Element::None },
@@ -190,10 +210,16 @@ impl BaseMagic {
 			Element::Mirage,
 		];
 
-		let element = *elements.get(i.u8()? as usize).ok_or_else(|| eyre!("invalid element"))?;
-		let target = MagicTarget::from_int(i.u8()?)?;
-		let effect1 = MagicEffect::from_int(i.u8()?)?;
-		let effect2 = MagicEffect::from_int(i.u8()?)?;
+		let element = i.u8()?;
+		let target = i.u8()?;
+		let effect1 = i.u8()?;
+		let effect2 = i.u8()?;
+
+		let element = *elements.get(element as usize).ok_or(Error::Enum("Element", element as u32))?;
+		let target  = MagicTarget::from_int(target) .map_err(|_| Error::Enum("MagicTarget", target as u32))?;
+		let effect1 = MagicEffect::from_int(effect1).map_err(|_| Error::Enum("MagicEffect", effect2 as u32))?;
+		let effect2 = MagicEffect::from_int(effect2).map_err(|_| Error::Enum("MagicEffect", effect2 as u32))?;
+
 		let target_p1 = i.u16()?;
 		let target_p2 = i.u16()?;
 		let warmup = i.u16()?;
@@ -235,6 +261,6 @@ impl Magic {
 	}
 
 	pub fn read(i: &[u8]) -> Result<Vec<Self>> {
-		util::toc(i, |i, _| Self::read_one(i))
+		Ok(util::toc(i, |i, _| Self::read_one(i))?)
 	}
 }

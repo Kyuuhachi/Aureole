@@ -253,7 +253,7 @@ pub fn read(i: &[u8]) -> Result<Scena> {
 	eyre::ensure!(i.pos() == head_end, "Overshot: {:X} > {:X}", i.pos(), head_end);
 
 	let mut n = 0u32;
-	let functions = util::multiple(&i, &func_table, code_end, |i, len| {
+	let functions = util::multiple::<_, eyre::Report, _>(&i, &func_table, code_end, |i, len| {
 		let _span = tracing::info_span!("function", n, start = i.pos(), end = i.pos()+len).entered();
 		n += 1;
 		let end = i.pos() + len;

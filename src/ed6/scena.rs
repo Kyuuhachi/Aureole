@@ -540,16 +540,18 @@ impl<'a> CodeRenderer<'a> {
 			InsnArg::bgmtbl(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 			InsnArg::quest(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 			InsnArg::sound(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::item(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+
 			InsnArg::flag(v) => {
 				a.text(" ");
 				a.span_text("flag", v);
 			}
+
 			InsnArg::shop(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+
 			InsnArg::magic(v) => {
 				a.text(" ");
 				let magic = self.inner.tables.magic.get(*v as usize);
-				let name: Cow<str> = magic.map_or(Cow::Owned(format!("[unknown {}]", v)), |a| Cow::Borrowed(&a.name));
+				let name = magic.map_or(Cow::Owned(format!("[unknown {}]", v)), |a| Cow::Borrowed(&a.name));
 				let kind = if let Some(magic) = magic {
 					#[allow(clippy::zero_prefixed_literal)]
 					match magic.base.id {
@@ -563,6 +565,22 @@ impl<'a> CodeRenderer<'a> {
 					Cow::Borrowed("unknown")
 				};
 				self.named(a, "magic", *v as usize, &name, Some(&kind));
+			}
+
+			InsnArg::item(v) => {
+				a.text(" ");
+				let item = self.inner.tables.items.get(*v as usize);
+				let name = item.map_or(Cow::Owned(format!("[unknown {}]", v)), |a| Cow::Borrowed(&a.name));
+				let icon = if let Some(item) = item {
+					item.base.ty[0]
+				} else {
+					0
+				};
+				let icon = if icon == 0 { 0x44 } else { icon };
+				a.node("span", |a| {
+					a.attr("style", format!("--icon-x: {}; --icon-y: {}", icon % 16, icon / 16));
+					self.named(a, "item", *v as usize, &name, None);
+				});
 			}
 
 			InsnArg::fork(v) => {

@@ -42,20 +42,15 @@
 	vertical-align: -5%;
 }
 
-%icon-sheet {
+@mixin icon-sheet($url, $w, $h) {
+	--icon-w: #{$w}; --icon-h: #{$h};
 	background-position:
 		calc(var(--icon-x) / (var(--icon-w) - 1) * 100%)
 		calc(var(--icon-y) / (var(--icon-h) - 1) * 100%);
 	background-size:
 		calc(var(--icon-w) * 100%)
 		calc(var(--icon-h) * 100%);
-}
-
-@mixin icon-sheet($url, $w, $h, $x, $y) {
-	@extend %icon-sheet;
 	background-image: url("/fc/ui/icon1.png");
-	--icon-w: #{$w}; --icon-h: #{$h};
-	--icon-x: #{$x}; --icon-y: #{$y};
 }
 
 body {
@@ -111,6 +106,7 @@ rt { white-space: pre; }
 	.member      { color: var(--aurora3); }
 	.color       { color: var(--base-text); }
 	.magic       { color: var(--aurora2); }
+	.item        { color: var(--aurora2); }
 	.sepith-element { color: var(--aurora3); }
 
 	.char-npc     { text-decoration-color: var(--aurora1); }
@@ -121,10 +117,10 @@ rt { white-space: pre; }
 		@extend %icon;
 	}
 
-	.magic::before, .sepith-element::before {
+	.magic::before, .item::before, .sepith-element::before {
 		content: "";
 		@extend %icon;
-		@include icon-sheet("/fc/ui/icon1.png", 16, 16, 4, 4);
+		@include icon-sheet("/fc/ui/icon1.png", 16, 16);
 	}
 
 	.magic-unknown::before { --icon-x:  7; --icon-y: 3; }

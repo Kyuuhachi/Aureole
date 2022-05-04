@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, borrow::Cow};
 use std::fs;
 use std::io::Write as _;
 
@@ -109,35 +109,31 @@ fn extract(dirfile: &PathBuf, datfile: &PathBuf, outdir: &PathBuf) -> eyre::Resu
 
 	for e in arch.entries() {
 		let outfile = outdir.join(e.display_name());
-		let data = arch.get(e.index).unwrap().1;
-		println!("Extracting {} ({} → {})", outfile.display(), data.len(), e.size);
+		let raw = arch.get(e.index).unwrap().1;
+		println!("Extracting {} ({} → {})", outfile.display(), raw.len(), e.size);
 
-		let note = if e.timestamp == 0 {
-			" e "
+		let (note, data) = if e.timestamp == 0 {
+			(" e ", None)
+		} else if raw.len() == e.size {
+			("   ", Some(Cow::Borrowed(raw)))
 		} else {
-			let time = filetime::FileTime::from_unix_time(e.timestamp as i64, 0);
-			if data.len() == e.size {
-				fs::write(&outfile, data)?;
-				filetime::set_file_mtime(&outfile, time)?;
-				"   "
-			} else {
-				match kaiseki::decompress::decompress(data) {
-					Ok(udata) => {
-						fs::write(&outfile, udata)?;
-						filetime::set_file_mtime(&outfile, time)?;
-						"(C)"
-					}
-					Err(e) => {
-						println!("  Decompression failed: {}", e);
-						fs::write(&outfile, data)?;
-						filetime::set_file_mtime(&outfile, time)?;
-						"(?)"
-					}
+			match kaiseki::decompress::decompress(raw) {
+				Ok(decompressed) => {
+					("(C)", Some(Cow::Owned(decompressed)))
+				}
+				Err(e) => {
+					println!("  Decompression failed: {}", e);
+					("(?)", Some(Cow::Borrowed(raw)))
 				}
 			}
 		};
 
-		writeln!(index, "{:4} {} {:?} ({} → {})", e.index, note, e.name, data.len(), e.size)?;
+		if let Some(data) = &data {
+			fs::write(&outfile, data)?;
+			filetime::set_file_mtime(&outfile, filetime::FileTime::from_unix_time(e.timestamp as i64, 0))?;
+		}
+
+		writeln!(index, "{:4} {} {:?} ({} → {}; {})", e.index, note, e.name, raw.len(), data.map_or(0, |a| a.len()), e.size)?;
 	}
 
 	Ok(())

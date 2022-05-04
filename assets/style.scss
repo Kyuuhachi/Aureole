@@ -123,6 +123,7 @@ rt { white-space: pre; }
 	.speed       { @extend .int; }
 	.angle       { @extend .int; }
 	.time        { @extend .int; }
+	.pos         { color: var(--aurora3) }
 	.emote       { @extend .int; }
 
 	.flag        { color: var(--aurora1); }

@@ -517,9 +517,42 @@ impl<'a> CodeRenderer<'a> {
 				a.span_text("file-ref", v);
 			}
 
-			InsnArg::pos2(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::pos3(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::relative(v) => { a.text(" "); a.span_text("unknown", format!("relative{:?}", v)); }
+			InsnArg::pos2(Pos2(x, y)) => {
+				a.text(" ");
+				a.span("pos", |a| {
+					a.text("(");
+					a.span_text("int", x);
+					a.text(", ");
+					a.span_text("int", y);
+					a.text(")");
+				});
+			}
+
+			InsnArg::pos3(Pos3(x, y, z)) => {
+				a.text(" ");
+				a.span("pos", |a| {
+					a.text("(");
+					a.span_text("int", x);
+					a.text(", ");
+					a.span_text("int", y);
+					a.text(", ");
+					a.span_text("int", z);
+					a.text(")");
+				});
+			}
+
+			InsnArg::relative(Pos3(x, y, z)) => {
+				a.text(" ");
+				a.span("pos", |a| {
+					a.text("+(");
+					a.span_text("int", x);
+					a.text(", ");
+					a.span_text("int", y);
+					a.text(", ");
+					a.span_text("int", z);
+					a.text(")");
+				});
+			}
 
 			InsnArg::time(v) => { a.text(" "); a.span_text("time", format!("{}ms", v)); }
 			InsnArg::speed(v) => { a.text(" "); a.span_text("speed", format!("{}mm/s", v)); }

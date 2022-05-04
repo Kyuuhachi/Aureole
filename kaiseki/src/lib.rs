@@ -11,5 +11,5 @@ pub mod ed6 {
 pub mod image;
 pub mod util;
 
-mod decompress;
-mod decompile;
+pub mod decompress;
+pub mod decompile;

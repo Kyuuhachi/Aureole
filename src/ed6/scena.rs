@@ -132,11 +132,7 @@ impl ScenaRenderer<'_> {
 
 	fn file_name(&self, FileRef(arch, index): FileRef) -> String {
 		if let Ok(file) = self.archives.get(arch as u8, index as usize) {
-			let name = file.0.name.decode();
-			let (prefix, suffix) = name.split_once('.').unwrap_or((&name, ""));
-			let prefix = prefix.trim_end_matches(|a| a == ' ');
-			let suffix = suffix.trim_start_matches(|a| a == '_');
-			format!("{:02}/{}.{}", arch, prefix, suffix)
+			format!("{:02}/{}", arch, file.0.display_name())
 		} else {
 			format!("{:02}/<{}>", arch, index)
 		}

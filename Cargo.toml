@@ -27,6 +27,7 @@ members = [
 	"choubun",
 	"kaiseki",
 	"kaiseki-macros",
+	"kiseki-tools",
 ]
 
 [profile.dev]

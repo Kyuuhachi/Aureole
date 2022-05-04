@@ -1,0 +1,10 @@
+[package]
+name = "kiseki-tools"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+kaiseki = { path = "../kaiseki" }
+eyre = "0.6.8"
+clap = { version = "3.1.15", features = ["derive"] }
+filetime = "0.2.16"

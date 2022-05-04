@@ -5,7 +5,6 @@ use std::{
 	collections::HashMap,
 	sync::{Arc, Mutex},
 };
-use chrono::NaiveDateTime;
 use mapr::Mmap;
 use hamu::read::{In, Le};
 
@@ -29,21 +28,33 @@ pub type Result<T, E=Error> = std::result::Result<T, E>;
 
 #[derive(Clone)]
 pub struct Entry {
+	pub index: usize,
 	pub name: ByteString<12>,
 	pub size: usize,
-	pub timestamp: NaiveDateTime,
+	pub timestamp: u32,
 	range: Range<usize>,
 }
 
 impl Entry {
 	pub fn is_real(&self) -> bool {
-		self.timestamp.timestamp() != 0
+		self.timestamp != 0
+	}
+
+	pub fn display_name(&self) -> String {
+		let name = self.name.decode();
+		if let Some((prefix, suffix)) = name.split_once('.') {
+			let prefix = prefix.trim_end_matches(|a| a == ' ');
+			format!("{}.{}", prefix, suffix)
+		} else {
+			name
+		}
 	}
 }
 
 impl std::fmt::Debug for Entry {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("Entry")
+			.field("index", &self.index)
 			.field("name", &self.name)
 			.field("size", &self.size)
 			.field("timestamp", &self.timestamp)
@@ -60,12 +71,16 @@ pub struct Archive {
 
 impl Archive {
 	pub fn new(path: impl AsRef<Path>, num: u8) -> Result<Archive> {
-		let mut dir_path = path.as_ref().to_owned();
-		let mut dat_path = path.as_ref().to_owned();
-		dir_path.push(format!("ED6_DT{:02X}.dir", num));
-		dat_path.push(format!("ED6_DT{:02X}.dat", num));
-		let dir = unsafe { Mmap::map(&File::open(&dir_path)?)? };
-		let dat = unsafe { Mmap::map(&File::open(&dat_path)?)? };
+		let mut dir = path.as_ref().to_owned();
+		let mut dat = path.as_ref().to_owned();
+		dir.push(format!("ED6_DT{:02X}.dir", num));
+		dat.push(format!("ED6_DT{:02X}.dat", num));
+		Self::from_dir_dat(dir, dat)
+	}
+
+	pub fn from_dir_dat(dir: impl AsRef<Path>, dat: impl AsRef<Path>) -> Result<Archive> {
+		let dir = unsafe { Mmap::map(&File::open(&dir)?)? };
+		let dat = unsafe { Mmap::map(&File::open(&dat)?)? };
 
 		let mut i = In::new(&dir);
 		let mut j = In::new(&dat);
@@ -76,19 +91,20 @@ impl Archive {
 		j.check_u32(20 + count as u32 * 4)?;
 
 		let mut entries = Vec::new();
-		for _ in 0..count {
+		for index in 0..count as usize {
 			let name = i.bytestring::<12>()?;
 			i.check_u32(0)?; // I don't know what this is. It's nonzero on a few files in 3rd, and some sources (which are me in the past) say it's a second timestamp
 			let len = i.u32()? as usize;
 			let size = i.u32()? as usize;
 			i.check_u32(len as u32)?;
-			let timestamp = NaiveDateTime::from_timestamp(i.u32()? as i64, 0);
+			let timestamp = i.u32()?;
 			let offset = i.u32()? as usize;
 			j.check_u32((offset + len) as u32)?;
 			j.clone().at(offset)?.slice(len)?;
 
 			if &name != b"/_______.___" {
 				entries.push(Entry {
+					index,
 					name,
 					size,
 					timestamp,

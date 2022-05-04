@@ -180,6 +180,9 @@ rt { white-space: pre; }
 		animation-duration: calc((var(--emote-end) - var(--emote-start)) * var(--emote-time));
 		animation-timing-function: steps(calc(var(--emote-end) - var(--emote-start)), end);
 		background-size: 6400% 100%;
+
+		margin: 0 0.25em;
+		transform: scale(1.5);
 	}
 
 	@keyframes emote {

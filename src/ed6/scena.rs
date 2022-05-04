@@ -646,32 +646,27 @@ impl<'a> CodeRenderer<'a> {
 				a.text(" ");
 				a.span_text("text-title", v);
 			}
-			InsnArg::text(v) => {
-				a.node("div", |a| {
-					a.class("block talk");
-					a.attr("style", format!("--indent: {}", self.indent));
-					self.text(a, v);
-				});
-			}
 
-			InsnArg::menu(v) => {
-				a.node("div", |a| {
-					a.attr("role", "list");
-					a.class("block menu");
-					a.attr("style", format!("--indent: {}", self.indent));
-					for (idx, line) in v.iter().enumerate() {
-						a.node("div", |a| {
-							a.class("menu-row");
-							a.span_text("menu-idx", format!("({})", idx));
-							a.text(" ");
-							a.span("menu-label", |a| {
-								a.attr("role", "listitem");
-								a.text(line);
-							});
+			InsnArg::text(v) => self.block(a, |a| {
+				a.class("talk");
+				self.text(a, v);
+			}),
+
+			InsnArg::menu(v) => self.block(a, |a| {
+				a.class("menu");
+				a.attr("role", "list");
+				for (idx, line) in v.iter().enumerate() {
+					a.node("div", |a| {
+						a.class("menu-row");
+						a.span_text("menu-idx", format!("({})", idx));
+						a.text(" ");
+						a.span("menu-label", |a| {
+							a.attr("role", "listitem");
+							a.text(line);
 						});
-					}
-				});
-			}
+					});
+				}
+			}),
 
 			InsnArg::quests(v) => {
 				for q in v {
@@ -785,6 +780,14 @@ impl<'a> CodeRenderer<'a> {
 
 			InsnArg::data(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 		}
+	}
+
+	fn block(&self, a: &mut Node, f: impl FnOnce(&mut Node)) {
+		a.node("div", |a| {
+			a.class("block");
+			a.attr("style", format!("--indent: {}", self.indent));
+			f(a)
+		})
 	}
 
 	fn named(&self, a: &mut Node, class: &str, v: usize, name: &str, kind: Option<&str>) {

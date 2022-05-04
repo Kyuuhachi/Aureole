@@ -648,7 +648,6 @@ impl<'a> CodeRenderer<'a> {
 			}
 			InsnArg::text(v) => {
 				a.node("div", |a| {
-					a.attr("role", "list");
 					a.class("block talk");
 					a.attr("style", format!("--indent: {}", self.indent));
 					self.text(a, v);

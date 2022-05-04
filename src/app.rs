@@ -1,7 +1,10 @@
 use std::{borrow::Cow, str::FromStr, sync::Arc};
 
 use percent_encoding::percent_decode_str;
-use kaiseki::{ed6::{Archives, magic::Magic}, util::ByteString};
+use kaiseki::{
+	ed6::{Archives, magic::Magic, item::Item},
+	util::ByteString,
+};
 use crate::{Result, Html, Image, ed6, imageedit::ImageEdit};
 
 pub struct App {
@@ -11,13 +14,19 @@ pub struct App {
 
 pub struct Tables {
 	pub magic: Vec<Magic>,
+	pub items: Vec<Item>,
 }
 
 impl Tables {
 	pub fn read(arch: &Archives) -> Result<Self> {
-		Ok(Tables {
-			magic: Magic::read(&arch.get_compressed_by_name(0x2, b"T_MAGIC ._DT")?.1)?,
-		})
+		let magic = Magic::read(
+			&arch.get_compressed_by_name(0x2, b"T_MAGIC ._DT")?.1
+		)?;
+		let items = Item::read(
+			&arch.get_compressed_by_name(0x2, b"T_ITEM  ._DT")?.1,
+			&arch.get_compressed_by_name(0x2, b"T_ITEM2 ._DT")?.1,
+		)?;
+		Ok(Tables { magic, items })
 	}
 }
 

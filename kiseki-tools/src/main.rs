@@ -1,4 +1,5 @@
-use std::{path::PathBuf, borrow::Cow};
+use std::path::{Path, PathBuf};
+use std::borrow::Cow;
 use std::fs;
 use std::io::Write as _;
 
@@ -63,24 +64,7 @@ fn main() {
 fn run(command: Command) -> Result<(), snafu::Whatever> {
 	match command {
 		Command::Extract { force, dirfile, outdir } => {
-			ensure_whatever!(dirfile.is_file() && dirfile.extension().filter(|a| a == &"dir").is_some(),
-				"dirfile {} must be a .dir file", dirfile.display(),
-			);
-			let datfile = dirfile.with_extension("dat");
-			ensure_whatever!(datfile.is_file(),
-				"datfile {} not found", datfile.display(),
-			);
-
-			if outdir.exists() {
-				if force {
-					fs::remove_dir_all(&outdir)
-						.with_whatever_context(|_| format!("failed to remove {}", outdir.display()))?;
-				} else {
-					whatever!("output directory {} already exists (use -f to overwrite)", outdir.display());
-				}
-			}
-
-			extract(&dirfile, &datfile, &outdir)?;
+			run_extract(force, &dirfile, &outdir)?;
 		},
 
 		Command::ExtractAll { force, indir, outdir } => {
@@ -89,23 +73,7 @@ fn run(command: Command) -> Result<(), snafu::Whatever> {
 				let a = a.whatever_context("failed to read directory entry")?;
 				let dirfile = a.path();
 				if dirfile.extension().filter(|a| a == &"dir").is_some() {
-					let datfile = dirfile.with_extension("dat");
-					ensure_whatever!(datfile.is_file(),
-						"datfile {} not found", datfile.display(),
-					);
-
-					let outdir = outdir.join(dirfile.file_stem().unwrap());
-
-					if outdir.exists() {
-						if force {
-							fs::remove_dir_all(&outdir)
-								.with_whatever_context(|_| format!("failed to remove {}", outdir.display()))?;
-						} else {
-							whatever!("output directory {} already exists (use -f to overwrite)", outdir.display());
-						}
-					}
-
-					extract(&dirfile, &datfile, &outdir)?;
+					run_extract(force, &dirfile, &outdir)?;
 				}
 			}
 		},
@@ -114,7 +82,29 @@ fn run(command: Command) -> Result<(), snafu::Whatever> {
 	Ok(())
 }
 
-fn extract(dirfile: &PathBuf, datfile: &PathBuf, outdir: &PathBuf) -> Result<(), snafu::Whatever> {
+fn run_extract(force: bool, dirfile: &Path, outdir: &Path) -> Result<(), snafu::Whatever> {
+	ensure_whatever!(dirfile.is_file() && dirfile.extension().filter(|a| a == &"dir").is_some(),
+		"dirfile {} must be a .dir file", dirfile.display(),
+	);
+	let datfile = dirfile.with_extension("dat");
+	ensure_whatever!(datfile.is_file(),
+		"datfile {} not found", datfile.display(),
+	);
+
+	if outdir.exists() {
+		if force {
+			fs::remove_dir_all(&outdir)
+				.with_whatever_context(|_| format!("failed to remove {}", outdir.display()))?;
+		} else {
+			whatever!("output directory {} already exists (use -f to overwrite)", outdir.display());
+		}
+	}
+
+	extract(dirfile, &datfile, outdir)?;
+	Ok(())
+}
+
+fn extract(dirfile: &Path, datfile: &Path, outdir: &Path) -> Result<(), snafu::Whatever> {
 	fs::create_dir_all(&outdir)
 		.with_whatever_context(|_| format!("failed to create output directory {}", outdir.display()))?;
 

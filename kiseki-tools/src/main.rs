@@ -7,6 +7,9 @@ use kaiseki::ed6::Archive;
 
 #[derive(Debug, Clone, clap::Parser)]
 struct Cli {
+	#[clap(flatten)]
+	verbose: clap_verbosity_flag::Verbosity<clap_verbosity_flag::WarnLevel>,
+
 	#[clap(subcommand)]
 	command: Command,
 }
@@ -46,6 +49,10 @@ enum Command {
 
 fn main() -> eyre::Result<()> {
 	let cli = Cli::parse();
+	env_logger::Builder::new()
+		.filter_level(cli.verbose.log_level_filter())
+		.init();
+
 	let mut cmd = Cli::command();
 	match cli.command {
 		Command::Extract { force, dirfile, outdir } => {
@@ -110,7 +117,7 @@ fn extract(dirfile: &PathBuf, datfile: &PathBuf, outdir: &PathBuf) -> eyre::Resu
 	for e in arch.entries() {
 		let outfile = outdir.join(e.display_name());
 		let raw = arch.get(e.index).unwrap().1;
-		println!("Extracting {} ({} → {})", outfile.display(), raw.len(), e.size);
+		log::info!("Extracting {} ({} → {})", outfile.display(), raw.len(), e.size);
 
 		let (note, data) = if e.timestamp == 0 {
 			(" e ", None)
@@ -122,7 +129,7 @@ fn extract(dirfile: &PathBuf, datfile: &PathBuf, outdir: &PathBuf) -> eyre::Resu
 					("(C)", Some(Cow::Owned(decompressed)))
 				}
 				Err(e) => {
-					println!("  Decompression failed: {}", e);
+					log::warn!("  Decompression failed: {}", e);
 					("(?)", Some(Cow::Borrowed(raw)))
 				}
 			}

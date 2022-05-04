@@ -158,6 +158,7 @@ impl ScenaRenderer<'_> {
 		let member_start = 0x101;
 		
 		fn get_name<T>(idx: usize, items: &[T], f: impl Fn(&T) -> &str) -> Cow<str> {
+			let f = |a| if f(a).trim().is_empty() { "<blank>" } else { f(a) };
 			let name = f(&items[idx]);
 			let mut dups = items.iter().enumerate().filter(|a| f(a.1) == name);
 			if dups.clone().count() == 1 {

@@ -187,6 +187,25 @@ rt { white-space: pre; }
 		to   { background-position-x: calc(var(--emote-end)/63 * 100%) }
 	}
 
+	.quest {
+		color: black;
+		font-family: sans-serif;
+
+		$w: 160;
+		$h: 32;
+		--quest-padding: 12;
+		border-image-source: url("/fc/ui/note1.png?edit=crop:0,224,#{$w},#{$h},512,512");
+		&.quest-main {
+			--quest-padding: 36;
+			border-image-source: url("/fc/ui/note1.png?edit=crop:0,128,#{$w},#{$h},512,512");
+		}
+		border-image-outset: 1px;
+		border-image-slice: 50% 0 50% calc(var(--quest-padding)/$w*100%) fill;
+		border-image-width: 50% 0 50% calc(var(--quest-padding)/$h*1.25em);
+		padding-left: calc(var(--quest-padding)/$h*1.25em);
+		padding-right: 0.5ch;
+	}
+
 	.block {
 		margin-left: calc(var(--indent) * 4ch);
 		width: max-content;

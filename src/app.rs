@@ -2,7 +2,7 @@ use std::{borrow::Cow, str::FromStr, sync::Arc};
 
 use percent_encoding::percent_decode_str;
 use kaiseki::{
-	ed6::{Archives, magic::Magic, item::{Item, Quartz}},
+	ed6::{Archives, magic::Magic, item::{Item, Quartz}, quest::Quest},
 	util::ByteString,
 };
 use crate::{Result, Html, Image, ed6, imageedit::ImageEdit};
@@ -16,6 +16,7 @@ pub struct Tables {
 	pub magic: Vec<Magic>,
 	pub items: Vec<Item>,
 	pub quartz: Vec<Quartz>,
+	pub quests: Vec<Quest>,
 }
 
 impl Tables {
@@ -30,7 +31,10 @@ impl Tables {
 		let quartz = Quartz::read(
 			&arch.get_compressed_by_name(0x2, b"T_QUARTZ._DT")?.1,
 		)?;
-		Ok(Tables { magic, items, quartz })
+		let quests = Quest::read(
+			&arch.get_compressed_by_name(0x2, b"T_QUEST ._DT")?.1,
+		)?;
+		Ok(Tables { magic, items, quartz, quests })
 	}
 }
 

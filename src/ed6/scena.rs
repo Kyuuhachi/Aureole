@@ -539,7 +539,6 @@ impl<'a> CodeRenderer<'a> {
 			InsnArg::battle(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 			InsnArg::town(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 			InsnArg::bgmtbl(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::quest(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 			InsnArg::sound(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 
 			InsnArg::flag(v) => {
@@ -588,6 +587,13 @@ impl<'a> CodeRenderer<'a> {
 					a.attr("style", format!("--icon-x: {}; --icon-y: {}", icon % 16, icon / 16));
 					self.named(a, "item", *v as usize, &name, None);
 				});
+			}
+
+			InsnArg::quest(v) => {
+				a.text(" ");
+				let quest = self.inner.tables.quests.get(*v as usize);
+				let name = quest.map_or(Cow::Owned(format!("[unknown {}]", v)), |a| Cow::Borrowed(&a.name));
+				self.named(a, "quest", *v as usize, &name, quest.filter(|a| a.is_main()).map(|_| "main"));
 			}
 
 			InsnArg::fork(v) => {

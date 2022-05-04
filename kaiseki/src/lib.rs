@@ -4,6 +4,7 @@ pub mod ed6 {
 	pub mod archive;
 	pub mod magic;
 	pub mod item;
+	pub mod quest;
 	pub mod scena;
 	pub use archive::{Archive,Archives};
 }

@@ -572,7 +572,13 @@ impl<'a> CodeRenderer<'a> {
 				let item = self.inner.tables.items.get(*v as usize);
 				let name = item.map_or(Cow::Owned(format!("[unknown {}]", v)), |a| Cow::Borrowed(&a.name));
 				let icon = if let Some(item) = item {
-					item.base.ty[0]
+					let quartz = item.base.id.checked_sub(600)
+						.and_then(|a| self.inner.tables.quartz.get(a as usize));
+					if let Some(quartz) = quartz {
+						0x59 + quartz.element as u8
+					} else {
+						item.base.ty[0]
+					}
 				} else {
 					0
 				};

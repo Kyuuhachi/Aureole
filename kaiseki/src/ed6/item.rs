@@ -51,7 +51,6 @@ pub struct BaseItem {
 	pub price: u32,
 }
 
-
 #[derive(Debug)]
 pub struct Item {
 	pub name: String, // todo should be Text
@@ -100,3 +99,28 @@ impl Item {
 	}
 }
 
+#[derive(Debug)]
+pub struct Quartz {
+	pub id: u16, // 600 less than the corresponding item id
+	pub element: u16, // should use magic::Element but whatever
+	pub sepith: [u16; 7],
+	pub value: [u16; 7],
+}
+
+impl Quartz {
+	pub fn read(i: &[u8]) -> Result<Vec<Self>> {
+		let mut i = In::new(i);
+		let start = i.clone().u16()?;
+		let mut items = Vec::with_capacity(start as usize/2);
+		for _ in 0..start/2 {
+			let mut i = i.ptr_u16()?;
+
+			let id = i.u16()?;
+			let element = i.u16()?;
+			let sepith = [ i.u16()?, i.u16()?, i.u16()?, i.u16()?, i.u16()?, i.u16()?, i.u16()? ];
+			let value  = [ i.u16()?, i.u16()?, i.u16()?, i.u16()?, i.u16()?, i.u16()?, i.u16()? ];
+			items.push(Quartz { id, element, sepith, value });
+		}
+		Ok(items)
+	}
+}

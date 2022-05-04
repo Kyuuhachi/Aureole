@@ -3,15 +3,15 @@ use hamu::read::{In, Le};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-	#[error("Read error")]
+	#[error("read error")]
 	Read(#[from] hamu::read::Error),
-	#[error("Tried to repeat {count} bytes from offset 0")]
+	#[error("tried to repeat {count} bytes from offset 0")]
 	ZeroRepeat { count: usize },
-	#[error("Tried to repeat {count} bytes from offset -{offset}, but only have {len}")]
+	#[error("tried to repeat {count} bytes from offset -{offset}, but only have {len}")]
 	TooLongRepeat { count: usize, offset: usize, len: usize },
-	#[error("Bytes remaining at end: {bytes:02X?}")]
+	#[error("bytes remaining at end: {bytes:02X?}")]
 	RemainingBytes { bytes: Vec<u8> },
-	#[error("Bits remaining at end: {bits:nbits$b}")]
+	#[error("bits remaining at end: {bits:nbits$b}")]
 	RemainingBits { bits: u16, nbits: usize },
 }
 pub type Result<T, E=Error> = std::result::Result<T, E>;

@@ -202,10 +202,10 @@ impl std::fmt::Display for Dump<'_> {
 
 impl Dump<'_> {
 	pub fn to_stdout(&self) {
-		println!("{}", self);
+		print!("{}", self);
 	}
 
 	pub fn to_stderr(&self) {
-		eprintln!("{}", self);
+		eprint!("{}", self);
 	}
 }

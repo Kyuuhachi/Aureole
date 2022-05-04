@@ -797,13 +797,13 @@ impl<'a> CodeRenderer<'a> {
 
 							if !s.is_empty() {
 								a.node("span", |a| {
-									a.class(&format!("text text-color-{color}, text-size-{size}"));
+									a.class(&format!("text text-color-{color} text-size-{size}"));
 									a.text(s)
 								});
 							}
 							if let Some((rb, rt)) = ruby {
 								a.node("ruby", |a| {
-									a.class(&format!("text text-color-{color}, text-size-{size}"));
+									a.class(&format!("text text-color-{color} text-size-{size}"));
 									a.text(rb);
 									a.node("rp", |a| a.text("（"));
 									a.node("rt", |a| a.text(rt));

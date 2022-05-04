@@ -64,7 +64,7 @@ fn main() {
 fn run(command: Command) -> Result<(), snafu::Whatever> {
 	match command {
 		Command::Extract { force, dirfile, outdir } => {
-			run_extract(force, &dirfile, &outdir)?;
+			extract(force, &dirfile, &outdir)?;
 		},
 
 		Command::ExtractAll { force, indir, outdir } => {
@@ -73,7 +73,7 @@ fn run(command: Command) -> Result<(), snafu::Whatever> {
 				let a = a.whatever_context("failed to read directory entry")?;
 				let dirfile = a.path();
 				if dirfile.extension().filter(|a| a == &"dir").is_some() {
-					run_extract(force, &dirfile, &outdir)?;
+					extract(force, &dirfile, &outdir)?;
 				}
 			}
 		},
@@ -82,7 +82,7 @@ fn run(command: Command) -> Result<(), snafu::Whatever> {
 	Ok(())
 }
 
-fn run_extract(force: bool, dirfile: &Path, outdir: &Path) -> Result<(), snafu::Whatever> {
+fn extract(force: bool, dirfile: &Path, outdir: &Path) -> Result<(), snafu::Whatever> {
 	ensure_whatever!(dirfile.is_file() && dirfile.extension().filter(|a| a == &"dir").is_some(),
 		"dirfile {} must be a .dir file", dirfile.display(),
 	);
@@ -100,16 +100,12 @@ fn run_extract(force: bool, dirfile: &Path, outdir: &Path) -> Result<(), snafu::
 		}
 	}
 
-	extract(dirfile, &datfile, outdir)?;
-	Ok(())
-}
+	let arch = Archive::from_dir_dat(&dirfile, &datfile)
+		.with_whatever_context(|_| format!("failed to read archive {}", dirfile.display()))?;
 
-fn extract(dirfile: &Path, datfile: &Path, outdir: &Path) -> Result<(), snafu::Whatever> {
 	fs::create_dir_all(&outdir)
 		.with_whatever_context(|_| format!("failed to create output directory {}", outdir.display()))?;
 
-	let arch = Archive::from_dir_dat(&dirfile, &datfile)
-		.with_whatever_context(|_| format!("failed to read archive {}", dirfile.display()))?;
 	let mut index = fs::File::create(outdir.join("index"))
 		.with_whatever_context(|_| format!("failed to create index {}", outdir.join("index").display()))?;
 

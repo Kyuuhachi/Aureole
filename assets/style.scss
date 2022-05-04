@@ -7,6 +7,7 @@
 	--snow0:   #D8DEE9; /* nord4 */
 	--snow1:   #E5E9F0; /* nord5 */
 	--snow2:   #ECEFF4; /* nord6 */
+	--snow3:   #FFFFFF; /* custom */
 	--frost0:  #8FBCBB; /* nord7 */
 	--frost1:  #88C0D0; /* nord8 */
 	--frost2:  #81A1C1; /* nord9 */
@@ -22,23 +23,31 @@
 	--text4:   #FFBB44;
 	--text5:   #88FFAA;
 	--text12:  #AACCEE;
+
+	// Pixel (8,8) on the empty-slot icons in C_ICON1
+	--el-earth:  #CC8855;
+	--el-water:  #3366FF;
+	--el-fire:   #FF3333;
+	--el-wind:   #339933;
+	--el-time:   #667788;
+	--el-space:  #FFEE77;
+	--el-mirage: #CCCCCC;
 }
 
 :root {
 	--base-bg: var(--night0);
 	--base-text: var(--snow2);
 	--whitespace: var(--night3);
-	--unimportant: var(--snow0);
 
+	--unimportant: var(--night4);
 	font-family: sans-serif;
 	font-size: 12px;
 }
 
 @media (prefers-color-scheme: light) { :root {
-	--base-bg: #FFFFFF;
+	--base-bg: var(--snow3);
 	--base-text: var(--night0);
 	--whitespace: var(--snow0);
-	--unimportant: var(--night4);
 } }
 
 %icon {

@@ -481,10 +481,10 @@ impl<'a> CodeRenderer<'a> {
 			InsnArg::scena_file(v) => {
 				a.text(" ");
 				let text = self.inner.file_name(*v);
-				if text.get(2..3) == Some("/") && text.ends_with(".SN") {
+				if text.get(2..3) == Some("/") && text.ends_with("._SN") {
 					a.node("a", |a| {
 						a.class("file-ref");
-						a.attr("href", &text[3..text.len()-3]); // XXX url
+						a.attr("href", &text[3..text.len()-4]); // XXX url
 						a.text(text);
 					});
 				} else {

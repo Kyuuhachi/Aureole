@@ -136,10 +136,11 @@ rt { white-space: pre; }
 	.item        { color: var(--aurora2); }
 	.sepith-element { color: var(--aurora3); }
 
-	.char         { color: var(--frost1); }
-	.member       { color: var(--frost0); }
-	.char-member  { color: var(--frost0); }
-	.char-self    { color: var(--aurora3); }
+	.char        { color: var(--frost1); }
+	.member      { color: var(--frost0); }
+	.char-member { color: var(--frost0); }
+	.char-party  { color: var(--frost0); }
+	.char-self   { color: var(--aurora3); }
 
 	.color-splat {
 		@extend %icon;

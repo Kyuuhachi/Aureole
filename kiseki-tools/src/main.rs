@@ -3,6 +3,7 @@ use std::fs;
 use std::io::Write as _;
 
 use clap::StructOpt;
+use snafu::prelude::*;
 use kaiseki::ed6::Archive;
 
 #[derive(Debug, Clone, clap::Parser)]
@@ -47,30 +48,35 @@ enum Command {
 	},
 }
 
-fn main() -> eyre::Result<()> {
+fn main() {
 	let cli = Cli::parse();
 	env_logger::Builder::new()
 		.filter_level(cli.verbose.log_level_filter())
 		.init();
 
-	match cli.command {
+	if let Err(e) = run(cli.command) {
+		eprintln!("{}", e);
+		std::process::exit(1);
+	}
+}
+
+fn run(command: Command) -> Result<(), snafu::Whatever> {
+	match command {
 		Command::Extract { force, dirfile, outdir } => {
-			if !dirfile.is_file() || dirfile.extension().filter(|a| a == &"dir").is_none() {
-				log::error!("Dirfile {} must be a .dir file", dirfile.display());
-				return Ok(())
-			}
+			ensure_whatever!(dirfile.is_file() && dirfile.extension().filter(|a| a == &"dir").is_some(),
+				"dirfile {} must be a .dir file", dirfile.display(),
+			);
 			let datfile = dirfile.with_extension("dat");
-			if !datfile.is_file() {
-				log::error!("Datfile {} not found", datfile.display());
-				return Ok(())
-			}
+			ensure_whatever!(datfile.is_file(),
+				"datfile {} not found", datfile.display(),
+			);
 
 			if outdir.exists() {
 				if force {
-					fs::remove_dir_all(&outdir)?;
+					fs::remove_dir_all(&outdir)
+						.with_whatever_context(|_| format!("failed to remove {}", outdir.display()))?;
 				} else {
-					log::error!("Output directory {} already exists (use -f to overwrite)", outdir.display());
-					return Ok(())
+					whatever!("output directory {} already exists (use -f to overwrite)", outdir.display());
 				}
 			}
 
@@ -78,29 +84,24 @@ fn main() -> eyre::Result<()> {
 		},
 
 		Command::ExtractAll { force, indir, outdir } => {
-			if !indir.is_dir() {
-				log::error!("Input directory {} not valid", indir.display());
-				return Ok(())
-			}
-
-			for a in fs::read_dir(&indir)? {
-				let a = a?;
+			for a in fs::read_dir(&indir)
+					.with_whatever_context(|_| format!("failed to read input directory {}", indir.display()))? {
+				let a = a.whatever_context("failed to read directory entry")?;
 				let dirfile = a.path();
 				if dirfile.extension().filter(|a| a == &"dir").is_some() {
 					let datfile = dirfile.with_extension("dat");
-					if !datfile.is_file() {
-						log::error!("{} not found", datfile.display());
-						return Ok(())
-					}
+					ensure_whatever!(datfile.is_file(),
+						"datfile {} not found", datfile.display(),
+					);
 
 					let outdir = outdir.join(dirfile.file_stem().unwrap());
 
 					if outdir.exists() {
 						if force {
-							fs::remove_dir_all(&outdir)?;
+							fs::remove_dir_all(&outdir)
+								.with_whatever_context(|_| format!("failed to remove {}", outdir.display()))?;
 						} else {
-							log::error!("Output directory {} already exists (use -f to overwrite)", outdir.display());
-							return Ok(())
+							whatever!("output directory {} already exists (use -f to overwrite)", outdir.display());
 						}
 					}
 
@@ -113,11 +114,14 @@ fn main() -> eyre::Result<()> {
 	Ok(())
 }
 
-fn extract(dirfile: &PathBuf, datfile: &PathBuf, outdir: &PathBuf) -> eyre::Result<()> {
-	fs::create_dir_all(&outdir)?;
+fn extract(dirfile: &PathBuf, datfile: &PathBuf, outdir: &PathBuf) -> Result<(), snafu::Whatever> {
+	fs::create_dir_all(&outdir)
+		.with_whatever_context(|_| format!("failed to create output directory {}", outdir.display()))?;
 
-	let arch = Archive::from_dir_dat(&dirfile, &datfile)?;
-	let mut index = fs::File::create(outdir.join("index"))?;
+	let arch = Archive::from_dir_dat(&dirfile, &datfile)
+		.with_whatever_context(|_| format!("failed to read archive {}", dirfile.display()))?;
+	let mut index = fs::File::create(outdir.join("index"))
+		.with_whatever_context(|_| format!("failed to create index {}", outdir.join("index").display()))?;
 
 	for e in arch.entries() {
 		let outfile = outdir.join(e.display_name());
@@ -141,11 +145,14 @@ fn extract(dirfile: &PathBuf, datfile: &PathBuf, outdir: &PathBuf) -> eyre::Resu
 		};
 
 		if let Some(data) = &data {
-			fs::write(&outfile, data)?;
-			filetime::set_file_mtime(&outfile, filetime::FileTime::from_unix_time(e.timestamp as i64, 0))?;
+			fs::write(&outfile, data)
+				.with_whatever_context(|_| format!("failed to write output file {}", outfile.display()))?;
+			filetime::set_file_mtime(&outfile, filetime::FileTime::from_unix_time(e.timestamp as i64, 0))
+				.with_whatever_context(|_| format!("failed to set mtime on {}", outfile.display()))?;
 		}
 
-		writeln!(index, "{:4} {} {:?} ({} → {}; {})", e.index, note, e.name, raw.len(), data.map_or(0, |a| a.len()), e.size)?;
+		writeln!(index, "{:4} {} {:?} ({} → {}; {})", e.index, note, e.name, raw.len(), data.map_or(0, |a| a.len()), e.size)
+			.whatever_context("failed to write to index")?;
 	}
 
 	Ok(())

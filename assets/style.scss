@@ -16,6 +16,12 @@
 	--aurora2: #EBCB8B; /* nord13 */
 	--aurora3: #A3BE8C; /* nord14 */
 	--aurora4: #B48EAD; /* nord15 */
+
+	--text0:   #FFFFFF;
+	--text2:   #FF5522;
+	--text4:   #FFBB44;
+	--text5:   #88FFAA;
+	--text12:  #AACCEE;
 }
 
 :root {
@@ -55,7 +61,7 @@
 
 %text {
 	font-family: sans-serif;
-	color: #FFF;
+	color: var(--text0);
 	text-shadow: 0.1em 0.1em 0.1em #333;
 }
 
@@ -182,7 +188,7 @@ rt { white-space: pre; }
 		@extend %text-box;
 		display: table;
 		.menu-row { display: table-row; }
-		.menu-idx { display: table-cell; text-align: right; color: #AACCEE; }
+		.menu-idx { display: table-cell; text-align: right; color: var(--text12); }
 	}
 
 	.text-title {
@@ -204,7 +210,7 @@ rt { white-space: pre; }
 
 		.text { line-height: 1.2em; }
 
-		.text-unknown { background: red; }
+		.text-unknown { background: #F00; }
 
 		.text-size-0 { font-size:  50%; }
 		.text-size-1 { font-size:  75%; }
@@ -214,17 +220,17 @@ rt { white-space: pre; }
 		.text-size-4 { font-size: 175%; }
 		.text-size-5 { font-size: 200%; }
 
-		.text-color-0  { color: #FFFFFF; }
-		.text-color-2  { color: #FF5522; }
-		.text-color-4  { color: #FFBB44; }
-		.text-color-5  { color: #88FFAA; }
-		.text-color-12 { color: #AACCEE; }
+		.text-color-0  { color: var(--text0); }
+		.text-color-2  { color: var(--text2); }
+		.text-color-4  { color: var(--text4); }
+		.text-color-5  { color: var(--text5); }
+		.text-color-12 { color: var(--text12); }
 
 		.text-color-1, .text-color-3, .text-color-6,
 		.text-color-7, .text-color-8, .text-color-9,
 		.text-color-10, .text-color-11, .text-color-13,
 		.text-color-14, .text-color-15 {
-			background: red;
+			background: #F00;
 		}
 
 		.talk-face-wrapper {

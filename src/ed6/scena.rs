@@ -614,7 +614,6 @@ impl<'a> CodeRenderer<'a> {
 				a.span_text("text-title", v);
 			}
 			InsnArg::text(v) => {
-				a.text(" ");
 				a.node("div", |a| {
 					a.attr("role", "list");
 					a.class("block talk");

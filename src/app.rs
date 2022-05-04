@@ -1,4 +1,4 @@
-use std::{borrow::Cow, str::FromStr};
+use std::{borrow::Cow, str::FromStr, sync::Arc};
 
 use percent_encoding::percent_decode_str;
 use kaiseki::{ed6::{Archives, magic::Magic}, util::ByteString};
@@ -159,7 +159,7 @@ impl<T: FromStr> QueryArg for Vec<T> {
 }
 
 impl App {
-	pub fn into_actix(self, path: &str) -> actix_web::Scope {
+	pub fn into_actix(self: Arc<Self>, path: &str) -> actix_web::Scope {
 		fn urldecode(v: &str) -> Option<Cow<str>> {
 			percent_decode_str(v).decode_utf8().ok()
 		}
@@ -170,7 +170,7 @@ impl App {
 
 		.route("/magic", web::get().to({
 			async fn magic(req: HttpRequest) -> Result<impl Responder, error::Error> {
-				let app = req.app_data::<App>().unwrap();
+				let app = req.app_data::<Arc<App>>().unwrap();
 				Ok(app.magic().await)
 			}
 			magic
@@ -198,7 +198,7 @@ impl App {
 					}
 				}
 
-				let app = req.app_data::<App>().unwrap();
+				let app = req.app_data::<Arc<App>>().unwrap();
 				Ok(app.scena(_name, _asm).await)
 			}
 			scena
@@ -226,7 +226,7 @@ impl App {
 					}
 				}
 
-				let app = req.app_data::<App>().unwrap();
+				let app = req.app_data::<Arc<App>>().unwrap();
 				Ok(app.ui_png(_name, _edit).await)
 			}
 			ui_png
@@ -234,7 +234,7 @@ impl App {
 
 		.route("/ui/", web::get().to({
 			async fn ui_index(req: HttpRequest) -> Result<impl Responder, error::Error> {
-				let app = req.app_data::<App>().unwrap();
+				let app = req.app_data::<Arc<App>>().unwrap();
 				Ok(app.ui_index().await)
 			}
 			ui_index
@@ -245,7 +245,7 @@ impl App {
 				let _n = req.match_info().get("n").unwrap();
 				let _n = _n.parse().map_err(|_| error::ErrorBadRequest(_n.to_owned()))?;
 
-				let app = req.app_data::<App>().unwrap();
+				let app = req.app_data::<Arc<App>>().unwrap();
 				Ok(app.face(_n).await)
 			}
 			face

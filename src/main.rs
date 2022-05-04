@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use actix_web::{
 	HttpServer,
 	App,
@@ -80,7 +82,10 @@ async fn main() -> std::io::Result<()> {
 			}
 		})).install().unwrap();
 
-	HttpServer::new(|| {
+	let app = app::App::new("data/fc").unwrap();
+	let app = Arc::new(app);
+
+	HttpServer::new(move || {
 		App::new()
 			.wrap(middleware::Logger::default())
 			.wrap(middleware::ErrorHandlers::new()
@@ -92,7 +97,7 @@ async fn main() -> std::io::Result<()> {
 				.show_files_listing()
 				.redirect_to_slash_directory()
 			)
-			.service(app::App::new("data/fc").unwrap().into_actix("/fc"))
+			.service(app.clone().into_actix("/fc"))
 	})
 	.bind(("127.0.0.1", 8000))?
 	.run()

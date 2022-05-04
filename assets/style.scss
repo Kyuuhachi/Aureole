@@ -53,6 +53,21 @@
 	background-image: url("/fc/ui/icon1.png");
 }
 
+%text {
+	font-family: sans-serif;
+	color: #FFF;
+	text-shadow: 0.1em 0.1em 0.1em #333;
+}
+
+%text-box {
+	@extend %text;
+	border-image-source: url("/fc/ui/waku1.png?edit=crop:0,0,48,48,256,256");
+	border-image-slice: 33% fill;
+	border-image-width: 1em;
+	border-width: 1em;
+	border-style: solid;
+}
+
 body {
 	background: var(--base-bg);
 	color: var(--base-text);
@@ -161,17 +176,17 @@ rt { white-space: pre; }
 	.block {
 		margin-left: calc(var(--indent) * 4ch);
 		width: max-content;
-		font-family: sans-serif;
 	}
 
-	.menu { display: table; }
-	.menu-row { display: table-row; }
-	.menu-idx { display: table-cell; text-align: right; color: var(--unimportant); }
+	.menu {
+		@extend %text-box;
+		display: table;
+		.menu-row { display: table-row; }
+		.menu-idx { display: table-cell; text-align: right; color: #AACCEE; }
+	}
 
 	.text-title {
-		font-family: sans-serif;
-		color: #FFF;
-		text-shadow: 0.1em 0.1em 0.1em #333;
+		@extend %text;
 		padding-left: 0.4em;
 		margin-left: -0.3em;
 		padding-right: 1em;
@@ -180,20 +195,11 @@ rt { white-space: pre; }
 		border-image-source: url("/fc/ui/waku3.png?edit=crop:10,141,#{$w},#{$h},256,256");
 		border-image-slice: calc(7/$h*100%) calc(50/$w*100%) calc(12/$h*100%) calc(7/$w*100%) fill;
 		border-image-width: 0.5em 50% 0.5em 0.5em;
-		border-image-repeat: stretch stretch;
 	}
 
 	.talk {
-		color: #FFF;
-		text-shadow: 0.1em 0.1em 0.1em #333;
-
 		.talk-page {
-			// The real thing probably uses waku3, but no idea how to make use of that
-			border-image-source: url("/fc/ui/waku1.png?edit=crop:0,0,48,48,256,256");
-			border-image-slice: 33% fill;
-			border-image-width: 1em;
-			border-width: 1em;
-			border-style: solid;
+			@extend %text-box;
 		}
 
 		.text { line-height: 1.2em; }

@@ -569,17 +569,10 @@ impl<'a> CodeRenderer<'a> {
 			InsnArg::time16(v) => { a.text(" "); a.span_text("time", format!("{}ms", v)); }
 			InsnArg::angle32(v) => { a.text(" "); a.span_text("angle", format!("{}m°", v)); }
 
-			InsnArg::battle(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::town(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::bgmtbl(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
-			InsnArg::sound(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
-
 			InsnArg::flag(v) => {
 				a.text(" ");
 				a.span_text("flag", v);
 			}
-
-			InsnArg::shop(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 
 			InsnArg::magic(v) => {
 				a.text(" ");
@@ -696,11 +689,6 @@ impl<'a> CodeRenderer<'a> {
 				self.arg(a, InsnArg::time(time));
 			}
 
-			InsnArg::flags(v)      => { a.text(" "); a.span_text("unknown", format!("0x{:08X}", v)); }
-			InsnArg::quest_flag(v) => { a.text(" "); a.span_text("unknown", format!("0x{:02X}", v)); }
-			InsnArg::char_flags(v) => { a.text(" "); a.span_text("unknown", format!("0x{:04X}", v)); }
-			InsnArg::quest_task(v) => { a.text(" "); a.span_text("unknown", format!("0x{:04X}", v)); }
-
 			InsnArg::sepith_element(v) => {
 				a.text(" ");
 				let (kind, name) = match v {
@@ -778,6 +766,17 @@ impl<'a> CodeRenderer<'a> {
 				let name = self.inner.member_name(*v as usize);
 				self.named(a, "member", *v as usize, &name, None);
 			}
+
+			InsnArg::shop(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::battle(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::town(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::bgmtbl(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+			InsnArg::sound(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
+
+			InsnArg::flags(v)      => { a.text(" "); a.span_text("unknown", format!("0x{:08X}", v)); }
+			InsnArg::quest_flag(v) => { a.text(" "); a.span_text("unknown", format!("0x{:02X}", v)); }
+			InsnArg::char_flags(v) => { a.text(" "); a.span_text("unknown", format!("0x{:04X}", v)); }
+			InsnArg::quest_task(v) => { a.text(" "); a.span_text("unknown", format!("0x{:04X}", v)); }
 
 			InsnArg::chcp(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }
 			InsnArg::fork_id(v) => { a.text(" "); a.span_text("unknown", format!("{:?}", v)); }

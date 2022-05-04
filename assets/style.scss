@@ -110,38 +110,36 @@ rt { white-space: pre; }
 		position: absolute;
 	}
 
-	/*              { color: #FF0000; } */
 	.empty-block { color: var(--unimportant); }
 
 	.syntax      { color: var(--frost2); }
 	.keyword     { color: var(--frost2); font-weight: bold; }
 	.expr-op     { color: var(--frost2); }
-	.case        { color: var(--aurora4); }
+	.case        { @extend .int; }
 	.label       { color: var(--aurora1); }
 	.insn        { color: var(--base-text); }
 
 	.int         { color: var(--aurora4); }
-	.speed       { color: var(--aurora4); }
-	.angle       { color: var(--aurora4); }
-	.time        { color: var(--aurora4); }
-	.emote       { color: var(--aurora4); }
+	.speed       { @extend .int; }
+	.angle       { @extend .int; }
+	.time        { @extend .int; }
+	.emote       { @extend .int; }
 
 	.flag        { color: var(--aurora1); }
 	.var         { color: var(--aurora2); }
 	.attr        { color: var(--aurora2); }
-	.char-attr   { color: var(--aurora2); }
-	.member-attr { color: var(--aurora2); }
+	.char-attr   { @extend .attr; }
+	.member-attr { @extend .attr; }
 
-	.char        { color: var(--aurora3); }
-	.member      { color: var(--aurora3); }
 	.color       { color: var(--base-text); }
 	.magic       { color: var(--aurora2); }
 	.item        { color: var(--aurora2); }
 	.sepith-element { color: var(--aurora3); }
 
-	.char-npc     { text-decoration-color: var(--aurora1); }
-	.char-monster { text-decoration-color: var(--aurora0); }
-	.char-self    { color: var(--aurora4); }
+	.char         { color: var(--frost1); }
+	.member       { color: var(--frost0); }
+	.char-member  { color: var(--frost0); }
+	.char-self    { color: var(--aurora3); }
 
 	.color-splat {
 		@extend %icon;

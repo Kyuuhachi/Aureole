@@ -2,7 +2,7 @@ use std::{path::PathBuf, borrow::Cow};
 use std::fs;
 use std::io::Write as _;
 
-use clap::{StructOpt, IntoApp};
+use clap::StructOpt;
 use kaiseki::ed6::Archive;
 
 #[derive(Debug, Clone, clap::Parser)]
@@ -53,22 +53,24 @@ fn main() -> eyre::Result<()> {
 		.filter_level(cli.verbose.log_level_filter())
 		.init();
 
-	let mut cmd = Cli::command();
 	match cli.command {
 		Command::Extract { force, dirfile, outdir } => {
 			if !dirfile.is_file() || dirfile.extension().filter(|a| a == &"dir").is_none() {
-				cmd.error(clap::ErrorKind::ValueValidation, "Input must be a .dir file").exit();
+				log::error!("Dirfile {} must be a .dir file", dirfile.display());
+				return Ok(())
 			}
 			let datfile = dirfile.with_extension("dat");
 			if !datfile.is_file() {
-				cmd.error(clap::ErrorKind::ValueValidation, ".dat file not found").exit();
+				log::error!("Datfile {} not found", datfile.display());
+				return Ok(())
 			}
 
 			if outdir.exists() {
 				if force {
 					fs::remove_dir_all(&outdir)?;
 				} else {
-					cmd.error(clap::ErrorKind::ValueValidation, "Output directory already exists (use -f to overwrite)").exit();
+					log::error!("Output directory {} already exists (use -f to overwrite)", outdir.display());
+					return Ok(())
 				}
 			}
 
@@ -77,7 +79,8 @@ fn main() -> eyre::Result<()> {
 
 		Command::ExtractAll { force, indir, outdir } => {
 			if !indir.is_dir() {
-				cmd.error(clap::ErrorKind::ValueValidation, "Invalid input directory").exit();
+				log::error!("Input directory {} not valid", indir.display());
+				return Ok(())
 			}
 
 			for a in fs::read_dir(&indir)? {
@@ -86,7 +89,8 @@ fn main() -> eyre::Result<()> {
 				if dirfile.extension().filter(|a| a == &"dir").is_some() {
 					let datfile = dirfile.with_extension("dat");
 					if !datfile.is_file() {
-						cmd.error(clap::ErrorKind::ValueValidation, ".dat file not found").exit();
+						log::error!("{} not found", datfile.display());
+						return Ok(())
 					}
 
 					let outdir = outdir.join(dirfile.file_stem().unwrap());
@@ -95,7 +99,8 @@ fn main() -> eyre::Result<()> {
 						if force {
 							fs::remove_dir_all(&outdir)?;
 						} else {
-							cmd.error(clap::ErrorKind::ValueValidation, "Output directory already exists (use -f to overwrite)").exit();
+							log::error!("Output directory {} already exists (use -f to overwrite)", outdir.display());
+							return Ok(())
 						}
 					}
 

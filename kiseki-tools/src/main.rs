@@ -10,7 +10,7 @@ use kaiseki::ed6::Archive;
 #[derive(Debug, Clone, clap::Parser)]
 struct Cli {
 	#[clap(flatten)]
-	verbose: clap_verbosity_flag::Verbosity<clap_verbosity_flag::WarnLevel>,
+	verbose: clap_verbosity_flag::Verbosity<clap_verbosity_flag::InfoLevel>,
 
 	#[clap(subcommand)]
 	command: Command,
@@ -100,6 +100,8 @@ fn extract(force: bool, dirfile: &Path, outdir: &Path) -> Result<(), snafu::What
 		}
 	}
 
+	log::info!("Extracting archive {} to {}", dirfile.display(), outdir.display());
+
 	let arch = Archive::from_dir_dat(&dirfile, &datfile)
 		.with_whatever_context(|_| format!("failed to read archive {}", dirfile.display()))?;
 
@@ -112,11 +114,12 @@ fn extract(force: bool, dirfile: &Path, outdir: &Path) -> Result<(), snafu::What
 	for e in arch.entries() {
 		let outfile = outdir.join(e.display_name());
 		let raw = arch.get(e.index).unwrap().1;
-		log::info!("Extracting {} ({} → {})", outfile.display(), raw.len(), e.size);
+		log::debug!("{} ({} → {})", outfile.display(), raw.len(), e.size);
 
 		let (note, data) = if e.timestamp == 0 {
 			(" e ", None)
 		} else if raw.len() == e.size {
+			// I'm not sure about this heuristic; the size is very unreliable
 			("   ", Some(Cow::Borrowed(raw)))
 		} else {
 			match kaiseki::decompress::decompress(raw) {
@@ -124,7 +127,7 @@ fn extract(force: bool, dirfile: &Path, outdir: &Path) -> Result<(), snafu::What
 					("(C)", Some(Cow::Owned(decompressed)))
 				}
 				Err(e) => {
-					log::warn!("  Decompression failed: {}", e);
+					log::warn!("{}: decompression failed: {}", outfile.display(), e);
 					("(?)", Some(Cow::Borrowed(raw)))
 				}
 			}

@@ -4,7 +4,7 @@ use std::{
 	ops::Range,
 };
 
-use crate::dump::Dump;
+use beryl::Dump;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -112,7 +112,9 @@ impl<'a> In<'a> {
 	}
 
 	pub fn dump(&self) -> Dump {
-		Dump::new(self)
+		let mut cursor = std::io::Cursor::new(&self.data);
+		cursor.set_position(self.pos as u64);
+		Dump::new(cursor, self.pos)
 	}
 }
 

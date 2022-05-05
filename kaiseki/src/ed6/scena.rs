@@ -398,12 +398,13 @@ impl<'a> CodeParser<'a> {
 				writeln!(mess, "  {addr:04X} {addr}: {op:?}").unwrap();
 			}
 			mess.push('\n');
-			write!(mess, "{}", 
+			write!(mess, "{}",
 				start.dump().end(end)
-					.marks(self.marks.iter())
+					.marks(self.marks.iter().map(|(a,b)|(*a,b)))
 					.mark(self.pos()-1, "\x1B[0;7m ")
-					.number_width(4)
+					.num_width(4)
 					.newline(false)
+					.to_string(true)
 			).unwrap();
 			tracing::error!("Parse error: {}", mess);
 

@@ -789,6 +789,7 @@ dependencies = [
 name = "hamu"
 version = "0.1.0"
 dependencies = [
+ "beryl",
  "extend",
  "paste",
  "thiserror",

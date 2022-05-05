@@ -47,7 +47,7 @@ enum DumpLength {
 
 #[must_use]
 pub struct Dump<'a> {
-	reader: &'a mut dyn io::Read,
+	reader: Box<dyn io::Read + 'a>,
 	start: usize,
 	length: DumpLength,
 	width: usize,
@@ -59,9 +59,9 @@ pub struct Dump<'a> {
 }
 
 impl<'a> Dump<'a> {
-	pub fn new(reader: &'a mut dyn io::Read, start: usize) -> Self {
+	pub fn new(reader: impl io::Read + 'a, start: usize) -> Self {
 		Self {
-			reader,
+			reader: Box::new(reader),
 			start,
 			width: 0,
 			length: DumpLength::None,
@@ -128,7 +128,7 @@ impl<'a> Dump<'a> {
 		self
 	}
 
-	pub fn write_to(self, out: &mut impl io::Write, ansi: bool) -> io::Result<()> {
+	pub fn write_to(mut self, out: &mut impl io::Write, ansi: bool) -> io::Result<()> {
 		let width = match self.width {
 			0 if self.preview.is_some() => 48,
 			0 if self.preview.is_none() => 72,

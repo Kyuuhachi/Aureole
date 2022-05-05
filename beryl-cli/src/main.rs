@@ -61,8 +61,8 @@ fn main() -> io::Result<()> {
 		None
 	} else if cli.encoding.to_ascii_lowercase() == "ascii" {
 		Some(Box::new(beryl::preview::ascii))
-	} else if let Some(encoding) = beryl::preview::encoding(cli.encoding.as_bytes()) {
-		Some(Box::new(encoding))
+	} else if let Some(encoding) = encoding_rs::Encoding::for_label_no_replacement(cli.encoding.as_bytes()) {
+		Some(Box::new(beryl::preview::encoding(encoding)))
 	} else {
 		eprintln!("Invalid encoding");
 		None

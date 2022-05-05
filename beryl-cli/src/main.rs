@@ -35,6 +35,9 @@ struct Cli {
 	#[clap(long)]
 	gray: bool,
 
+	#[clap(long, short='E', default_value="ascii")]
+	encoding: String,
+
 	#[clap(value_hint=clap::ValueHint::FilePath)]
 	files: Vec<PathBuf>,
 }
@@ -53,11 +56,33 @@ fn parse_size(s: &str) -> Result<usize, std::num::ParseIntError> {
 
 fn main() -> io::Result<()> {
 	let cli = Cli::parse();
+
+	let preview: Option<Box<beryl::PreviewFn>> = if cli.encoding.to_ascii_lowercase() == "none" {
+		None
+	} else if cli.encoding.to_ascii_lowercase() == "ascii" {
+		Some(Box::new(beryl::preview::ascii))
+	} else if let Some(encoding) = encoding_rs::Encoding::for_label_no_replacement(cli.encoding.as_bytes()) {
+		Some(Box::new(move |f: &mut Vec<beryl::Ansi>, data: &[u8]| {
+			for c in encoding.decode_without_bom_handling(data).0.chars() {
+				if c.is_control() {
+					f.push(beryl::Style::new().dimmed().paint("·"))
+				} else if c == '�' {
+					f.push(beryl::Style::new().dimmed().paint("�"))
+				} else {
+					f.push(c.to_string().into())
+				}
+			}
+		}))
+	} else {
+		panic!("invalid encoding");
+	};
+
 	let files = if cli.files.is_empty() {
 		vec![PathBuf::from("-")]
 	} else {
 		cli.files
 	};
+
 	for file in files {
 		let size;
 		let mut file: Box<dyn io::Read> = if file == OsStr::new("-") {
@@ -73,6 +98,7 @@ fn main() -> io::Result<()> {
 
 		let mut dump = beryl::Dump::new(&mut file, cli.start);
 		dump = dump.num_width_from(size);
+		dump = dump.preview_option(preview.as_deref());
 		if let Some(v) = cli.end    { dump = dump.end(v); }
 		if let Some(v) = cli.lines  { dump = dump.lines(v); }
 		if let Some(v) = cli.length { dump = dump.bytes(v); }

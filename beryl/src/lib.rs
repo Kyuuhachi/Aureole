@@ -45,14 +45,17 @@ enum DumpLength {
 	Lines(usize),
 }
 
+pub type ColorFn = dyn Fn(u8) -> Style;
+pub type PreviewFn = dyn Fn(&mut Vec<Ansi>, &[u8]);
+
 #[must_use]
 pub struct Dump<'a> {
 	reader: Box<dyn io::Read + 'a>,
 	start: usize,
 	length: DumpLength,
 	width: usize,
-	color: &'a dyn Fn(u8) -> Style,
-	preview: Option<&'a dyn Fn(&mut Vec<Ansi>, &[u8])>,
+	color: &'a ColorFn,
+	preview: Option<&'a PreviewFn>,
 	num_width: usize,
 	newline: bool,
 	marks: BTreeMap<usize, Ansi<'a>>,
@@ -94,18 +97,22 @@ impl<'a> Dump<'a> {
 		Dump { width, ..self }
 	}
 
-	pub fn color(self, color: &'a dyn Fn(u8) -> Style) -> Self {
+	pub fn color(self, color: &'a ColorFn) -> Self {
 		Dump { color, ..self }
 	}
 
-	pub fn preview(self, preview: &'a dyn Fn(&mut Vec<Ansi>, &[u8])) -> Self {
-		Dump { preview: Some(preview), ..self }
+	pub fn preview(self, preview: &'a PreviewFn) -> Self {
+		self.preview_option(Some(preview))
 	}
 
 	// This is different from a no-op preview function, since it affects the
 	// default width and trailing space on the last line.
 	pub fn no_preview(self) -> Self {
-		Dump { preview: None, ..self }
+		self.preview_option(None)
+	}
+
+	pub fn preview_option(self, preview: Option<&'a PreviewFn>) -> Self {
+		Dump { preview, ..self }
 	}
 
 	pub fn num_width(self, num_width: usize) -> Self {

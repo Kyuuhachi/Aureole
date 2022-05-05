@@ -73,7 +73,7 @@ fn run(command: Command) -> Result<(), snafu::Whatever> {
 				let a = a.whatever_context("failed to read directory entry")?;
 				let dirfile = a.path();
 				if dirfile.extension().filter(|a| a == &"dir").is_some() {
-					extract(force, &dirfile, &outdir)?;
+					extract(force, &dirfile, &outdir.join(dirfile.file_stem().unwrap()))?;
 				}
 			}
 		},

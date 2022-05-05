@@ -115,6 +115,7 @@ impl<'a> In<'a> {
 		let mut cursor = std::io::Cursor::new(&self.data);
 		cursor.set_position(self.pos as u64);
 		Dump::new(cursor, self.pos)
+			.num_width_from(self.len())
 	}
 }
 

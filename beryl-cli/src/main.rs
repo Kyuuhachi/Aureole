@@ -59,15 +59,20 @@ fn main() -> io::Result<()> {
 		cli.files
 	};
 	for file in files {
+		let size;
 		let mut file: Box<dyn io::Read> = if file == OsStr::new("-") {
+			size = 0;
 			Box::new(io::stdin())
 		} else {
-			Box::new(std::fs::File::open(file)?)
+			let file = std::fs::File::open(file)?;
+			size = file.metadata()?.len() as usize;
+			Box::new(file)
 		};
 
-		io::copy(&mut (&mut file).take(cli.start as u64), &mut io::sink())?;
+		io::copy(&mut file.by_ref().take(cli.start as u64), &mut io::sink())?;
 
 		let mut dump = beryl::Dump::new(&mut file, cli.start);
+		dump = dump.num_width_from(size);
 		if let Some(v) = cli.end    { dump = dump.end(v); }
 		if let Some(v) = cli.lines  { dump = dump.lines(v); }
 		if let Some(v) = cli.length { dump = dump.bytes(v); }

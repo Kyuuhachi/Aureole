@@ -112,6 +112,10 @@ impl<'a> Dump<'a> {
 		Dump { num_width, ..self }
 	}
 
+	pub fn num_width_from(self, max: usize) -> Self {
+		self.num_width(format!("{max:X}").len())
+	}
+
 	pub fn newline(self, newline: bool) -> Self {
 		Dump { newline, ..self }
 	}

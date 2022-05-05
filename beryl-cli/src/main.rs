@@ -61,20 +61,11 @@ fn main() -> io::Result<()> {
 		None
 	} else if cli.encoding.to_ascii_lowercase() == "ascii" {
 		Some(Box::new(beryl::preview::ascii))
-	} else if let Some(encoding) = encoding_rs::Encoding::for_label_no_replacement(cli.encoding.as_bytes()) {
-		Some(Box::new(move |f: &mut Vec<beryl::Ansi>, data: &[u8]| {
-			for c in encoding.decode_without_bom_handling(data).0.chars() {
-				if c.is_control() {
-					f.push(beryl::Style::new().dimmed().paint("·"))
-				} else if c == '�' {
-					f.push(beryl::Style::new().dimmed().paint("�"))
-				} else {
-					f.push(c.to_string().into())
-				}
-			}
-		}))
+	} else if let Some(encoding) = beryl::preview::encoding(cli.encoding.as_bytes()) {
+		Some(Box::new(encoding))
 	} else {
-		panic!("invalid encoding");
+		eprintln!("Invalid encoding");
+		None
 	};
 
 	let files = if cli.files.is_empty() {

@@ -319,6 +319,7 @@ version = "0.1.0"
 dependencies = [
  "ansi_term",
  "atty",
+ "encoding_rs",
 ]
 
 [[package]]
@@ -327,7 +328,6 @@ version = "0.1.0"
 dependencies = [
  "beryl",
  "clap",
- "encoding_rs",
 ]
 
 [[package]]

@@ -15,6 +15,24 @@ pub mod preview {
 			})
 		}
 	}
+
+	#[cfg(feature = "encoding_rs")]
+	pub fn encoding(label: &[u8]) -> Option<impl Fn(&mut Vec<Ansi>, &[u8])> {
+		encoding_rs::Encoding::for_label_no_replacement(label)
+		.map(|encoding| {
+			move |f: &mut Vec<Ansi>, data: &[u8]| {
+				for c in encoding.decode_without_bom_handling(data).0.chars() {
+					if c.is_control() {
+						f.push(Style::new().dimmed().paint("·"))
+					} else if c == '�' {
+						f.push(Style::new().dimmed().paint("�"))
+					} else {
+						f.push(c.to_string().into())
+					}
+				}
+			}
+		})
+	}
 }
 
 pub mod color {

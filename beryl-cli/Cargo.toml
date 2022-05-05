@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 beryl = { path = "../beryl" }
 clap = { version = "3.1.15", features = ["derive"] }
-encoding_rs = "0.8.31"
 
 [[bin]]
 name = "beryl"

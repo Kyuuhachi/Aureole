@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 ansi_term = "0.12.1"
 atty = { version = "0.2.14", optional = true }
+encoding_rs = { version = "0.8.31", optional = true }
 
 [features]
-default = ["atty"]
+default = ["atty", "encoding_rs"]

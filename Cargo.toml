@@ -28,6 +28,8 @@ members = [
 	"kaiseki",
 	"kaiseki-macros",
 	"kiseki-tools",
+	"beryl",
+	"beryl-cli",
 ]
 
 [profile.dev]

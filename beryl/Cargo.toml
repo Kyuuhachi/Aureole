@@ -1,0 +1,11 @@
+[package]
+name = "beryl"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ansi_term = "0.12.1"
+atty = { version = "0.2.14", optional = true }
+
+[features]
+default = ["atty"]

@@ -1,0 +1,12 @@
+[package]
+name = "beryl-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+beryl = { path = "../beryl" }
+clap = { version = "3.1.15", features = ["derive"] }
+
+[[bin]]
+name = "beryl"
+path = "src/main.rs"

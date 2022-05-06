@@ -153,14 +153,14 @@ rt { white-space: pre; }
 		@include icon-sheet("/fc/ui/icon1.png", 16, 16);
 	}
 
-	.magic-unknown::before { --icon-x:  7; --icon-y: 3; }
+	.magic-unknown::before { --icon-x:  4; --icon-y: 4; }
 	.magic-craft::before   { --icon-x: 12; --icon-y: 2; }
 	.magic-scraft::before  { --icon-x: 10; --icon-y: 2; }
 	.magic-earth::before   { --icon-x:  8; --icon-y: 3; }
 	.magic-water::before   { --icon-x:  9; --icon-y: 3; }
 	.magic-fire::before    { --icon-x: 10; --icon-y: 3; }
 	.magic-wind::before    { --icon-x: 11; --icon-y: 3; }
-	.magic-time::before    { --icon-x: 14; --icon-y: 3; }
+	.magic-time::before    { --icon-x:  7; --icon-y: 3; }
 	.magic-space::before   { --icon-x: 12; --icon-y: 3; }
 	.magic-mirage::before  { --icon-x: 13; --icon-y: 3; }
 

@@ -181,7 +181,7 @@ impl Node {
 		self.leaf.render_fragment(out, false)?;
 		for item in &self.body {
 			if self.indent {
-				write!(out, "\n{}", "\t".repeat(indent))?;
+				write!(out, "\n{}", "\t".repeat(indent+1))?;
 			}
 			match item {
 				Item::Node(v) => v.render_fragment(out, indent+1)?,

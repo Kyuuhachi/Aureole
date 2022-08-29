@@ -177,6 +177,8 @@ impl<'a> Dump<'a> {
 			self.num_width
 		};
 
+		let mut first = true;
+
 		loop {
 			let buf = if let Some(len) = len {
 				&mut buf[..width.min(self.start + len - pos)]
@@ -186,6 +188,8 @@ impl<'a> Dump<'a> {
 			let nread = self.reader.read(buf)?;
 			let buf = &buf[..nread];
 
+			if buf.is_empty() && !first { break; }
+			first = false;
 
 			let mut line = Vec::new();
 			if self.num_width > 0 {
@@ -229,7 +233,7 @@ impl<'a> Dump<'a> {
 			}
 			writeln!(out)?;
 
-			if Some(pos) == len.map(|a| self.start+a) || buf.is_empty() { break; }
+			if Some(pos) == len.map(|a| self.start+a) { break; }
 		}
 
 		if self.newline {

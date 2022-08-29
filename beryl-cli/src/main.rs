@@ -93,11 +93,11 @@ fn main() -> io::Result<()> {
 		if let Some(v) = cli.end    { dump = dump.end(v); }
 		if let Some(v) = cli.lines  { dump = dump.lines(v); }
 		if let Some(v) = cli.length { dump = dump.bytes(v); }
-		if let Some(v) = cli.width  { dump = dump.end(v); }
-		if let Some(v) = cli.num_width  { dump = dump.num_width(v); }
-		if cli.no_blank  { dump = dump.newline(false); }
-		if cli.one_line  { dump = dump.oneline(); }
-		if cli.gray  { dump = dump.color(&beryl::color::gray); }
+		if let Some(v) = cli.width  { dump = dump.width(v); }
+		if let Some(v) = cli.num_width { dump = dump.num_width(v); }
+		if cli.no_blank { dump = dump.newline(false); }
+		if cli.one_line { dump = dump.oneline(); }
+		if cli.gray { dump = dump.color(&beryl::color::gray); }
 
 		dump.to_stdout();
 	}

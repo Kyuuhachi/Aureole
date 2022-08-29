@@ -58,6 +58,7 @@ enum DumpLength {
 	None,
 	Bytes(usize),
 	Lines(usize),
+	End(usize),
 }
 
 pub type ColorFn = dyn Fn(u8) -> Style;
@@ -104,7 +105,7 @@ impl<'a> Dump<'a> {
 	}
 
 	pub fn end(self, end: usize) -> Self {
-		Dump { length: DumpLength::Bytes(end - self.start), ..self }
+		Dump { length: DumpLength::End(end), ..self }
 	}
 
 	pub fn width(self, width: usize) -> Self {
@@ -165,6 +166,7 @@ impl<'a> Dump<'a> {
 			DumpLength::None => None,
 			DumpLength::Bytes(b) => Some(b),
 			DumpLength::Lines(l) => Some(l * width),
+			DumpLength::End(l)   => Some(l.saturating_sub(self.start)),
 		};
 
 		let mut marks = self.marks.range(self.start..).peekable();

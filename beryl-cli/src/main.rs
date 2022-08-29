@@ -23,10 +23,10 @@ struct Cli {
 	#[clap(long, short, parse(try_from_str = parse_size))]
 	width: Option<usize>,
 
-	#[clap(long, short='N', value_name="DIGITS")]
+	#[clap(long, short='n', value_name="DIGITS")]
 	num_width: Option<usize>,
 
-	#[clap(long, short='n')]
+	#[clap(long, short='N')]
 	no_blank: bool,
 
 	#[clap(long, short='1')]

@@ -1,35 +1,11 @@
-[package]
-name = "kiseki"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-choubun = { path = "./choubun" }
-kaiseki = { path = "./kaiseki" }
-
-eyre = "0.6.8"
-color-eyre = "0.6.1"
-convert_case = "0.5.0"
-actix-web = "4.0.1"
-actix-files = "0.6.0"
-tracing = "0.1.34"
-tracing-error = "0.2.0"
-tracing-subscriber = { version = "0.3.11", features = ["env-filter"] }
-tracing-span-tree = "0.1.1"
-extend = "1.1.2"
-image = { version = "0.24.2", default-features = false, features = ["png"] }
-percent-encoding = "2.1.0"
-unicode-width = "0.1.9"
-
 [workspace]
 members = [
-	"hamu",
-	"choubun",
-	"kaiseki",
-	"kaiseki-macros",
-	"kiseki-tools",
 	"beryl",
 	"beryl-cli",
+	"hamu",
+	"choubun",
+
+	"ed6",
 ]
 
 [profile.dev]

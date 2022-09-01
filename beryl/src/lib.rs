@@ -155,6 +155,11 @@ impl<'a> Dump<'a> {
 		self
 	}
 
+	pub fn clear_marks(mut self) -> Self {
+		self.marks.clear();
+		self
+	}
+
 	pub fn write_to(mut self, out: &mut impl io::Write, ansi: bool) -> io::Result<()> {
 		let width = match self.width {
 			0 if self.preview.is_some() => 48,

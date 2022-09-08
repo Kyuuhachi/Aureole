@@ -1,0 +1,16 @@
+[package]
+name = "tools"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ed6 = { path = "../ed6" }
+snafu = { version = "0.7.1", features = ["backtraces"] }
+clap = { version = "3.1.15", features = ["derive"] }
+
+filetime = "0.2.16"
+chrono = "0.4.22"
+
+clap-verbosity-flag = "1.0.0"
+log = "0.4.17"
+env_logger = "0.9.0"

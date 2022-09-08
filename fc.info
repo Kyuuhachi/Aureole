@@ -1,145 +1,144 @@
 Archives:
 	00: System textures
-		- C_*.CH
-		- H_*.CH
-		- FONT*.DA
-		- C_WIPE*.DS
-		The C_WIPE*.DS have mismatched size and csize, but are *not* compressed. Weird.
+		- c_*._ch
+		- h_*._ch
+		- font*._da
+		- c_wipe*._ds
 	01: Scenarios/areas
-		- {area}.SN
-		- {area}_?.SN
-		- SNRES*.(nil)
-		- SN_RES*.(nil)
+		- {area}._sn
+		- {area}_?._sn
+		- snres*.(nil)
+		- sn_res*.(nil)
 		The SNRES do not appear to have much relation to the indices.
 	02: Data tables
-		- T_*.DT
+		- t_*._dt
 	03: Maps?
-		- M{area}.CH
-		- M{area}A.CH
-		The A is probably Alternate. I think they correspond to Mistwald (when the Sky Bandits are
+		- m{area}._ch
+		- m{area}a._ch
+		The a is probably Alternate. I think they correspond to Mistwald (when the Sky Bandits are
 		there) and Mercia Orphanage (after the fire), but that needs double-checking.
 	04: More system textures, and event images
-		- C_*.CH
-		- H_*.CH
-		- W_*.CH
+		- c_*._ch
+		- h_*._ch
+		- w_*._ch
 	05: Faces and newspaper images
-		- C_KAO*.CH
-		- H_KAO*.CH
-		Indexed (H_ are +1000)
+		- c_kao*._ch
+		- h_kao*._ch
+		Indexed (h_ are +1000)
 		Number 900+ are newspaper images.
 	06: CHCPs
-		- CH{ch2}.CH
-		- CH{ch2}P.CP
+		- ch{ch2}._ch
+		- ch{ch2}p._cp
 	07: CHCPs
-		- CH{ch0}.CH
-		- CH{ch0}P.CP
+		- ch{ch0}._ch
+		- ch{ch0}p._cp
 	08: Sound effects
-		- ED6SE*.WAV
+		- ed6se*.wav
 		Indexed.
 	09: CHCPs
-		- CH{ch1}.CH
-		- CH{ch1}P.CP
-		- CH{ch3}.CH
-		- CH{ch3}P.CP
+		- ch{ch1}._ch
+		- ch{ch1}p._cp
+		- ch{ch3}._ch
+		- ch{ch3}p._cp
 	0A: Models
-		- {area}.X2
-		- B{area}.X2
-		- *.X2
+		- {area}._x2
+		- b{area}._x2
+		- *._x2
 	0B: CT
-		- {area}.CT
-		- B{area}.CT
+		- {area}._ct
+		- b{area}._ct
 	0C: LM
-		- {area}.LM
+		- {area}._lm
 	0D: CL
-		- {area}.CL
+		- {area}._cl
 	0E: Shaders
-		- *.VS
-		- 9*.VS
+		- *._vs
+		- 9*._vs
 	0F: Battle textures
-		- *.CH
-		- H*.CH
-		- BFACE*.CH
-		- HFACE.CH
-		- CTI*.CH
-		These don't follow the usual C_/H_ rules apparently.
+		- *._ch
+		- h*._ch
+		- bface*._ch
+		- hface._ch
+		- cti*._ch
+		These don't follow the usual c_/h_ rules apparently.
 	10: Battle data
-		- AS{ch013}.DT
-		- ASMAG000.DT
-		- BS*.DT
-		- MS{ch013}.DT
+		- as{ch013}._dt
+		- asmag000._dt
+		- bs*._dt
+		- ms{ch013}._dt
 	11: Unknown
-		- TEMP.SY
-		- SY{ch013}.SY
+		- temp._sy
+		- sy{ch013}._sy
 	12: Auxiliary scenario data
-		- {area}.EN
-		- TEMP.EN
-		- {area}.OP
-		- B{area}.OP
-		- {area}_*.OP
-		- T00010.OP
+		- {area}._en
+		- temp._en
+		- {area}._op
+		- b{area}._op
+		- {area}_*._op
+		- t00010._op
 	13: Particles
-		- *.EF
-		- *.DS
-		- *.X2
-		- {area}.EP
-		- B{area}.EP
+		- *._ef
+		- *._ds
+		- *._x2
+		- {area}._ep
+		- b{area}._ep
 	14: HD
-		- {area}.HD
-		- B{area}.HD
+		- {area}._hd
+		- b{area}._hd
 	15: World textures
-		- *.DS
+		- *._ds
 	16: Reverie
-		- *.DS
-		- *.X2
+		- *._ds
+		- *._x2
 	19: MH
-		- B{area}.MH
+		- b{area}._mh
 	(1A: Japanese voice)
 		Same as 1B, needs to be installed separately
 	1B: Battle voice
-		- ED6T1*.WAV
+		- ed6t1*.wav
 		Not indexed; there's a gap at 474
 	1C: Monster book?
-		- *.CH
-		- H*.CH
-		- CA{ch013}.CH
-		- MNSNOTE1.DT
-		- MNSNOTE2.DT
+		- *._ch
+		- h*._ch
+		- ca{ch013}._ch
+		- mnsnote1._dt
+		- mnsnote2._dt
 
 Files:
-	*.WAV: [.] WAV file
-	*.DS:  [.] DDS file
-	*.CH:  [C] Bitmap (Size and pixel format is specified externally)
-	*.EF:  [.] Effect
-	*.VS:  [C] Vertex shader
-	9*.VS: [C] Unknown
-	*.X2:  [.] Model
-	FONT*.DA: [C] Font
+	*.wav:  [.] WAV file
+	*._ds:  [.] DDS file
+	*._ch:  [C] Bitmap (Size and pixel format is specified externally)
+	*._ef:  [.] Effect
+	*._vs:  [C] Vertex shader
+	9*._vs: [C] Unknown
+	*._x2:  [?] Model (all compressed except Reverie)
+	font*._da: [C] Font
 
-	{area}.CT,  B{area}.CT:  [.] Unknown
-	{area}.CL:               [.] Unknown
-	{area}.EN:               [.] Entrances
-	{area}.EP,  B{area}.EP:  [.] Effect placement
-	{area}.HD,  B{area}.HD:  [.] Unknown
-	{area}.LM:               [.] Unkown
-	{area}.OP,  B{area}.OP:  [.] Object placement
-	{area}_*.OP:             [.] Likely alternate placements when the story calls for it
-	{area}.SN                [C] Main scenario info
-	{area}_?.SN              [C] Scenario include files. Contain extra functions (often for quests), but no objects
-	{area}.X2,  B{area}.X2:  [.] World model
-	M{area}.CH, M{area}A.CH: [C] Map image
+	{area}._ct,  b{area}._ct:  [.] Unknown
+	{area}._cl:                [.] Unknown
+	{area}._en:                [.] Entrances
+	{area}._ep,  b{area}._ep:  [.] Effect placement
+	{area}._hd,  b{area}._hd:  [.] Unknown
+	{area}._lm:                [.] Unkown
+	{area}._op,  b{area}._op:  [.] Object placement
+	{area}_*._op:              [.] Likely alternate placements when the story calls for it
+	{area}._SN                 [C] Main scene info
+	{area}_?._SN               [C] Scene include files. Contain extra functions (often for quests), but no objects
+	{area}._x2,  b{area}._x2:  [.] World model
+	m{area}._ch, m{area}a._ch: [C] Map image
 	
-	AS{ch}.DT:   [C] Attack scripts
-	ASMAG000.DT: [C] Shared attack scripts for T_MAGIC
-	CA{ch}*.CH:  [C] Monster book pictures
-	CH{ch}.CH:   [C] NPC spritesheet, 16×16 chunks
-	CH{ch}P.CP:  [C] NPC spritesheet, assembly
-	SY{ch}.SY:   [C] Unknown
-	BS*.DT:      [C] Possibly scripts for particular battles?
-	MS{ch}.DT:   [C] Monster info
+	as{ch}._dt:   [C] Attack scripts
+	asmag000._dt: [C] Shared attack scripts for t_magic
+	ca{ch}*._ch:  [C] Monster book pictures
+	ch{ch}._ch:   [C] NPC spritesheet, 16×16 chunks
+	ch{ch}p._cp:  [C] NPC spritesheet, assembly
+	sy{ch}._sy:   [C] Unknown
+	bs*._dt:      [C] Possibly scripts for particular battles?
+	ms{ch}._dt:   [C] Monster info
 
-	T_*.DT:      [C] Data table
-	MNSNOTE1.DT: [C] Text file listing monsters, probably not used
-	MNSNOTE2.DT: [C] Concatenation of MS*.DT
-	C_WIPE*.DT:  [?] Unknown
+	t_*._dt:      [C] Data table
+	mnsnote1._dt: [C] Text file listing monsters, probably not used
+	mnsnote2._dt: [C] Concatenation of ms*._dt
+	c_wipe*._dt:  [?] Unknown
 
-	SN_RES*/SNRES*: Empty. Likely a placeholder
+	sn_res*/snres*: Empty. Likely a placeholder

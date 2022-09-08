@@ -38,6 +38,9 @@ struct Cli {
 	#[clap(long, short='E', default_value="ascii")]
 	encoding: String,
 
+	#[clap(long, short='v')]
+	print_name: bool,
+
 	#[clap(value_hint=clap::ValueHint::FilePath)]
 	files: Vec<PathBuf>,
 }
@@ -74,13 +77,13 @@ fn main() -> io::Result<()> {
 		cli.files
 	};
 
-	for file in files {
+	for path in files {
 		let size;
-		let mut file: Box<dyn io::Read> = if file == OsStr::new("-") {
+		let mut file: Box<dyn io::Read> = if path == OsStr::new("-") {
 			size = 0;
 			Box::new(io::stdin())
 		} else {
-			let file = std::fs::File::open(file)?;
+			let file = std::fs::File::open(&path)?;
 			size = file.metadata()?.len() as usize;
 			Box::new(file)
 		};
@@ -99,6 +102,9 @@ fn main() -> io::Result<()> {
 		if cli.one_line { dump = dump.oneline(); }
 		if cli.gray { dump = dump.color(&beryl::color::gray); }
 
+		if cli.print_name {
+			println!("{}", path.display());
+		}
 		dump.to_stdout();
 	}
 	Ok(())

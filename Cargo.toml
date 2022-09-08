@@ -6,7 +6,10 @@ members = [
 	"choubun",
 
 	"ed6",
+	"tools",
 ]
+
+exclude = ["_old"]
 
 [profile.dev]
 package.hamu.opt-level = 3

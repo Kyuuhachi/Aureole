@@ -4,14 +4,12 @@ use std::{
 	io::Write as _, ffi::OsStr,
 };
 use clap::StructOpt;
+use indicatif::{ProgressBar, MultiProgress, ProgressStyle};
 use snafu::prelude::*;
 use ed6::archive::{Archive, Archives};
 
 #[derive(Debug, Clone, clap::Parser)]
 struct Cli {
-	#[clap(flatten)]
-	verbose: clap_verbosity_flag::Verbosity<clap_verbosity_flag::InfoLevel>,
-
 	#[clap(subcommand)]
 	command: Command,
 }
@@ -53,10 +51,6 @@ enum Command {
 
 fn main() {
 	let cli = Cli::parse();
-	env_logger::Builder::new()
-		.filter_level(cli.verbose.log_level_filter())
-		.init();
-
 	if let Err(e) = run(cli.command) {
 		report(e);
 		std::process::exit(1);
@@ -97,6 +91,7 @@ pub enum Error {
 }
 
 fn run(command: Command) -> Result<(), Error> {
+	let style = ProgressStyle::with_template("{wide_bar} {msg:>12} ({bytes}/{total_bytes})").unwrap();
 	match command {
 		Command::Extract { force, dirfile, outdir } => {
 			snafu::ensure_whatever!(
@@ -110,7 +105,8 @@ fn run(command: Command) -> Result<(), Error> {
 				.with_whatever_context(|_| format!("could not open {}", datfile.display()))?;
 			let arc = Archive::from_dir_dat(&dir, &dat)
 				.with_context(|_| ArchiveSnafu { message: format!("could not read archive from {}", dirfile.display()) })?;
-			extract(force, &arc, &outdir)?;
+			let bar = ProgressBar::new(0).with_style(style);
+			extract(force, &arc, &outdir, bar, None)?;
 		}
 
 		Command::ExtractAll { force, indir, outdir } => {
@@ -122,9 +118,19 @@ fn run(command: Command) -> Result<(), Error> {
 			);
 			let mut arcs = arcs.archives().collect::<Vec<_>>();
 			arcs.sort_by_key(|a| a.0);
+			let mpb = MultiProgress::new();
+
+			let total_size = arcs.iter().flat_map(|a| a.1.entries()).map(|a| a.len() as u64).sum();
+			let outerbar = ProgressBar::new(total_size)
+				.with_style(ProgressStyle::with_template("{elapsed_precise} ({percent}%) {wide_bar} {msg}").unwrap());
+			mpb.add(outerbar.clone());
+
 			for (i, arc) in arcs {
-				let outdir = outdir.join(format!("{i:02X}"));
-				extract(force, arc, &outdir)?;
+				outerbar.set_message(format!("ED6_DT{i:02X}"));
+
+				let bar = ProgressBar::new(0).with_style(style.clone());
+				mpb.add(bar.clone());
+				extract(force, arc, &outdir.join(format!("{i:02X}")), bar, Some(outerbar.clone()))?;
 			}
 		}
 	}
@@ -132,18 +138,16 @@ fn run(command: Command) -> Result<(), Error> {
 	Ok(())
 }
 
-fn extract(force: bool, arc: &Archive, outdir: &Path) -> Result<(), Error> {
+fn extract(force: bool, arc: &Archive, outdir: &Path, bar: ProgressBar, outerbar: Option<ProgressBar>) -> Result<(), Error> {
 	if outdir.exists() {
 		if force {
 			fs::remove_dir_all(&outdir)
 				.with_whatever_context(|_| format!("failed to remove {}", outdir.display()))?;
 		} else {
-			log::warn!("output directory {} already exists (use -f to overwrite)", outdir.display());
+			eprintln!("output directory {} already exists (use -f to overwrite)", outdir.display());
 			return Ok(())
 		}
 	}
-
-	log::info!("Extracting to {}", outdir.display());
 
 	fs::create_dir_all(&outdir)
 		.with_whatever_context(|_| format!("failed to create output directory {}", outdir.display()))?;
@@ -151,7 +155,9 @@ fn extract(force: bool, arc: &Archive, outdir: &Path) -> Result<(), Error> {
 	let mut index = fs::File::create(outdir.join("index"))
 		.with_whatever_context(|_| format!("failed to create index {}", outdir.join("index").display()))?;
 
+	bar.set_length(arc.entries().iter().map(|e| e.len() as u64).sum());
 	for e in arc.entries() {
+		bar.set_message(e.name.to_owned());
 		let (rawlen, outlen) = if &e.name == "/_______.___" {
 			continue
 		} else if e.timestamp == 0 {
@@ -159,7 +165,6 @@ fn extract(force: bool, arc: &Archive, outdir: &Path) -> Result<(), Error> {
 		} else {
 			let outfile = outdir.join(&e.name);
 			let raw = arc.get(&e.name).unwrap();
-			log::debug!("{}", outfile.display());
 
 			fs::write(&outfile, &raw)
 				.with_whatever_context(|_| format!("failed to write output file {}", outfile.display()))?;
@@ -189,6 +194,11 @@ fn extract(force: bool, arc: &Archive, outdir: &Path) -> Result<(), Error> {
 			chrono::NaiveDateTime::from_timestamp(e.timestamp as i64, 0),
 			e.unk1, e.unk2,
 		).whatever_context("failed to write to index")?;
+
+		bar.inc(e.len() as u64);
+		if let Some(outerbar) = &outerbar {
+			outerbar.inc(e.len() as u64);
+		}
 	}
 
 	Ok(())

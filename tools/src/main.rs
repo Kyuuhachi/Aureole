@@ -1,4 +1,6 @@
 use clap::StructOpt;
+use ed6::archive::Archives;
+use snafu::prelude::*;
 
 mod extract;
 
@@ -10,7 +12,11 @@ struct Cli {
 
 #[derive(Debug, Clone, clap::Subcommand)]
 enum Command {
-	Extract(extract::Command)
+	Extract(extract::Command),
+	Test {
+		#[clap(required(true))]
+		dirs: Vec<String>,
+	},
 }
 
 fn main() {
@@ -37,7 +43,7 @@ fn report<E>(e: E) where E: std::error::Error + snafu::ErrorCompat + 'static {
 #[derive(Debug, snafu::Snafu)]
 pub enum Error {
 	#[snafu(display("{message}\n{source}"))]
-	Archive { message: String, #[snafu(backtrace)] source: ed6::archive::ArchiveError },
+	Archive { message: String, #[snafu(backtrace)] source: ed6::archive::Error },
 
 	#[snafu(whatever, display("{}", source.as_ref().map_or(message.into(), |source| format!("{message}\n{source}"))))]
 	Whatever {
@@ -50,7 +56,23 @@ pub enum Error {
 
 fn run(command: Command) -> Result<(), Error> {
 	match command {
-		Command::Extract(command) => extract::run(command)?
+		Command::Extract(command) => extract::run(command)?,
+		Command::Test { dirs } => run_test(dirs)?,
 	}
+	Ok(())
+}
+
+fn run_test(dirs: Vec<String>) -> Result<(), Error> {
+	for name in dirs {
+		let arcs = Archives::new(&name).with_context(|_| ArchiveSnafu { message: format!("Couldn't read data/{name}") })?;
+		if let Err(e) = run_test_on(&arcs) {
+			report(e);
+		}
+	}
+	Ok(())
+}
+
+fn run_test_on(arc: &Archives) -> Result<(), ed6::tables::Error> {
+	ed6::tables::town::load(arc)?;
 	Ok(())
 }

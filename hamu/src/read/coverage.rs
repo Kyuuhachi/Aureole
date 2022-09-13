@@ -7,7 +7,7 @@ use super::prelude::*;
 
 #[derive(Debug, snafu::Snafu)]
 #[snafu(display("uncovered data at {uncovered:X?}"))]
-pub struct CoverageError {
+pub struct Error {
 	uncovered: Vec<Range<usize>>,
 }
 
@@ -58,7 +58,7 @@ impl<'a, T: Dump<'a>> Dump<'a> for Coverage<'a, T> {
 		let mut d = self.inner.dump();
 		for r in self.coverage.borrow().iter() {
 			d = d.mark(r.start, "\x1B[7m[\x1B[m");
-			d = d.mark(r.end+1, "\x1B[7m]\x1B[m");
+			d = d.mark(r.end, "\x1B[7m]\x1B[m");
 		}
 		d
 	}
@@ -86,16 +86,16 @@ impl<'a, T: In<'a>> Coverage<'a, T> {
 		uncovered
 	}
 
-	pub fn assert_covered(&self) -> Result<(), CoverageError> {
+	pub fn assert_covered(&self) -> Result<(), Error> {
 		let uncovered = self.uncovered();
 		if uncovered.is_empty() {
 			Ok(())
 		} else {
-			CoverageSnafu { uncovered }.fail()
+			Snafu { uncovered }.fail()
 		}
 	}
 
-	pub fn dump_uncovered(&self, mut f: impl FnMut(beryl::Dump)) -> Result<(), CoverageError> where Self: Dump<'a> + Clone {
+	pub fn dump_uncovered(&self, mut f: impl FnMut(beryl::Dump)) -> Result<(), Error> where Self: Dump<'a> + Clone {
 		let uncovered = self.uncovered();
 		if uncovered.is_empty() {
 			Ok(())
@@ -103,7 +103,7 @@ impl<'a, T: In<'a>> Coverage<'a, T> {
 			for r in uncovered.iter() {
 				f(self.clone().at(r.start).unwrap().dump().end(r.end))
 			}
-			CoverageSnafu { uncovered }.fail()
+			Snafu { uncovered }.fail()
 		}
 	}
 

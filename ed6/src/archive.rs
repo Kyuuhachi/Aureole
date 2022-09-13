@@ -3,10 +3,11 @@ use mapr::Mmap;
 use hamu::read::{le::*, coverage::*};
 use snafu::prelude::*;
 
-use encoding_rs::SHIFT_JIS;
+use crate::decompress;
+use crate::util;
 
 #[derive(Debug, snafu::Snafu)]
-pub enum ArchiveError {
+pub enum Error {
 	#[snafu(display("{source}"), context(false))]
 	Read { source: ReadError, backtrace: snafu::Backtrace },
 
@@ -14,24 +15,14 @@ pub enum ArchiveError {
 	Io { source: std::io::Error, backtrace: snafu::Backtrace },
 
 	#[snafu(display("{source}"))]
-	Encoding { source: DecodeError, backtrace: snafu::Backtrace },
+	Encoding { source: util::DecodeError, backtrace: snafu::Backtrace },
 
 	#[snafu(display("while reading {}\n{source}", dirpath.display()))]
 	Archive {
 		dirpath: PathBuf,
-		#[snafu(source(from(ArchiveError, Box::new)), backtrace)]
-		source: Box<ArchiveError>,
+		#[snafu(source(from(Error, Box::new)), backtrace)]
+		source: Box<Error>,
 	},
-}
-
-#[derive(Debug, snafu::Snafu)]
-#[snafu(display("Invalid SJIS string {text:?}"))]
-pub struct DecodeError { text: String }
-
-pub fn decode(s: &[u8]) -> Result<String, DecodeError> {
-	let (text, _, error) = SHIFT_JIS.decode(s);
-	snafu::ensure!(!error, DecodeSnafu { text });
-	Ok(text.into_owned())
 }
 
 #[derive(Debug)]
@@ -59,7 +50,7 @@ impl Entry {
 }
 
 impl Archive {
-	pub fn new(path: impl AsRef<Path>, num: u8) -> Result<Archive, ArchiveError> {
+	pub fn new(path: impl AsRef<Path>, num: u8) -> Result<Archive, Error> {
 		let (dir, dat) = Self::dir_dat(path, num);
 		Self::from_dir_dat(&File::open(dir)?, &File::open(dat)?)
 	}
@@ -72,7 +63,7 @@ impl Archive {
 		(dir, dat)
 	}
 
-	pub fn from_dir_dat(dir: &File, dat: &File) -> Result<Archive, ArchiveError> {
+	pub fn from_dir_dat(dir: &File, dat: &File) -> Result<Archive, Error> {
 		let dir = unsafe { Mmap::map(dir)? };
 		let dat = unsafe { Mmap::map(dat)? };
 
@@ -90,7 +81,7 @@ impl Archive {
 
 			for index in 0..count as usize {
 				let name = dir.slice(12)?;
-				let name = decode(name).context(EncodingSnafu)?;
+				let name = util::decode(name).context(EncodingSnafu)?;
 				let name = if let Some((name, ext)) = name.split_once('.') {
 					format!("{}.{}", name.trim_end(), ext)
 				} else {
@@ -155,6 +146,7 @@ impl Archive {
 	}
 }
 
+// TODO should this even be part of this? Not sure if it's general enough to be meaningful.
 #[derive(Debug)]
 pub struct Archives {
 	names: HashMap<String, u16>,
@@ -162,7 +154,7 @@ pub struct Archives {
 }
 
 impl Archives {
-	pub fn new(path: impl AsRef<Path>) -> Result<Self, ArchiveError> {
+	pub fn new(path: impl AsRef<Path>) -> Result<Self, Error> {
 		let mut names = HashMap::new();
 		let mut archives = HashMap::new();
 		for num in 0..=255u16 {
@@ -193,6 +185,10 @@ impl Archives {
 	pub fn get(&self, name: &str) -> Option<&[u8]> {
 		let arch = *self.names.get(name)?;
 		self.archives.get(&arch)?.get(name)
+	}
+
+	pub fn get_decomp(&self, name: &str) -> Option<decompress::Result<Vec<u8>>> {
+		self.get(name).map(decompress::decompress)
 	}
 
 	pub fn archives(&self) -> impl Iterator<Item=(u8, &Archive)> {

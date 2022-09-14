@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 ed6 = { path = "../ed6" }
-snafu = { version = "0.7.1", features = ["backtraces"] }
+snafu = { version = "0.7.1", features = ["backtraces-impl-backtrace-crate"] }
 clap = { version = "3.1.15", features = ["derive"] }
 indicatif = "0.17.0"
 

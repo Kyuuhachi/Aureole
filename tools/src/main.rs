@@ -35,7 +35,7 @@ fn report<E>(e: E) where E: std::error::Error + snafu::ErrorCompat + 'static {
 	if env_lib_backtrace == "1" || (env_backtrace == "1" && env_lib_backtrace != "0") {
 		if let Some(backtrace) = snafu::ErrorCompat::backtrace(&e) {
 			eprintln!("Backtrace:");
-			eprintln!("{}", backtrace);
+			eprintln!("{:?}", backtrace);
 		}
 	}
 }

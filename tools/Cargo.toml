@@ -12,3 +12,7 @@ similar = "2.2.0"
 
 filetime = "0.2.16"
 chrono = "0.4.22"
+
+[[bin]]
+name = "ed6"
+path = "src/main.rs"

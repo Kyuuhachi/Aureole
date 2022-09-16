@@ -1,6 +1,7 @@
 use clap::StructOpt;
 
 mod extract;
+mod decompress;
 
 #[derive(Debug, Clone, clap::Parser)]
 struct Cli {
@@ -11,14 +12,16 @@ struct Cli {
 #[derive(Debug, Clone, clap::Subcommand)]
 enum Command {
 	Extract(extract::Command),
+	Decompress(decompress::Command),
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let cli = Cli::parse();
-	if let Err(e) = run(cli.command) {
-		report(e);
-		std::process::exit(1);
+	match cli.command {
+		Command::Extract(command) => extract::run(command)?,
+		Command::Decompress(command) => decompress::run(command)?,
 	}
+	Ok(())
 }
 
 fn report<E>(e: E) where E: std::error::Error + snafu::ErrorCompat + 'static {
@@ -46,10 +49,4 @@ pub enum Error {
 		message: String,
 		backtrace: snafu::Backtrace,
 	},
-}
-
-fn run(command: Command) -> Result<(), Error> {
-	match command {
-		Command::Extract(command) => extract::run(command),
-	}
 }

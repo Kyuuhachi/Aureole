@@ -1,6 +1,4 @@
 use clap::StructOpt;
-use ed6::archive::Archives;
-use snafu::prelude::*;
 
 mod extract;
 
@@ -13,10 +11,6 @@ struct Cli {
 #[derive(Debug, Clone, clap::Subcommand)]
 enum Command {
 	Extract(extract::Command),
-	Test {
-		#[clap(required(true))]
-		dirs: Vec<String>,
-	},
 }
 
 fn main() {
@@ -56,23 +50,6 @@ pub enum Error {
 
 fn run(command: Command) -> Result<(), Error> {
 	match command {
-		Command::Extract(command) => extract::run(command)?,
-		Command::Test { dirs } => run_test(dirs)?,
+		Command::Extract(command) => extract::run(command),
 	}
-	Ok(())
-}
-
-fn run_test(dirs: Vec<String>) -> Result<(), Error> {
-	for name in dirs {
-		let arcs = Archives::new(&name).with_context(|_| ArchiveSnafu { message: format!("Couldn't read data/{name}") })?;
-		if let Err(e) = run_test_on(&arcs) {
-			report(e);
-		}
-	}
-	Ok(())
-}
-
-fn run_test_on(arc: &Archives) -> Result<(), ed6::tables::Error> {
-	ed6::tables::town::load(arc)?;
-	Ok(())
 }

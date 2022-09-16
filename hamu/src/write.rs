@@ -5,6 +5,10 @@ use std::{
 	rc::Rc,
 };
 
+pub mod prelude {
+	pub use super::{Out, Count};
+}
+
 pub struct Out<'a, L: Eq + Hash + Debug + 'a> {
 	data: Vec<u8>,
 	#[allow(clippy::type_complexity)]
@@ -113,26 +117,52 @@ impl<'a, L: Eq + Hash + Debug> Out<'a, L> {
 }
 
 macro_rules! primitives {
-	($name:ident, $conv:ident; $($type:ident),*; $($utype:ident),*) => { paste::paste! {
-		#[extend::ext(name=$name)]
-		pub impl<L: Eq + Hash + Debug> Out<'_, L> {
-			$(fn $type(&mut self, v: $type) {
-				self.array(v.$conv());
-			})*
+	($name:ident, $suf: ident, $conv:ident; $($type:ident),*; $($utype:ident),*) => { paste::paste! {
+		pub trait $name<L: Eq + Hash + Debug> {
+			$(
+				fn $type(&mut self, v: $type) {
+					self.[<$type _ $suf>](v);
+				}
 
-			$(fn [<delay_ $utype>](&mut self, k: L) {
-				self.delay(move |l| {
-					$utype::try_from(l(&k)).unwrap_or_else(|_| {
-						panic!("{:?} is {:?}, which does not fit in a {}", &k, l(&k), stringify!($utype))
-					}).$conv()
-				});
-			})*
+				fn [<$type _ $suf>](&mut self, v: $type);
+			)*
+
+			$(
+				fn [<delay_ $utype>](&mut self, k: L) {
+					self.[<delay_ $utype _ $suf>](k);
+				}
+
+				fn [<delay_ $utype _ $suf>](&mut self, k: L);
+			)*
+		}
+
+		impl<L: Eq + Hash + Debug> $name<L> for Out<'_, L> {
+			$(
+				fn [<$type _ $suf>](&mut self, v: $type) {
+					self.array(v.$conv());
+				}
+			)*
+
+			$(
+				fn [<delay_ $utype _ $suf>](&mut self, k: L) {
+					self.delay(move |l| {
+						$utype::try_from(l(&k)).unwrap_or_else(|_| {
+							panic!("{:?} is {:?}, which does not fit in a {}", &k, l(&k), stringify!($utype))
+						}).$conv()
+					});
+				}
+			)*
+		}
+
+		pub mod $suf {
+			pub use super::prelude::*;
+			pub use super::$name;
 		}
 	} }
 }
 
-primitives!(Le, to_le_bytes; u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, f32, f64; u8, u16, u32, u64, u128);
-primitives!(Be, to_be_bytes; u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, f32, f64; u8, u16, u32, u64, u128);
+primitives!(OutLe, le, to_le_bytes; u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, f32, f64; u8, u16, u32, u64, u128);
+primitives!(OutBe, be, to_be_bytes; u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, f32, f64; u8, u16, u32, u64, u128);
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Count { value: usize }

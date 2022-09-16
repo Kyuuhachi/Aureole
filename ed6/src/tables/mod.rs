@@ -20,9 +20,9 @@
 // t_shop
 // t_sltget
 // t_status
-// t_town
 // t_world
 
+// t_town
 pub mod town;
 
 #[derive(Debug, snafu::Snafu)]
@@ -55,5 +55,40 @@ impl<T> From<num_enum::TryFromPrimitiveError<T>> for Error where
 			value: e.number.to_string(),
 			type_: std::any::type_name::<T>(),
 		}.build()
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::archive::Archives;
+	pub use super::Error;
+
+	lazy_static::lazy_static! {
+		pub static ref FC: Archives = Archives::new("../data/fc").unwrap();
+	}
+
+	pub fn check_equal<T: PartialEq + std::fmt::Debug>(a: &T, b: &T) -> Result<(), Error> {
+		if a != b {
+			use similar::{TextDiff, ChangeTag};
+
+			let a = format!("{:#?}", a);
+			let b = format!("{:#?}", b);
+			let diff = TextDiff::configure().diff_lines(&a, &b);
+
+			for (i, hunk) in diff.unified_diff().iter_hunks().enumerate() {
+				if i > 0 {
+					println!("\x1B[34m…\x1B[39m");
+				}
+				for change in hunk.iter_changes() {
+					match change.tag() {
+						ChangeTag::Delete => print!("\x1B[31m-{change}\x1B[39m"),
+						ChangeTag::Insert => print!("\x1B[32m+{change}\x1B[39m"),
+						ChangeTag::Equal => print!(" {change}"),
+					};
+				}
+			}
+			panic!("{} differs", std::any::type_name::<T>());
+		}
+		Ok(())
 	}
 }

@@ -113,8 +113,8 @@ macro_rules! primitives {
 	} }
 }
 
-primitives!(Le, le, from_le_bytes; u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, f32, f64);
-primitives!(Be, be, from_be_bytes; u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, f32, f64);
+primitives!(InLe, le, from_le_bytes; u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, f32, f64);
+primitives!(InBe, be, from_be_bytes; u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, f32, f64);
 
 #[derive(Clone)]
 pub struct Bytes<'a> {

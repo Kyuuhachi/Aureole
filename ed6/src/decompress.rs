@@ -18,6 +18,7 @@ fn u8(data: &mut impl Read) -> Result<u8> {
 struct Ctx<'b> {
 	out: Vec<u8>,
 	data: &'b [u8],
+	pos: usize,
 }
 
 impl <'a> Ctx<'a> {
@@ -25,15 +26,15 @@ impl <'a> Ctx<'a> {
 		Ctx {
 			out: Vec::with_capacity(0xFFF0), // TODO I am not sure allocating here is good. Probably more performant to do it outside.
 			data,
+			pos: 0,
 		}
 	}
 
 	fn u8(&mut self) -> Result<u8> {
+		let pos = self.pos.min(self.data.len());
 		let mut buf = [0];
-		Read::read_exact(&mut self.data, &mut buf)?;
-		if !self.data.is_empty() {
-			self.data = &self.data[1..]
-		}
+		Read::read_exact(&mut &self.data[pos..], &mut buf)?;
+		self.pos += 1;
 		Ok(buf[0])
 	}
 
@@ -165,7 +166,7 @@ fn decompress2(data: &[u8]) -> Result<Vec<u8>> {
 	let mut c = Ctx::new(data);
 
 	let mut last_o = 0;
-	while c.data.is_empty() {
+	while c.pos < c.data.len() {
 		#[bitmatch] match c.u8()? as usize {
 			"00xnnnnn" => {
 				let n = if x == 1 { c.extend(n)? } else { n };

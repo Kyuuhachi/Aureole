@@ -1,34 +1,49 @@
-use hamu::read::le::*;
+use std::io::{Read, Result, Error, ErrorKind};
 
-#[derive(Debug, snafu::Snafu)]
-pub enum Error {
-	#[snafu(context(false))]
-	Read { source: ReadError, backtrace: snafu::Backtrace },
-	#[snafu(display("tried to repeat {count} bytes from offset -{offset} (length {len})"))]
-	Repeat { count: usize, offset: usize, len: usize },
+macro_rules! ioe {
+	($kind:ident, $e1:literal, $($args:tt)*) => {
+		Error::new(ErrorKind::$kind, format!($e1, $($args)*))
+	};
+	($kind:ident, $e:expr) => {
+		Error::new(ErrorKind::$kind, $e)
+	}
 }
 
-pub type Result<T, E=Error> = std::result::Result<T, E>;
+fn u8(data: &mut impl Read) -> Result<u8> {
+	let mut buf = [0];
+	data.read_exact(&mut buf)?;
+	Ok(buf[0])
+}
 
 struct Ctx<'b> {
 	out: Vec<u8>,
-	data: Bytes<'b>,
+	data: &'b [u8],
+	pos: usize,
 }
 
 impl <'a> Ctx<'a> {
 	fn new(data: &'a [u8]) -> Self {
 		Ctx {
 			out: Vec::with_capacity(0xFFF0),
-			data: Bytes::new(data),
+			data,
+			pos: 0,
 		}
 	}
 
+	fn u8(&mut self) -> Result<u8> {
+		let pos = self.pos.min(self.data.len());
+		let mut buf = [0];
+		Read::read_exact(&mut &self.data[pos..], &mut buf)?;
+		self.pos += 1;
+		Ok(buf[0])
+	}
+
 	fn byte(&mut self) -> Result<usize> {
-		Ok(self.data.u8()? as usize)
+		Ok(self.u8()? as usize)
 	}
 
 	fn constant(&mut self, n: usize) -> Result<()> {
-		let b = self.data.u8()?;
+		let b = self.u8()?;
 		for _ in 0..n {
 			self.out.push(b);
 		}
@@ -37,18 +52,16 @@ impl <'a> Ctx<'a> {
 
 	fn verbatim(&mut self, n: usize) -> Result<()> {
 		for _ in 0..n {
-			let b = self.data.u8()?;
+			let b = self.u8()?;
 			self.out.push(b);
 		}
 		Ok(())
 	}
 
 	fn repeat(&mut self, n: usize, o: usize) -> Result<()> {
-		snafu::ensure!((1..=self.out.len()).contains(&o), RepeatSnafu {
-			count: n,
-			offset: o,
-			len: self.out.len(),
-		});
+		if !(1..=self.out.len()).contains(&o) {
+			return Err(ioe!(InvalidData, "tried to repeat {n} bytes from offset -{o} (length {len})", len=self.out.len()))
+		}
 		for _ in 0..n {
 			self.out.push(self.out[self.out.len()-o]);
 		}
@@ -86,7 +99,7 @@ impl <'a> ByteCtx<'a> {
 	}
 
 	fn renew_bits(&mut self) -> Result<()> {
-		self.bits = self.data.u16()?;
+		self.bits = u16::from_le_bytes([self.u8()?, self.u8()?]);
 		self.nextbit = 1;
 		Ok(())
 	}
@@ -153,8 +166,8 @@ fn decompress2(data: &[u8]) -> Result<Vec<u8>> {
 	let mut c = Ctx::new(data);
 
 	let mut last_o = 0;
-	while c.data.remaining() > 0 {
-		#[bitmatch] match c.byte()? {
+	while c.pos < c.data.len() {
+		#[bitmatch] match c.u8()? as usize {
 			"00xnnnnn" => {
 				let n = if x == 1 { n << 8 | c.byte()? } else { n };
 				c.verbatim(n)?;
@@ -186,12 +199,27 @@ pub fn decompress_chunk(data: &[u8]) -> Result<Vec<u8>> {
 
 pub fn decompress(data: &[u8]) -> Result<Vec<u8>> {
 	let mut out = Vec::new();
-	let mut i = Bytes::new(data);
-	loop {
-		let chunklen = i.u16()? as usize;
-		let chunk = i.slice(chunklen - 2)?;
-		out.append(&mut decompress_chunk(chunk)?);
-		if i.u8()? == 0 { break }
+	for chunk in decompress_stream(&mut std::io::Cursor::new(data)) {
+		out.append(&mut chunk?);
 	}
 	Ok(out)
+}
+
+pub fn decompress_stream(data: &mut impl Read) -> impl Iterator<Item=Result<Vec<u8>>> + '_ {
+	let mut has_next = true;
+	let mut buf = Vec::new();
+	let mut buf2 = [0u8;2];
+	std::iter::from_fn(move || has_next.then(|| {
+		data.read_exact(&mut buf2)?;
+		let chunklen = u16::from_le_bytes(buf2) as usize;
+		let chunklen = chunklen.checked_sub(2).ok_or_else(|| ioe!(InvalidData, "chunk len < 2"))?;
+		if chunklen > buf.len() {
+			buf = vec![0; chunklen];
+		}
+		let buf = &mut buf[..chunklen];
+		data.read_exact(buf)?;
+		let chunk = decompress_chunk(buf)?;
+		has_next = u8(data)? != 0;
+		Ok(chunk)
+	}))
 }

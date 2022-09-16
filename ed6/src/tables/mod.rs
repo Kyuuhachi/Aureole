@@ -31,7 +31,7 @@ pub enum Error {
 	Archive { source: crate::archive::Error, backtrace: snafu::Backtrace },
 
 	#[snafu(display("{source}"), context(false))]
-	Decompress { source: crate::decompress::Error, backtrace: snafu::Backtrace },
+	Io { source: std::io::Error, backtrace: snafu::Backtrace },
 
 	#[snafu(display("{source}"), context(false))]
 	Read { source: hamu::read::Error, backtrace: snafu::Backtrace },

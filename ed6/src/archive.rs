@@ -187,7 +187,7 @@ impl Archives {
 		self.archives.get(&arch)?.get(name)
 	}
 
-	pub fn get_decomp(&self, name: &str) -> Option<decompress::Result<Vec<u8>>> {
+	pub fn get_decomp(&self, name: &str) -> Option<std::io::Result<Vec<u8>>> {
 		self.get(name).map(decompress::decompress)
 	}
 

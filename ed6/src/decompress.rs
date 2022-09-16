@@ -24,7 +24,7 @@ struct Ctx<'b> {
 impl <'a> Ctx<'a> {
 	fn new(data: &'a [u8]) -> Self {
 		Ctx {
-			out: Vec::with_capacity(0xFFF0),
+			out: Vec::with_capacity(0xFFF0), // TODO I am not sure allocating here is good. Probably more performant to do it outside.
 			data,
 			pos: 0,
 		}
@@ -38,8 +38,8 @@ impl <'a> Ctx<'a> {
 		Ok(buf[0])
 	}
 
-	fn byte(&mut self) -> Result<usize> {
-		Ok(self.u8()? as usize)
+	fn extend(&mut self, b: usize) -> Result<usize> {
+		Ok(b << 8 | self.u8()? as usize)
 	}
 
 	fn constant(&mut self, n: usize) -> Result<()> {
@@ -110,7 +110,7 @@ impl <'a> ByteCtx<'a> {
 			x = x << 1 | usize::from(self.bit()?);
 		}
 		for _ in 0..n/8 {
-			x = x << 8 | self.byte()?;
+			x = self.extend(x)?;
 		}
 		Ok(x)
 	}
@@ -169,18 +169,18 @@ fn decompress2(data: &[u8]) -> Result<Vec<u8>> {
 	while c.pos < c.data.len() {
 		#[bitmatch] match c.u8()? as usize {
 			"00xnnnnn" => {
-				let n = if x == 1 { n << 8 | c.byte()? } else { n };
+				let n = if x == 1 { c.extend(n)? } else { n };
 				c.verbatim(n)?;
 			}
 			"010xnnnn" => {
-				let n = if x == 1 { n << 8 | c.byte()? } else { n };
+				let n = if x == 1 { c.extend(n)? } else { n };
 				c.constant(4 + n)?;
 			}
 			"011nnnnn" => {
 				c.repeat(n, last_o)?;
 			}
 			"1nnooooo" => {
-				last_o = o << 8 | c.byte()?;
+				last_o = c.extend(o)?;
 				c.repeat(4 + n, last_o)?;
 			},
 		}

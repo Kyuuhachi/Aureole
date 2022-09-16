@@ -10,10 +10,11 @@ pub mod prelude {
 	pub use super::{Out, Count};
 }
 
+type Delayed<'a, L> = Box<dyn FnOnce(&dyn Fn(&L) -> usize, &mut [u8]) + 'a>;
+
 pub struct Out<'a, L: Eq + Hash + Debug + 'a> {
 	data: Vec<u8>,
-	#[allow(clippy::type_complexity)]
-	delays: Vec<(Range<usize>, Box<dyn FnOnce(&dyn Fn(&L) -> usize, &mut [u8]) + 'a>)>,
+	delays: Vec<(Range<usize>, Delayed<'a, L>)>,
 	labels: HashMap<L, usize>,
 }
 
@@ -45,52 +46,12 @@ impl<'a, L: Eq + Hash + Debug> Out<'a, L> {
 		self.data
 	}
 
-	pub fn label(&mut self, label: L) {
-		self.set_label(label, self.data.len());
+	pub fn len(&self) -> usize {
+		self.data.len()
 	}
 
-	fn set_label(&mut self, label: L, val: usize) {
-		match self.labels.entry(label) {
-			Entry::Vacant(entry) => entry.insert(val),
-			Entry::Occupied(entry) => {
-				panic!("Duplicate label {:?} (prev: {:#X}, new: {:#X})", entry.key(), entry.get(), val)
-			}
-		};
-	}
-
-	pub fn concat(&mut self, mut other: Self) {
-		let shift = self.data.len();
-		self.data.append(&mut other.data);
-
-		for (range, cb) in other.delays {
-			self.delays.push((range.start+shift..range.end+shift, cb));
-		}
-
-		for (k, v) in other.labels {
-			self.set_label(k, v+shift)
-		}
-	}
-
-	pub fn map<M, F>(mut self, f: F) -> Out<'a, M> where
-		M: Eq + Hash + Debug + 'a,
-		F: Fn(&L) -> M + 'a,
-	{
-		let mut new = Out::new();
-		new.data.append(&mut self.data);
-
-		let f = Rc::new(f);
-		for (range, cb) in self.delays {
-			new.delays.push((range, Box::new({
-				let f = f.clone();
-				move |l, m| cb(&|k| l(&f(k)), m)
-			})))
-		}
-
-		for (k, v) in self.labels {
-			new.set_label(f(&k), v);
-		}
-
-		new
+	pub fn is_empty(&self) -> bool {
+		self.len() == 0
 	}
 
 	pub fn slice(&mut self, data: &[u8]) {
@@ -102,17 +63,67 @@ impl<'a, L: Eq + Hash + Debug> Out<'a, L> {
 	}
 
 	pub fn align(&mut self, size: usize) {
-		self.slice(&vec![0;(size-(self.data.len()%size))%size]);
+		self.slice(&vec![0;(size-(self.len()%size))%size]);
 	}
 
-	pub fn delay<const N: usize, F>(&mut self, f: F) where
+	pub fn label(&mut self, label: L) {
+		self.set_label(label, self.len());
+	}
+
+	fn set_label(&mut self, label: L, val: usize) {
+		match self.labels.entry(label) {
+			Entry::Vacant(entry) => entry.insert(val),
+			Entry::Occupied(entry) => {
+				panic!("Duplicate label {:?} (prev: {:#X}, new: {:#X})", entry.key(), entry.get(), val)
+			}
+		};
+	}
+
+	// It is unfortunate that I need Clone here.
+	// But lookup must take the key by reference, and thus the mapping function must receive a reference.
+	pub fn concat(&mut self, other: Self) where L: Clone {
+		self.concat_with(other, |a| a.clone())
+	}
+
+	pub fn concat_with<M: Eq + Hash + Debug>(
+		&mut self,
+		mut other: Out<'a, M>,
+		f: impl Fn(&M) -> L + 'a,
+	) {
+		let shift = self.len();
+		self.data.append(&mut other.data);
+
+		let f = Rc::new(f);
+		for (range, cb) in other.delays {
+			let range = range.start+shift..range.end+shift;
+			self.delays.push((range, Box::new({
+				let f = f.clone();
+				move |lookup, slice| cb(&|k| lookup(&f(k)), slice)
+			})))
+		}
+
+		for (k, v) in other.labels {
+			self.set_label(f(&k), v+shift);
+		}
+	}
+
+	pub fn map<M: Eq + Hash + Debug>(
+		self,
+		f: impl Fn(&L) -> M + 'a,
+	) -> Out<'a, M> {
+		let mut new = Out::new();
+		new.concat_with(self, f);
+		new
+	}
+
+	pub fn delay<const N: usize, F>(&mut self, cb: F) where
 		F: FnOnce(&dyn Fn(&L) -> usize) -> [u8; N] + 'a,
 	{
-		let start = self.data.len();
-		self.data.extend([0; N]);
-		let end = self.data.len();
-		self.delays.push((start..end, Box::new(move |l, o| {
-			o.copy_from_slice(&f(l))
+		let start = self.len();
+		self.array([0; N]);
+		let end = self.len();
+		self.delays.push((start..end, Box::new(move |lookup, slice| {
+			slice.copy_from_slice(&cb(lookup))
 		})));
 	}
 }
@@ -146,9 +157,9 @@ macro_rules! primitives {
 
 			$(
 				fn [<delay_ $utype _ $suf>](&mut self, k: L) {
-					self.delay(move |l| {
-						$utype::try_from(l(&k)).unwrap_or_else(|_| {
-							panic!("{:?} is {:?}, which does not fit in a {}", &k, l(&k), stringify!($utype))
+					self.delay(move |lookup| {
+						$utype::try_from(lookup(&k)).unwrap_or_else(|_| {
+							panic!("{:?} is {:?}, which does not fit in a {}", &k, lookup(&k), stringify!($utype))
 						}).$conv()
 					});
 				}

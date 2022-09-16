@@ -28,9 +28,6 @@ pub mod town;
 #[derive(Debug, snafu::Snafu)]
 pub enum Error {
 	#[snafu(display("{source}"), context(false))]
-	Archive { source: crate::archive::Error, backtrace: snafu::Backtrace },
-
-	#[snafu(display("{source}"), context(false))]
 	Io { source: std::io::Error, backtrace: snafu::Backtrace },
 
 	#[snafu(display("{source}"), context(false))]

@@ -126,19 +126,19 @@ impl Archive {
 	}
 
 
-	pub fn name(&self, index: usize) -> Option<&str> {
-		let ent = self.entries.get(index)?;
-		Some(ent.name.as_str())
+	pub fn name(&self, index: usize) -> io::Result<&str> {
+		let ent = self.entries.get(index).ok_or_else(||io::Error::from(io::ErrorKind::NotFound))?;
+		Ok(ent.name.as_str())
 	}
 
-	pub fn entry(&self, name: &str) -> Option<&Entry> {
-		let index = *self.names.get(name)?;
-		self.entries.get(index)
+	pub fn entry(&self, name: &str) -> io::Result<&Entry> {
+		let index = *self.names.get(name).ok_or_else(||io::Error::from(io::ErrorKind::NotFound))?;
+		Ok(self.entries.get(index).unwrap())
 	}
 
-	pub fn get(&self, name: &str) -> Option<&[u8]> {
+	pub fn get(&self, name: &str) -> io::Result<&[u8]> {
 		let ent = self.entry(name)?;
-		Some(&self.dat[ent.range.clone()])
+		Ok(&self.dat[ent.range.clone()])
 	}
 
 	pub fn entries(&self) -> &[Entry] {
@@ -176,19 +176,23 @@ impl Archives {
 		})
 	}
 
-	pub fn name(&self, index: [u8; 4]) -> Option<&str> {
-		let arch  = u16::from_le_bytes([index[0], index[1]]);
-		let index = u16::from_le_bytes([index[2], index[3]]);
-		self.archives.get(&arch)?.name(index as usize)
+	fn archive(&self, n: u16) -> io::Result<&Archive> {
+		self.archives.get(&n).ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))
 	}
 
-	pub fn get(&self, name: &str) -> Option<&[u8]> {
-		let arch = *self.names.get(name)?;
-		self.archives.get(&arch)?.get(name)
+	pub fn name(&self, [a,b,c,d]: [u8; 4]) -> io::Result<&str> {
+		let arch  = u16::from_le_bytes([a,b]);
+		let index = u16::from_le_bytes([c,d]);
+		self.archive(arch)?.name(index as usize)
 	}
 
-	pub fn get_decomp(&self, name: &str) -> Option<std::io::Result<Vec<u8>>> {
-		self.get(name).map(decompress::decompress)
+	pub fn get(&self, name: &str) -> io::Result<&[u8]> {
+		let arch = *self.names.get(name).ok_or_else(||io::Error::from(io::ErrorKind::NotFound))?;
+		self.archive(arch)?.get(name)
+	}
+
+	pub fn get_decomp(&self, name: &str) -> std::io::Result<Vec<u8>> {
+		self.get(name).and_then(decompress::decompress)
 	}
 
 	pub fn archives(&self) -> impl Iterator<Item=(u8, &Archive)> {

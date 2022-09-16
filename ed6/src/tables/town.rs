@@ -69,7 +69,7 @@ mod test {
 
 	#[test_case::test_case(&FC; "fc")]
 	fn roundtrip(arc: &Archives) -> Result<(), Error> {
-		let t_town = arc.get_decomp("t_town._dt").expect("no t_town")?;
+		let t_town = arc.get_decomp("t_town._dt")?;
 		let town = super::read(arc, &t_town)?;
 		let t_town_ = super::write(arc, &town);
 		let town_ = super::read(arc, &t_town_)?;

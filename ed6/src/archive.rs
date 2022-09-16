@@ -127,12 +127,16 @@ impl Archive {
 
 
 	pub fn name(&self, index: usize) -> io::Result<&str> {
-		let ent = self.entries.get(index).ok_or_else(||io::Error::from(io::ErrorKind::NotFound))?;
+		let ent = self.entries.get(index).ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
 		Ok(ent.name.as_str())
 	}
 
+	pub fn index(&self, name: &str) -> io::Result<usize> {
+		self.names.get(name).ok_or_else(|| io::Error::from(io::ErrorKind::NotFound)).copied()
+	}
+
 	pub fn entry(&self, name: &str) -> io::Result<&Entry> {
-		let index = *self.names.get(name).ok_or_else(||io::Error::from(io::ErrorKind::NotFound))?;
+		let index = self.index(name)?;
 		Ok(self.entries.get(index).unwrap())
 	}
 
@@ -181,13 +185,21 @@ impl Archives {
 	}
 
 	pub fn name(&self, [a,b,c,d]: [u8; 4]) -> io::Result<&str> {
-		let arch  = u16::from_le_bytes([a,b]);
-		let index = u16::from_le_bytes([c,d]);
+		let index = u16::from_le_bytes([a,b]);
+		let arch  = u16::from_le_bytes([c,d]);
 		self.archive(arch)?.name(index as usize)
 	}
 
+	pub fn index(&self, name: &str) -> io::Result<[u8; 4]> {
+		let arch = *self.names.get(name).ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
+		let index = self.archive(arch)?.index(name)?;
+		let [a,b] = u16::to_le_bytes(index as u16);
+		let [c,d] = u16::to_le_bytes(arch);
+		Ok([a,b,c,d])
+	}
+
 	pub fn get(&self, name: &str) -> io::Result<&[u8]> {
-		let arch = *self.names.get(name).ok_or_else(||io::Error::from(io::ErrorKind::NotFound))?;
+		let arch = *self.names.get(name).ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
 		self.archive(arch)?.get(name)
 	}
 

@@ -5,7 +5,6 @@
 // t_cook
 // t_crfget
 // t_exp
-// t_face
 // t_item2
 // t_item
 // t_magget
@@ -24,6 +23,9 @@
 
 // t_town
 pub mod town;
+
+// t_face
+pub mod face;
 
 #[derive(Debug, snafu::Snafu)]
 pub enum Error {

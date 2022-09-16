@@ -38,12 +38,13 @@ pub trait InExt<'a>: In<'a> {
 impl<'a, T: In<'a>> InExt<'a> for T {}
 
 pub trait OutExt<L: Eq + std::hash::Hash + std::fmt::Debug> {
-	fn string(&mut self, s: &str);
+	fn string(&mut self, s: &str) -> Result<(), EncodeError>;
 }
 impl<L: Eq + std::hash::Hash + std::fmt::Debug> OutExt<L> for Out<'_, L> {
-	fn string(&mut self, s: &str) {
+	fn string(&mut self, s: &str) -> Result<(), EncodeError> {
 		assert!(!s.contains('\0'), "{s:?} contains NUL");
-		self.slice(&encode(s).unwrap());
+		self.slice(&encode(s)?);
 		self.array([0]);
+		Ok(())
 	}
 }

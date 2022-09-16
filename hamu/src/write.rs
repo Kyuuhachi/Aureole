@@ -6,11 +6,29 @@ use std::{
 	ops::Range,
 };
 
+use snafu::prelude::*;
+
 pub mod prelude {
-	pub use super::{Out, Count};
+	pub use super::{Out, Count, Error as WriteError};
 }
 
-type Delayed<'a, L> = Box<dyn FnOnce(&dyn Fn(&L) -> usize, &mut [u8]) + 'a>;
+#[derive(Debug, snafu::Snafu)]
+pub enum Error {
+	#[snafu(display("undefined label '{label}'"))]
+	Undefined { label: String },
+	#[snafu(display("duplicate label '{label}': {v1} → {v2}"))]
+	Duplicate { label: String, v1: usize, v2: usize },
+	#[snafu(display("failed to convert {label} ({value}) to {type_}: {source}"))]
+	TryFrom {
+		label: String,
+		type_: &'static str,
+		value: String,
+		source: Box<dyn std::error::Error>
+	},
+}
+pub type Result<T, E=Error> = std::result::Result<T, E>;
+
+type Delayed<'a, L> = Box<dyn FnOnce(&dyn Fn(&L) -> Result<usize>, &mut [u8]) -> Result<()> + 'a>;
 
 pub struct Out<'a, L: Eq + Hash + Debug + 'a> {
 	data: Vec<u8>,
@@ -33,17 +51,20 @@ impl<'a, L: Eq + Hash + Debug> Out<'a, L> {
 		}
 	}
 
-	pub fn finish(mut self) -> Vec<u8> {
+	pub fn finish(mut self) -> Result<Vec<u8>> {
 		for (range, cb) in self.delays {
 			cb(
 				&|k| {
-					*self.labels.get(k)
-						.unwrap_or_else(|| panic!("Undefined label {:?}", k))
+					self.labels.get(k)
+						.copied()
+						.with_context(|| UndefinedSnafu {
+							label: format!("{:?}", k),
+						})
 				},
 				&mut self.data[range],
-			);
+			)?;
 		}
-		self.data
+		Ok(self.data)
 	}
 
 	pub fn len(&self) -> usize {
@@ -117,13 +138,14 @@ impl<'a, L: Eq + Hash + Debug> Out<'a, L> {
 	}
 
 	pub fn delay<const N: usize, F>(&mut self, cb: F) where
-		F: FnOnce(&dyn Fn(&L) -> usize) -> [u8; N] + 'a,
+		F: FnOnce(&dyn Fn(&L) -> Result<usize>) -> Result<[u8; N]> + 'a,
 	{
 		let start = self.len();
 		self.array([0; N]);
 		let end = self.len();
 		self.delays.push((start..end, Box::new(move |lookup, slice| {
-			slice.copy_from_slice(&cb(lookup))
+			slice.copy_from_slice(&cb(lookup)?);
+			Ok(())
 		})));
 	}
 }
@@ -158,9 +180,18 @@ macro_rules! primitives {
 			$(
 				fn [<delay_ $utype _ $suf>](&mut self, k: L) {
 					self.delay(move |lookup| {
-						$utype::try_from(lookup(&k)).unwrap_or_else(|_| {
-							panic!("{:?} is {:?}, which does not fit in a {}", &k, lookup(&k), stringify!($utype))
-						}).$conv()
+						let v = lookup(&k)?;
+						let v = $utype::try_from(v)
+							.map_err(|e| {
+								let a: Box<dyn std::error::Error> = Box::new(e);
+								a
+							})
+							.with_context(|_| TryFromSnafu {
+								label: format!("{:?}", k),
+								type_: std::any::type_name::<$utype>(),
+								value: format!("{:?}", v),
+							})?;
+						Ok(v.$conv())
 					});
 				}
 			)*

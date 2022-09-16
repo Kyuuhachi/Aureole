@@ -22,14 +22,14 @@ pub enum TownType {
 	Cafe       = 8, // Cafe             飲食・喫茶
 }
 
-pub fn read(_arcs: &Archives, t_town: &[u8]) -> Result<Vec<Town>, super::Error> {
+pub fn read(_arcs: &Archives, t_town: &[u8]) -> Result<Vec<Town>, super::ReadError> {
 	let mut f = Coverage::new(Bytes::new(t_town));
 	let n = f.u16()?;
 	let mut names = Vec::with_capacity(n as usize);
 	for _ in 0..n {
 		let pos = f.u16()? as usize;
 		let mut g = f.clone().at(pos)?;
-		let name = g.string().map_err(|a| a.either_into::<super::Error>())?;
+		let name = g.string().map_err(|a| a.either_into::<super::ReadError>())?;
 		let type_ = if name.is_empty() {
 			0
 		} else {
@@ -42,7 +42,7 @@ pub fn read(_arcs: &Archives, t_town: &[u8]) -> Result<Vec<Town>, super::Error> 
 	Ok(names)
 }
 
-pub fn write(_arcs: &Archives, towns: &[Town]) -> Vec<u8> {
+pub fn write(_arcs: &Archives, towns: &[Town]) -> Result<Vec<u8>, super::WriteError> {
 	let mut head = Out::new();
 	let mut body = Out::new();
 	let mut count = Count::new();
@@ -51,7 +51,7 @@ pub fn write(_arcs: &Archives, towns: &[Town]) -> Vec<u8> {
 		let l = count.next();
 		head.delay_u16(l);
 		body.label(l);
-		body.string(name);
+		body.string(name)?;
 		if name.is_empty() {
 			assert_eq!(kind, &TownType::None);
 		} else {
@@ -59,7 +59,7 @@ pub fn write(_arcs: &Archives, towns: &[Town]) -> Vec<u8> {
 		}
 	}
 	head.concat(body);
-	head.finish()
+	Ok(head.finish()?)
 }
 
 #[cfg(test)]
@@ -71,7 +71,7 @@ mod test {
 	fn roundtrip(arc: &Archives) -> Result<(), Error> {
 		let t_town = arc.get_decomp("t_town._dt")?;
 		let town = super::read(arc, &t_town)?;
-		let t_town_ = super::write(arc, &town);
+		let t_town_ = super::write(arc, &town)?;
 		let town_ = super::read(arc, &t_town_)?;
 		check_equal(&town, &town_)
 	}

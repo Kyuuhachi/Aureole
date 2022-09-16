@@ -28,7 +28,7 @@ pub mod town;
 pub mod face;
 
 #[derive(Debug, snafu::Snafu)]
-pub enum Error {
+pub enum ReadError {
 	#[snafu(display("{source}"), context(false))]
 	Io { source: std::io::Error, backtrace: snafu::Backtrace },
 
@@ -45,7 +45,7 @@ pub enum Error {
 	Enum { value: String, type_: String, backtrace: snafu::Backtrace },
 }
 
-impl<T> From<num_enum::TryFromPrimitiveError<T>> for Error where
+impl<T> From<num_enum::TryFromPrimitiveError<T>> for ReadError where
 	T: num_enum::TryFromPrimitive,
 	T::Primitive: std::fmt::Display,
 {
@@ -57,10 +57,33 @@ impl<T> From<num_enum::TryFromPrimitiveError<T>> for Error where
 	}
 }
 
+#[derive(Debug, snafu::Snafu)]
+pub enum WriteError {
+	#[snafu(display("{source}"), context(false))]
+	Io { source: std::io::Error, backtrace: snafu::Backtrace },
+
+	#[snafu(display("{source}"), context(false))]
+	Write { source: hamu::write::Error, backtrace: snafu::Backtrace },
+
+	#[snafu(display("{source}"), context(false))]
+	Encoding { source: crate::util::EncodeError, backtrace: snafu::Backtrace },
+}
+
 #[cfg(test)]
 mod test {
 	use crate::archive::Archives;
-	pub use super::Error;
+
+	#[derive(Debug, snafu::Snafu)]
+	pub enum Error {
+		#[snafu(display("{source}"), context(false))]
+		Io { source: std::io::Error, backtrace: snafu::Backtrace },
+
+		#[snafu(display("{source}"), context(false))]
+		Read { #[snafu(backtrace)] source: super::ReadError },
+
+		#[snafu(display("{source}"), context(false))]
+		Write { #[snafu(backtrace)] source: super::WriteError },
+	}
 
 	lazy_static::lazy_static! {
 		pub static ref FC: Archives = Archives::new("../data/fc").unwrap();

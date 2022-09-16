@@ -43,6 +43,14 @@ pub enum ReadError {
 
 	#[snafu(display("invalid value for enum {type_}: {value}"))]
 	Enum { value: String, type_: String, backtrace: snafu::Backtrace },
+
+	#[snafu(whatever, display("{}", source.as_ref().map_or(message.into(), |source| format!("{message}\n{source}"))))]
+	Whatever {
+		#[snafu(source(from(Box<dyn std::error::Error>, Some)))]
+		source: Option<Box<dyn std::error::Error>>,
+		message: String,
+		backtrace: snafu::Backtrace,
+	},
 }
 
 impl<T> From<num_enum::TryFromPrimitiveError<T>> for ReadError where
@@ -67,6 +75,14 @@ pub enum WriteError {
 
 	#[snafu(display("{source}"), context(false))]
 	Encoding { source: crate::util::EncodeError, backtrace: snafu::Backtrace },
+
+	#[snafu(whatever, display("{}", source.as_ref().map_or(message.into(), |source| format!("{message}\n{source}"))))]
+	Whatever {
+		#[snafu(source(from(Box<dyn std::error::Error>, Some)))]
+		source: Option<Box<dyn std::error::Error>>,
+		message: String,
+		backtrace: snafu::Backtrace,
+	},
 }
 
 #[cfg(test)]

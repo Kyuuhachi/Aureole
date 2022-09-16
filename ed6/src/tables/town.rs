@@ -53,7 +53,7 @@ pub fn write(_arcs: &Archives, towns: &[Town]) -> Result<Vec<u8>, super::WriteEr
 		body.label(l);
 		body.string(name)?;
 		if name.is_empty() {
-			assert_eq!(kind, &TownType::None);
+			snafu::ensure_whatever!(kind == &TownType::None, "invalid empty town kind");
 		} else {
 			body.u8(kind.clone().into());
 		}

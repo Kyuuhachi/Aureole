@@ -3,6 +3,7 @@ use std::{
 	collections::{HashMap, hash_map::Entry},
 	fmt::Debug,
 	rc::Rc,
+	ops::Range,
 };
 
 pub mod prelude {
@@ -12,7 +13,7 @@ pub mod prelude {
 pub struct Out<'a, L: Eq + Hash + Debug + 'a> {
 	data: Vec<u8>,
 	#[allow(clippy::type_complexity)]
-	delays: Vec<(usize, usize, Box<dyn FnOnce(&dyn Fn(&L) -> usize, &mut [u8]) + 'a>)>,
+	delays: Vec<(Range<usize>, Box<dyn FnOnce(&dyn Fn(&L) -> usize, &mut [u8]) + 'a>)>,
 	labels: HashMap<L, usize>,
 }
 
@@ -32,13 +33,13 @@ impl<'a, L: Eq + Hash + Debug> Out<'a, L> {
 	}
 
 	pub fn finish(mut self) -> Vec<u8> {
-		for (start, end, f) in self.delays {
-			f(
+		for (range, cb) in self.delays {
+			cb(
 				&|k| {
 					*self.labels.get(k)
 						.unwrap_or_else(|| panic!("Undefined label {:?}", k))
 				},
-				&mut self.data[start..end],
+				&mut self.data[range],
 			);
 		}
 		self.data
@@ -61,8 +62,8 @@ impl<'a, L: Eq + Hash + Debug> Out<'a, L> {
 		let shift = self.data.len();
 		self.data.append(&mut other.data);
 
-		for (start, end, f) in other.delays {
-			self.delays.push((start+shift, end+shift, f));
+		for (range, cb) in other.delays {
+			self.delays.push((range.start+shift..range.end+shift, cb));
 		}
 
 		for (k, v) in other.labels {
@@ -78,10 +79,10 @@ impl<'a, L: Eq + Hash + Debug> Out<'a, L> {
 		new.data.append(&mut self.data);
 
 		let f = Rc::new(f);
-		for (start, end, g) in self.delays {
-			new.delays.push((start, end, Box::new({
+		for (range, cb) in self.delays {
+			new.delays.push((range, Box::new({
 				let f = f.clone();
-				move |l, m| g(&|k| l(&f(k)), m)
+				move |l, m| cb(&|k| l(&f(k)), m)
 			})))
 		}
 
@@ -110,7 +111,7 @@ impl<'a, L: Eq + Hash + Debug> Out<'a, L> {
 		let start = self.data.len();
 		self.data.extend([0; N]);
 		let end = self.data.len();
-		self.delays.push((start, end, Box::new(move |l, o| {
+		self.delays.push((start..end, Box::new(move |l, o| {
 			o.copy_from_slice(&f(l))
 		})));
 	}

@@ -30,16 +30,11 @@ pub type Result<T, E=Error> = std::result::Result<T, E>;
 
 type Delayed<'a, L> = Box<dyn FnOnce(&dyn Fn(&L) -> Result<usize>, &mut [u8]) -> Result<()> + 'a>;
 
+#[derive(Default)]
 pub struct Out<'a, L: Eq + Hash + Debug + 'a> {
 	data: Vec<u8>,
 	delays: Vec<(Range<usize>, Delayed<'a, L>)>,
 	labels: HashMap<L, usize>,
-}
-
-impl<L: Eq + Hash + Debug> Default for Out<'_, L> {
-	fn default() -> Self {
-		Self::new()
-	}
 }
 
 impl<'a, L: Eq + Hash + Debug> Out<'a, L> {

@@ -235,7 +235,6 @@ version = "0.1.0"
 dependencies = [
  "bitmatch",
  "derive_more",
- "either",
  "encoding_rs",
  "hamu",
  "lazy_static",

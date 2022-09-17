@@ -29,12 +29,6 @@ pub enum ReadError {
 	},
 }
 
-impl<A: Into<Self>, B: Into<Self>> From<either::Either<A, B>> for ReadError {
-	fn from(e: either::Either<A, B>) -> Self {
-		e.either_into()
-	}
-}
-
 #[derive(Debug, snafu::Snafu)]
 pub enum WriteError {
 	#[snafu(display("{source}"), context(false))]
@@ -56,12 +50,6 @@ pub enum WriteError {
 		message: String,
 		backtrace: snafu::Backtrace,
 	},
-}
-
-impl<A: Into<Self>, B: Into<Self>> From<either::Either<A, B>> for WriteError {
-	fn from(e: either::Either<A, B>) -> Self {
-		e.either_into()
-	}
 }
 
 #[derive(Debug, snafu::Snafu)]

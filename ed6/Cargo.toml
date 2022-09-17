@@ -10,7 +10,6 @@ mapr = "0.8.0"
 snafu = "0.7.1"
 bitmatch = "0.1.1" # for decompress algorithm 2
 encoding_rs = "0.8.31"
-either = "1.8.0"
 num_enum = "0.5.7"
 
 derive_more = { version = "0.99.17", default-features = false, features = ["deref", "deref_mut", "display", "from", "into"] }

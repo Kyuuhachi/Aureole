@@ -154,10 +154,10 @@ pub mod test {
 		Io { source: std::io::Error, backtrace: snafu::Backtrace },
 
 		#[snafu(display("{source}"), context(false))]
-		Read { #[snafu(backtrace)] source: crate::util::ReadError },
+		Read { #[snafu(backtrace)] source: Box<crate::util::ReadError> },
 
 		#[snafu(display("{source}"), context(false))]
-		Write { #[snafu(backtrace)] source: crate::util::WriteError },
+		Write { #[snafu(backtrace)] source: Box<crate::util::WriteError> },
 	}
 
 	lazy_static::lazy_static! {
@@ -200,9 +200,9 @@ pub mod test {
 		T2: ?Sized,
 	{
 		let data = arc.get_decomp(name)?;
-		let parsed = read(arc, &data)?;
-		let data2 = write(arc, parsed.as_ref())?;
-		let parsed2 = read(arc, &data2)?;
+		let parsed = read(arc, &data).map_err(Box::new)?;
+		let data2 = write(arc, parsed.as_ref()).map_err(Box::new)?;
+		let parsed2 = read(arc, &data2).map_err(Box::new)?;
 		check_equal(&parsed, &parsed2)
 	}
 }

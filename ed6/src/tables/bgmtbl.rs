@@ -44,4 +44,3 @@ mod test {
 		check_roundtrip(arc, "t_bgmtbl._dt", super::read, super::write)
 	}
 }
-

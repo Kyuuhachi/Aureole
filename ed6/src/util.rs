@@ -172,10 +172,10 @@ pub mod test {
 		Io { #[from] source: std::io::Error, backtrace: std::backtrace::Backtrace },
 
 		#[error(transparent)]
-		Read { #[from] #[backtrace] source: Box<crate::util::ReadError> },
+		Read { #[from] #[backtrace] source: crate::util::ReadError },
 
 		#[error(transparent)]
-		Write { #[from] #[backtrace] source: Box<crate::util::WriteError> },
+		Write { #[from] #[backtrace] source: crate::util::WriteError },
 	}
 
 	lazy_static::lazy_static! {
@@ -218,9 +218,9 @@ pub mod test {
 		T2: ?Sized,
 	{
 		let data = arc.get_decomp(name)?;
-		let parsed = read(arc, &data).map_err(Box::new)?;
-		let data2 = write(arc, parsed.as_ref()).map_err(Box::new)?;
-		let parsed2 = read(arc, &data2).map_err(Box::new)?;
+		let parsed = read(arc, &data)?;
+		let data2 = write(arc, parsed.as_ref())?;
+		let parsed2 = read(arc, &data2)?;
 		check_equal(&parsed, &parsed2)
 	}
 }

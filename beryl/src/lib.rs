@@ -162,7 +162,9 @@ impl<'a> Dump<'a> {
 	}
 
 	pub fn mark_range(mut self, range: Range<usize>, color: u8) -> Self {
-		self.marks.insert(range, color);
+		if !range.is_empty() {
+			self.marks.insert(range, color);
+		}
 		self
 	}
 

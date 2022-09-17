@@ -2,7 +2,7 @@ use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
 use crate::archive::Archives;
-use crate::util::{InExt, OutExt};
+use crate::util::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Town(String, TownType);
@@ -22,7 +22,7 @@ pub enum TownType {
 	Cafe       = 8, // Cafe             飲食・喫茶
 }
 
-pub fn read(_arcs: &Archives, t_town: &[u8]) -> Result<Vec<Town>, super::ReadError> {
+pub fn read(_arcs: &Archives, t_town: &[u8]) -> Result<Vec<Town>, ReadError> {
 	let mut f = Coverage::new(Bytes::new(t_town));
 	let n = f.u16()?;
 	let mut names = Vec::with_capacity(n as usize);
@@ -35,18 +35,18 @@ pub fn read(_arcs: &Archives, t_town: &[u8]) -> Result<Vec<Town>, super::ReadErr
 		} else {
 			g.u8()?
 		};
-		let type_ = type_.try_into()?;
+		let type_ = cast(type_)?;
 		names.push(Town(name, type_));
 	}
 	f.assert_covered()?;
 	Ok(names)
 }
 
-pub fn write(_arcs: &Archives, towns: &[Town]) -> Result<Vec<u8>, super::WriteError> {
+pub fn write(_arcs: &Archives, towns: &[Town]) -> Result<Vec<u8>, WriteError> {
 	let mut head = Out::new();
 	let mut body = Out::new();
 	let mut count = Count::new();
-	head.u16(towns.len().try_into().unwrap());
+	head.u16(cast(towns.len())?);
 	for Town(name, kind) in towns {
 		let l = count.next();
 		head.delay_u16(l);
@@ -65,7 +65,7 @@ pub fn write(_arcs: &Archives, towns: &[Town]) -> Result<Vec<u8>, super::WriteEr
 #[cfg(test)]
 mod test {
 	use crate::archive::Archives;
-	use super::super::test::*;
+	use crate::util::test::*;
 
 	#[test_case::test_case(&FC; "fc")]
 	fn roundtrip(arc: &Archives) -> Result<(), Error> {

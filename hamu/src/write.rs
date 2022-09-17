@@ -9,7 +9,7 @@ use std::{
 use snafu::prelude::*;
 
 pub mod prelude {
-	pub use super::{Out, Count, Error as WriteError};
+	pub use super::{Out, Count};
 }
 
 #[derive(Debug, snafu::Snafu)]

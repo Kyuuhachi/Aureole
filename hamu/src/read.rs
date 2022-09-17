@@ -1,5 +1,5 @@
 pub mod prelude {
-	pub use super::{In, InBase, Dump, Error as ReadError, Bytes};
+	pub use super::{In, InBase, Dump, Bytes};
 }
 
 pub mod coverage;

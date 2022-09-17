@@ -2,8 +2,9 @@ use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
 use crate::archive::Archives;
+use crate::util::*;
 
-pub fn read(_arcs: &Archives, t_face: &[u8]) -> Result<Vec<String>, super::ReadError> {
+pub fn read(_arcs: &Archives, t_face: &[u8]) -> Result<Vec<String>, ReadError> {
 	let mut f = Coverage::new(Bytes::new(t_face));
 	let mut faces = Vec::with_capacity(f.remaining() / 4);
 	while f.remaining() > 0 {
@@ -13,7 +14,7 @@ pub fn read(_arcs: &Archives, t_face: &[u8]) -> Result<Vec<String>, super::ReadE
 	Ok(faces)
 }
 
-pub fn write(_arcs: &Archives, names: &[impl AsRef<str>]) -> Result<Vec<u8>, super::WriteError> {
+pub fn write(_arcs: &Archives, names: &[impl AsRef<str>]) -> Result<Vec<u8>, WriteError> {
 	let mut out = Out::<()>::new();
 	for name in names {
 		out.array(_arcs.index(name.as_ref()).unwrap())
@@ -24,7 +25,7 @@ pub fn write(_arcs: &Archives, names: &[impl AsRef<str>]) -> Result<Vec<u8>, sup
 #[cfg(test)]
 mod test {
 	use crate::archive::Archives;
-	use super::super::test::*;
+	use crate::util::test::*;
 
 	#[test_case::test_case(&FC; "fc")]
 	fn roundtrip(arc: &Archives) -> Result<(), Error> {

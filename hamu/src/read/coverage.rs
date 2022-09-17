@@ -39,13 +39,13 @@ impl<'a, T: In<'a>> InBase<'a> for Coverage<'a, T> {
 		self.inner.len()
 	}
 
-	fn seek(&mut self, pos: usize) -> Result<(), ReadError> {
+	fn seek(&mut self, pos: usize) -> Result<(), super::Error> {
 		self.inner.seek(pos)?;
 		self.find_coverage(pos);
 		Ok(())
 	}
 
-	fn slice(&mut self, len: usize) -> Result<&'a [u8], ReadError> {
+	fn slice(&mut self, len: usize) -> Result<&'a [u8], super::Error> {
 		let pos = self.pos();
 		let data = self.inner.slice(len)?;
 		self.insert_coverage(pos..pos+len);

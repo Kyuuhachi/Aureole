@@ -9,7 +9,7 @@ use crate::util;
 #[derive(Debug, snafu::Snafu)]
 pub enum Error {
 	#[snafu(display("{source}"), context(false))]
-	Read { source: ReadError, backtrace: snafu::Backtrace },
+	Read { source: hamu::read::Error, backtrace: snafu::Backtrace },
 
 	#[snafu(display("{source}"), context(false))]
 	Io { source: std::io::Error, backtrace: snafu::Backtrace },

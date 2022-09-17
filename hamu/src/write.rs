@@ -19,7 +19,7 @@ pub enum Error {
 	#[snafu(display("duplicate label '{label}': {v1} → {v2}"))]
 	Duplicate { label: String, v1: usize, v2: usize },
 	#[snafu(display("failed to convert {label} ({value}) to {type_}: {source}"))]
-	TryFrom {
+	LabelSize {
 		label: String,
 		type_: &'static str,
 		value: String,
@@ -177,11 +177,7 @@ macro_rules! primitives {
 					self.delay(move |lookup| {
 						let v = lookup(&k)?;
 						let v = $utype::try_from(v)
-							.map_err(|e| {
-								let a: Box<dyn std::error::Error> = Box::new(e);
-								a
-							})
-							.with_context(|_| TryFromSnafu {
+							.map_err(Box::from).with_context(|_| LabelSizeSnafu {
 								label: format!("{:?}", k),
 								type_: std::any::type_name::<$utype>(),
 								value: format!("{:?}", v),

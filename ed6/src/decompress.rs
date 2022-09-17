@@ -190,7 +190,7 @@ fn decompress2(data: &[u8]) -> Result<Vec<u8>> {
 }
 
 pub fn decompress_chunk(data: &[u8]) -> Result<Vec<u8>> {
-	if data.get(0) == Some(&0) {
+	if data.first() == Some(&0) {
 		Ok(decompress1(data)?)
 	} else {
 		Ok(decompress2(data)?)

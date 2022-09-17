@@ -13,7 +13,7 @@ pub fn run(Command {path}: Command) -> Result<(), io::Error> {
 	let mut input: Box<dyn io::Read> = if path == Path::new("-") {
 		Box::new(io::stdin().lock())
 	} else {
-		Box::new(std::fs::File::open(&path)?)
+		Box::new(std::fs::File::open(path)?)
 	};
 
 	let mut output = io::stdout().lock();

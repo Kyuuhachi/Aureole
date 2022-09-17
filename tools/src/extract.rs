@@ -86,7 +86,7 @@ pub fn run(Command { force, infile, outdir }: Command) -> Result<(), Error> {
 fn extract(force: bool, arc: &Archive, outdir: &Path, bar: ProgressBar, outerbar: Option<ProgressBar>) -> Result<(), Error> {
 	if outdir.exists() {
 		if force {
-			fs::remove_dir_all(&outdir)
+			fs::remove_dir_all(outdir)
 				.with_whatever_context(|_| format!("failed to remove {}", outdir.display()))?;
 		} else {
 			eprintln!("output directory {} already exists (use -f to overwrite)", outdir.display());
@@ -94,7 +94,7 @@ fn extract(force: bool, arc: &Archive, outdir: &Path, bar: ProgressBar, outerbar
 		}
 	}
 
-	fs::create_dir_all(&outdir)
+	fs::create_dir_all(outdir)
 		.with_whatever_context(|_| format!("failed to create output directory {}", outdir.display()))?;
 
 	let mut index = fs::File::create(outdir.join("index"))
@@ -111,7 +111,7 @@ fn extract(force: bool, arc: &Archive, outdir: &Path, bar: ProgressBar, outerbar
 			let outfile = outdir.join(&e.name);
 			let raw = arc.get(&e.name).unwrap();
 
-			fs::write(&outfile, &raw)
+			fs::write(&outfile, raw)
 				.with_whatever_context(|_| format!("failed to write output file {}", outfile.display()))?;
 			filetime::set_file_mtime(&outfile, filetime::FileTime::from_unix_time(e.timestamp as i64, 0))
 				.with_whatever_context(|_| format!("failed to set mtime on {}", outfile.display()))?;
@@ -119,7 +119,7 @@ fn extract(force: bool, arc: &Archive, outdir: &Path, bar: ProgressBar, outerbar
 			let decomp = ed6::decompress::decompress(raw).ok();
 			if let Some(decomp) = &decomp {
 				let outfile2 = outdir.join(&format!("{}.dec", e.name));
-				fs::write(&outfile2, &decomp)
+				fs::write(&outfile2, decomp)
 					.with_whatever_context(|_| format!("failed to write output file {}", outfile.display()))?;
 				filetime::set_file_mtime(&outfile2, filetime::FileTime::from_unix_time(e.timestamp as i64, 0))
 					.with_whatever_context(|_| format!("failed to set mtime on {}", outfile.display()))?;

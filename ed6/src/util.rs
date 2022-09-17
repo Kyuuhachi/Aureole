@@ -1,7 +1,6 @@
 use encoding_rs::SHIFT_JIS;
 use hamu::read::prelude::*;
 use hamu::write::prelude::*;
-use snafu::prelude::*;
 
 #[derive(Debug, snafu::Snafu)]
 pub enum ReadError {

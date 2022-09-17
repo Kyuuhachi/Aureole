@@ -2,79 +2,97 @@ use encoding_rs::SHIFT_JIS;
 use hamu::read::prelude::*;
 use hamu::write::prelude::*;
 
-#[derive(Debug, snafu::Snafu)]
+type Backtrace = Box<std::backtrace::Backtrace>;
+
+#[derive(Debug, thiserror::Error)]
 pub enum ReadError {
-	#[snafu(display("{source}"), context(false))]
-	Io { source: std::io::Error, backtrace: snafu::Backtrace },
+	#[error("{source}")]
+	Io { #[from] source: std::io::Error, backtrace: Backtrace },
 
-	#[snafu(display("{source}"), context(false))]
-	Read { source: hamu::read::Error, backtrace: snafu::Backtrace },
+	#[error("{source}")]
+	Read { #[from] source: hamu::read::Error, backtrace: Backtrace },
 
-	#[snafu(display("{source}"), context(false))]
-	Coverage { source: hamu::read::coverage::Error, backtrace: snafu::Backtrace },
+	#[error("{source}")]
+	Coverage { #[from] source: hamu::read::coverage::Error, backtrace: Backtrace },
 
-	#[snafu(display("{source}"), context(false))]
-	Encoding { source: crate::util::DecodeError, backtrace: snafu::Backtrace },
+	#[error("{source}")]
+	Encoding { #[from] source: crate::util::DecodeError, backtrace: Backtrace },
 
-	#[snafu(display("{source}"), context(false))]
-	Cast { source: CastError, backtrace: snafu::Backtrace },
+	#[error("{source}")]
+	Cast { #[from] source: CastError, backtrace: Backtrace },
 
-	#[snafu(whatever, display("{}", source.as_ref().map_or(message.into(), |source| format!("{message}\n{source}"))))]
-	Whatever {
-		#[snafu(source(from(Box<dyn std::error::Error>, Some)))]
-		source: Option<Box<dyn std::error::Error>>,
-		message: String,
-		backtrace: snafu::Backtrace,
-	},
+	#[error("{assertion}")]
+	Assert { assertion: Box<str>, backtrace: Backtrace },
 }
 
-#[derive(Debug, snafu::Snafu)]
+impl std::convert::From<String> for ReadError {
+	fn from(assertion: String) -> Self {
+		Self::Assert {
+			assertion: assertion.into(),
+			backtrace: std::backtrace::Backtrace::capture().into(),
+		}
+	}
+}
+
+#[derive(Debug, thiserror::Error)]
 pub enum WriteError {
-	#[snafu(display("{source}"), context(false))]
-	Io { source: std::io::Error, backtrace: snafu::Backtrace },
+	#[error("{source}")]
+	Io { #[from] source: std::io::Error, backtrace: Backtrace },
 
-	#[snafu(display("{source}"), context(false))]
-	Write { source: hamu::write::Error, backtrace: snafu::Backtrace },
+	#[error("{source}")]
+	Write { #[from] source: hamu::write::Error, backtrace: Backtrace },
 
-	#[snafu(display("{source}"), context(false))]
-	Encoding { source: crate::util::EncodeError, backtrace: snafu::Backtrace },
+	#[error("{source}")]
+	Encoding { #[from] source: crate::util::EncodeError, backtrace: Backtrace },
 
-	#[snafu(display("{source}"), context(false))]
-	Cast { source: CastError, backtrace: snafu::Backtrace },
+	#[error("{source}")]
+	Cast { #[from] source: CastError, backtrace: Backtrace },
 
-	#[snafu(whatever, display("{}", source.as_ref().map_or(message.into(), |source| format!("{message}\n{source}"))))]
-	Whatever {
-		#[snafu(source(from(Box<dyn std::error::Error>, Some)))]
-		source: Option<Box<dyn std::error::Error>>,
-		message: String,
-		backtrace: snafu::Backtrace,
-	},
+	#[error("{assertion}")]
+	Assert { assertion: Box<str>, backtrace: Backtrace },
 }
 
-#[derive(Debug, snafu::Snafu)]
-#[snafu(display("Invalid SJIS string {text:?}"))]
+impl std::convert::From<String> for WriteError {
+	fn from(assertion: String) -> Self {
+		Self::Assert {
+			assertion: assertion.into(),
+			backtrace: std::backtrace::Backtrace::capture().into(),
+		}
+	}
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("Invalid SJIS string {text:?}")]
 pub struct DecodeError { text: String }
 
 pub fn decode(bytes: &[u8]) -> Result<String, DecodeError> {
 	let (text, _, error) = SHIFT_JIS.decode(bytes);
-	snafu::ensure!(!error, DecodeSnafu { text });
-	snafu::ensure!(!text.contains('\0'), DecodeSnafu { text });
+	if error {
+		return Err(DecodeError { text: text.into_owned() });
+	}
+	if text.contains('\0') {
+		return Err(DecodeError { text: text.into_owned() });
+	}
 	Ok(text.into_owned())
 }
 
-#[derive(Debug, snafu::Snafu)]
-#[snafu(display("Cannot encode {text:?} as SJIS"))]
+#[derive(Debug, thiserror::Error)]
+#[error("Cannot encode {text:?} as SJIS")]
 pub struct EncodeError { text: String }
 
 pub fn encode(text: &str) -> Result<Vec<u8>, EncodeError> {
-	snafu::ensure!(!text.contains('\0'), EncodeSnafu { text });
+	if text.contains('\0') {
+		return Err(EncodeError { text: text.to_owned() });
+	}
 	let (bytes, _, error) = SHIFT_JIS.encode(text);
-	snafu::ensure!(!error, EncodeSnafu { text });
+	if error {
+		return Err(EncodeError { text: text.to_owned() });
+	}
 	Ok(bytes.into_owned())
 }
 
-#[derive(Debug, snafu::Snafu)]
-#[snafu(display("cannot convert {value} into {type_}\n{source}"))]
+#[derive(Debug, thiserror::Error)]
+#[error("cannot convert {value} into {type_}\n{source}")]
 pub struct CastError {
 	source: Box<dyn std::error::Error>,
 	type_: &'static str,
@@ -148,16 +166,16 @@ impl<L: Eq + std::hash::Hash + std::fmt::Debug> OutExt<L> for Out<'_, L> {
 pub mod test {
 	use crate::archive::Archives;
 
-	#[derive(Debug, snafu::Snafu)]
+	#[derive(Debug, thiserror::Error)]
 	pub enum Error {
-		#[snafu(display("{source}"), context(false))]
-		Io { source: std::io::Error, backtrace: snafu::Backtrace },
+		#[error("{source}")]
+		Io { #[from] source: std::io::Error, backtrace: std::backtrace::Backtrace },
 
-		#[snafu(display("{source}"), context(false))]
-		Read { #[snafu(backtrace)] source: Box<crate::util::ReadError> },
+		#[error(transparent)]
+		Read { #[from] #[backtrace] source: Box<crate::util::ReadError> },
 
-		#[snafu(display("{source}"), context(false))]
-		Write { #[snafu(backtrace)] source: Box<crate::util::WriteError> },
+		#[error(transparent)]
+		Write { #[from] #[backtrace] source: Box<crate::util::WriteError> },
 	}
 
 	lazy_static::lazy_static! {

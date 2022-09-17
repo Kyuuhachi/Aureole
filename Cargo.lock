@@ -74,6 +74,7 @@ dependencies = [
  "ansi_term",
  "atty",
  "encoding_rs",
+ "rangemap",
 ]
 
 [[package]]
@@ -573,6 +574,12 @@ checksum = "a1feb54ed693b93a84e14094943b84b7c4eae204c512b7ccb95ab0c66d278ad1"
 dependencies = [
  "proc-macro2",
 ]
+
+[[package]]
+name = "rangemap"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ea2d559b3970fe7aa56ce7432a3702ff4b20a57b543ae08b4850ee629353ea6"
 
 [[package]]
 name = "redox_syscall"

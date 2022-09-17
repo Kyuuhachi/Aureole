@@ -1,8 +1,6 @@
-use std::{
-	collections::BTreeMap,
-	io,
-};
+use std::{io, ops::Range };
 pub use ansi_term::{Color::Fixed as Color, Style, ANSIString as Ansi};
+use rangemap::RangeMap;
 
 pub mod preview {
 	use super::*;
@@ -35,22 +33,38 @@ pub mod preview {
 pub mod color {
 	use super::*;
 
-	pub fn ascii(byte: u8) -> Style {
-		match byte {
-			0x00        => Style::new().dimmed(),
-			0xFF        => Style::new().fg(Color(9)), // bright red
-			0x20..=0x7E => Style::new().fg(Color(10)), // bright green
-			_           => Style::new(),
+	pub fn ascii(byte: u8, mark: Option<u8>) -> Style {
+		let mut s = Style::new();
+		s = match byte {
+			0x00        => s.dimmed(),
+			0xFF        => s.fg(Color(9)), // bright red
+			0x20..=0x7E => s.fg(Color(10)), // bright green
+			_           => s,
+		};
+		if let Some(c) = mark {
+			s = s.on(Color(c))
 		}
+		s
 	}
 
-	pub fn gray(byte: u8) -> Style {
-		Style::new()
-			.fg(Color(if byte <  0x30 { 245 } else { 236 }))
-			.on(Color(if byte == 0x00 { 237 } else { 238 + byte / 16 }))
+	pub fn gray(byte: u8, mark: Option<u8>) -> Style {
+		let mut s = Style::new();
+		if let Some(c) = mark {
+			s = s.fg(Color(c));
+		} else {
+			s = s.fg(Color(if byte <  0x30 { 245 } else { 236 }));
+		}
+		s = s.on(Color(if byte == 0x00 { 237 } else { 238 + byte / 16 }));
+		s
 	}
 
-	pub fn none(_byte: u8) -> Style { Style::new() }
+	pub fn none(_byte: u8, mark: Option<u8>) -> Style {
+		let mut s = Style::new();
+		if let Some(c) = mark {
+			s = s.on(Color(c))
+		}
+		s
+	}
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -61,7 +75,7 @@ enum DumpLength {
 	End(usize),
 }
 
-pub type ColorFn = dyn Fn(u8) -> Style;
+pub type ColorFn = dyn Fn(u8, Option<u8>) -> Style;
 pub type PreviewFn = dyn Fn(&mut Vec<Ansi>, &[u8]);
 
 #[must_use]
@@ -74,7 +88,7 @@ pub struct Dump<'a> {
 	preview: Option<&'a PreviewFn>,
 	num_width: usize,
 	newline: bool,
-	marks: BTreeMap<usize, Ansi<'a>>,
+	marks: RangeMap<usize, u8>,
 }
 
 impl<'a> Dump<'a> {
@@ -88,7 +102,7 @@ impl<'a> Dump<'a> {
 			preview: Some(&preview::ascii),
 			num_width: 1,
 			newline: true,
-			marks: BTreeMap::new(),
+			marks: RangeMap::new(),
 		}
 	}
 
@@ -143,20 +157,17 @@ impl<'a> Dump<'a> {
 		Dump { newline, ..self }
 	}
 
-	pub fn mark(mut self, pos: usize, mark: impl Into<Ansi<'a>>) -> Self {
-		self.marks.insert(pos, mark.into());
-		self
+	pub fn mark(self, pos: usize, color: u8) -> Self {
+		self.mark_range(pos..pos+1, color)
 	}
 
-	pub fn marks(mut self, iter: impl Iterator<Item=(usize, impl Into<Ansi<'a>>)>) -> Self {
-		for (k, v) in iter {
-			self = self.mark(k, v);
-		}
+	pub fn mark_range(mut self, range: Range<usize>, color: u8) -> Self {
+		self.marks.insert(range, color);
 		self
 	}
 
 	pub fn clear_marks(mut self) -> Self {
-		self.marks.clear();
+		self.marks = RangeMap::new(); // there is no RangeMap::clear, I posted #53
 		self
 	}
 
@@ -174,7 +185,6 @@ impl<'a> Dump<'a> {
 			DumpLength::End(l)   => Some(l.saturating_sub(self.start)),
 		};
 
-		let mut marks = self.marks.range(self.start..).peekable();
 		let mut pos = self.start;
 		let mut buf = vec![0; width];
 
@@ -185,6 +195,9 @@ impl<'a> Dump<'a> {
 		};
 
 		let mut first = true;
+
+		let mut marks = self.marks.iter().peekable();
+		let mut mark = None;
 
 		loop {
 			let buf = if let Some(len) = len {
@@ -209,19 +222,21 @@ impl<'a> Dump<'a> {
 			}
 
 			for &b in buf {
-				match marks.next_if(|&(&a, _)| a <= pos) {
-					Some((_, mark)) => line.push(mark.clone()), // cloning here is a little wasteful
-					_ => line.push(" ".into()),
+				if marks.next_if(|(r, _)| r.end <= pos).is_some() {
+					mark = None;
 				}
-				let style = (self.color)(b);
-				line.push(style.paint(format!("{:02X}", b)));
+				if let Some((r, &c)) = marks.peek() {
+					if r.start <= pos {
+						mark = Some(c);
+					}
+				}
+
+				let style = (self.color)(b, mark);
+				line.push(style.paint(format!(" {:02X}", b)));
 				pos += 1;
 			}
-			// If a mark lands on a line break, we'll print it both before and after because why not.
-			match marks.peek() {
-				Some(&(&a, mark)) if a <= pos => line.push(mark.clone()),
-				_ => line.push(" ".into()),
-			}
+
+			line.push(" ".into());
 
 			if let Some(preview) = self.preview {
 				if buf.len() < width {

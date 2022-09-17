@@ -57,8 +57,7 @@ impl<'a, T: Dump<'a>> Dump<'a> for Coverage<'a, T> {
 	fn dump(&self) -> beryl::Dump {
 		let mut d = self.inner.dump();
 		for r in self.coverage.borrow().iter() {
-			d = d.mark(r.start, "\x1B[7m[\x1B[m");
-			d = d.mark(r.end, "\x1B[7m]\x1B[m");
+			d = d.mark_range(r.clone(), 6);
 		}
 		d
 	}

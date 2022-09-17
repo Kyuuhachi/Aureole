@@ -3,7 +3,6 @@
 // t_cook2
 // t_cook
 // t_crfget
-// t_exp
 // t_item2
 // t_item
 // t_magget
@@ -17,7 +16,6 @@
 // t_se
 // t_shop
 // t_sltget
-// t_status
 // t_world
 
 // t_town
@@ -28,3 +26,9 @@ pub mod face;
 
 // t_bgmtbl
 pub mod bgmtbl;
+
+// t_status
+pub mod status;
+
+// t_exp
+pub mod exp;

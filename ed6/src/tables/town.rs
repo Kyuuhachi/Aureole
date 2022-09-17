@@ -29,7 +29,7 @@ pub fn read(_arcs: &Archives, t_town: &[u8]) -> Result<Vec<Town>, super::ReadErr
 	for _ in 0..n {
 		let pos = f.u16()? as usize;
 		let mut g = f.clone().at(pos)?;
-		let name = g.string().map_err(|a| a.either_into::<super::ReadError>())?;
+		let name = g.string()?;
 		let type_ = if name.is_empty() {
 			0
 		} else {

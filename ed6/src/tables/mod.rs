@@ -53,6 +53,12 @@ pub enum ReadError {
 	},
 }
 
+impl<A: Into<Self>, B: Into<Self>> From<either::Either<A, B>> for ReadError {
+	fn from(e: either::Either<A, B>) -> Self {
+		e.either_into()
+	}
+}
+
 impl<T> From<num_enum::TryFromPrimitiveError<T>> for ReadError where
 	T: num_enum::TryFromPrimitive,
 	T::Primitive: std::fmt::Display,
@@ -83,6 +89,12 @@ pub enum WriteError {
 		message: String,
 		backtrace: snafu::Backtrace,
 	},
+}
+
+impl<A: Into<Self>, B: Into<Self>> From<either::Either<A, B>> for WriteError {
+	fn from(e: either::Either<A, B>) -> Self {
+		e.either_into()
+	}
 }
 
 #[cfg(test)]

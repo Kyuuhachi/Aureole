@@ -6,19 +6,17 @@ use std::{
 	ops::Range,
 };
 
-use snafu::prelude::*;
-
 pub mod prelude {
 	pub use super::{Out, Count};
 }
 
-#[derive(Debug, snafu::Snafu)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
-	#[snafu(display("undefined label '{label}'"))]
+	#[error("undefined label '{label}'")]
 	Undefined { label: String },
-	#[snafu(display("duplicate label '{label}': {v1} → {v2}"))]
+	#[error("duplicate label '{label}': {v1} → {v2}")]
 	Duplicate { label: String, v1: usize, v2: usize },
-	#[snafu(display("failed to convert {label} ({value}) to {type_}: {source}"))]
+	#[error("failed to convert {label} ({value}) to {type_}: {source}")]
 	LabelSize {
 		label: String,
 		type_: &'static str,
@@ -52,7 +50,7 @@ impl<'a, L: Eq + Hash + Debug> Out<'a, L> {
 				&|k| {
 					self.labels.get(k)
 						.copied()
-						.with_context(|| UndefinedSnafu {
+						.ok_or_else(|| Error::Undefined {
 							label: format!("{:?}", k),
 						})
 				},
@@ -177,7 +175,8 @@ macro_rules! primitives {
 					self.delay(move |lookup| {
 						let v = lookup(&k)?;
 						let v = $utype::try_from(v)
-							.map_err(Box::from).with_context(|_| LabelSizeSnafu {
+							.map_err(Box::from).map_err(|source| Error::LabelSize {
+								source,
 								label: format!("{:?}", k),
 								type_: std::any::type_name::<$utype>(),
 								value: format!("{:?}", v),

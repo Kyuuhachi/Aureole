@@ -4,13 +4,13 @@ pub mod prelude {
 
 pub mod coverage;
 
-#[derive(Debug, snafu::Snafu)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
-	#[snafu(display("out-of-bounds seek to {pos:#X} (size {size:#X})"))]
+	#[error("out-of-bounds seek to {pos:#X} (size {size:#X})")]
 	Seek { pos: usize, size: usize },
-	#[snafu(display("out-of-bounds read of {pos:#X}+{len} (size {size:#X})"))]
+	#[error("out-of-bounds read of {pos:#X}+{len} (size {size:#X})")]
 	Read { pos: usize, len: usize, size: usize },
-	#[snafu(display("mismatched {type_} at {pos:#X}\n  got:      {got}\n  expected: {expected}"))]
+	#[error("mismatched {type_} at {pos:#X}\n  got:      {got}\n  expected: {expected}")]
 	Check { pos: usize, type_: String, got: String, expected: String },
 }
 pub type Result<T, E=Error> = std::result::Result<T, E>;
@@ -55,12 +55,12 @@ pub trait In<'a>: InBase<'a> {
 				while got.len() < exp.len() { got.push('░') }
 				while exp.len() < got.len() { exp.push('░') }
 			}
-			return CheckSnafu {
+			return Err(Error::Check {
 				pos,
 				type_:    format!("[u8; {}]", v.len()),
 				got:      format!("b\"{}\"", got.into_iter().collect::<String>()),
 				expected: format!("b\"{}\"", exp.into_iter().collect::<String>()),
-			}.fail()
+			})
 		}
 		Ok(())
 	}
@@ -93,12 +93,12 @@ macro_rules! primitives {
 					let u = $name::$type(self)?;
 					if u != v {
 						let _ = self.seek(pos);
-						return CheckSnafu {
+						return Err(Error::Check {
 							pos,
 							type_: stringify!($type).to_owned(),
 							got: u.to_string(),
 							expected: v.to_string(),
-						}.fail()
+						})
 					}
 					Ok(())
 				}
@@ -141,13 +141,17 @@ impl<'a> InBase<'a> for Bytes<'a> {
 	}
 
 	fn seek(&mut self, pos: usize) -> Result<()> {
-		snafu::ensure!(pos <= self.len(), SeekSnafu { pos, size: self.len() });
+		if pos > self.len() {
+			return Err(Error::Seek { pos, size: self.len() })
+		}
 		self.pos = pos;
 		Ok(())
 	}
 
 	fn slice(&mut self, len: usize) -> Result<&'a [u8]> {
-		snafu::ensure!(len <= self.remaining(), ReadSnafu { pos: self.pos(), len, size: self.len() });
+		if len > self.remaining() {
+			return Err(Error::Read { pos: self.pos(), len, size: self.len() });
+		}
 		let pos = self.pos;
 		self.pos += len;
 		Ok(&self.data[pos..pos+len])

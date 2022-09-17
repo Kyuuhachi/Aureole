@@ -5,8 +5,8 @@ use std::{
 };
 use super::prelude::*;
 
-#[derive(Debug, snafu::Snafu)]
-#[snafu(display("uncovered data at {uncovered:X?}"))]
+#[derive(Debug, thiserror::Error)]
+#[error("uncovered data at {uncovered:X?}")]
 pub struct Error {
 	uncovered: Vec<Range<usize>>,
 }
@@ -88,23 +88,21 @@ impl<'a, T: In<'a>> Coverage<'a, T> {
 
 	pub fn assert_covered(&self) -> Result<(), Error> {
 		let uncovered = self.uncovered();
-		if uncovered.is_empty() {
-			Ok(())
-		} else {
-			Snafu { uncovered }.fail()
+		if !uncovered.is_empty() {
+			return Err(Error { uncovered })
 		}
+		Ok(())
 	}
 
 	pub fn dump_uncovered(&self, mut f: impl FnMut(beryl::Dump)) -> Result<(), Error> where Self: Dump<'a> + Clone {
 		let uncovered = self.uncovered();
-		if uncovered.is_empty() {
-			Ok(())
-		} else {
+		if !uncovered.is_empty() {
 			for r in uncovered.iter() {
 				f(self.clone().at(r.start).unwrap().dump().end(r.end))
 			}
-			Snafu { uncovered }.fail()
+			return Err(Error { uncovered });
 		}
+		Ok(())
 	}
 
 	fn find_coverage(&mut self, pos: usize) {

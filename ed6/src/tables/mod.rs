@@ -1,4 +1,3 @@
-// t_bgmtbl
 // t_book{00..=07}
 // t_btlset
 // t_cook2
@@ -26,3 +25,6 @@ pub mod town;
 
 // t_face
 pub mod face;
+
+// t_bgmtbl
+pub mod bgmtbl;

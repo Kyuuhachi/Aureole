@@ -99,10 +99,18 @@ pub fn cast<A, B>(a: A) -> Result<B, CastError> where
 	B: TryFrom<A>,
 	B::Error: std::error::Error + 'static,
 {
-	a.clone().try_into().map_err(Box::from).with_context(|_| CastSnafu {
-		type_: std::any::type_name::<B>(),
-		value: format!("{:?}", a),
-	})
+	a.clone().try_into().map_err(|e| cast_error::<B>(a, e))
+}
+
+pub fn cast_error<T>(
+	val: impl std::fmt::Debug,
+	cause: impl Into<Box<dyn std::error::Error>>,
+) -> CastError {
+	CastError {
+		type_: std::any::type_name::<T>(),
+		value: format!("{:?}", val),
+		source: cause.into()
+	}
 }
 
 pub trait InExt<'a>: In<'a> {
@@ -140,14 +148,11 @@ impl<L: Eq + std::hash::Hash + std::fmt::Debug> OutExt<L> for Out<'_, L> {
 	fn sized_string<const N: usize>(&mut self, s: &str) -> Result<(), WriteError> {
 		let s = encode(s)?;
 		if s.len() > N {
-			return Err(CastError {
-				source: "too large".into(),
-				type_: std::any::type_name::<[u8; N]>(),
-				value: format!("{:?}", s),
-			}.into());
+			return Err(cast_error::<[u8; N]>(s, "too large").into());
 		}
 		let mut buf = [0; N];
 		buf[..s.len()].copy_from_slice(&s);
+		self.array::<N>(buf);
 		Ok(())
 	}
 }
@@ -195,5 +200,22 @@ pub mod test {
 			panic!("{} differs", std::any::type_name::<T>());
 		}
 		Ok(())
+	}
+
+	pub fn check_roundtrip<T, T2>(
+		arc: &Archives,
+		name: &str,
+		read: fn(&Archives, &[u8]) -> Result<T, super::ReadError>,
+		write: fn(&Archives, &T2) -> Result<Vec<u8>, super::WriteError>,
+	) -> Result<(), Error> where
+		T: PartialEq + std::fmt::Debug,
+		T: AsRef<T2>,
+		T2: ?Sized,
+	{
+		let data = arc.get_decomp(name)?;
+		let parsed = read(arc, &data)?;
+		let data2 = write(arc, parsed.as_ref())?;
+		let parsed2 = read(arc, &data2)?;
+		check_equal(&parsed, &parsed2)
 	}
 }

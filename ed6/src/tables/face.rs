@@ -29,10 +29,6 @@ mod test {
 
 	#[test_case::test_case(&FC; "fc")]
 	fn roundtrip(arc: &Archives) -> Result<(), Error> {
-		let t_face = arc.get_decomp("t_face._dt")?;
-		let face = super::read(arc, &t_face)?;
-		let t_face_ = super::write(arc, &face)?;
-		let face_ = super::read(arc, &t_face_)?;
-		check_equal(&face, &face_)
+		check_roundtrip(arc, "t_face._dt", super::read, super::write)
 	}
 }

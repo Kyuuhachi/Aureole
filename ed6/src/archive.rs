@@ -1,27 +1,28 @@
 use std::{collections::HashMap, path::{Path, PathBuf}, io, fs::File, ops::Range};
 use mapr::Mmap;
 use hamu::read::{le::*, coverage::*};
-use snafu::prelude::*;
 
 use crate::decompress;
 use crate::util;
 
-#[derive(Debug, snafu::Snafu)]
+type Backtrace = Box<std::backtrace::Backtrace>;
+
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
-	#[snafu(display("{source}"), context(false))]
-	Read { source: hamu::read::Error, backtrace: snafu::Backtrace },
+	#[error("{source}")]
+	Read { #[from] source: hamu::read::Error, backtrace: Backtrace },
 
-	#[snafu(display("{source}"), context(false))]
-	Io { source: std::io::Error, backtrace: snafu::Backtrace },
+	#[error("{source}")]
+	Io { #[from] source: std::io::Error, backtrace: Backtrace },
 
-	#[snafu(display("{source}"))]
-	Encoding { source: util::DecodeError, backtrace: snafu::Backtrace },
+	#[error("{source}")]
+	Encoding { #[from] source: util::DecodeError, backtrace: Backtrace },
 
-	#[snafu(display("while reading {}\n{source}", dirpath.display()))]
+	#[error("while reading {}\n{source}", dirpath.display())]
 	Archive {
-		dirpath: PathBuf,
-		#[snafu(source(from(Error, Box::new)), backtrace)]
+		#[backtrace]
 		source: Box<Error>,
+		dirpath: PathBuf,
 	},
 }
 
@@ -81,7 +82,7 @@ impl Archive {
 
 			for index in 0..count as usize {
 				let name = dir.slice(12)?;
-				let name = util::decode(name).context(EncodingSnafu)?;
+				let name = util::decode(name)?;
 				let name = if let Some((name, ext)) = name.split_once('.') {
 					format!("{}.{}", name.trim_end(), ext)
 				} else {
@@ -168,7 +169,7 @@ impl Archives {
 				e => e?,
 			};
 			let dat = File::open(&datpath)?;
-			let arch = Archive::from_dir_dat(&dir, &dat).context(ArchiveSnafu { dirpath })?;
+			let arch = Archive::from_dir_dat(&dir, &dat).map_err(|e| Error::Archive { dirpath, source: e.into() })?;
 			for ent in arch.entries() {
 				names.insert(ent.name.to_owned(), num);
 			}

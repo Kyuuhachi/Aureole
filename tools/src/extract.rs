@@ -4,10 +4,8 @@ use std::{
 	io::Write as _, ffi::OsStr,
 };
 use indicatif::{ProgressBar, MultiProgress, ProgressStyle};
-use snafu::prelude::*;
 use ed6::archive::{Archive, Archives};
-
-use super::{Error, ArchiveSnafu};
+use eyre::*;
 
 /// Extract one or several .dir/dat archives.
 #[derive(Debug, Clone, clap::Args)]
@@ -31,30 +29,30 @@ pub struct Command {
 const BAR_STYLE: &str = "{wide_bar} {msg:>12} ({bytes}/{total_bytes})";
 const TOTAL_BAR_STYLE: &str = "{elapsed_precise} ({percent}%) {wide_bar} {msg}";
 
-pub fn run(Command { force, infile, outdir }: Command) -> Result<(), Error> {
+pub fn run(Command { force, infile, outdir }: Command) -> Result<(), Report> {
 	let meta = infile.metadata()
-		.with_whatever_context(|_| format!("could stat open {}", infile.display()))?;
+		.with_context(|| format!("could stat open {}", infile.display()))?;
 	if meta.is_file() {
-		snafu::ensure_whatever!(
+		ensure!(
 			infile.extension() == Some(OsStr::new("dir")),
 			"{} is not a .dir file", infile.display(),
 		);
 
 		let dir = File::open(&infile)
-			.with_whatever_context(|_| format!("could not open {}", infile.display()))?;
+			.with_context(|| format!("could not open {}", infile.display()))?;
 		let datfile = infile.with_extension("dat");
 		let dat = File::open(&datfile)
-			.with_whatever_context(|_| format!("could not open {}", datfile.display()))?;
+			.with_context(|| format!("could not open {}", datfile.display()))?;
 		let arc = Archive::from_dir_dat(&dir, &dat)
-			.with_context(|_| ArchiveSnafu { message: format!("could not read archive from {}", infile.display()) })?;
+			.with_context(|| format!("could not read archive from {}", infile.display()))?;
 
 		let bar = ProgressBar::new(0)
 			.with_style(ProgressStyle::with_template(BAR_STYLE).unwrap());
 		extract(force, &arc, &outdir, bar, None)?;
 	} else if meta.is_dir() {
 		let arcs = Archives::new(&infile)
-			.with_context(|_| ArchiveSnafu { message: format!("could not read archives from {}", infile.display()) })?;
-		snafu::ensure_whatever!(
+			.with_context(|| format!("could not read archives from {}", infile.display()))?;
+		ensure!(
 			arcs.archives().next().is_some(),
 			"no archives in {}", infile.display(),
 		);
@@ -77,7 +75,7 @@ pub fn run(Command { force, infile, outdir }: Command) -> Result<(), Error> {
 			extract(force, arc, &outdir.join(format!("{i:02X}")), bar, Some(outerbar.clone()))?;
 		}
 	} else {
-		whatever!("cannot handle {}", infile.display());
+		bail!("cannot handle {}", infile.display());
 	}
 
 	Ok(())
@@ -87,7 +85,7 @@ fn extract(force: bool, arc: &Archive, outdir: &Path, bar: ProgressBar, outerbar
 	if outdir.exists() {
 		if force {
 			fs::remove_dir_all(outdir)
-				.with_whatever_context(|_| format!("failed to remove {}", outdir.display()))?;
+				.with_context(|| format!("failed to remove {}", outdir.display()))?;
 		} else {
 			eprintln!("output directory {} already exists (use -f to overwrite)", outdir.display());
 			return Ok(())
@@ -95,10 +93,10 @@ fn extract(force: bool, arc: &Archive, outdir: &Path, bar: ProgressBar, outerbar
 	}
 
 	fs::create_dir_all(outdir)
-		.with_whatever_context(|_| format!("failed to create output directory {}", outdir.display()))?;
+		.with_context(|| format!("failed to create output directory {}", outdir.display()))?;
 
 	let mut index = fs::File::create(outdir.join("index"))
-		.with_whatever_context(|_| format!("failed to create index {}", outdir.join("index").display()))?;
+		.with_context(|| format!("failed to create index {}", outdir.join("index").display()))?;
 
 	bar.set_length(arc.entries().iter().map(|e| e.len() as u64).sum());
 	for e in arc.entries() {
@@ -112,17 +110,17 @@ fn extract(force: bool, arc: &Archive, outdir: &Path, bar: ProgressBar, outerbar
 			let raw = arc.get(&e.name).unwrap();
 
 			fs::write(&outfile, raw)
-				.with_whatever_context(|_| format!("failed to write output file {}", outfile.display()))?;
+				.with_context(|| format!("failed to write output file {}", outfile.display()))?;
 			filetime::set_file_mtime(&outfile, filetime::FileTime::from_unix_time(e.timestamp as i64, 0))
-				.with_whatever_context(|_| format!("failed to set mtime on {}", outfile.display()))?;
+				.with_context(|| format!("failed to set mtime on {}", outfile.display()))?;
 
 			let decomp = ed6::decompress::decompress(raw).ok();
 			if let Some(decomp) = &decomp {
 				let outfile2 = outdir.join(&format!("{}.dec", e.name));
 				fs::write(&outfile2, decomp)
-					.with_whatever_context(|_| format!("failed to write output file {}", outfile.display()))?;
+					.with_context(|| format!("failed to write output file {}", outfile.display()))?;
 				filetime::set_file_mtime(&outfile2, filetime::FileTime::from_unix_time(e.timestamp as i64, 0))
-					.with_whatever_context(|_| format!("failed to set mtime on {}", outfile.display()))?;
+					.with_context(|| format!("failed to set mtime on {}", outfile.display()))?;
 			}
 
 			(raw.len(), decomp.map(|a| a.len()))
@@ -138,7 +136,7 @@ fn extract(force: bool, arc: &Archive, outdir: &Path, bar: ProgressBar, outerbar
 			e.index, e.name,
 			chrono::NaiveDateTime::from_timestamp(e.timestamp as i64, 0),
 			e.unk1, e.unk2,
-		).whatever_context("failed to write to index")?;
+		).context("failed to write to index")?;
 
 		bar.inc(e.len() as u64);
 		if let Some(outerbar) = &outerbar {

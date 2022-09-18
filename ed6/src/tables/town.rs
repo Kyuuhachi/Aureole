@@ -7,7 +7,7 @@ use crate::util::*;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Town(String, TownType);
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[derive(num_enum::TryFromPrimitive, num_enum::IntoPrimitive)]
 #[repr(u8)]
 pub enum TownType {
@@ -47,17 +47,17 @@ pub fn write(_arcs: &Archives, towns: &[Town]) -> Result<Vec<u8>, WriteError> {
 	let mut body = Out::new();
 	let mut count = Count::new();
 	head.u16(cast(towns.len())?);
-	for Town(name, kind) in towns {
+	for &Town(ref name, kind) in towns {
 		let l = count.next();
 		head.delay_u16(l);
 		body.label(l);
 		body.string(name)?;
 		if name.is_empty() {
-			if *kind != TownType::None {
+			if kind != TownType::None {
 				return Err("empty town must be type None".to_owned().into());
 			}
 		} else {
-			body.u8(kind.clone().into());
+			body.u8(kind.into());
 		}
 	}
 	head.concat(body);

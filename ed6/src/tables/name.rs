@@ -90,8 +90,7 @@ mod test {
 
 	#[test_case::test_case(&FC; "fc")]
 	fn roundtrip(arc: &Archives) -> Result<(), Error> {
-		let a = check_roundtrip(arc, "t_name._dt", super::read, super::write)?;
-		println!("{:#?}", a);
+		check_roundtrip(arc, "t_name._dt", super::read, super::write)?;
 		Ok(())
 	}
 }

@@ -199,7 +199,6 @@ impl<'a> Dump<'a> {
 		let mut first = true;
 
 		let mut marks = self.marks.iter().peekable();
-		let mut mark = None;
 
 		loop {
 			let buf = if let Some(len) = len {
@@ -224,15 +223,8 @@ impl<'a> Dump<'a> {
 			}
 
 			for &b in buf {
-				if marks.next_if(|(r, _)| r.end <= pos).is_some() {
-					mark = None;
-				}
-				if let Some((r, &c)) = marks.peek() {
-					if r.start <= pos {
-						mark = Some(c);
-					}
-				}
-
+				while marks.next_if(|(r, _)| pos >= r.end).is_some() {}
+				let mark = marks.peek().and_then(|(r, &c)| r.contains(&pos).then_some(c));
 				let style = (self.color)(b, mark);
 				line.push(style.paint(format!(" {:02X}", b)));
 				pos += 1;

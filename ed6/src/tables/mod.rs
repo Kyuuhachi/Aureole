@@ -9,7 +9,6 @@
 // t_magic
 // t_magqrt
 // t_memo
-// t_name
 // t_orb
 // t_quartz
 // t_quest
@@ -20,6 +19,7 @@
 pub mod bgmtbl; // t_bgmtbl
 pub mod exp; // t_exp
 pub mod face; // t_face
+pub mod name; // t_name
 pub mod status; // t_status
 pub mod town; // t_town
 pub mod world; // t_world

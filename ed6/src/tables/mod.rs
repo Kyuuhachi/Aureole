@@ -12,7 +12,6 @@
 // t_orb
 // t_quartz
 // t_quest
-// t_se
 // t_shop
 // t_sltget
 
@@ -20,6 +19,7 @@ pub mod bgmtbl; // t_bgmtbl
 pub mod exp; // t_exp
 pub mod face; // t_face
 pub mod name; // t_name
+pub mod se; // t_se
 pub mod status; // t_status
 pub mod town; // t_town
 pub mod world; // t_world

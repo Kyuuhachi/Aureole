@@ -182,6 +182,9 @@ impl Archives {
 	}
 
 	fn archive(&self, n: u16) -> io::Result<&Archive> {
+		if n == 0x1A && !self.archives.contains_key(&n) {
+			return self.archive(0x1B);
+		}
 		self.archives.get(&n).ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))
 	}
 

@@ -10,16 +10,16 @@ pub struct Bgm { id: u32, name: String, loops: bool }
 pub fn read(_arcs: &Archives, t_town: &[u8]) -> Result<Vec<Bgm>, ReadError> {
 	let mut f = Coverage::new(Bytes::new(t_town));
 	let mut bgmtbl = Vec::with_capacity(f.remaining() / 16);
-	while f.remaining() > 0 {
+	while f.remaining() > 16 {
 		let id = f.u32()?;
 		let name = f.sized_string::<8>()?;
-		let loops = match f.u32()? {
-			0 => false,
-			1 => true,
-			n => Err(cast_error::<bool>(n, "out of range integral type conversion attempted"))?,
-		};
+		let loops = cast_bool(f.u32()?)?;
 		bgmtbl.push(Bgm { id, name, loops });
 	}
+	f.check_u32(0)?;
+	f.check(b"ED6999\0\0")?;
+	f.check_u32(0)?;
+
 	f.assert_covered()?;
 	Ok(bgmtbl)
 }
@@ -31,6 +31,9 @@ pub fn write(_arcs: &Archives, bgmtbl: &[Bgm]) -> Result<Vec<u8>, WriteError> {
 		out.sized_string::<8>(&bgm.name)?;
 		out.u32(bgm.loops.into());
 	}
+	out.u32(0);
+	out.slice(b"ED6999\0\0");
+	out.u32(0);
 	Ok(out.finish()?)
 }
 

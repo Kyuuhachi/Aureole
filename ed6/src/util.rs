@@ -107,6 +107,14 @@ pub fn cast<A, B>(a: A) -> Result<B, CastError> where
 	a.clone().try_into().map_err(|e| cast_error::<B>(a, e))
 }
 
+pub fn cast_bool(a: impl Into<u64> + std::fmt::Debug + Clone) -> Result<bool, CastError> {
+	match a.into() {
+		0 => Ok(false),
+		1 => Ok(true),
+		n => Err(cast_error::<bool>(n, "out of range integral type conversion attempted")),
+	}
+}
+
 pub fn cast_error<T>(
 	val: impl std::fmt::Debug,
 	cause: impl Into<Box<dyn std::error::Error>>,

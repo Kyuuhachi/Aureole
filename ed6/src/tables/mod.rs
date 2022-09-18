@@ -16,19 +16,10 @@
 // t_se
 // t_shop
 // t_sltget
-// t_world
 
-// t_town
-pub mod town;
-
-// t_face
-pub mod face;
-
-// t_bgmtbl
-pub mod bgmtbl;
-
-// t_status
-pub mod status;
-
-// t_exp
-pub mod exp;
+pub mod bgmtbl; // t_bgmtbl
+pub mod exp; // t_exp
+pub mod face; // t_face
+pub mod status; // t_status
+pub mod town; // t_town
+pub mod world; // t_world

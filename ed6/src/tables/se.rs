@@ -44,11 +44,13 @@ pub fn write(_arcs: &Archives, list: &[Sound]) -> Result<Vec<u8>, WriteError> {
 		out.u16(flag1.into());
 		out.u16(flag2.into());
 	}
+
 	out.u16(0xFFFF);
 	out.u16(0x0001);
 	out.u32(0);
 	out.u16(0);
 	out.u16(0);
+
 	Ok(out.finish()?)
 }
 

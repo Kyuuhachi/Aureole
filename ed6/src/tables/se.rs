@@ -15,7 +15,7 @@ pub struct Sound {
 
 pub fn read(_arcs: &Archives, data: &[u8]) -> Result<Vec<Sound>, ReadError> {
 	let mut f = Coverage::new(Bytes::new(data));
-	let mut list = Vec::with_capacity(f.remaining() / 4);
+	let mut list = Vec::with_capacity(f.remaining() / 12);
 	while f.remaining() > 12 {
 		let id = f.u16()?;
 		let unk = f.u16()?;

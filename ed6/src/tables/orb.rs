@@ -40,7 +40,6 @@ pub fn read(_arcs: &Archives, data: &[u8]) -> Result<Vec<Orbment>, ReadError> {
 		}
 		g.check(&[0xFF; 2])?;
 
-
 		list.push(Orbment { slots, lines });
 	}
 

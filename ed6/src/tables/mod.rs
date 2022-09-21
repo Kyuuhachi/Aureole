@@ -1,26 +1,23 @@
+pub mod bgmtbl;
 // t_book{00..=07}
 // t_btlset
 // t_cook2
 // t_cook
 // t_crfget
-// t_item2
-// t_item
+pub mod exp;
+pub mod face;
+pub mod item; // t_item, t_item2
 // t_magget
 // t_magic
 // t_magqrt
 // t_memo
-// t_orb
-// t_quartz
-// t_quest
-// t_shop
-// t_sltget
-
-pub mod bgmtbl;
-pub mod exp;
-pub mod face;
 pub mod name;
 pub mod orb;
+// t_quartz
+// t_quest
 pub mod se;
+// t_shop
+// t_sltget
 pub mod status;
 pub mod town;
 pub mod world;
@@ -48,7 +45,7 @@ impl Element {
 			4 => Ok(Element::Time),
 			5 => Ok(Element::Space),
 			6 => Ok(Element::Mirage),
-			_ => return Err(crate::util::cast_error::<Element>(v.to_string(), "invalid enum value")),
+			_ => Err(crate::util::cast_error::<Element>(v.to_string(), "invalid enum value")),
 		}
 	}
 
@@ -62,7 +59,7 @@ impl Element {
 			5 => Ok(Some(Element::Time)),
 			6 => Ok(Some(Element::Space)),
 			7 => Ok(Some(Element::Mirage)),
-			_ => return Err(crate::util::cast_error::<Option<Element>>(v.to_string(), "invalid enum value")),
+			_ => Err(crate::util::cast_error::<Option<Element>>(v.to_string(), "invalid enum value")),
 		}
 	}
 

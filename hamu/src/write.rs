@@ -29,13 +29,13 @@ pub type Result<T, E=Error> = std::result::Result<T, E>;
 type Delayed<'a, L> = Box<dyn FnOnce(&dyn Fn(&L) -> Result<usize>, &mut [u8]) -> Result<()> + 'a>;
 
 #[derive(Default)]
-pub struct Out<'a, L: Eq + Hash + Debug + 'a> {
+pub struct Out<'a, L: Eq + Hash + Debug + Clone + 'a> {
 	data: Vec<u8>,
 	delays: Vec<(Range<usize>, Delayed<'a, L>)>,
 	labels: HashMap<L, usize>,
 }
 
-impl<'a, L: Eq + Hash + Debug> Out<'a, L> {
+impl<'a, L: Eq + Hash + Debug + Clone> Out<'a, L> {
 	pub fn new() -> Self {
 		Self {
 			data: Vec::new(),
@@ -99,7 +99,7 @@ impl<'a, L: Eq + Hash + Debug> Out<'a, L> {
 		self.concat_with(other, |a| a.clone())
 	}
 
-	pub fn concat_with<M: Eq + Hash + Debug>(
+	pub fn concat_with<M: Eq + Hash + Debug + Clone>(
 		&mut self,
 		mut other: Out<'a, M>,
 		f: impl Fn(&M) -> L + 'a,
@@ -121,7 +121,7 @@ impl<'a, L: Eq + Hash + Debug> Out<'a, L> {
 		}
 	}
 
-	pub fn map<M: Eq + Hash + Debug>(
+	pub fn map<M: Eq + Hash + Debug + Clone>(
 		self,
 		f: impl Fn(&L) -> M + 'a,
 	) -> Out<'a, M> {
@@ -163,7 +163,7 @@ macro_rules! primitives {
 			)*
 		}
 
-		impl<L: Eq + Hash + Debug> $name<L> for Out<'_, L> {
+		impl<L: Eq + Hash + Debug + Clone> $name<L> for Out<'_, L> {
 			$(
 				fn [<$type _ $suf>](&mut self, v: $type) {
 					self.array(v.$conv());

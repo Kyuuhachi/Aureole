@@ -185,7 +185,7 @@ pub trait OutExt<L: Eq + std::hash::Hash + std::fmt::Debug> {
 	) -> Result<(), WriteError>;
 	fn sized_string<const N: usize>(&mut self, s: &str) -> Result<(), WriteError>;
 }
-impl<L: Eq + std::hash::Hash + std::fmt::Debug> OutExt<L> for Out<'_, L> {
+impl<L: Eq + std::hash::Hash + std::fmt::Debug + Clone> OutExt<L> for Out<'_, L> {
 	fn string(&mut self, s: &str) -> Result<(), WriteError> {
 		let s = encode(s)?;
 		self.slice(&s);

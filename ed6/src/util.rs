@@ -1,6 +1,6 @@
 use encoding_rs::SHIFT_JIS;
-use hamu::read::prelude::*;
-use hamu::write::prelude::*;
+use hamu::read::le::*;
+use hamu::write::le::*;
 
 type Backtrace = Box<std::backtrace::Backtrace>;
 
@@ -138,10 +138,39 @@ pub trait InExt<'a>: In<'a> {
 		Ok(decode(&buf)?)
 	}
 
+	fn multiple<const N: usize, A: PartialEq + std::fmt::Debug>(
+		&mut self,
+		nil: &[u8],
+		mut f: impl FnMut(&mut Self) -> Result<A, ReadError>,
+	) -> Result<Vec<A>, ReadError> {
+		let mut out = Vec::with_capacity(N);
+		let mut has_junk = false;
+		for _ in 0..N {
+			let i = self.pos();
+			if self.slice(nil.len())? == nil {
+				has_junk = true;
+			} else {
+				let j = self.pos();
+				self.seek(i)?;
+				let v = f(self)?;
+
+				if self.pos() != j {
+					return Err(format!("inconsistent position: {i} != {j}").into())
+				}
+
+				if has_junk {
+					return Err(format!("junk after end: {v:?}").into())
+				}
+
+				out.push(v);
+			}
+		}
+		Ok(out)
+	}
+
 	fn sized_string<const N: usize>(&mut self) -> Result<String, ReadError> {
-		let buf = self.array::<N>()?;
-		let buf = buf.splitn(2, |&a| a==b'\0').next().unwrap();
-		Ok(decode(buf)?)
+		let buf = self.multiple::<N, _>(&[0], |a| Ok(a.u8()?))?;
+		Ok(decode(&buf)?)
 	}
 }
 impl<'a, T: In<'a>> InExt<'a> for T {}

@@ -31,12 +31,7 @@ pub fn read(_arcs: &Archives, data: &[u8]) -> Result<Vec<Orbment>, ReadError> {
 		let nlines = g.u8()?;
 		let mut lines = Vec::with_capacity(nlines as usize);
 		for _ in 0..nlines {
-			lines.push(
-				g.array::<8>()?
-				.into_iter()
-				.take_while(|&a| a != 0xFF)
-				.collect()
-			);
+			lines.push(g.multiple::<8, _>(&[0xFF], |a| Ok(a.u8()?))?);
 		}
 		g.check(&[0xFF; 2])?;
 

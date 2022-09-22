@@ -66,7 +66,7 @@ pub trait In<'a>: InBase<'a> {
 	}
 }
 
-impl<'a, T> In<'a> for T where T: InBase<'a> {}
+impl<'a, T> In<'a> for T where T: InBase<'a> + ?Sized {}
 
 pub trait Dump<'a>: In<'a> {
 	fn dump(&self) -> beryl::Dump;
@@ -104,7 +104,7 @@ macro_rules! primitives {
 				}
 			)*
 		}
-		impl<'a, T: In<'a>> $name<'a> for T {}
+		impl<'a, T: In<'a> + ?Sized> $name<'a> for T {}
 
 		pub mod $suf {
 			pub use super::prelude::*;

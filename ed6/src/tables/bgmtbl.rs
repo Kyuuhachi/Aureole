@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
@@ -10,34 +12,33 @@ pub struct BgmId(u32);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Bgm {
-	pub id: BgmId,
 	pub name: String,
 	pub loops: bool,
 }
 
-pub fn read(_arcs: &Archives, t_town: &[u8]) -> Result<Vec<Bgm>, ReadError> {
+pub fn read(_arcs: &Archives, t_town: &[u8]) -> Result<BTreeMap<BgmId, Bgm>, ReadError> {
 	let mut f = Coverage::new(Bytes::new(t_town));
-	let mut bgmtbl = Vec::with_capacity(f.remaining() / 16);
+	let mut table = BTreeMap::new();
 	while f.remaining() > 16 {
 		let id = f.u32()?.into();
 		let name = f.sized_string::<8>()?;
 		let loops = cast_bool(f.u32()?)?;
-		bgmtbl.push(Bgm { id, name, loops });
+		table.insert(id, Bgm { name, loops });
 	}
 	f.check_u32(0)?;
 	f.check(b"ED6999\0\0")?;
 	f.check_u32(0)?;
 
 	f.assert_covered()?;
-	Ok(bgmtbl)
+	Ok(table)
 }
 
-pub fn write(_arcs: &Archives, bgmtbl: &[Bgm]) -> Result<Vec<u8>, WriteError> {
+pub fn write(_arcs: &Archives, table: &BTreeMap<BgmId, Bgm>) -> Result<Vec<u8>, WriteError> {
 	let mut out = Out::<()>::new();
-	for bgm in bgmtbl {
-		out.u32(bgm.id.into());
-		out.sized_string::<8>(&bgm.name)?;
-		out.u32(bgm.loops.into());
+	for (&id, &Bgm { ref name, loops }) in table {
+		out.u32(id.into());
+		out.sized_string::<8>(name)?;
+		out.u32(loops.into());
 	}
 	out.u32(0);
 	out.slice(b"ED6999\0\0");

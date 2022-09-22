@@ -14,7 +14,7 @@ pub fn read(_arcs: &Archives, data: &[u8]) -> Result<Vec<u32>, ReadError> {
 	Ok(list)
 }
 
-pub fn write(_arcs: &Archives, list: &[u32]) -> Result<Vec<u8>, WriteError> {
+pub fn write(_arcs: &Archives, list: &Vec<u32>) -> Result<Vec<u8>, WriteError> {
 	let mut out = Out::<()>::new();
 	for item in list {
 		out.u32(*item);

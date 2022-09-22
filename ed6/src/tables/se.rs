@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
@@ -10,23 +12,22 @@ pub struct SoundId(u16);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Sound {
-	pub id: SoundId,
 	pub unk: u16,
 	pub file: String,
 	pub flag1: bool,
 	pub flag2: bool,
 }
 
-pub fn read(_arcs: &Archives, data: &[u8]) -> Result<Vec<Sound>, ReadError> {
+pub fn read(_arcs: &Archives, data: &[u8]) -> Result<BTreeMap<SoundId, Sound>, ReadError> {
 	let mut f = Coverage::new(Bytes::new(data));
-	let mut list = Vec::with_capacity(f.remaining() / 12);
+	let mut table = BTreeMap::new();
 	while f.remaining() > 12 {
 		let id = f.u16()?.into();
 		let unk = f.u16()?;
 		let file = _arcs.name(f.array()?)?.to_owned();
 		let flag1 = cast_bool(f.u16()?)?;
 		let flag2 = cast_bool(f.u16()?)?;
-		list.push(Sound { id, unk, file, flag1, flag2 });
+		table.insert(id, Sound { unk, file, flag1, flag2 });
 	}
 
 	f.check_u16(0xFFFF)?;
@@ -36,12 +37,12 @@ pub fn read(_arcs: &Archives, data: &[u8]) -> Result<Vec<Sound>, ReadError> {
 	f.check_u16(0)?;
 
 	f.assert_covered()?;
-	Ok(list)
+	Ok(table)
 }
 
-pub fn write(_arcs: &Archives, list: &[Sound]) -> Result<Vec<u8>, WriteError> {
+pub fn write(_arcs: &Archives, table: &BTreeMap<SoundId, Sound>) -> Result<Vec<u8>, WriteError> {
 	let mut out = Out::<()>::new();
-	for &Sound { id, unk, ref file, flag1, flag2 } in list {
+	for (&id, &Sound { unk, ref file, flag1, flag2 }) in table {
 		out.u16(id.into());
 		out.u16(unk);
 		out.array(_arcs.index(file).unwrap());

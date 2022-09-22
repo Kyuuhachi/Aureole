@@ -47,7 +47,7 @@ pub fn read(_arcs: &Archives, data: &[u8]) -> Result<Vec<Vec<Status>>, ReadError
 	Ok(list)
 }
 
-pub fn write(_arcs: &Archives, list: &[Vec<Status>]) -> Result<Vec<u8>, WriteError> {
+pub fn write(_arcs: &Archives, list: &Vec<Vec<Status>>) -> Result<Vec<u8>, WriteError> {
 	let mut head = Out::new();
 	let mut body = Out::new();
 	let mut count = Count::new();

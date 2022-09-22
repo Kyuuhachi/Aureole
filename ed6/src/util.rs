@@ -215,19 +215,17 @@ pub mod test {
 		Ok(())
 	}
 
-	pub fn check_roundtrip<T, T2>(
+	pub fn check_roundtrip<T>(
 		arc: &Archives,
 		name: &str,
 		read: impl Fn(&Archives, &[u8]) -> Result<T, super::ReadError>,
-		write: impl Fn(&Archives, &T2) -> Result<Vec<u8>, super::WriteError>,
+		write: impl Fn(&Archives, &T) -> Result<Vec<u8>, super::WriteError>,
 	) -> Result<T, Error> where
 		T: PartialEq + std::fmt::Debug,
-		T: AsRef<T2>,
-		T2: ?Sized,
 	{
 		let data = arc.get_decomp(name)?;
 		let parsed = read(arc, &data)?;
-		let data2 = write(arc, parsed.as_ref())?;
+		let data2 = write(arc, &parsed)?;
 		let parsed2 = read(arc, &data2)?;
 		check_equal(&parsed, &parsed2)?;
 		Ok(parsed2)

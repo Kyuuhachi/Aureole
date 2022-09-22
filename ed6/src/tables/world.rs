@@ -9,23 +9,23 @@ pub struct World { scena: String, x: u32, y: u32 }
 
 pub fn read(_arcs: &Archives, data: &[u8]) -> Result<Vec<World>, ReadError> {
 	let mut f = Coverage::new(Bytes::new(data));
-	let mut list = Vec::with_capacity(f.remaining() / 4);
+	let mut table = Vec::with_capacity(f.remaining() / 4);
 	while f.remaining() > 12 {
 		let scena = _arcs.name(f.array()?)?.to_owned();
 		let x = f.u32()?;
 		let y = f.u32()?;
-		list.push(World { scena, x, y });
+		table.push(World { scena, x, y });
 	}
 	f.check_u32(0xFFFFFFFF)?;
 	f.check_u32(0)?;
 	f.check_u32(0)?;
 	f.assert_covered()?;
-	Ok(list)
+	Ok(table)
 }
 
-pub fn write(_arcs: &Archives, list: &[World]) -> Result<Vec<u8>, WriteError> {
+pub fn write(_arcs: &Archives, table: &Vec<World>) -> Result<Vec<u8>, WriteError> {
 	let mut out = Out::<()>::new();
-	for &World { ref scena, x, y } in list {
+	for &World { ref scena, x, y } in table {
 		out.array(_arcs.index(scena).unwrap());
 		out.u32(x);
 		out.u32(y);

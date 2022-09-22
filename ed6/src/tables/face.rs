@@ -14,7 +14,7 @@ pub fn read(_arcs: &Archives, t_face: &[u8]) -> Result<Vec<String>, ReadError> {
 	Ok(faces)
 }
 
-pub fn write(_arcs: &Archives, names: &[impl AsRef<str>]) -> Result<Vec<u8>, WriteError> {
+pub fn write(_arcs: &Archives, names: &Vec<String>) -> Result<Vec<u8>, WriteError> {
 	let mut out = Out::<()>::new();
 	for name in names {
 		out.array(_arcs.index(name.as_ref()).unwrap())

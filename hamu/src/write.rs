@@ -26,7 +26,7 @@ pub enum Error {
 }
 pub type Result<T, E=Error> = std::result::Result<T, E>;
 
-type Delayed<'a, L> = Box<dyn FnOnce(&dyn Fn(&L) -> Result<usize>, &mut [u8]) -> Result<()> + 'a>;
+type Delayed<'a, L> = Box<dyn FnOnce(&dyn Fn(L) -> Result<usize>, &mut [u8]) -> Result<()> + 'a>;
 
 #[derive(Default)]
 pub struct Out<'a, L: Eq + Hash + Debug + Clone + 'a> {
@@ -48,7 +48,7 @@ impl<'a, L: Eq + Hash + Debug + Clone> Out<'a, L> {
 		for (range, cb) in self.delays {
 			cb(
 				&|k| {
-					self.labels.get(k)
+					self.labels.get(&k)
 						.copied()
 						.ok_or_else(|| Error::Undefined {
 							label: format!("{:?}", k),
@@ -93,16 +93,14 @@ impl<'a, L: Eq + Hash + Debug + Clone> Out<'a, L> {
 		};
 	}
 
-	// It is unfortunate that I need Clone here.
-	// But lookup must take the key by reference, and thus the mapping function must receive a reference.
-	pub fn concat(&mut self, other: Self) where L: Clone {
-		self.concat_with(other, |a| a.clone())
+	pub fn concat(&mut self, other: Self) {
+		self.concat_with(other, |a| a)
 	}
 
 	pub fn concat_with<M: Eq + Hash + Debug + Clone>(
 		&mut self,
 		mut other: Out<'a, M>,
-		f: impl Fn(&M) -> L + 'a,
+		f: impl Fn(M) -> L + 'a,
 	) {
 		let shift = self.len();
 		self.data.append(&mut other.data);
@@ -112,18 +110,18 @@ impl<'a, L: Eq + Hash + Debug + Clone> Out<'a, L> {
 			let range = range.start+shift..range.end+shift;
 			self.delays.push((range, Box::new({
 				let f = f.clone();
-				move |lookup, slice| cb(&|k| lookup(&f(k)), slice)
+				move |lookup, slice| cb(&|k| lookup(f(k)), slice)
 			})))
 		}
 
 		for (k, v) in other.labels {
-			self.set_label(f(&k), v+shift);
+			self.set_label(f(k), v+shift);
 		}
 	}
 
 	pub fn map<M: Eq + Hash + Debug + Clone>(
 		self,
-		f: impl Fn(&L) -> M + 'a,
+		f: impl Fn(L) -> M + 'a,
 	) -> Out<'a, M> {
 		let mut new = Out::new();
 		new.concat_with(self, f);
@@ -131,7 +129,7 @@ impl<'a, L: Eq + Hash + Debug + Clone> Out<'a, L> {
 	}
 
 	pub fn delay<const N: usize, F>(&mut self, cb: F) where
-		F: FnOnce(&dyn Fn(&L) -> Result<usize>) -> Result<[u8; N]> + 'a,
+		F: FnOnce(&dyn Fn(L) -> Result<usize>) -> Result<[u8; N]> + 'a,
 	{
 		let start = self.len();
 		self.array([0; N]);
@@ -173,7 +171,7 @@ macro_rules! primitives {
 			$(
 				fn [<delay_ $utype _ $suf>](&mut self, k: L) {
 					self.delay(move |lookup| {
-						let v = lookup(&k)?;
+						let v = lookup(k.clone())?;
 						let v = $utype::try_from(v)
 							.map_err(Box::from).map_err(|source| Error::LabelSize {
 								source,

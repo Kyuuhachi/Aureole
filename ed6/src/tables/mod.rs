@@ -1,13 +1,13 @@
 pub mod bgmtbl;
 // t_book{00..=07}
 // t_btlset
-// t_cook2
-// t_cook
+// t_cook // seems unimportant, it's the same 36-byte file in both fc and sc
+pub mod cook2;
 // t_crfget
 pub mod exp;
 pub mod face;
 pub mod item; // t_item, t_item2
-// t_magget
+// t_magget // only exists in fc
 // t_magic
 // t_magqrt
 // t_memo

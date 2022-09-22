@@ -69,8 +69,7 @@ pub fn write(_arcs: &Archives, table: &Vec<Orbment>) -> Result<Vec<u8>, WriteErr
 		}
 		g.array([0xFF; 2]);
 	}
-	f.concat(g);
-	Ok(f.finish()?)
+	Ok(f.concat(g).finish()?)
 }
 
 #[cfg(test)]

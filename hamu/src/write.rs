@@ -93,15 +93,17 @@ impl<'a, L: Eq + Hash + Debug + Clone> Out<'a, L> {
 		};
 	}
 
-	pub fn concat(&mut self, other: Self) {
+	#[must_use]
+	pub fn concat(self, other: Self) -> Self {
 		self.concat_with(other, |a| a)
 	}
 
+	#[must_use]
 	pub fn concat_with<M: Eq + Hash + Debug + Clone>(
-		&mut self,
+		mut self,
 		mut other: Out<'a, M>,
 		f: impl Fn(M) -> L + 'a,
-	) {
+	) -> Self {
 		let shift = self.len();
 		self.data.append(&mut other.data);
 
@@ -117,15 +119,15 @@ impl<'a, L: Eq + Hash + Debug + Clone> Out<'a, L> {
 		for (k, v) in other.labels {
 			self.set_label(f(k), v+shift);
 		}
+
+		self
 	}
 
 	pub fn map<M: Eq + Hash + Debug + Clone>(
 		self,
 		f: impl Fn(L) -> M + 'a,
 	) -> Out<'a, M> {
-		let mut new = Out::new();
-		new.concat_with(self, f);
-		new
+		Out::new().concat_with(self, f)
 	}
 
 	pub fn delay<const N: usize, F>(&mut self, cb: F) where

@@ -101,9 +101,7 @@ pub fn write(_arcs: &Archives, table: &BTreeMap<ItemId, Item>) -> Result<(Vec<u8
 
 		g2.name_desc(count.next(), count.next(), name_desc)?;
 	}
-	f1.concat(g1);
-	f2.concat(g2);
-	Ok((f1.finish()?, f2.finish()?))
+	Ok((f1.concat(g1).finish()?, f2.concat(g2).finish()?))
 }
 
 #[cfg(test)]

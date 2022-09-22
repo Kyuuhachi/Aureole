@@ -84,8 +84,7 @@ pub fn write(arc: &Archives, table: &BTreeMap<NameId, Name>) -> Result<Vec<u8>, 
 	g.label(l);
 	g.string(" ")?;
 
-	f.concat(g);
-	Ok(f.finish()?)
+	Ok(f.concat(g).finish()?)
 }
 
 #[cfg(test)]

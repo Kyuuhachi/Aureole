@@ -60,8 +60,7 @@ pub fn write(_arcs: &Archives, towns: &Vec<Town>) -> Result<Vec<u8>, WriteError>
 			g.u8(kind.into());
 		}
 	}
-	f.concat(g);
-	Ok(f.finish()?)
+	Ok(f.concat(g).finish()?)
 }
 
 #[cfg(test)]

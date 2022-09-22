@@ -75,8 +75,7 @@ pub fn write(_arcs: &Archives, table: &BTreeMap<RecipeId, Recipe>) -> Result<Vec
 		g.u16(heal);
 		g.name_desc(count.next(), count.next(), name_desc)?;
 	}
-	f.concat(g);
-	Ok(f.finish()?)
+	Ok(f.concat(g).finish()?)
 }
 
 #[cfg(test)]

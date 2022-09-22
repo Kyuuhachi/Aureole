@@ -68,8 +68,7 @@ pub fn write(_arcs: &Archives, table: &Vec<Vec<Status>>) -> Result<Vec<u8>, Writ
 			g.u16(status.spd);
 		}
 	}
-	f.concat(g);
-	Ok(f.finish()?)
+	Ok(f.concat(g).finish()?)
 }
 
 #[cfg(test)]

@@ -1,9 +1,15 @@
+use std::collections::BTreeMap;
+
 use enumflags2::*;
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
 use crate::archive::Archives;
 use crate::util::*;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(derive_more::From, derive_more::Into)]
+pub struct ItemId(u16);
 
 #[bitflags]
 #[repr(u8)]
@@ -19,16 +25,9 @@ pub enum ItemFlag {
 	_80         = 0x80,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[derive(derive_more::From, derive_more::Into)]
-pub struct ItemId(u16);
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Item {
-	// Actually name and desc come first, but having id first is nicer
-	pub id: ItemId,
-	pub name: String,
-	pub desc: String, // TODO should be Text
+	pub name_desc: NameDesc,
 	pub flags: BitFlags<ItemFlag>,
 	pub usable_by: u8,
 	pub ty: [u8; 4],
@@ -38,7 +37,7 @@ pub struct Item {
 	pub price: u32,
 }
 
-pub fn read(_arcs: &Archives, t_item: &[u8], t_item2: &[u8]) -> Result<Vec<Item>, ReadError> {
+pub fn read(_arcs: &Archives, t_item: &[u8], t_item2: &[u8]) -> Result<BTreeMap<ItemId, Item>, ReadError> {
 	let mut f1 = Coverage::new(Bytes::new(t_item));
 	let mut f2 = Coverage::new(Bytes::new(t_item2));
 	let n = f1.clone().u16()? / 2;
@@ -47,7 +46,7 @@ pub fn read(_arcs: &Archives, t_item: &[u8], t_item2: &[u8]) -> Result<Vec<Item>
 		return Err("mismatched item/item2".to_owned().into())
 	}
 
-	let mut list = Vec::with_capacity(n as usize);
+	let mut table = BTreeMap::new();
 
 	for _ in 0..n {
 		let mut g1 = f1.clone().at(f1.u16()? as usize)?;
@@ -66,25 +65,24 @@ pub fn read(_arcs: &Archives, t_item: &[u8], t_item2: &[u8]) -> Result<Vec<Item>
 		let limit = g1.u16()?;
 		let price = g1.u32()?;
 
-		let name = g2.clone().at(g2.u16()? as usize)?.string()?;
-		let desc = g2.clone().at(g2.u16()? as usize)?.string()?;
+		let name_desc = g2.name_desc()?;
 
-		list.push(Item { id, name, desc, flags, usable_by, ty, _unk1, stats, limit, price });
+		table.insert(id, Item { name_desc, flags, usable_by, ty, _unk1, stats, limit, price });
 	}
 
 	f1.assert_covered()?;
 	f2.assert_covered()?;
-	Ok(list)
+	Ok(table)
 }
 
-pub fn write(_arcs: &Archives, list: &[Item]) -> Result<(Vec<u8>, Vec<u8>), WriteError> {
+pub fn write(_arcs: &Archives, table: &BTreeMap<ItemId, Item>) -> Result<(Vec<u8>, Vec<u8>), WriteError> {
 	let mut f1 = Out::new();
 	let mut g1 = Out::new();
 	let mut f2 = Out::new();
 	let mut g2 = Out::new();
 	let mut count = Count::new();
 
-	for &Item { id, ref name, ref desc, flags, usable_by, ty, _unk1, stats, limit, price } in list {
+	for (&id, &Item { ref name_desc, flags, usable_by, ty, _unk1, stats, limit, price }) in table {
 		let l = count.next();
 		f1.delay_u16(l);
 		g1.label(l);
@@ -101,14 +99,7 @@ pub fn write(_arcs: &Archives, list: &[Item]) -> Result<(Vec<u8>, Vec<u8>), Writ
 		g1.u16(limit);
 		g1.u32(price);
 
-		let l1 = count.next();
-		let l2 = count.next();
-		g2.delay_u16(l1);
-		g2.delay_u16(l2);
-		g2.label(l1);
-		g2.string(name)?;
-		g2.label(l2);
-		g2.string(desc)?;
+		g2.name_desc(count.next(), count.next(), name_desc)?;
 	}
 	f1.concat(g1);
 	f2.concat(g2);

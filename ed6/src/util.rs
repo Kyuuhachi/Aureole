@@ -126,6 +126,12 @@ pub fn cast_error<T>(
 	}
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NameDesc {
+	pub name: String,
+	pub desc: String,
+}
+
 pub trait InExt<'a>: In<'a> {
 	fn string(&mut self) -> Result<String, ReadError> {
 		let mut buf = Vec::new();
@@ -172,6 +178,20 @@ pub trait InExt<'a>: In<'a> {
 		let buf = self.multiple::<N, _>(&[0], |a| Ok(a.u8()?))?;
 		Ok(decode(&buf)?)
 	}
+
+	fn name_desc(&mut self) -> Result<NameDesc, ReadError> {
+		let l1 = self.u16()? as usize;
+		let l2 = self.u16()? as usize;
+		if self.pos() != l1 {
+			return Err("invalid NameDesc".to_owned().into())
+		}
+		let name = self.string()?;
+		if self.pos() != l2 {
+			return Err("invalid NameDesc".to_owned().into())
+		}
+		let desc = self.string()?;
+		Ok(NameDesc { name, desc })
+	}
 }
 impl<'a, T: In<'a>> InExt<'a> for T {}
 
@@ -184,6 +204,7 @@ pub trait OutExt<L: Eq + std::hash::Hash + std::fmt::Debug> {
 		f: impl FnMut(&mut Self, &A) -> Result<(), WriteError>,
 	) -> Result<(), WriteError>;
 	fn sized_string<const N: usize>(&mut self, s: &str) -> Result<(), WriteError>;
+	fn name_desc(&mut self, l1: L, l2: L, nd: &NameDesc) -> Result<(), WriteError>;
 }
 impl<L: Eq + std::hash::Hash + std::fmt::Debug + Clone> OutExt<L> for Out<'_, L> {
 	fn string(&mut self, s: &str) -> Result<(), WriteError> {
@@ -220,6 +241,16 @@ impl<L: Eq + std::hash::Hash + std::fmt::Debug + Clone> OutExt<L> for Out<'_, L>
 		let mut buf = [0; N];
 		buf[..s.len()].copy_from_slice(&s);
 		self.array::<N>(buf);
+		Ok(())
+	}
+
+	fn name_desc(&mut self, l1: L, l2: L, NameDesc { name, desc }: &NameDesc) -> Result<(), WriteError> {
+		self.delay_u16(l1.clone());
+		self.delay_u16(l2.clone());
+		self.label(l1);
+		self.string(name)?;
+		self.label(l2);
+		self.string(desc)?;
 		Ok(())
 	}
 }

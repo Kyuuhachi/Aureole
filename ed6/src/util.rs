@@ -177,6 +177,12 @@ impl<'a, T: In<'a>> InExt<'a> for T {}
 
 pub trait OutExt<L: Eq + std::hash::Hash + std::fmt::Debug> {
 	fn string(&mut self, s: &str) -> Result<(), WriteError>;
+	fn multiple<const N: usize, A: PartialEq + std::fmt::Debug>(
+		&mut self,
+		nil: &[u8],
+		items: &[A],
+		f: impl FnMut(&mut Self, &A) -> Result<(), WriteError>,
+	) -> Result<(), WriteError>;
 	fn sized_string<const N: usize>(&mut self, s: &str) -> Result<(), WriteError>;
 }
 impl<L: Eq + std::hash::Hash + std::fmt::Debug> OutExt<L> for Out<'_, L> {
@@ -187,10 +193,29 @@ impl<L: Eq + std::hash::Hash + std::fmt::Debug> OutExt<L> for Out<'_, L> {
 		Ok(())
 	}
 
+	fn multiple<const N: usize, A: PartialEq + std::fmt::Debug>(
+		&mut self,
+		nil: &[u8],
+		items: &[A],
+		mut f: impl FnMut(&mut Self, &A) -> Result<(), WriteError>,
+	) -> Result<(), WriteError> {
+		if items.len() > N {
+			return Err(cast_error::<[A; N]>(format!("{items:?}"), "too large").into());
+		}
+		for i in items {
+			f(self, i)?;
+		}
+		for _ in items.len()..N {
+			self.slice(nil);
+		}
+		Ok(())
+	}
+
 	fn sized_string<const N: usize>(&mut self, s: &str) -> Result<(), WriteError> {
 		let s = encode(s)?;
+		// Not using multiple() here to include the string in the error
 		if s.len() > N {
-			return Err(cast_error::<[u8; N]>(s, "too large").into());
+			return Err(cast_error::<[u8; N]>(format!("{s:?}"), "too large").into());
 		}
 		let mut buf = [0; N];
 		buf[..s.len()].copy_from_slice(&s);

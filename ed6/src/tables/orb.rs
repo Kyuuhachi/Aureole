@@ -43,8 +43,8 @@ pub fn read(_arcs: &Archives, data: &[u8]) -> Result<Vec<Orbment>, ReadError> {
 }
 
 pub fn write(_arcs: &Archives, list: &Vec<Orbment>) -> Result<Vec<u8>, WriteError> {
-	let mut head = Out::new();
-	let mut body = Out::new();
+	let mut f = Out::new();
+	let mut g = Out::new();
 	let mut count = Count::new();
 
 	let nslots = 6; // 7 in sc/3rd
@@ -52,30 +52,25 @@ pub fn write(_arcs: &Archives, list: &Vec<Orbment>) -> Result<Vec<u8>, WriteErro
 
 	for Orbment { slots, lines } in list {
 		let l = count.next();
-		head.delay_u16(l);
-		body.label(l);
+		f.delay_u16(l);
+		g.label(l);
 
 		if slots.len() != nslots {
 			return Err(format!("must be {nslots}").into())
 		}
 		for s in slots {
-			body.u8(Element::to_u8_opt(*s));
+			g.u8(Element::to_u8_opt(*s));
 		}
-		body.slice(&[0;2][..npad]);
+		g.slice(&[0;2][..npad]);
 
-		body.u8(cast(lines.len())?);
+		g.u8(cast(lines.len())?);
 		for line in lines {
-			if line.len() > 8 {
-				return Err("line cannot be longer than 8".to_owned().into())
-			}
-			let mut buf = [0xFF; 8];
-			buf[..line.len()].copy_from_slice(line);
-			body.array(buf);
+			g.multiple::<8, _>(&[0xFF], line, |g, &i| { g.u8(i); Ok(()) })?;
 		}
-		body.array([0xFF; 2]);
+		g.array([0xFF; 2]);
 	}
-	head.concat(body);
-	Ok(head.finish()?)
+	f.concat(g);
+	Ok(f.finish()?)
 }
 
 #[cfg(test)]

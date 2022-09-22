@@ -22,7 +22,7 @@ pub fn read(_arcs: &Archives, data: &[u8]) -> Result<Vec<Vec<Status>>, ReadError
 	let mut f = Coverage::new(Bytes::new(data));
 	let n = f.clone().u16()? / 2;
 	let m = (f.clone().at(2)?.u16()? - f.clone().u16()?)/22;
-	let mut list = Vec::with_capacity(n as usize);
+	let mut table = Vec::with_capacity(n as usize);
 	for _ in 0..n {
 		let mut char = Vec::new();
 		let pos = f.u16()? as usize;
@@ -41,17 +41,17 @@ pub fn read(_arcs: &Archives, data: &[u8]) -> Result<Vec<Vec<Status>>, ReadError
 				spd: g.u16()?,
 			});
 		}
-		list.push(char);
+		table.push(char);
 	}
 	f.assert_covered()?;
-	Ok(list)
+	Ok(table)
 }
 
-pub fn write(_arcs: &Archives, list: &Vec<Vec<Status>>) -> Result<Vec<u8>, WriteError> {
+pub fn write(_arcs: &Archives, table: &Vec<Vec<Status>>) -> Result<Vec<u8>, WriteError> {
 	let mut f = Out::new();
 	let mut g = Out::new();
 	let mut count = Count::new();
-	for char in list {
+	for char in table {
 		let l = count.next();
 		f.delay_u16(l);
 		g.label(l);

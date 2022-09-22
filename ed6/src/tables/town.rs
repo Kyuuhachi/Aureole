@@ -43,25 +43,25 @@ pub fn read(_arcs: &Archives, t_town: &[u8]) -> Result<Vec<Town>, ReadError> {
 }
 
 pub fn write(_arcs: &Archives, towns: &Vec<Town>) -> Result<Vec<u8>, WriteError> {
-	let mut head = Out::new();
-	let mut body = Out::new();
+	let mut f = Out::new();
+	let mut g = Out::new();
 	let mut count = Count::new();
-	head.u16(cast(towns.len())?);
+	f.u16(cast(towns.len())?);
 	for &Town(ref name, kind) in towns {
 		let l = count.next();
-		head.delay_u16(l);
-		body.label(l);
-		body.string(name)?;
+		f.delay_u16(l);
+		g.label(l);
+		g.string(name)?;
 		if name.is_empty() {
 			if kind != TownType::None {
 				return Err("empty town must be type None".to_owned().into());
 			}
 		} else {
-			body.u8(kind.into());
+			g.u8(kind.into());
 		}
 	}
-	head.concat(body);
-	Ok(head.finish()?)
+	f.concat(g);
+	Ok(f.finish()?)
 }
 
 #[cfg(test)]

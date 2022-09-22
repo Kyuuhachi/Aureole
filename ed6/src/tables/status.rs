@@ -48,28 +48,28 @@ pub fn read(_arcs: &Archives, data: &[u8]) -> Result<Vec<Vec<Status>>, ReadError
 }
 
 pub fn write(_arcs: &Archives, list: &Vec<Vec<Status>>) -> Result<Vec<u8>, WriteError> {
-	let mut head = Out::new();
-	let mut body = Out::new();
+	let mut f = Out::new();
+	let mut g = Out::new();
 	let mut count = Count::new();
 	for char in list {
 		let l = count.next();
-		head.delay_u16(l);
-		body.label(l);
+		f.delay_u16(l);
+		g.label(l);
 		for status in char {
-			body.u16(status.level);
-			body.u32(status.hp);
-			body.u16(status.atk);
-			body.u16(status.def);
-			body.u16(status.ats);
-			body.u16(status.adf);
-			body.u16(status.dex);
-			body.u16(status.agl);
-			body.u16(status.mov);
-			body.u16(status.spd);
+			g.u16(status.level);
+			g.u32(status.hp);
+			g.u16(status.atk);
+			g.u16(status.def);
+			g.u16(status.ats);
+			g.u16(status.adf);
+			g.u16(status.dex);
+			g.u16(status.agl);
+			g.u16(status.mov);
+			g.u16(status.spd);
 		}
 	}
-	head.concat(body);
-	Ok(head.finish()?)
+	f.concat(g);
+	Ok(f.finish()?)
 }
 
 #[cfg(test)]

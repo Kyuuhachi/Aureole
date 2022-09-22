@@ -53,39 +53,39 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<BTreeMap<NameId, Name>, ReadE
 }
 
 pub fn write(arc: &Archives, table: &BTreeMap<NameId, Name>) -> Result<Vec<u8>, WriteError> {
-	let mut head = Out::new();
-	let mut body = Out::new();
+	let mut f = Out::new();
+	let mut g = Out::new();
 	let mut count = Count::new();
 	let fileref = |a| Option::map_or(a, Ok([0; 4]), |a| arc.index(a));
 	for (&id, Name { ch1, ch2, cp1, cp2, ms1, ms2, name }) in table {
 		let l = count.next();
-		head.delay_u16(l);
-		body.label(l);
-		body.u32(id.into());
-		body.array(arc.index(ch1)?);
-		body.array(arc.index(ch2)?);
-		body.array(arc.index(cp1)?);
-		body.array(arc.index(cp2)?);
-		body.array(fileref(ms1.as_deref())?);
-		body.array(fileref(ms2.as_deref())?);
+		f.delay_u16(l);
+		g.label(l);
+		g.u32(id.into());
+		g.array(arc.index(ch1)?);
+		g.array(arc.index(ch2)?);
+		g.array(arc.index(cp1)?);
+		g.array(arc.index(cp2)?);
+		g.array(fileref(ms1.as_deref())?);
+		g.array(fileref(ms2.as_deref())?);
 		let l = count.next();
-		body.delay_u16(l);
-		body.label(l);
-		body.string(name)?;
+		g.delay_u16(l);
+		g.label(l);
+		g.string(name)?;
 	}
 
 	let l = count.next();
-	head.delay_u16(l);
-	body.label(l);
-	body.u32(999);
-	body.array([0; 6*4]);
+	f.delay_u16(l);
+	g.label(l);
+	g.u32(999);
+	g.array([0; 6*4]);
 	let l = count.next();
-	body.delay_u16(l);
-	body.label(l);
-	body.string(" ")?;
+	g.delay_u16(l);
+	g.label(l);
+	g.string(" ")?;
 
-	head.concat(body);
-	Ok(head.finish()?)
+	f.concat(g);
+	Ok(f.finish()?)
 }
 
 #[cfg(test)]

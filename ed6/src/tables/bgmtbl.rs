@@ -4,14 +4,22 @@ use hamu::write::le::*;
 use crate::archive::Archives;
 use crate::util::*;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(derive_more::From, derive_more::Into)]
+pub struct BgmId(u32);
+
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Bgm { id: u32, name: String, loops: bool }
+pub struct Bgm {
+	pub id: BgmId,
+	pub name: String,
+	pub loops: bool,
+}
 
 pub fn read(_arcs: &Archives, t_town: &[u8]) -> Result<Vec<Bgm>, ReadError> {
 	let mut f = Coverage::new(Bytes::new(t_town));
 	let mut bgmtbl = Vec::with_capacity(f.remaining() / 16);
 	while f.remaining() > 16 {
-		let id = f.u32()?;
+		let id = f.u32()?.into();
 		let name = f.sized_string::<8>()?;
 		let loops = cast_bool(f.u32()?)?;
 		bgmtbl.push(Bgm { id, name, loops });
@@ -27,7 +35,7 @@ pub fn read(_arcs: &Archives, t_town: &[u8]) -> Result<Vec<Bgm>, ReadError> {
 pub fn write(_arcs: &Archives, bgmtbl: &[Bgm]) -> Result<Vec<u8>, WriteError> {
 	let mut out = Out::<()>::new();
 	for bgm in bgmtbl {
-		out.u32(bgm.id);
+		out.u32(bgm.id.into());
 		out.sized_string::<8>(&bgm.name)?;
 		out.u32(bgm.loops.into());
 	}

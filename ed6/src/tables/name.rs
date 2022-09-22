@@ -4,16 +4,20 @@ use hamu::write::le::*;
 use crate::archive::Archives;
 use crate::util::*;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(derive_more::From, derive_more::Into)]
+pub struct NameId(u32);
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Name {
-	id: u32,
-	ch1: String,
-	ch2: String,
-	cp1: String,
-	cp2: String,
-	ms1: Option<String>,
-	ms2: Option<String>,
-	name: String,
+	pub id: NameId,
+	pub ch1: String,
+	pub ch2: String,
+	pub cp1: String,
+	pub cp2: String,
+	pub ms1: Option<String>,
+	pub ms2: Option<String>,
+	pub name: String,
 }
 
 pub fn read(arc: &Archives, data: &[u8]) -> Result<Vec<Name>, ReadError> {
@@ -24,7 +28,7 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<Vec<Name>, ReadError> {
 
 	for _ in 0..n-1 {
 		let mut g = f.clone().at(f.u16()? as usize)?;
-		let id = g.u32()?;
+		let id = g.u32()?.into();
 		let ch1 = arc.name(g.array()?)?.to_owned();
 		let ch2 = arc.name(g.array()?)?.to_owned();
 		let cp1 = arc.name(g.array()?)?.to_owned();
@@ -56,7 +60,7 @@ pub fn write(arc: &Archives, list: &[Name]) -> Result<Vec<u8>, WriteError> {
 		let l = count.next();
 		head.delay_u16(l);
 		body.label(l);
-		body.u32(*id);
+		body.u32((*id).into());
 		body.array(arc.index(ch1)?);
 		body.array(arc.index(ch2)?);
 		body.array(arc.index(cp1)?);

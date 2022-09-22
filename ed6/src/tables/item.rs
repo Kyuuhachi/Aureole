@@ -19,10 +19,14 @@ pub enum ItemFlag {
 	_80         = 0x80,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(derive_more::From, derive_more::Into)]
+pub struct ItemId(u16);
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Item {
 	// Actually name and desc come first, but having id first is nicer
-	pub id: u16,
+	pub id: ItemId,
 	pub name: String,
 	pub desc: String, // TODO should be Text
 	pub flags: BitFlags<ItemFlag>,
@@ -49,7 +53,7 @@ pub fn read(_arcs: &Archives, t_item: &[u8], t_item2: &[u8]) -> Result<Vec<Item>
 		let mut g1 = f1.clone().at(f1.u16()? as usize)?;
 		let mut g2 = f2.clone().at(f2.u16()? as usize)?;
 
-		let id = g1.u16()?;
+		let id = g1.u16()?.into();
 		let flags = cast(g1.u8()?)?;
 		let usable_by = g1.u8()?; // TODO Flags in FC, enum in others
 		let ty = [ g1.u8()?, g1.u8()?, g1.u8()?, g1.u8()? ];
@@ -87,7 +91,7 @@ pub fn write(_arcs: &Archives, list: &[Item]) -> Result<(Vec<u8>, Vec<u8>), Writ
 		f2.delay_u16(l);
 		g2.label(l);
 
-		g1.u16(id);
+		g1.u16(id.into());
 		g1.u8(flags.bits());
 		g1.u8(usable_by);
 		g1.array(ty);

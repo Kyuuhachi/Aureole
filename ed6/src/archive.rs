@@ -37,8 +37,9 @@ pub struct Archive {
 pub struct Entry {
 	pub index: usize,
 	pub name: String,
-	pub unk1: usize,
+	pub unk1: u32,
 	pub unk2: usize,
+	pub unk3: usize,
 	pub timestamp: u32,
 	range: Range<usize>,
 }
@@ -90,9 +91,9 @@ impl Archive {
 				};
 				let name = name.to_lowercase();
 
-				dir.check_u32(0)?; // I don't know what this is. It's nonzero on a few files in 3rd, and some sources (which are me in the past) say it's a second timestamp
-				let unk1 = dir.u32()? as usize;
+				let unk1 = dir.u32()?; // Zero in all but a few files in 3rd; in those cases it looks kinda like a timestamp
 				let unk2 = dir.u32()? as usize;
+				let unk3 = dir.u32()? as usize;
 				let len = dir.u32()? as usize;
 				let timestamp = dir.u32()?;
 				let offset = dir.u32()? as usize;
@@ -105,6 +106,7 @@ impl Archive {
 					name: name.to_owned(),
 					unk1,
 					unk2,
+					unk3,
 					timestamp,
 					range: offset..offset+len,
 				};

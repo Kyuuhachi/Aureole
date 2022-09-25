@@ -87,7 +87,7 @@ fn extract(force: bool, arc: &Archive, outdir: &Path, bar: ProgressBar, outerbar
 			fs::remove_dir_all(outdir)
 				.with_context(|| format!("failed to remove {}", outdir.display()))?;
 		} else {
-			eprintln!("output directory {} already exists (use -f to overwrite)", outdir.display());
+			bar.println(format!("output directory {} already exists (use -f to overwrite)", outdir.display()));
 			return Ok(())
 		}
 	}
@@ -132,10 +132,11 @@ fn extract(force: bool, arc: &Archive, outdir: &Path, bar: ProgressBar, outerbar
 			format!("{}", rawlen)
 		};
 
-		writeln!(index, "{:4} {:12} {} ({lenstr}; {} {})",
+		writeln!(index, "{:4} {:12} {ts1} {ts2} ({lenstr}; {} {})",
 			e.index, e.name,
-			chrono::NaiveDateTime::from_timestamp(e.timestamp as i64, 0),
 			e.unk1, e.unk2,
+			ts1 = chrono::NaiveDateTime::from_timestamp(e.timestamp as i64, 0),
+			ts2 = chrono::NaiveDateTime::from_timestamp(e.unk3 as i64, 0),
 		).context("failed to write to index")?;
 
 		bar.inc(e.len() as u64);

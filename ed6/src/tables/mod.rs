@@ -1,6 +1,6 @@
 pub mod bgmtbl;
 // t_book{00..=07}
-// t_btlset
+pub mod btlset;
 // t_cook // seems unimportant, it's the same 36-byte file in both fc and sc
 pub mod cook2;
 // t_crfget

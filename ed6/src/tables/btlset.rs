@@ -112,9 +112,7 @@ fn read_battlefield<'a>(
 		let mut g = f.clone().at(o as usize)?;
 		let unk1 = g.u16()?;
 		let l1 = g.u16()? as usize;
-		if g.pos() != l1 {
-			return Err("invalid battlefield".to_owned().into())
-		}
+		ensure!(g.pos() == l1, "invalid battlefield");
 		let battlefield = g.string()?;
 		Ok(Battlefield(unk1, battlefield))
 	})

@@ -42,9 +42,7 @@ pub fn read(_arcs: &Archives, t_item: &[u8], t_item2: &[u8]) -> Result<BTreeMap<
 	let mut f2 = Coverage::new(Bytes::new(t_item2));
 	let n = f1.clone().u16()? / 2;
 	let n2 = f2.clone().u16()? / 2;
-	if n != n2 {
-		return Err("mismatched item/item2".to_owned().into())
-	}
+	ensure!(n == n2, "mismatched item/item2");
 
 	let mut table = BTreeMap::new();
 

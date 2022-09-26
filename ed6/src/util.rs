@@ -128,6 +128,21 @@ pub fn cast_error<T>(
 	}
 }
 
+#[macro_export]
+macro_rules! __ensure {
+	($cond:expr, $str:literal $($arg:tt)*) => {
+		if !($cond) {
+			return Err(format!($str $($arg)*).into())
+		}
+	};
+	($cond:expr, $e:expr) => {
+		if !($cond) {
+			return Err($e)
+		}
+	}
+}
+pub use __ensure as ensure;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NameDesc {
 	pub name: String,
@@ -162,13 +177,8 @@ pub trait InExt<'a>: In<'a> {
 				self.seek(i)?;
 				let v = f(self)?;
 
-				if self.pos() != j {
-					return Err(format!("inconsistent position: {i} != {j}").into())
-				}
-
-				if has_junk {
-					return Err(format!("junk after end: {v:?}").into())
-				}
+				ensure!(self.pos() == j, "inconsistent position: {i} != {j}");
+				ensure!(!has_junk, "junk after end: {v:?}");
 
 				out.push(v);
 			}
@@ -184,13 +194,9 @@ pub trait InExt<'a>: In<'a> {
 	fn name_desc(&mut self) -> Result<NameDesc, ReadError> {
 		let l1 = self.u16()? as usize;
 		let l2 = self.u16()? as usize;
-		if self.pos() != l1 {
-			return Err("invalid NameDesc".to_owned().into())
-		}
+		ensure!(self.pos() == l1, "invalid NameDesc");
 		let name = self.string()?;
-		if self.pos() != l2 {
-			return Err("invalid NameDesc".to_owned().into())
-		}
+		ensure!(self.pos() == l2, "invalid NameDesc");
 		let desc = self.string()?;
 		Ok(NameDesc { name, desc })
 	}
@@ -222,9 +228,7 @@ impl<L: Eq + std::hash::Hash + std::fmt::Debug + Clone> OutExt<L> for Out<'_, L>
 		items: &[A],
 		mut f: impl FnMut(&mut Self, &A) -> Result<(), WriteError>,
 	) -> Result<(), WriteError> {
-		if items.len() > N {
-			return Err(cast_error::<[A; N]>(format!("{items:?}"), "too large").into());
-		}
+		ensure!(items.len() <= N, cast_error::<[A; N]>(format!("{items:?}"), "too large").into());
 		for i in items {
 			f(self, i)?;
 		}
@@ -237,9 +241,7 @@ impl<L: Eq + std::hash::Hash + std::fmt::Debug + Clone> OutExt<L> for Out<'_, L>
 	fn sized_string<const N: usize>(&mut self, s: &str) -> Result<(), WriteError> {
 		let s = encode(s)?;
 		// Not using multiple() here to include the string in the error
-		if s.len() > N {
-			return Err(cast_error::<[u8; N]>(format!("{s:?}"), "too large").into());
-		}
+		ensure!(s.len() <= N, cast_error::<[u8; N]>(format!("{s:?}"), "too large").into());
 		let mut buf = [0; N];
 		buf[..s.len()].copy_from_slice(&s);
 		self.array::<N>(buf);

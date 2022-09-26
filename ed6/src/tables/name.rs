@@ -44,9 +44,7 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<BTreeMap<NameId, Name>, ReadE
 	g.check_u32(999)?;
 	g.check(&[0; 4*6])?;
 	let name = g.clone().at(g.u16()? as usize)?.string()?;
-	if name != " " {
-		return Err(format!("last name should be blank, was {name:?}").into())
-	}
+	ensure!(name == " ", "last name should be blank, was {name:?}");
 
 	f.assert_covered()?;
 	Ok(table)

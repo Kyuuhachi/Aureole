@@ -55,9 +55,7 @@ pub fn write(_arcs: &Archives, table: &Vec<Orbment>) -> Result<Vec<u8>, WriteErr
 		f.delay_u16(l);
 		g.label(l);
 
-		if slots.len() != nslots {
-			return Err(format!("must be {nslots}").into())
-		}
+		ensure!(slots.len() == nslots, "must be {nslots}");
 		for s in slots {
 			g.u8(Element::to_u8_opt(*s));
 		}

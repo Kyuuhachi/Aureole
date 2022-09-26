@@ -53,9 +53,7 @@ pub fn write(_arcs: &Archives, towns: &Vec<Town>) -> Result<Vec<u8>, WriteError>
 		g.label(l);
 		g.string(name)?;
 		if name.is_empty() {
-			if kind != TownType::None {
-				return Err("empty town must be type None".to_owned().into());
-			}
+			ensure!(kind == TownType::None, "empty town must be type None");
 		} else {
 			g.u8(kind.into());
 		}

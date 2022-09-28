@@ -131,7 +131,7 @@ fn read_battles<'a>(
 	let mut table = BTreeMap::new();
 
 	loop {
-		let mut g = f.clone().at(f.u16()? as usize)?;
+		let mut g = f.ptr()?;
 
 		let id = g.u16()?.into();
 		let flags: BitFlags<BattleFlag> = cast(g.u16()?)?;
@@ -205,7 +205,7 @@ fn read_auto_battles<'a>(
 	let mut table = BTreeMap::new();
 
 	loop {
-		let mut g = f.clone().at(f.u16()? as usize)?;
+		let mut g = f.ptr()?;
 
 		let id = g.u16()?.into();
 
@@ -238,8 +238,8 @@ fn read_auto_battles<'a>(
 pub fn read(arc: &Archives, data: &[u8]) -> Result<(BTreeMap<BattleId, Battle>, BTreeMap<BattleId, AutoBattle>), ReadError> {
 	let mut f = Coverage::new(Bytes::new(data));
 
-	let battles = read_battles(arc, f.clone().at(f.u16()? as usize)?)?;
-	let auto_battles = read_auto_battles(arc, f.clone().at(f.u16()? as usize)?)?;
+	let battles = read_battles(arc, f.ptr()?)?;
+	let auto_battles = read_auto_battles(arc, f.ptr()?)?;
 
 	// f.assert_covered()?; // Does not have full coverage
 	Ok((battles, auto_battles))
@@ -253,7 +253,7 @@ mod test {
 	use crate::util::test::*;
 
 	#[test_case::test_case(&FC; "fc")]
-	fn roundtrip(arc: &Archives) -> Result<(), Error> {
+	fn parse(arc: &Archives) -> Result<(), Error> {
 		let data = arc.get_decomp("t_btlset._dt")?;
 		let _parsed = super::read(arc, &data)?;
 		Ok(())

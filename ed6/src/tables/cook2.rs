@@ -39,7 +39,7 @@ pub fn read(_arcs: &Archives, data: &[u8]) -> Result<BTreeMap<RecipeId, Recipe>,
 	let mut table = BTreeMap::new();
 
 	for _ in 0..n {
-		let mut g = f.clone().at(f.u16()? as usize)?;
+		let mut g = f.ptr()?;
 
 		let id = g.u16()?.into();
 		let ingredients = g.multiple::<8, _>(&[0;4], |g| Ok((g.u16()?.into(), g.u16()?)))?;
@@ -55,7 +55,6 @@ pub fn read(_arcs: &Archives, data: &[u8]) -> Result<BTreeMap<RecipeId, Recipe>,
 	f.assert_covered()?;
 	Ok(table)
 }
-
 
 pub fn write(_arcs: &Archives, table: &BTreeMap<RecipeId, Recipe>) -> Result<Vec<u8>, WriteError> {
 	let mut f = Out::new();

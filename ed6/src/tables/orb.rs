@@ -20,7 +20,7 @@ pub fn read(_arcs: &Archives, data: &[u8]) -> Result<Vec<Orbment>, ReadError> {
 	let npad = 1; // 2 in sc/3rd
 
 	for _ in 0..n {
-		let mut g = f.clone().at(f.u16()? as usize)?;
+		let mut g = f.ptr()?;
 
 		let mut slots = Vec::with_capacity(nslots);
 		for _ in 0..nslots {

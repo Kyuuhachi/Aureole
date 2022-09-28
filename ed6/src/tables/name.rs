@@ -28,7 +28,7 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<BTreeMap<NameId, Name>, ReadE
 	let fileref = |a| if a == [0; 4] { Ok(None) } else { arc.name(a).map(|a| Some(a.to_owned())) };
 
 	for _ in 0..n-1 {
-		let mut g = f.clone().at(f.u16()? as usize)?;
+		let mut g = f.ptr()?;
 		let id = g.u32()?.into();
 		let ch1 = arc.name(g.array()?)?.to_owned();
 		let ch2 = arc.name(g.array()?)?.to_owned();
@@ -36,14 +36,14 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<BTreeMap<NameId, Name>, ReadE
 		let cp2 = arc.name(g.array()?)?.to_owned();
 		let ms1 = fileref(g.array()?)?;
 		let ms2 = fileref(g.array()?)?;
-		let name = g.clone().at(g.u16()? as usize)?.string()?;
+		let name = g.ptr()?.string()?;
 		table.insert(id, Name { ch1, ch2, cp1, cp2, ms1, ms2, name });
 	}
 
-	let mut g = f.clone().at(f.u16()? as usize)?;
+	let mut g = f.ptr()?;
 	g.check_u32(999)?;
 	g.check(&[0; 4*6])?;
-	let name = g.clone().at(g.u16()? as usize)?.string()?;
+	let name = g.ptr()?.string()?;
 	ensure!(name == " ", "last name should be blank, was {name:?}");
 
 	f.assert_covered()?;

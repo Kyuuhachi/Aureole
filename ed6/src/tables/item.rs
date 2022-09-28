@@ -47,8 +47,8 @@ pub fn read(_arcs: &Archives, t_item: &[u8], t_item2: &[u8]) -> Result<BTreeMap<
 	let mut table = BTreeMap::new();
 
 	for _ in 0..n {
-		let mut g1 = f1.clone().at(f1.u16()? as usize)?;
-		let mut g2 = f2.clone().at(f2.u16()? as usize)?;
+		let mut g1 = f1.ptr()?;
+		let mut g2 = f2.ptr()?;
 
 		let id = g1.u16()?.into();
 		let flags = cast(g1.u8()?)?;

@@ -26,8 +26,8 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<BTreeMap<ItemId, NameDesc>, R
 		let chunkdata = chunks.get(file).unwrap();
 
 		let mut h = Bytes::new(chunkdata).at((index as usize) * 4)?;
-		let name = h.clone().at(h.u16()? as usize)?.string()?;
-		let desc = h.clone().at(h.u16()? as usize)?.string()?;
+		let name = h.ptr()?.string()?;
+		let desc = h.ptr()?.string()?;
 
 		table.insert(id, NameDesc { name, desc });
 	}

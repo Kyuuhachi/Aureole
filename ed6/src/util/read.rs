@@ -50,6 +50,10 @@ pub fn decode(bytes: &[u8]) -> Result<String, DecodeError> {
 }
 
 pub trait InExt<'a>: In<'a> {
+	fn ptr(&mut self) -> Result<Self, ReadError> where Self: Clone {
+		Ok(self.clone().at(self.u16()? as usize)?)
+	}
+
 	fn string(&mut self) -> Result<String, ReadError> {
 		let mut buf = Vec::new();
 		loop {

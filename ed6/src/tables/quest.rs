@@ -29,7 +29,7 @@ pub fn read(_arc: &Archives, data: &[u8]) -> Result<BTreeMap<QuestId, Quest>, Re
 	let mut table = BTreeMap::new();
 
 	for _ in 0..n {
-		let mut g = f.clone().at(f.u16()? as usize)?;
+		let mut g = f.ptr()?;
 
 		let id = g.u16()?.into();
 		g.check_u16(0)?;

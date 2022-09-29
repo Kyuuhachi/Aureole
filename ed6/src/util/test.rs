@@ -10,6 +10,18 @@ pub enum Error {
 
 	#[error(transparent)]
 	Write { #[from] #[backtrace] source: crate::util::WriteError },
+
+	#[error("{assertion}")]
+	Assert { assertion: Box<str>, backtrace: Box<std::backtrace::Backtrace> },
+}
+
+impl std::convert::From<String> for Error {
+	fn from(assertion: String) -> Self {
+		Self::Assert {
+			assertion: assertion.into(),
+			backtrace: std::backtrace::Backtrace::capture().into(),
+		}
+	}
 }
 
 lazy_static::lazy_static! {
@@ -36,7 +48,7 @@ pub fn check_equal<T: PartialEq + std::fmt::Debug>(a: &T, b: &T) -> Result<(), E
 				};
 			}
 		}
-		panic!("{} differs", std::any::type_name::<T>());
+		return Err(format!("{} differs", std::any::type_name::<T>()).into())
 	}
 	Ok(())
 }

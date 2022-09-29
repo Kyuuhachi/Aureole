@@ -46,18 +46,8 @@ pub fn encode(text: &str) -> Result<Vec<u8>, EncodeError> {
 	Ok(bytes.into_owned())
 }
 
-pub trait OutExt<L: Eq + std::hash::Hash + std::fmt::Debug> {
-	fn string(&mut self, s: &str) -> Result<(), WriteError>;
-	fn multiple<const N: usize, A: PartialEq + std::fmt::Debug>(
-		&mut self,
-		nil: &[u8],
-		items: &[A],
-		f: impl FnMut(&mut Self, &A) -> Result<(), WriteError>,
-	) -> Result<(), WriteError>;
-	fn sized_string<const N: usize>(&mut self, s: &str) -> Result<(), WriteError>;
-	fn name_desc(&mut self, l1: L, l2: L, nd: &super::NameDesc) -> Result<(), WriteError>;
-}
-impl<L: Eq + std::hash::Hash + std::fmt::Debug + Clone> OutExt<L> for Out<'_, L> {
+#[extend::ext(name=OutExt)]
+pub impl<L: Eq + std::hash::Hash + std::fmt::Debug + Clone> Out<'_, L> {
 	fn string(&mut self, s: &str) -> Result<(), WriteError> {
 		let s = encode(s)?;
 		self.slice(&s);
@@ -91,7 +81,8 @@ impl<L: Eq + std::hash::Hash + std::fmt::Debug + Clone> OutExt<L> for Out<'_, L>
 		Ok(())
 	}
 
-	fn name_desc(&mut self, l1: L, l2: L, super::NameDesc { name, desc }: &super::NameDesc) -> Result<(), WriteError> {
+	fn name_desc(&mut self, l1: L, l2: L, nd: &super::NameDesc) -> Result<(), WriteError> {
+		let super::NameDesc { name, desc } = nd;
 		self.delay_u16(l1.clone());
 		self.delay_u16(l2.clone());
 		self.label(l1);

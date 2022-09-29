@@ -32,7 +32,7 @@ newtype!(CharId, u8);
 #[debug(fmt = "CharAttr({_0:?}, {_1})")]
 pub struct CharAttr(pub CharId, pub u8);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Npc {
 	pub name: String,
 	pub pos: Pos3,
@@ -44,7 +44,7 @@ pub struct Npc {
 	pub talk: FuncRef,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Monster {
 	pub name: String,
 	pub pos: Pos3,
@@ -57,7 +57,7 @@ pub struct Monster {
 	pub _3: u16,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Trigger {
 	pub pos1: Pos3,
 	pub pos2: Pos3,
@@ -66,7 +66,7 @@ pub struct Trigger {
 	pub _1: u16,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Object {
 	pub pos: Pos3,
 	pub radius: u32,
@@ -76,8 +76,7 @@ pub struct Object {
 	pub _1: u16,
 }
 
-// I'm not 100% sure, but I *think* this one has to do with camera
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CameraAngle {
 	// According to some debug strings, the camera has
 	// CAM_X, CAM_Y, CAM_Z,
@@ -102,7 +101,7 @@ pub struct CameraAngle {
 	pub _7: u16,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Scena {
 	pub dir: String,
 	pub fname: String,
@@ -156,6 +155,7 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<Scena, ReadError> {
 	let objects  = (f.ptr()?, f.u16()?);
 
 	let mut strings = f.ptr()?;
+
 	let code_start = f.u16()? as usize;
 	f.check_u16(0)?;
 	let func_table = (f.ptr()?, f.u16()? / 2);
@@ -250,8 +250,6 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<Scena, ReadError> {
 	for (start, end) in starts.zip(ends) {
 		let mut g = f.clone().at(start)?;
 		functions.push(g.slice(end-start)?.to_owned());
-		functions.pop();
-		functions.push(vec![]);
 		// let code = CodeParser::new(g).func(end)?;
 	}
 
@@ -270,6 +268,175 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<Scena, ReadError> {
 	})
 }
 
+#[extend::ext(name=OutExt2)]
+impl<L: Eq + std::hash::Hash + std::fmt::Debug + Clone> Out<'_, L> {
+	fn func_ref(&mut self, fr: FuncRef) {
+		self.u16(fr.0);
+		self.u16(fr.1);
+	}
+
+	fn pos2(&mut self, p: Pos2) {
+		self.i32(p.0);
+		self.i32(p.1);
+	}
+
+	fn pos3(&mut self, p: Pos3) {
+		self.i32(p.0);
+		self.i32(p.1);
+		self.i32(p.2);
+	}
+}
+
+pub fn write(arc: &Archives, scena: &Scena) -> Result<Vec<u8>, WriteError> {
+	let &Scena {
+		ref dir,
+		ref fname,
+		town,
+		bgm,
+		entry_func,
+		ref includes,
+		ref ch,
+		ref cp,
+		ref npcs,
+		ref monsters,
+		ref triggers,
+		ref objects,
+		ref camera_angles,
+		ref functions,
+	} = scena;
+	let mut f = Out::<usize>::new();
+	let mut g = Out::new();
+	let mut func_table = Out::new();
+	let mut strings = Out::new();
+	let mut count = Count::new();
+
+	f.sized_string::<10>(dir)?;
+	f.sized_string::<14>(fname)?;
+	f.u16(town.0);
+	f.u16(bgm.0);
+	f.func_ref(entry_func);
+	f.multiple::<8, _>(&[0xFF; 4], includes, |g, a| { g.array(arc.index(a)?); Ok(()) }).strict()?;
+	f.u16(0);
+
+	let l_ch = count.next();
+	f.delay_u16(l_ch);
+	f.u16(cast(ch.len())?);
+
+	let l_cp = count.next();
+	f.delay_u16(l_cp);
+	f.u16(cast(cp.len())?);
+
+	let l_npcs = count.next();
+	f.delay_u16(l_npcs);
+	f.u16(cast(npcs.len())?);
+
+	let l_monsters = count.next();
+	f.delay_u16(l_monsters);
+	f.u16(cast(monsters.len())?);
+
+	let l_triggers = count.next();
+	f.delay_u16(l_triggers);
+	f.u16(cast(triggers.len())?);
+
+	let l_objects = count.next();
+	f.delay_u16(l_objects);
+	f.u16(cast(objects.len())?);
+
+	let l_strings = count.next();
+	f.delay_u16(l_strings);
+	strings.label(l_strings);
+	strings.string("@FileName")?;
+
+	let l_code_start = count.next();
+	f.delay_u16(l_code_start);
+	f.u16(0);
+	let l_func_table = count.next();
+	f.delay_u16(l_func_table);
+	f.u16(cast(functions.len() * 2)?);
+
+	g.label(l_ch);
+	for ch in ch { g.array(arc.index(ch)?); }
+	g.u8(0xFF);
+
+	g.label(l_cp);
+	for cp in cp { g.array(arc.index(cp)?); }
+	g.u8(0xFF);
+
+	g.label(l_npcs);
+	for &Npc { ref name, pos, angle, ch, cp, flags, init, talk } in npcs {
+		strings.string(name)?;
+		g.pos3(pos);
+		g.u16(angle);
+		g.u16(ch.0); g.u16(ch.1);
+		g.u16(cp.0); g.u16(cp.1);
+		g.u16(flags);
+		g.func_ref(init);
+		g.func_ref(talk);
+	}
+
+	g.label(l_monsters);
+	for &Monster { ref name, pos, angle, _1, flags, _2, battle, flag, _3 } in monsters {
+		strings.string(name)?;
+		g.pos3(pos);
+		g.u16(angle);
+		g.u16(_1);
+		g.u16(flags);
+		g.i32(_2);
+		g.u16(battle.0);
+		g.u16(flag.0);
+		g.u16(_3);
+	}
+
+	g.label(l_triggers);
+	for &Trigger { pos1, pos2, flags, func, _1 } in triggers {
+		g.pos3(pos1);
+		g.pos3(pos2);
+		g.u16(flags);
+		g.func_ref(func);
+		g.u16(_1);
+	}
+
+	g.label(l_objects);
+	for &Object { pos, radius, bubble_pos, flags, func, _1 } in objects {
+		g.pos3(pos);
+		g.u32(radius);
+		g.pos3(bubble_pos);
+		g.u16(flags);
+		g.func_ref(func);
+		g.u16(_1);
+	}
+
+	func_table.label(l_func_table);
+	g.label(l_code_start);
+	for func in functions {
+		let l_func = count.next();
+		func_table.delay_u16(l_func);
+		g.label(l_func);
+		g.slice(func);
+	}
+
+	for &CameraAngle { pos, _1, angle, pos2, pos3, zoom, fov, angle1, angle2, angle3, _2, _3, _4, _5, _6, _7 } in camera_angles {
+		f.pos3(pos);
+		f.u16(_1);
+		f.u16(angle);
+		f.pos3(pos2);
+		f.pos3(pos3);
+		f.i32(zoom);
+		f.i32(fov);
+		f.i16(angle1);
+		f.i16(angle2);
+		f.i16(angle3);
+		f.u16(_2);
+		f.u16(_3);
+		f.u16(_4);
+		f.u16(_5);
+		f.u32(_6);
+		f.u16(_7);
+	}
+
+	Ok(f.concat(g).concat(func_table).concat(strings).finish()?)
+}
+
 #[cfg(test)]
 mod test {
 	use crate::archive::Archives;
@@ -281,15 +448,9 @@ mod test {
 
 		for e in arc.archive(scena_archive)?.entries() {
 			if e.is_empty() { continue }
-			let data = arc.get_decomp(&e.name)?;
-			match super::read(arc, &data) {
-				Ok(scena) => {
-					println!("{}: {scena:#?}", &e.name);
-				}
-				Err(err) => {
-					println!("{}: {err:#?}", &e.name);
-					failed = true;
-				},
+			if let Err(err) = check_roundtrip(arc, &e.name, super::read, super::write) {
+				println!("{}: {err:#?}", &e.name);
+				failed = true;
 			};
 		}
 

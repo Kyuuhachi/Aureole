@@ -6,9 +6,7 @@ use hamu::write::le::*;
 use crate::archive::Archives;
 use crate::util::*;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[derive(derive_more::From, derive_more::Into)]
-pub struct NameId(u32);
+newtype!(NameId, u16);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Name {
@@ -29,7 +27,8 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<BTreeMap<NameId, Name>, ReadE
 
 	for _ in 0..n-1 {
 		let mut g = f.ptr()?;
-		let id = g.u32()?.into();
+		let id = NameId(g.u16()?);
+		g.check_u16(0)?;
 		let ch1 = arc.name(g.array()?)?.to_owned();
 		let ch2 = arc.name(g.array()?)?.to_owned();
 		let cp1 = arc.name(g.array()?)?.to_owned();
@@ -59,7 +58,8 @@ pub fn write(arc: &Archives, table: &BTreeMap<NameId, Name>) -> Result<Vec<u8>, 
 		let l = count.next();
 		f.delay_u16(l);
 		g.label(l);
-		g.u32(id.into());
+		g.u16(id.0);
+		g.u16(0);
 		g.array(arc.index(ch1)?);
 		g.array(arc.index(ch2)?);
 		g.array(arc.index(cp1)?);

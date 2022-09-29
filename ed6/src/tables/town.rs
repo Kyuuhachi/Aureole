@@ -4,8 +4,10 @@ use hamu::write::le::*;
 use crate::archive::Archives;
 use crate::util::*;
 
+newtype!(TownId, u16);
+
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Town(String, TownType);
+pub struct Town(pub String, pub TownType);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[derive(num_enum::TryFromPrimitive, num_enum::IntoPrimitive)]

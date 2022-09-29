@@ -45,9 +45,12 @@ pub struct Entry {
 }
 
 impl Entry {
-	#[allow(clippy::len_without_is_empty)]
 	pub fn len(&self) -> usize {
 		self.range.end - self.range.start
+	}
+
+	pub fn is_empty(&self) -> bool {
+		self.len() == 0
 	}
 }
 
@@ -183,7 +186,7 @@ impl Archives {
 		})
 	}
 
-	fn archive(&self, n: u16) -> io::Result<&Archive> {
+	pub fn archive(&self, n: u16) -> io::Result<&Archive> {
 		if n == 0x1A && !self.archives.contains_key(&n) {
 			return self.archive(0x1B);
 		}

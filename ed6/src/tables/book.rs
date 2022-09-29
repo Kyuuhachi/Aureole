@@ -14,7 +14,7 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<BTreeMap<ItemId, NameDesc>, R
 	let mut chunks = BTreeMap::new();
 
 	while f.remaining() > 12 {
-		let id = f.u16()?.into();
+		let id = ItemId(f.u16()?);
 		f.check_u16(0)?;
 		let file = arc.name(f.array()?)?;
 		let index = f.u16()?;

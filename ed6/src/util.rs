@@ -61,6 +61,23 @@ macro_rules! __ensure {
 }
 pub use __ensure as ensure;
 
+#[macro_export]
+macro_rules! __newtype {
+	($name:ident, $ty:ty) => {
+		#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+		#[derive(derive_more::From, derive_more::Into)]
+		pub struct $name(pub $ty);
+
+		// For some reason DebugCustom doesn't work, probably because I want to include $name
+		impl std::fmt::Debug for $name where $ty: std::fmt::Debug {
+			fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+				write!(f, "{}({:?})", stringify!($name), &self.0)
+			}
+		}
+	};
+}
+pub use __newtype as newtype;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NameDesc {
 	pub name: String,
@@ -116,8 +133,19 @@ impl<A, B> Try for StrictResult<A, B> {
 
 pub fn array<const N: usize, R: Try>(
 	mut f: impl FnMut() -> R,
-) -> <<R as Try>::Residual as Residual<[<R as Try>::Output; N]>>::TryType where
-	<R as Try>::Residual: Residual<[<R as Try>::Output; N]>,
+) -> <R::Residual as Residual<[R::Output; N]>>::TryType where
+	R::Residual: Residual<[R::Output; N]>,
 {
 	[(); N].try_map(move |()| f())
+}
+
+pub fn list<V, E>(
+	n: usize,
+	mut f: impl FnMut() -> Result<V, E>,
+) -> Result<Vec<V>, E> {
+	let mut a = Vec::with_capacity(n);
+	for _ in 0..n {
+		a.push(f()?);
+	}
+	Ok(a)
 }

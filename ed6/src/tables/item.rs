@@ -7,9 +7,7 @@ use hamu::write::le::*;
 use crate::archive::Archives;
 use crate::util::*;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[derive(derive_more::From, derive_more::Into)]
-pub struct ItemId(u16);
+newtype!(ItemId, u16);
 
 #[bitflags]
 #[repr(u8)]
@@ -50,7 +48,7 @@ pub fn read(_arcs: &Archives, t_item: &[u8], t_item2: &[u8]) -> Result<BTreeMap<
 		let mut g1 = f1.ptr()?;
 		let mut g2 = f2.ptr()?;
 
-		let id = g1.u16()?.into();
+		let id = ItemId(g1.u16()?);
 		let flags = cast(g1.u8()?)?;
 		let usable_by = g1.u8()?; // TODO Flags in FC, enum in others
 		let ty = [ g1.u8()?, g1.u8()?, g1.u8()?, g1.u8()? ];
@@ -87,7 +85,7 @@ pub fn write(_arcs: &Archives, table: &BTreeMap<ItemId, Item>) -> Result<(Vec<u8
 		f2.delay_u16(l);
 		g2.label(l);
 
-		g1.u16(id.into());
+		g1.u16(id.0);
 		g1.u8(flags.bits());
 		g1.u8(usable_by);
 		g1.array(ty);

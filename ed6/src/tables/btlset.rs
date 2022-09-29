@@ -8,9 +8,7 @@ use crate::archive::Archives;
 use crate::tables::bgmtbl::BgmId;
 use crate::util::*;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[derive(derive_more::From, derive_more::Into)]
-pub struct BattleId(u16);
+newtype!(BattleId, u16);
 
 #[bitflags]
 #[repr(u16)]
@@ -133,7 +131,7 @@ fn read_battles<'a>(
 	loop {
 		let mut g = f.ptr()?;
 
-		let id = g.u16()?.into();
+		let id = BattleId(g.u16()?);
 		let flags: BitFlags<BattleFlag> = cast(g.u16()?)?;
 
 		let unk1 = g.u16()?;
@@ -148,7 +146,8 @@ fn read_battles<'a>(
 		let battlefield = read_battlefield(&mut g, &mut battlefields)?;
 		g.check_u16(0)?;
 
-		let bgm: BgmId = g.u32()?.into();
+		let bgm: BgmId = BgmId(g.u16()?);
+		g.check_u16(0)?;
 
 		let at_roll = read_rc(&mut at_rolls, g.u16()?, |&o| {
 			let mut g = f.clone().at(o as usize)?;
@@ -207,7 +206,7 @@ fn read_auto_battles<'a>(
 	loop {
 		let mut g = f.ptr()?;
 
-		let id = g.u16()?.into();
+		let id = BattleId(g.u16()?);
 
 		let unk1 = g.u16()?;
 		let battlefield = read_battlefield(&mut g, &mut battlefields)?;
@@ -216,7 +215,8 @@ fn read_auto_battles<'a>(
 		let side1: [_; 8] = array(|| Ok(fileref(g.array()?)?)).strict()?;
 		let side2: [_; 8] = array(|| Ok(fileref(g.array()?)?)).strict()?;
 
-		let bgm: BgmId = g.u32()?.into();
+		let bgm: BgmId = BgmId(g.u16()?);
+		g.check_u16(0)?;
 
 		table.insert(id, AutoBattle {
 			unk1,

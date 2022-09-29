@@ -6,9 +6,7 @@ use hamu::write::le::*;
 use crate::archive::Archives;
 use crate::util::*;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[derive(derive_more::From, derive_more::Into)]
-pub struct SoundId(u16);
+newtype!(SoundId, u16);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Sound {
@@ -22,7 +20,7 @@ pub fn read(_arcs: &Archives, data: &[u8]) -> Result<BTreeMap<SoundId, Sound>, R
 	let mut f = Coverage::new(Bytes::new(data));
 	let mut table = BTreeMap::new();
 	while f.remaining() > 12 {
-		let id = f.u16()?.into();
+		let id = SoundId(f.u16()?);
 		let unk = f.u16()?;
 		let file = _arcs.name(f.array()?)?.to_owned();
 		let flag1 = cast_bool(f.u16()?)?;
@@ -43,7 +41,7 @@ pub fn read(_arcs: &Archives, data: &[u8]) -> Result<BTreeMap<SoundId, Sound>, R
 pub fn write(_arcs: &Archives, table: &BTreeMap<SoundId, Sound>) -> Result<Vec<u8>, WriteError> {
 	let mut out = Out::<()>::new();
 	for (&id, &Sound { unk, ref file, flag1, flag2 }) in table {
-		out.u16(id.into());
+		out.u16(id.0);
 		out.u16(unk);
 		out.array(_arcs.index(file).unwrap());
 		out.u16(flag1.into());

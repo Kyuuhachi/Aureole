@@ -9,9 +9,7 @@ use crate::archive::Archives;
 use crate::util::*;
 use super::item::ItemId;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[derive(derive_more::From, derive_more::Into)]
-pub struct RecipeId(u16);
+newtype!(RecipeId, u16);
 
 #[bitflags]
 #[repr(u16)]
@@ -41,10 +39,10 @@ pub fn read(_arcs: &Archives, data: &[u8]) -> Result<BTreeMap<RecipeId, Recipe>,
 	for _ in 0..n {
 		let mut g = f.ptr()?;
 
-		let id = g.u16()?.into();
-		let ingredients = g.multiple::<8, _>(&[0;4], |g| Ok((g.u16()?.into(), g.u16()?)))?;
+		let id = RecipeId(g.u16()?);
+		let ingredients = g.multiple::<8, _>(&[0;4], |g| Ok((ItemId(g.u16()?), g.u16()?)))?;
 		let flags = cast(g.u16()?)?;
-		let result = g.u16()?.into();
+		let result = ItemId(g.u16()?);
 		g.check_u16(0)?;
 		let heal = g.u16()?;
 		let name_desc = g.name_desc()?;
@@ -66,10 +64,10 @@ pub fn write(_arcs: &Archives, table: &BTreeMap<RecipeId, Recipe>) -> Result<Vec
 		f.delay_u16(l);
 		g.label(l);
 
-		g.u16(id.into());
-		g.multiple::<8, _>(&[0;4], ingredients, |g, &i| { g.u16(i.0.into()); g.u16(i.1); Ok(()) })?;
+		g.u16(id.0);
+		g.multiple::<8, _>(&[0;4], ingredients, |g, &i| { g.u16(i.0.0); g.u16(i.1); Ok(()) })?;
 		g.u16(flags.bits());
-		g.u16(result.into());
+		g.u16(result.0);
 		g.u16(0);
 		g.u16(heal);
 		g.name_desc(count.next(), count.next(), name_desc)?;

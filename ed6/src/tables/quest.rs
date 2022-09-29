@@ -4,11 +4,10 @@ use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
 use crate::archive::Archives;
+use crate::scena::Flag;
 use crate::util::*;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[derive(derive_more::From, derive_more::Into)]
-pub struct QuestId(u16);
+newtype!(QuestId, u16);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Quest {
@@ -16,7 +15,7 @@ pub struct Quest {
 	pub index: u16,
 	pub bp: u16,
 	pub mira: u16,
-	pub flags: [u16; 3], // TODO should be a "flag" type
+	pub flags: [Flag; 3],
 	pub name: String,
 	pub desc: String,
 	pub extra_desc: Option<String>,
@@ -31,14 +30,14 @@ pub fn read(_arc: &Archives, data: &[u8]) -> Result<BTreeMap<QuestId, Quest>, Re
 	for _ in 0..n {
 		let mut g = f.ptr()?;
 
-		let id = g.u16()?.into();
+		let id = QuestId(g.u16()?);
 		g.check_u16(0)?;
 
 		let section = g.u16()?;
 		let index = g.u16()?;
 		let bp = g.u16()?;
 		let mira = g.u16()?;
-		let flags = [g.u16()?, g.u16()?, g.u16()?];
+		let flags = array(|| Ok(Flag(g.u16()?))).strict()?;
 
 		let namep = g.u16()? as usize;
 		let descp = g.u16()? as usize;
@@ -75,15 +74,15 @@ pub fn write(_arc: &Archives, table: &BTreeMap<QuestId, Quest>) -> Result<Vec<u8
 		f.delay_u16(l);
 		g.label(l);
 
-		g.u16(id.into());
+		g.u16(id.0);
 		g.u16(0);
 		g.u16(section);
 		g.u16(index);
 		g.u16(bp);
 		g.u16(mira);
-		g.u16(flags[0]);
-		g.u16(flags[1]);
-		g.u16(flags[2]);
+		g.u16(flags[0].0);
+		g.u16(flags[1].0);
+		g.u16(flags[2].0);
 
 		let mut h = Out::new();
 

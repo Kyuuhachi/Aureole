@@ -29,8 +29,7 @@ pub fn read(_arcs: &Archives, t_town: &[u8]) -> Result<Vec<Town>, ReadError> {
 	let n = f.u16()?;
 	let mut names = Vec::with_capacity(n as usize);
 	for _ in 0..n {
-		let pos = f.u16()? as usize;
-		let mut g = f.clone().at(pos)?;
+		let mut g = f.ptr()?;
 		let name = g.string()?;
 		let type_ = if name.is_empty() {
 			0

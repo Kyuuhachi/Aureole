@@ -187,21 +187,24 @@ impl Archives {
 	}
 
 	pub fn archive(&self, n: u16) -> io::Result<&Archive> {
-		if n == 0x1A && !self.archives.contains_key(&n) {
-			return self.archive(0x1B);
-		}
 		self.archives.get(&n).ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))
 	}
 
 	pub fn name(&self, [a,b,c,d]: [u8; 4]) -> io::Result<&str> {
 		let index = u16::from_le_bytes([a,b]);
-		let arch  = u16::from_le_bytes([c,d]);
+		let mut arch  = u16::from_le_bytes([c,d]);
+		if arch == 0x1A && !self.archives.contains_key(&0x1A) {
+			arch = 0x1B;
+		}
 		self.archive(arch)?.name(index as usize)
 	}
 
 	pub fn index(&self, name: &str) -> io::Result<[u8; 4]> {
-		let arch = *self.names.get(name).ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
+		let mut arch = *self.names.get(name).ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
 		let index = self.archive(arch)?.index(name)?;
+		if arch == 0x1B {
+			arch = 0x1A;
+		}
 		let [a,b] = u16::to_le_bytes(index as u16);
 		let [c,d] = u16::to_le_bytes(arch);
 		Ok([a,b,c,d])

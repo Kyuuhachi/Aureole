@@ -14,6 +14,7 @@ pub struct Bgm {
 	pub loops: bool,
 }
 
+// I'm throwing away the record order in the file here, hope that doesn't matter.
 pub fn read(_arcs: &Archives, t_town: &[u8]) -> Result<BTreeMap<BgmId, Bgm>, ReadError> {
 	let mut f = Coverage::new(Bytes::new(t_town));
 	let mut table = BTreeMap::new();
@@ -24,6 +25,7 @@ pub fn read(_arcs: &Archives, t_town: &[u8]) -> Result<BTreeMap<BgmId, Bgm>, Rea
 		let loops = cast_bool(f.u32()?)?;
 		table.insert(id, Bgm { name, loops });
 	}
+
 	f.check_u32(0)?;
 	f.check(b"ED6999\0\0")?;
 	f.check_u32(0)?;

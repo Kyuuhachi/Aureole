@@ -448,7 +448,7 @@ mod test {
 
 		for e in arc.archive(scena_archive)?.entries() {
 			if e.is_empty() { continue }
-			if let Err(err) = check_roundtrip(arc, &e.name, super::read, super::write) {
+			if let Err(err) = check_roundtrip_strict(arc, &e.name, super::read, super::write) {
 				println!("{}: {err:#?}", &e.name);
 				failed = true;
 			};

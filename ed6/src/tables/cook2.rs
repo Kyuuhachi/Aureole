@@ -82,7 +82,7 @@ mod test {
 
 	#[test_case::test_case(&FC; "fc")]
 	fn roundtrip(arc: &Archives) -> Result<(), Error> {
-		check_roundtrip(arc, "t_cook2._dt", super::read, super::write)?;
+		check_roundtrip_strict(arc, "t_cook2._dt", super::read, super::write)?;
 		Ok(())
 	}
 }

@@ -43,7 +43,7 @@ pub fn write(_arcs: &Archives, table: &BTreeMap<SoundId, Sound>) -> Result<Vec<u
 	for (&id, &Sound { unk, ref file, flag1, flag2 }) in table {
 		out.u16(id.0);
 		out.u16(unk);
-		out.array(_arcs.index(file).unwrap());
+		out.array(_arcs.index(file)?);
 		out.u16(flag1.into());
 		out.u16(flag2.into());
 	}
@@ -64,7 +64,7 @@ mod test {
 
 	#[test_case::test_case(&FC; "fc")]
 	fn roundtrip(arc: &Archives) -> Result<(), Error> {
-		check_roundtrip(arc, "t_se._dt", super::read, super::write)?;
+		check_roundtrip_strict(arc, "t_se._dt", super::read, super::write)?;
 		Ok(())
 	}
 }

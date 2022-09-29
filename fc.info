@@ -4,15 +4,16 @@ Archives:
 		- h_*._ch
 		- font*._da
 		- c_wipe*._ds
-	01: Scenarios/areas
+
+
+	01: Scenas
 		- {area}._sn
 		- {area}_?._sn
 		- snres*.(nil)
 		- sn_res*.(nil)
-		The SNRES do not appear to have much relation to the indices.
 	02: Data tables
 		- t_*._dt
-	03: Maps?
+	03: Maps
 		- m{area}._ch
 		- m{area}a._ch
 		The a is probably Alternate. I think they correspond to Mistwald (when the Sky Bandits are
@@ -24,7 +25,6 @@ Archives:
 	05: Faces and newspaper images
 		- c_kao*._ch
 		- h_kao*._ch
-		Indexed (h_ are +1000)
 		Number 900+ are newspaper images.
 	06: CHCPs
 		- ch{ch2}._ch
@@ -34,7 +34,6 @@ Archives:
 		- ch{ch0}p._cp
 	08: Sound effects
 		- ed6se*.wav
-		Indexed.
 	09: CHCPs
 		- ch{ch1}._ch
 		- ch{ch1}p._cp
@@ -96,8 +95,7 @@ Archives:
 		Same as 1B, needs to be installed separately
 	1B: Battle voice
 		- ed6t1*.wav
-		Not indexed; there's a gap at 474
-	1C: Monster book?
+	1C: Bestiary
 		- *._ch
 		- h*._ch
 		- ca{ch013}._ch
@@ -110,7 +108,7 @@ Files:
 	*._ch:  [C] Bitmap (Size and pixel format is specified externally)
 	*._ef:  [.] Effect
 	*._vs:  [C] Vertex shader
-	9*._vs: [C] Unknown
+	9*._vs: [C] Vertex shader, compiled
 	*._x2:  [?] Model (all compressed except Reverie)
 	font*._da: [C] Font
 
@@ -138,7 +136,7 @@ Files:
 
 	t_*._dt:      [C] Data table
 	mnsnote1._dt: [C] Text file listing monsters, probably not used
-	mnsnote2._dt: [C] Concatenation of ms*._dt
+	mnsnote2._dt: [C] Concatenation of ms*._dt. Presumably ms* is used in battle while mnsnote2 is in the bestiary.
 	c_wipe*._dt:  [?] Unknown
 
 	sn_res*/snres*: Empty. Likely a placeholder

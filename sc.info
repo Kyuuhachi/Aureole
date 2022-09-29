@@ -1,0 +1,29 @@
+Structure is largely the same as FC, but archive numbers are mostly increased by 0x20.
+There is also a `mg05.{x3,hd,ct}`, which is the same as fields and battlefields.
+	20:
+		Same as fc, plus:
+		- encback._ds
+		- encount._x3
+	21..=25, 28, 2B..=32, 34, 35, 39, 3C: unchanged
+	(24's contents need double checking)
+	(06, 26), (07, 27), (09, 29):
+		Same as fc, but split up for whatever reason
+	2A, 33:
+		Uses .x3 instead of .x2, but otherwise same
+	36:
+		contains many more, but seems to be roughly the same
+	38:
+		Corresponds to fc.1B (probably 37 corresponds to fc.1A)
+	3A: Minigame, fish, cooking textures
+		- m{nn}_{mmmm}._ds
+			- 00: roulette
+			- 01: slots
+			- 02: blackjack
+			- 03: fishing
+			- 04: poker
+		- fishback._ds
+		- fishsepa._ds (absent)
+		- fish{nn}._ds
+		- cook{nn}._ds
+		- hfish{nn}._ds
+	3B: doesn't exist

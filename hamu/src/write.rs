@@ -7,7 +7,7 @@ use std::{
 };
 
 pub mod prelude {
-	pub use super::{OutBase, OutDelay, Out, OutBytes, Count};
+	pub use super::{OutBase, Label, OutDelay, Out, OutBytes, Count};
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -32,11 +32,13 @@ pub trait OutBase {
 	fn slice(&mut self, data: &[u8]);
 }
 
-pub trait OutDelay: OutBase {
-	type Label: Eq + Hash + Clone + Debug + 'static;
-	fn label(&mut self, label: Self::Label);
+pub trait Label: Eq + Hash + Clone + Debug + 'static {}
+impl<T: Eq + Hash + Clone + Debug + 'static> Label for T {}
+
+pub trait OutDelay<L: Label>: OutBase {
+	fn label(&mut self, label: L);
 	fn delay<const N: usize, F>(&mut self, cb: F) where
-		F: FnOnce(&dyn Fn(Self::Label) -> Result<usize>) -> Result<[u8; N]> + 'static;
+		F: FnOnce(&dyn Fn(L) -> Result<usize>) -> Result<[u8; N]> + 'static;
 }
 
 pub trait Out: OutBase {
@@ -58,13 +60,13 @@ type Delayed<L> = Box<dyn FnOnce(&dyn Fn(L) -> Result<usize>, &mut [u8]) -> Resu
 
 #[derive(Default)]
 #[must_use]
-pub struct OutBytes<L: Eq + Hash + Clone + Debug + 'static> {
+pub struct OutBytes<L: Label> {
 	data: Vec<u8>,
 	delays: Vec<(Range<usize>, Delayed<L>)>,
 	labels: HashMap<L, usize>,
 }
 
-impl<L: Eq + Hash + Clone + Debug + 'static> OutBytes<L> {
+impl<L: Label> OutBytes<L> {
 	pub fn new() -> Self {
 		Self {
 			data: Vec::new(),
@@ -102,7 +104,7 @@ impl<L: Eq + Hash + Clone + Debug + 'static> OutBytes<L> {
 		self.concat_with(other, |a| a)
 	}
 
-	pub fn concat_with<M: Eq + Hash + Debug + Clone + 'static>(
+	pub fn concat_with<M: Label>(
 		mut self,
 		mut other: OutBytes<M>,
 		f: impl Fn(M) -> L + 'static,
@@ -126,7 +128,7 @@ impl<L: Eq + Hash + Clone + Debug + 'static> OutBytes<L> {
 		self
 	}
 
-	pub fn map<M: Eq + Hash + Debug + Clone>(
+	pub fn map<M: Label>(
 		self,
 		f: impl Fn(L) -> M + 'static,
 	) -> OutBytes<M> {
@@ -135,7 +137,7 @@ impl<L: Eq + Hash + Clone + Debug + 'static> OutBytes<L> {
 
 }
 
-impl<L: Eq + Hash + Debug + Clone + 'static> OutBase for OutBytes<L> {
+impl<L: Label> OutBase for OutBytes<L> {
 	fn len(&self) -> usize {
 		self.data.len()
 	}
@@ -145,10 +147,8 @@ impl<L: Eq + Hash + Debug + Clone + 'static> OutBase for OutBytes<L> {
 	}
 }
 
-impl<L: Eq + Hash + Clone + Debug + 'static> OutDelay for OutBytes<L> {
-	type Label = L;
-
-	fn label(&mut self, label: Self::Label) {
+impl<L: Label> OutDelay<L> for OutBytes<L> {
+	fn label(&mut self, label: L) {
 		self.set_label(label, self.len());
 	}
 
@@ -179,11 +179,11 @@ macro_rules! primitives {
 			)*
 
 			$(
-				fn [<delay_ $utype>](&mut self, k: <Self as OutDelay>::Label) where Self: OutDelay {
+				fn [<delay_ $utype>]<L: Label>(&mut self, k: L) where Self: OutDelay<L> {
 					self.[<delay_ $utype _ $suf>](k);
 				}
 
-				fn [<delay_ $utype _ $suf>](&mut self, k: <Self as OutDelay>::Label) where Self: OutDelay {
+				fn [<delay_ $utype _ $suf>]<L: Label>(&mut self, k: L) where Self: OutDelay<L> {
 					self.delay(move |lookup| {
 						let v = lookup(k.clone())?;
 						let v = $utype::try_from(v)

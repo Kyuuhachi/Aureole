@@ -17,10 +17,10 @@ use syn::{
 #[proc_macro]
 #[allow(non_snake_case)]
 pub fn bytecode(tokens: TokenStream) -> TokenStream {
-	let table = parse_macro_input!(tokens as Table);
+	let body = parse_macro_input!(tokens as Body);
 	let f = Ident::new("f", Span::call_site());
 	let mut ctx = Ctx::new(f.clone());
-	let read_body = gather(&mut ctx, &table, &Item::default());
+	let read_body = gather(&mut ctx, &body.table, &Item::default());
 
 	let items = ctx.items.iter().map(|(name, Item { types, .. })| quote! {
 		#name(#(#types),*)
@@ -60,8 +60,9 @@ pub fn bytecode(tokens: TokenStream) -> TokenStream {
 		}
 	};
 
+	let args = &body.args;
 	let read = quote! {
-		pub fn read<'a>(#f: &mut impl In<'a>) -> Result<Self, ReadError> {
+		pub fn read<'a>(#f: &mut impl In<'a>, #args) -> Result<Self, ReadError> {
 			#read_body
 		}
 	};
@@ -70,7 +71,7 @@ pub fn bytecode(tokens: TokenStream) -> TokenStream {
 		Self::#name(#(#vars),*) => { #(#write)* }
 	});
 	let write = quote! {
-		pub fn write(&self, #f: &mut impl Out) -> Result<(), WriteError> {
+		pub fn write(&self, #f: &mut impl Out, #args) -> Result<(), WriteError> {
 			match self {
 				#(#items)*
 			}
@@ -138,17 +139,55 @@ mod kw {
 	syn::custom_keyword!(alias);
 }
 
-fn emit<A>(e: Result<A>) -> Option<A> {
-	match e {
-		Ok(a) => Some(a),
-		Err(e) => {
-			Diagnostic::spanned(e.span().unwrap(), Level::Error, e.to_string()).emit();
-			None
-		},
+// {{{1 AST and parse
+#[derive(Clone, Debug)]
+struct Body {
+	or1_token: Token![|],
+	args: Punctuated<PatType, Token![,]>,
+	or2_token: Token![|],
+	table: Table,
+}
+
+impl Parse for Body {
+	fn parse(input: ParseStream) -> Result<Self> {
+		Ok(Self {
+			or1_token: input.parse()?,
+			args: {
+				let mut inputs = Punctuated::new();
+				loop {
+					if input.peek(Token![|]) {
+						break;
+					}
+					let value = PatType {
+						attrs: Vec::new(),
+						pat: input.parse()?,
+						colon_token: input.parse()?,
+						ty: input.parse()?,
+					};
+					inputs.push_value(value);
+					if input.peek(Token![|]) {
+						break;
+					}
+					let punct: Token![,] = input.parse()?;
+					inputs.push_punct(punct);
+				}
+				inputs
+			},
+			or2_token: input.parse()?,
+			table: input.parse()?,
+		})
 	}
 }
 
-// {{{1 AST and parse
+impl ToTokens for Body {
+	fn to_tokens(&self, ts: &mut TokenStream2) {
+		self.or1_token.to_tokens(ts);
+		self.args.to_tokens(ts);
+		self.or2_token.to_tokens(ts);
+		self.table.to_tokens(ts);
+	}
+}
+
 #[derive(Clone, Debug)]
 struct Table {
 	match_token: Token![match],
@@ -345,7 +384,7 @@ impl ToTokens for Source {
 struct SourceCall {
 	name: Ident,
 	paren_token: token::Paren,
-	args: Punctuated<LitInt, Token![,]>,
+	args: Punctuated<Member, Token![,]>,
 	arrow_token: Token![->],
 	ty: Box<Type>,
 }
@@ -439,7 +478,7 @@ fn gather(ctx: &mut Ctx, t: &Table, item: &Item) -> TokenStream2 {
 				let mut val = quote! { #varname };
 				if let Source::Simple(a) = &arg.source {
 					// I don't like this. Is there any better way?
-					if !(a == "String" || a == "Text") {
+					if a != "String" {
 						val = quote_spanned! { arg.span() => *#val };
 					}
 				}
@@ -454,14 +493,14 @@ fn gather(ctx: &mut Ctx, t: &Table, item: &Item) -> TokenStream2 {
 					},
 					Source::Call(a) => {
 						let name = &a.name;
-						let mut args = vec![quote! { #f }, val];
+						let mut args = vec![val, quote! { #f }];
 						parse_index(&mut args, &item.vars, a.args.iter());
 						quote_spanned! { a.span() => #name::write(#(#args),*)? }
 					},
 				};
 				if let Source::Simple(a) = &arg.source {
 					// Pretty sure this one could be improved with a trait implemented for () and Result<(), WriteError>
-					if a == "String" || a == "Text" {
+					if a == "String" {
 						val = quote_spanned! { arg.span() => #val? };
 					}
 				}
@@ -513,13 +552,18 @@ fn gather(ctx: &mut Ctx, t: &Table, item: &Item) -> TokenStream2 {
 	}
 }
 
-fn parse_index<'a>(args: &mut Vec<TokenStream2>, vars: &[Ident], iter: impl Iterator<Item=&'a LitInt>) {
+fn parse_index<'a>(args: &mut Vec<TokenStream2>, vars: &[Ident], iter: impl Iterator<Item=&'a Member>) {
 	for n in iter {
-		if let Some(n2) = emit(n.base10_parse::<usize>()) {
-			if let Some(arg) = vars.get(n2) {
-				args.push(quote_spanned! { n.span() => &#arg })
-			} else {
-				Diagnostic::spanned(n.span().unwrap(), Level::Error, "invalid index").emit();
+		match n {
+			Member::Named(n) => {
+				args.push(quote_spanned! { n.span() => &#n })
+			},
+			Member::Unnamed(n) => {
+				if let Some(arg) = vars.get(n.index as usize) {
+					args.push(quote! { &#arg })
+				} else {
+					Diagnostic::spanned(n.span().unwrap(), Level::Error, "invalid index").emit();
+				}
 			}
 		}
 	}

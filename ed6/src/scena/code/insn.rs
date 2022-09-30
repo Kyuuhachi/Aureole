@@ -1,10 +1,11 @@
 use super::*;
 
 ed6_macros::bytecode! {
+	|arc: &Archives|
 	match {
 		0x01 => Return(),
-		0x05 => Call(FuncRef),
-		0x06 => NewScene(FileRef alias ScenaFileRef, u8, u8, u8, u8),
+		0x05 => Call(func_ref() -> FuncRef),
+		0x06 => NewScene(file_ref(arc) -> String alias ScenaFileRef, u8, u8, u8, u8),
 		0x08 => Sleep(u32 alias Time),
 		0x09 => FlagsSet(u32 as Flags),
 		0x0A => FlagsUnset(u32 as Flags),
@@ -18,7 +19,7 @@ ed6_macros::bytecode! {
 		0x16 => Map(match {
 			0x00 => Hide(),
 			0x01 => Show(),
-			0x02 => Set(i32, Pos2, FileRef alias MapFileRef),
+			0x02 => Set(i32, Pos2, file_ref(arc) -> String alias MapFileRef),
 		}),
 		0x17 => Save(),
 		0x19 => EventBegin(u8),
@@ -65,27 +66,27 @@ ed6_macros::bytecode! {
 		0x3F => ItemRemove(u16 as ItemId, u16),
 		0x40 => ItemHas(u16 as ItemId), // or is it ItemGetCount?
 		0x41 => PartyEquip(u8 as Member, u16 as ItemId, party_equip_slot(1) -> i8),
-		0x43 => CharForkFunc(u16 as CharId, u8 alias ForkId, FuncRef),
+		0x43 => CharForkFunc(u16 as CharId, u8 alias ForkId, func_ref() -> FuncRef),
 		0x44 => CharForkQuit(u16 as CharId, u8 alias ForkId),
-		0x45 => CharFork(u16 as CharId, u8 alias ForkId, u8, fork() -> Vec<Insn> alias Fork),
-		0x46 => CharForkLoop(u16 as CharId, u8 alias ForkId, u8, fork_loop() -> Vec<Insn> alias Fork),
+		0x45 => CharFork(u16 as CharId, u8 alias ForkId, u8, fork(arc) -> Vec<Insn> alias Fork),
+		0x46 => CharForkLoop(u16 as CharId, u8 alias ForkId, u8, fork_loop(arc) -> Vec<Insn> alias Fork),
 		0x47 => CharForkAwait(u16 as CharId, u8 alias ForkId, u8),
 		0x48 => Yield(), // Used in tight loops, probably wait until next frame
-		0x49 => Event(FuncRef), // Not sure how this differs from Call
+		0x49 => Event(func_ref() -> FuncRef), // Not sure how this differs from Call
 		0x4A => _Char4A(u16 as CharId, u8),
 		0x4B => _Char4B(u16 as CharId, u8),
-		0x4D => Var(u16 as Var, expr() -> Expr),
-		0x4F => Attr(u8 as Attr, expr() -> Expr),
-		0x51 => CharAttr(char_attr() -> CharAttr, expr() -> Expr),
+		0x4D => Var(u16 as Var, expr(arc) -> Expr),
+		0x4F => Attr(u8 as Attr, expr(arc) -> Expr),
+		0x51 => CharAttr(char_attr() -> CharAttr, expr(arc) -> Expr),
 		0x52 => TextStart(u16 as CharId),
 		0x53 => TextEnd(u16 as CharId),
-		0x54 => TextMessage(Text),
+		0x54 => TextMessage(text() -> Text),
 		0x56 => TextReset(u8),
 		0x58 => TextWait(),
 		0x59 => _59(),
 		0x5A => TextSetPos(i16, i16, i16, i16),
-		0x5B => TextTalk(u16 as CharId, Text),
-		0x5C => TextTalkNamed(u16 as CharId, String alias TextTitle, Text),
+		0x5B => TextTalk(u16 as CharId, text() -> Text),
+		0x5C => TextTalkNamed(u16 as CharId, String alias TextTitle, text() -> Text),
 		0x5D => Menu(u16 alias MenuId, i16, i16, u8, menu() -> Vec<String> alias Menu),
 		0x5E => MenuWait(u16 as Var),
 		0x5F => MenuClose(u16 alias MenuId),
@@ -144,7 +145,7 @@ ed6_macros::bytecode! {
 		0xA6 => FlagAwaitSet(u16 as Flag),
 		0xA9 => ShopOpen(u8 as ShopId),
 		0xAC => RecipeLearn(u16), // TODO check type
-		0xAD => ImageShow(FileRef alias VisFileRef, u16, u16, u32 alias Time),
+		0xAD => ImageShow(file_ref(arc) -> String alias VisFileRef, u16, u16, u32 alias Time),
 		0xAE => ImageHide(u32 alias Time),
 		0xAF => QuestSubmit(u8 as ShopId, u16 as QuestId),
 		0xB1 => OpLoad(String alias OpFileRef),

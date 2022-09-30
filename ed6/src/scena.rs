@@ -142,10 +142,6 @@ pub trait InExt2<'a>: In<'a> {
 	fn pos3(&mut self) -> Result<Pos3, ReadError> {
 		Ok(Pos3(self.i32()?, self.i32()?, self.i32()?))
 	}
-
-	fn text(&mut self) -> Result<Text, ReadError> {
-		todo!();
-	}
 }
 impl<'a, T: In<'a>> InExt2<'a> for T {}
 
@@ -165,10 +161,6 @@ pub trait OutExt2: Out {
 		self.i32(p.1);
 		self.i32(p.2);
 	}
-
-	fn text(&mut self, p: &Text) -> Result<(), WriteError> {
-		todo!()
-	}
 }
 impl<T: Out> OutExt2 for T {}
 
@@ -181,7 +173,7 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<Scena, ReadError> {
 	let bgm = BgmId(f.u8()?);
 	f.check_u8(0)?;
 	let entry_func = f.func_ref()?;
-	let includes = f.multiple::<8, _>(&[0xFF;4], |a| Ok(arc.name(a.array()?)?.to_owned()))?;
+	let includes = f.multiple::<8, _>(&[0xFF;4], |g| Ok(arc.name(g.array()?)?.to_owned()))?;
 	f.check_u16(0)?;
 
 	let head_end = f.clone().u16()? as usize;
@@ -287,6 +279,8 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<Scena, ReadError> {
 	let starts = func_table.iter().copied();
 	let ends = func_table.iter().copied().skip(1).chain(std::iter::once(code_end));
 	for (start, end) in starts.zip(ends) {
+		let code = code::read_func(&mut f.clone().at(start)?, arc, end)?;
+		println!("{:#?}", code);
 		let mut g = f.clone().at(start)?;
 		let slice = g.slice(end-start)?;
 		functions.push(slice.to_owned());
@@ -469,6 +463,7 @@ mod test {
 
 		for e in arc.archive(scena_archive)?.entries() {
 			if e.is_empty() { continue }
+			println!("{}", e.name);
 			if let Err(err) = check_roundtrip_strict(arc, &e.name, super::read, super::write) {
 				println!("{}: {err:#?}", &e.name);
 				failed = true;

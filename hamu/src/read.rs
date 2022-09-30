@@ -1,5 +1,5 @@
 pub mod prelude {
-	pub use super::{In, InBase, Dump, Bytes};
+	pub use super::{In, InBase, Bytes};
 }
 
 pub mod coverage;
@@ -21,6 +21,7 @@ pub trait InBase<'a> {
 	fn len(&self) -> usize;
 	fn seek(&mut self, pos: usize) -> Result<()>;
 	fn slice(&mut self, len: usize) -> Result<&'a [u8]>;
+	fn dump(&self) -> beryl::Dump;
 }
 
 pub trait In<'a>: InBase<'a> {
@@ -67,10 +68,6 @@ pub trait In<'a>: InBase<'a> {
 }
 
 impl<'a, T> In<'a> for T where T: InBase<'a> + ?Sized {}
-
-pub trait Dump<'a>: In<'a> {
-	fn dump(&self) -> beryl::Dump;
-}
 
 macro_rules! primitives {
 	($name:ident, $suf:ident, $conv:ident; $($type:ident),*) => { paste::paste! {
@@ -156,9 +153,7 @@ impl<'a> InBase<'a> for Bytes<'a> {
 		self.pos += len;
 		Ok(&self.data[pos..pos+len])
 	}
-}
 
-impl<'a> Dump<'a> for Bytes<'a> {
 	fn dump(&self) -> beryl::Dump {
 		let mut cursor = std::io::Cursor::new(&self.data);
 		cursor.set_position(self.pos as u64);

@@ -15,9 +15,9 @@ pub fn read(_arcs: &Archives, data: &[u8]) -> Result<Vec<u32>, ReadError> {
 }
 
 pub fn write(_arcs: &Archives, table: &Vec<u32>) -> Result<Vec<u8>, WriteError> {
-	let mut out = Out::<()>::new();
-	for item in table {
-		out.u32(*item);
+	let mut out = OutBytes::<()>::new();
+	for &item in table {
+		out.u32(item);
 	}
 	Ok(out.finish()?)
 }

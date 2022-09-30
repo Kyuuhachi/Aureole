@@ -24,7 +24,7 @@ pub fn read(_arcs: &Archives, data: &[u8]) -> Result<Vec<World>, ReadError> {
 }
 
 pub fn write(_arcs: &Archives, table: &Vec<World>) -> Result<Vec<u8>, WriteError> {
-	let mut out = Out::<()>::new();
+	let mut out = OutBytes::<()>::new();
 	for &World { ref scena, x, y } in table {
 		out.array(_arcs.index(scena).unwrap());
 		out.u32(x);

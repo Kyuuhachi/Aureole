@@ -46,8 +46,7 @@ pub fn encode(text: &str) -> Result<Vec<u8>, EncodeError> {
 	Ok(bytes.into_owned())
 }
 
-#[extend::ext(name=OutExt)]
-pub impl<L: Eq + std::hash::Hash + std::fmt::Debug + Clone> Out<'_, L> {
+pub trait OutExt: Out {
 	fn string(&mut self, s: &str) -> Result<(), WriteError> {
 		let s = encode(s)?;
 		self.slice(&s);
@@ -81,7 +80,7 @@ pub impl<L: Eq + std::hash::Hash + std::fmt::Debug + Clone> Out<'_, L> {
 		Ok(())
 	}
 
-	fn name_desc(&mut self, l1: L, l2: L, nd: &super::NameDesc) -> Result<(), WriteError> {
+	fn name_desc(&mut self, l1: <Self as OutDelay>::Label, l2: <Self as OutDelay>::Label, nd: &super::NameDesc) -> Result<(), WriteError> where Self: OutDelay {
 		let super::NameDesc { name, desc } = nd;
 		self.delay_u16(l1.clone());
 		self.delay_u16(l2.clone());
@@ -92,3 +91,4 @@ pub impl<L: Eq + std::hash::Hash + std::fmt::Debug + Clone> Out<'_, L> {
 		Ok(())
 	}
 }
+impl<T: Out + ?Sized> OutExt for T {}

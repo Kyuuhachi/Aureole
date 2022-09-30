@@ -35,7 +35,7 @@ pub fn read(_arcs: &Archives, t_town: &[u8]) -> Result<BTreeMap<BgmId, Bgm>, Rea
 }
 
 pub fn write(_arcs: &Archives, table: &BTreeMap<BgmId, Bgm>) -> Result<Vec<u8>, WriteError> {
-	let mut out = Out::<()>::new();
+	let mut out = OutBytes::<()>::new();
 	for (&id, &Bgm { ref name, loops }) in table {
 		out.u16(id.0);
 		out.u16(0);

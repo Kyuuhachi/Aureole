@@ -55,8 +55,8 @@ pub fn read(_arcs: &Archives, data: &[u8]) -> Result<BTreeMap<RecipeId, Recipe>,
 }
 
 pub fn write(_arcs: &Archives, table: &BTreeMap<RecipeId, Recipe>) -> Result<Vec<u8>, WriteError> {
-	let mut f = Out::new();
-	let mut g = Out::new();
+	let mut f = OutBytes::new();
+	let mut g = OutBytes::new();
 	let mut count = Count::new();
 
 	for (&id, &Recipe { ref name_desc, ref ingredients, flags, result, heal }) in table {

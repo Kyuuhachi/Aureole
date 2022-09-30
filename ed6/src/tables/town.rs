@@ -39,13 +39,14 @@ pub fn read(_arcs: &Archives, t_town: &[u8]) -> Result<Vec<Town>, ReadError> {
 		let type_ = cast(type_)?;
 		names.push(Town(name, type_));
 	}
+	println!();
 	f.assert_covered()?;
 	Ok(names)
 }
 
 pub fn write(_arcs: &Archives, towns: &Vec<Town>) -> Result<Vec<u8>, WriteError> {
-	let mut f = Out::new();
-	let mut g = Out::new();
+	let mut f = OutBytes::new();
+	let mut g = OutBytes::new();
 	let mut count = Count::new();
 	f.u16(cast(towns.len())?);
 	for &Town(ref name, kind) in towns {

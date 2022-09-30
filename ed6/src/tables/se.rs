@@ -39,7 +39,7 @@ pub fn read(_arcs: &Archives, data: &[u8]) -> Result<BTreeMap<SoundId, Sound>, R
 }
 
 pub fn write(_arcs: &Archives, table: &BTreeMap<SoundId, Sound>) -> Result<Vec<u8>, WriteError> {
-	let mut out = Out::<()>::new();
+	let mut out = OutBytes::<()>::new();
 	for (&id, &Sound { unk, ref file, flag1, flag2 }) in table {
 		out.u16(id.0);
 		out.u16(unk);

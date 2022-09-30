@@ -268,8 +268,7 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<Scena, ReadError> {
 	})
 }
 
-#[extend::ext(name=OutExt2)]
-impl<L: Eq + std::hash::Hash + std::fmt::Debug + Clone> Out<'_, L> {
+pub trait OutExt2: Out {
 	fn func_ref(&mut self, fr: FuncRef) {
 		self.u16(fr.0);
 		self.u16(fr.1);
@@ -286,6 +285,7 @@ impl<L: Eq + std::hash::Hash + std::fmt::Debug + Clone> Out<'_, L> {
 		self.i32(p.2);
 	}
 }
+impl<T: Out> OutExt2 for T {}
 
 pub fn write(arc: &Archives, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	let &Scena {
@@ -304,10 +304,10 @@ pub fn write(arc: &Archives, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		ref camera_angles,
 		ref functions,
 	} = scena;
-	let mut f = Out::<usize>::new();
-	let mut g = Out::new();
-	let mut func_table = Out::new();
-	let mut strings = Out::new();
+	let mut f = OutBytes::new();
+	let mut g = OutBytes::new();
+	let mut func_table = OutBytes::new();
+	let mut strings = OutBytes::new();
 	let mut count = Count::new();
 
 	f.sized_string::<10>(dir)?;

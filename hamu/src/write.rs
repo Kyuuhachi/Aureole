@@ -7,7 +7,7 @@ use std::{
 };
 
 pub mod prelude {
-	pub use super::{Out, Count};
+	pub use super::{OutBase, OutDelay, Out, OutBytes, Count};
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -26,16 +26,45 @@ pub enum Error {
 }
 pub type Result<T, E=Error> = std::result::Result<T, E>;
 
-type Delayed<'a, L> = Box<dyn FnOnce(&dyn Fn(L) -> Result<usize>, &mut [u8]) -> Result<()> + 'a>;
+#[allow(clippy::len_without_is_empty)]
+pub trait OutBase {
+	fn len(&self) -> usize;
+	fn slice(&mut self, data: &[u8]);
+}
+
+pub trait OutDelay: OutBase {
+	type Label: Eq + Hash + Clone + Debug + 'static;
+	fn label(&mut self, label: Self::Label);
+	fn delay<const N: usize, F>(&mut self, cb: F) where
+		F: FnOnce(&dyn Fn(Self::Label) -> Result<usize>) -> Result<[u8; N]> + 'static;
+}
+
+pub trait Out: OutBase {
+	fn is_empty(&self) -> bool {
+		self.len() == 0
+	}
+
+	fn array<const N: usize>(&mut self, data: [u8; N]) {
+		self.slice(&data)
+	}
+
+	fn align(&mut self, size: usize) {
+		self.slice(&vec![0;(size-(self.len()%size))%size]);
+	}
+}
+impl<T> Out for T where T: OutBase + ?Sized {}
+
+type Delayed<L> = Box<dyn FnOnce(&dyn Fn(L) -> Result<usize>, &mut [u8]) -> Result<()>>;
 
 #[derive(Default)]
-pub struct Out<'a, L: Eq + Hash + Debug + Clone + 'a> {
+#[must_use]
+pub struct OutBytes<L: Eq + Hash + Clone + Debug + 'static> {
 	data: Vec<u8>,
-	delays: Vec<(Range<usize>, Delayed<'a, L>)>,
+	delays: Vec<(Range<usize>, Delayed<L>)>,
 	labels: HashMap<L, usize>,
 }
 
-impl<'a, L: Eq + Hash + Debug + Clone> Out<'a, L> {
+impl<L: Eq + Hash + Clone + Debug + 'static> OutBytes<L> {
 	pub fn new() -> Self {
 		Self {
 			data: Vec::new(),
@@ -60,30 +89,6 @@ impl<'a, L: Eq + Hash + Debug + Clone> Out<'a, L> {
 		Ok(self.data)
 	}
 
-	pub fn len(&self) -> usize {
-		self.data.len()
-	}
-
-	pub fn is_empty(&self) -> bool {
-		self.len() == 0
-	}
-
-	pub fn slice(&mut self, data: &[u8]) {
-		self.data.extend(data)
-	}
-
-	pub fn array<const N: usize>(&mut self, data: [u8; N]) {
-		self.slice(&data)
-	}
-
-	pub fn align(&mut self, size: usize) {
-		self.slice(&vec![0;(size-(self.len()%size))%size]);
-	}
-
-	pub fn label(&mut self, label: L) {
-		self.set_label(label, self.len());
-	}
-
 	fn set_label(&mut self, label: L, val: usize) {
 		match self.labels.entry(label) {
 			Entry::Vacant(entry) => entry.insert(val),
@@ -93,16 +98,14 @@ impl<'a, L: Eq + Hash + Debug + Clone> Out<'a, L> {
 		};
 	}
 
-	#[must_use]
 	pub fn concat(self, other: Self) -> Self {
 		self.concat_with(other, |a| a)
 	}
 
-	#[must_use]
-	pub fn concat_with<M: Eq + Hash + Debug + Clone>(
+	pub fn concat_with<M: Eq + Hash + Debug + Clone + 'static>(
 		mut self,
-		mut other: Out<'a, M>,
-		f: impl Fn(M) -> L + 'a,
+		mut other: OutBytes<M>,
+		f: impl Fn(M) -> L + 'static,
 	) -> Self {
 		let shift = self.len();
 		self.data.append(&mut other.data);
@@ -125,13 +128,32 @@ impl<'a, L: Eq + Hash + Debug + Clone> Out<'a, L> {
 
 	pub fn map<M: Eq + Hash + Debug + Clone>(
 		self,
-		f: impl Fn(L) -> M + 'a,
-	) -> Out<'a, M> {
-		Out::new().concat_with(self, f)
+		f: impl Fn(L) -> M + 'static,
+	) -> OutBytes<M> {
+		OutBytes::new().concat_with(self, f)
 	}
 
-	pub fn delay<const N: usize, F>(&mut self, cb: F) where
-		F: FnOnce(&dyn Fn(L) -> Result<usize>) -> Result<[u8; N]> + 'a,
+}
+
+impl<L: Eq + Hash + Debug + Clone + 'static> OutBase for OutBytes<L> {
+	fn len(&self) -> usize {
+		self.data.len()
+	}
+
+	fn slice(&mut self, data: &[u8]) {
+		self.data.extend(data)
+	}
+}
+
+impl<L: Eq + Hash + Clone + Debug + 'static> OutDelay for OutBytes<L> {
+	type Label = L;
+
+	fn label(&mut self, label: Self::Label) {
+		self.set_label(label, self.len());
+	}
+
+	fn delay<const N: usize, F>(&mut self, cb: F) where
+		F: FnOnce(&dyn Fn(L) -> Result<usize>) -> Result<[u8; N]> + 'static,
 	{
 		let start = self.len();
 		self.array([0; N]);
@@ -145,33 +167,23 @@ impl<'a, L: Eq + Hash + Debug + Clone> Out<'a, L> {
 
 macro_rules! primitives {
 	($name:ident, $suf: ident, $conv:ident; $($type:ident),*; $($utype:ident),*) => { paste::paste! {
-		pub trait $name<L: Eq + Hash + Debug> {
+		pub trait $name: Out {
 			$(
 				fn $type(&mut self, v: $type) {
 					self.[<$type _ $suf>](v);
 				}
 
-				fn [<$type _ $suf>](&mut self, v: $type);
-			)*
-
-			$(
-				fn [<delay_ $utype>](&mut self, k: L) {
-					self.[<delay_ $utype _ $suf>](k);
-				}
-
-				fn [<delay_ $utype _ $suf>](&mut self, k: L);
-			)*
-		}
-
-		impl<L: Eq + Hash + Debug + Clone> $name<L> for Out<'_, L> {
-			$(
 				fn [<$type _ $suf>](&mut self, v: $type) {
 					self.array(v.$conv());
 				}
 			)*
 
 			$(
-				fn [<delay_ $utype _ $suf>](&mut self, k: L) {
+				fn [<delay_ $utype>](&mut self, k: <Self as OutDelay>::Label) where Self: OutDelay {
+					self.[<delay_ $utype _ $suf>](k);
+				}
+
+				fn [<delay_ $utype _ $suf>](&mut self, k: <Self as OutDelay>::Label) where Self: OutDelay {
 					self.delay(move |lookup| {
 						let v = lookup(k.clone())?;
 						let v = $utype::try_from(v)
@@ -186,6 +198,7 @@ macro_rules! primitives {
 				}
 			)*
 		}
+		impl<T: Out + ?Sized> $name for T {}
 
 		pub mod $suf {
 			pub use super::prelude::*;

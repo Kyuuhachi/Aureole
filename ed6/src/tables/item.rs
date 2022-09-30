@@ -72,10 +72,10 @@ pub fn read(_arcs: &Archives, t_item: &[u8], t_item2: &[u8]) -> Result<BTreeMap<
 }
 
 pub fn write(_arcs: &Archives, table: &BTreeMap<ItemId, Item>) -> Result<(Vec<u8>, Vec<u8>), WriteError> {
-	let mut f1 = Out::new();
-	let mut g1 = Out::new();
-	let mut f2 = Out::new();
-	let mut g2 = Out::new();
+	let mut f1 = OutBytes::new();
+	let mut g1 = OutBytes::new();
+	let mut f2 = OutBytes::new();
+	let mut g2 = OutBytes::new();
 	let mut count = Count::new();
 
 	for (&id, &Item { ref name_desc, flags, usable_by, ty, _unk1, stats, limit, price }) in table {

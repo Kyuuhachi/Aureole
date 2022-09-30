@@ -43,8 +43,8 @@ pub fn read(_arcs: &Archives, data: &[u8]) -> Result<Vec<Orbment>, ReadError> {
 }
 
 pub fn write(_arcs: &Archives, table: &Vec<Orbment>) -> Result<Vec<u8>, WriteError> {
-	let mut f = Out::new();
-	let mut g = Out::new();
+	let mut f = OutBytes::new();
+	let mut g = OutBytes::new();
 	let mut count = Count::new();
 
 	let nslots = 6; // 7 in sc/3rd

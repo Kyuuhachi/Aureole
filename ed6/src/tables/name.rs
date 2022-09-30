@@ -50,8 +50,8 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<BTreeMap<NameId, Name>, ReadE
 }
 
 pub fn write(arc: &Archives, table: &BTreeMap<NameId, Name>) -> Result<Vec<u8>, WriteError> {
-	let mut f = Out::new();
-	let mut g = Out::new();
+	let mut f = OutBytes::new();
+	let mut g = OutBytes::new();
 	let mut count = Count::new();
 	let fileref = |a| Option::map_or(a, Ok([0; 4]), |a| arc.index(a));
 	for (&id, Name { ch1, ch2, cp1, cp2, ms1, ms2, name }) in table {

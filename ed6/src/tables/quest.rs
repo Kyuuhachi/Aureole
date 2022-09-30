@@ -65,8 +65,8 @@ pub fn read(_arc: &Archives, data: &[u8]) -> Result<BTreeMap<QuestId, Quest>, Re
 }
 
 pub fn write(_arc: &Archives, table: &BTreeMap<QuestId, Quest>) -> Result<Vec<u8>, WriteError> {
-	let mut f = Out::<usize>::new();
-	let mut g = Out::new();
+	let mut f = OutBytes::new();
+	let mut g = OutBytes::new();
 	let mut count = Count::new();
 
 	for (&id, &Quest { section, index, bp, mira, flags, ref name, ref desc, ref extra_desc, ref steps }) in table {
@@ -84,7 +84,7 @@ pub fn write(_arc: &Archives, table: &BTreeMap<QuestId, Quest>) -> Result<Vec<u8
 		g.u16(flags[1].0);
 		g.u16(flags[2].0);
 
-		let mut h = Out::new();
+		let mut h = OutBytes::new();
 
 		let l = count.next();
 		g.delay_u16(l);

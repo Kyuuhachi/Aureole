@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 hamu = { path = "../hamu" }
+ed6-macros = { path = "../ed6-macros" }
 mapr = "0.8.0"
 
 thiserror = "1.0.0"

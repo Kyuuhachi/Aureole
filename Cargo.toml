@@ -5,6 +5,7 @@ members = [
 	"hamu",
 	"choubun",
 
+	"ed6-macros",
 	"ed6",
 	"tools",
 ]

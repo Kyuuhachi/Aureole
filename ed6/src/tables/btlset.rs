@@ -146,7 +146,8 @@ fn read_battles<'a>(
 		let battlefield = read_battlefield(&mut g, &mut battlefields)?;
 		g.check_u16(0)?;
 
-		let bgm: BgmId = BgmId(g.u16()?);
+		let bgm: BgmId = BgmId(g.u8()?);
+		g.check_u8(0)?;
 		g.check_u16(0)?;
 
 		let at_roll = read_rc(&mut at_rolls, g.u16()?, |&o| {
@@ -215,7 +216,8 @@ fn read_auto_battles<'a>(
 		let side1: [_; 8] = array(|| Ok(fileref(g.array()?)?)).strict()?;
 		let side2: [_; 8] = array(|| Ok(fileref(g.array()?)?)).strict()?;
 
-		let bgm: BgmId = BgmId(g.u16()?);
+		let bgm: BgmId = BgmId(g.u8()?);
+		g.check_u8(0)?;
 		g.check_u16(0)?;
 
 		table.insert(id, AutoBattle {

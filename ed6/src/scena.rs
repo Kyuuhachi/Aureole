@@ -7,6 +7,8 @@ use crate::tables::btlset::BattleId;
 use crate::tables::town::TownId;
 use crate::util::*;
 
+pub mod code;
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[derive(derive_more::DebugCustom)]
 #[debug(fmt = "FuncRef({_0}, {_1})")]
@@ -24,13 +26,18 @@ pub struct Pos3(pub i32, pub i32, pub i32);
 
 newtype!(Flag, u16);
 newtype!(Var, u16);
-newtype!(Attr, u16);
-newtype!(CharId, u8);
+newtype!(Attr, u8);
+newtype!(CharId, u16);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[derive(derive_more::DebugCustom)]
 #[debug(fmt = "CharAttr({_0:?}, {_1})")]
 pub struct CharAttr(pub CharId, pub u8);
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(derive_more::DebugCustom)]
+#[debug(fmt = "Emote({_0:?}, {_1})")]
+pub struct Emote(pub u8, pub u8, pub u32);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Npc {
@@ -119,6 +126,10 @@ pub struct Scena {
 	pub functions: Vec<Vec<u8>>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Text {
+}
+
 pub trait InExt2<'a>: In<'a> {
 	fn func_ref(&mut self) -> Result<FuncRef, ReadError> {
 		Ok(FuncRef(self.u16()?, self.u16()?))
@@ -131,8 +142,35 @@ pub trait InExt2<'a>: In<'a> {
 	fn pos3(&mut self) -> Result<Pos3, ReadError> {
 		Ok(Pos3(self.i32()?, self.i32()?, self.i32()?))
 	}
+
+	fn text(&mut self) -> Result<Text, ReadError> {
+		todo!();
+	}
 }
 impl<'a, T: In<'a>> InExt2<'a> for T {}
+
+pub trait OutExt2: Out {
+	fn func_ref(&mut self, fr: FuncRef) {
+		self.u16(fr.0);
+		self.u16(fr.1);
+	}
+
+	fn pos2(&mut self, p: Pos2) {
+		self.i32(p.0);
+		self.i32(p.1);
+	}
+
+	fn pos3(&mut self, p: Pos3) {
+		self.i32(p.0);
+		self.i32(p.1);
+		self.i32(p.2);
+	}
+
+	fn text(&mut self, p: &Text) -> Result<(), WriteError> {
+		todo!()
+	}
+}
+impl<T: Out> OutExt2 for T {}
 
 pub fn read(arc: &Archives, data: &[u8]) -> Result<Scena, ReadError> {
 	let mut f = Coverage::new(Bytes::new(data));
@@ -140,7 +178,8 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<Scena, ReadError> {
 	let dir = f.sized_string::<10>()?;
 	let fname = f.sized_string::<14>()?;
 	let town = TownId(f.u16()?);
-	let bgm = BgmId(f.u16()?);
+	let bgm = BgmId(f.u8()?);
+	f.check_u8(0)?;
 	let entry_func = f.func_ref()?;
 	let includes = f.multiple::<8, _>(&[0xFF;4], |a| Ok(arc.name(a.array()?)?.to_owned()))?;
 	f.check_u16(0)?;
@@ -249,8 +288,8 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<Scena, ReadError> {
 	let ends = func_table.iter().copied().skip(1).chain(std::iter::once(code_end));
 	for (start, end) in starts.zip(ends) {
 		let mut g = f.clone().at(start)?;
-		functions.push(g.slice(end-start)?.to_owned());
-		// let code = CodeParser::new(g).func(end)?;
+		let slice = g.slice(end-start)?;
+		functions.push(slice.to_owned());
 	}
 
 	f.assert_covered()?;
@@ -267,25 +306,6 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<Scena, ReadError> {
 		functions,
 	})
 }
-
-pub trait OutExt2: Out {
-	fn func_ref(&mut self, fr: FuncRef) {
-		self.u16(fr.0);
-		self.u16(fr.1);
-	}
-
-	fn pos2(&mut self, p: Pos2) {
-		self.i32(p.0);
-		self.i32(p.1);
-	}
-
-	fn pos3(&mut self, p: Pos3) {
-		self.i32(p.0);
-		self.i32(p.1);
-		self.i32(p.2);
-	}
-}
-impl<T: Out> OutExt2 for T {}
 
 pub fn write(arc: &Archives, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	let &Scena {
@@ -313,7 +333,8 @@ pub fn write(arc: &Archives, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	f.sized_string::<10>(dir)?;
 	f.sized_string::<14>(fname)?;
 	f.u16(town.0);
-	f.u16(bgm.0);
+	f.u8(bgm.0);
+	f.u8(0);
 	f.func_ref(entry_func);
 	f.multiple::<8, _>(&[0xFF; 4], includes, |g, a| { g.array(arc.index(a)?); Ok(()) }).strict()?;
 	f.u16(0);
@@ -451,6 +472,7 @@ mod test {
 			if let Err(err) = check_roundtrip_strict(arc, &e.name, super::read, super::write) {
 				println!("{}: {err:#?}", &e.name);
 				failed = true;
+				break;
 			};
 		}
 

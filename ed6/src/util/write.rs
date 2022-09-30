@@ -31,6 +31,18 @@ impl std::convert::From<String> for WriteError {
 	}
 }
 
+impl std::convert::From<&str> for WriteError {
+	fn from(assertion: &str) -> Self {
+		assertion.to_owned().into()
+	}
+}
+
+impl std::convert::From<std::convert::Infallible> for WriteError {
+	fn from(v: std::convert::Infallible) -> Self {
+		match v {}
+	}
+}
+
 #[derive(Debug, thiserror::Error)]
 #[error("Cannot encode {text:?} as SJIS")]
 pub struct EncodeError { text: String }

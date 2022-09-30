@@ -34,6 +34,18 @@ impl std::convert::From<String> for ReadError {
 	}
 }
 
+impl std::convert::From<&str> for ReadError {
+	fn from(assertion: &str) -> Self {
+		assertion.to_owned().into()
+	}
+}
+
+impl std::convert::From<std::convert::Infallible> for ReadError {
+	fn from(v: std::convert::Infallible) -> Self {
+		match v {}
+	}
+}
+
 #[derive(Debug, thiserror::Error)]
 #[error("Invalid SJIS string {text:?}")]
 pub struct DecodeError { text: String }

@@ -6,7 +6,7 @@ use hamu::write::le::*;
 use crate::archive::Archives;
 use crate::util::*;
 
-newtype!(BgmId, u16);
+newtype!(BgmId, u8);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Bgm {
@@ -19,8 +19,8 @@ pub fn read(_arcs: &Archives, t_town: &[u8]) -> Result<BTreeMap<BgmId, Bgm>, Rea
 	let mut f = Coverage::new(Bytes::new(t_town));
 	let mut table = BTreeMap::new();
 	while f.remaining() > 16 {
-		let id = BgmId(f.u16()?);
-		f.check_u16(0)?;
+		let id = BgmId(f.u8()?);
+		f.check(&[0; 3])?;
 		let name = f.sized_string::<8>()?;
 		let loops = cast_bool(f.u32()?)?;
 		table.insert(id, Bgm { name, loops });
@@ -35,17 +35,17 @@ pub fn read(_arcs: &Archives, t_town: &[u8]) -> Result<BTreeMap<BgmId, Bgm>, Rea
 }
 
 pub fn write(_arcs: &Archives, table: &BTreeMap<BgmId, Bgm>) -> Result<Vec<u8>, WriteError> {
-	let mut out = OutBytes::<()>::new();
+	let mut f = OutBytes::<()>::new();
 	for (&id, &Bgm { ref name, loops }) in table {
-		out.u16(id.0);
-		out.u16(0);
-		out.sized_string::<8>(name)?;
-		out.u32(loops.into());
+		f.u8(id.0);
+		f.slice(&[0; 3]);
+		f.sized_string::<8>(name)?;
+		f.u32(loops.into());
 	}
-	out.u32(0);
-	out.slice(b"ED6999\0\0");
-	out.u32(0);
-	Ok(out.finish()?)
+	f.u32(0);
+	f.slice(b"ED6999\0\0");
+	f.u32(0);
+	Ok(f.finish()?)
 }
 
 #[cfg(test)]

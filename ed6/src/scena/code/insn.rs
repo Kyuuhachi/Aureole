@@ -14,6 +14,8 @@ ed6_macros::bytecode! {
 		0x0D => _0D(),
 		0x0E => Blur(u32 alias Time),
 		0x0F => Battle(u16 as BattleId, u16, u16, u16, u8, u16, i8),
+		0x10 => ExitSetEnabled(u8 alias ExitId, u8),
+		0x11 => Fog(u8, u8, u8, u32, u32, u32), // First three are color; TODO parse it as one. Last is always 0.
 		0x12 => _12(i32, i32, u32),
 		0x13 => PlaceSetName(u16 as TownId),
 		0x16 => Map(match {
@@ -34,6 +36,7 @@ ed6_macros::bytecode! {
 		0x22 => SoundPlay(u16 as SoundId, u8, u8),
 		0x23 => SoundStop(u16 as SoundId),
 		0x24 => SoundLoop(u16 as SoundId, u8),
+		0x25 => _Sound25(u16 as SoundId, Pos3, u32, u32, u8, u32),
 		0x26 => _Sound26(u16 as SoundId),
 		0x28 => Quest(u16 as QuestId, match {
 			0x01 => TaskSet(u16 alias QuestTask),
@@ -66,6 +69,7 @@ ed6_macros::bytecode! {
 		0x3F => ItemRemove(u16 as ItemId, u16),
 		0x40 => ItemHas(u16 as ItemId), // or is it ItemGetCount?
 		0x41 => PartyEquip(u8 as Member, u16 as ItemId, party_equip_slot(1) -> i8),
+		0x42 => PartyPosition(u8 as Member),
 		0x43 => CharForkFunc(u16 as CharId, u8 alias ForkId, func_ref() -> FuncRef),
 		0x44 => CharForkQuit(u16 as CharId, u8 alias ForkId),
 		0x45 => CharFork(u16 as CharId, u8 alias ForkId, u8, fork(arc) -> Vec<Insn> alias Fork),
@@ -109,18 +113,29 @@ ed6_macros::bytecode! {
 		0x71 => _Obj71(u16 alias ObjectId, u16),
 		0x72 => _Obj72(u16 alias ObjectId, u16),
 		0x73 => _Obj73(u16 alias ObjectId),
+		0x74 => _74(u16, u32, u16),
+		0x75 => _75(u8, u32, u8),
+		0x76 => _76(u16, u32, u16, Pos3, u8, u8),
 		0x77 => _77(u32 as Color, u32 alias Time),
+		0x78 => _78(u8, u16),
+		0x79 => _79(u8, u16),
+		0x7A => _7A(u8, u16),
+		0x7B => _7B(),
 		0x7C => Shake(u32, u32, u32, u32 alias Time),
+		0x7E => _7E(i16, i16, u16, u8, u32),
 		0x7F => EffLoad(u8, String alias EffFileRef),
 		0x80 => EffPlay(u8, u8, i16, Pos3, u16, u16, u16, u32, u32, u32, u16, u32, u32, u32, u32),
 		0x81 => EffPlay2(u16, u8, String alias EffFileRef, Pos3, u16, u16, u16, u32, u32, u32, u32),
 		0x82 => _82(u16),
 		0x83 => Achievement(u8, u8),
+		0x84 => _84(u8),
+		0x85 => _85(u16),
 		0x86 => CharSetChcp   (u16 as CharId, u16 alias ChcpId),
 		0x87 => CharSetFrame  (u16 as CharId, u16),
 		0x88 => CharSetPos    (u16 as CharId, Pos3, u16 alias Angle),
 		0x89 => _Char89       (u16 as CharId, Pos3, u16),
 		0x8A => CharLookAt    (u16 as CharId, u16 as CharId, u16 alias Time16),
+		0x8B => _Char8B       (u16 as CharId, Pos2, u16),
 		0x8C => CharSetAngle  (u16 as CharId, u16 alias Angle, u16 alias Time16),
 		0x8D => CharIdle      (u16 as CharId, Pos2, Pos2, u32 alias Speed),
 		0x8E => CharWalkTo    (u16 as CharId, Pos3, u32 alias Speed, u8),
@@ -128,8 +143,10 @@ ed6_macros::bytecode! {
 		0x90 => DontGoThere   (u16, Pos3 alias RelativePos3, u32, u8),
 		0x91 => _Char91       (u16 as CharId, Pos3 alias RelativePos3, i32, u8),
 		0x92 => _Char92       (u16 as CharId, u16 as CharId, u32, u32 alias Time, u8),
+		0x93 => _Char93       (u16 as CharId, u16, u32, u32, u8),
 		0x94 => _94       (u8, u16 as CharId, u16, u32, u32, u8), // used with chickens
 		0x95 => CharJump      (u16 as CharId, Pos3 alias RelativePos3, u32 alias Time, u32),
+		0x96 => _Char96       (u16 as CharId, Pos3, i32, i32),
 		0x97 => _Char97       (u16 as CharId, Pos2, i32 alias Angle32, u32 alias Time, u16), // used with pigeons
 		0x99 => CharAnimation (u16 as CharId, u8, u8, u32 alias Time),
 		0x9A => CharFlagsSet  (u16 as CharId, u16 as CharFlags),
@@ -148,6 +165,7 @@ ed6_macros::bytecode! {
 		0xAD => ImageShow(file_ref(arc) -> String alias VisFileRef, u16, u16, u32 alias Time),
 		0xAE => ImageHide(u32 alias Time),
 		0xAF => QuestSubmit(u8 as ShopId, u16 as QuestId),
+		0xB0 => _B0(u16, u8), // Used along with 6F, 70, and 73 during T0700#11
 		0xB1 => OpLoad(String alias OpFileRef),
 		0xB2 => _B2(u8, u8, u16),
 		0xB3 => Video(match {
@@ -155,10 +173,14 @@ ed6_macros::bytecode! {
 			0x01 => _01(u8),
 		}),
 		0xB4 => ReturnToTitle(u8),
-		0xB5 => PartySlot(u8 as Member, u8, u8), // FC only
-		0xB9 => ReadBook(u16 as ItemId, u16), // FC only
+		// fc only region
+		0xB5 => PartySlot(u8 as Member, u8, u8),
+		0xB6 => _B6(u8),
+		0xB7 => _B7(u8 as Member, u8, u8),
+		0xB8 => _B8(u8 as Member),
+		0xB9 => ReadBook(u16 as ItemId, u16),
 		0xBA => PartyHasSpell(u8 as Member, u16 as MagicId),
-		0xBB => PartyHasSlot(u8 as Member, u8), // FC only
-		0xDE => SaveClearData(), // FC only
+		0xBB => PartyHasSlot(u8 as Member, u8),
+		0xDE => SaveClearData(),
 	}
 }

@@ -10,8 +10,9 @@ use crate::tables::quest::QuestId;
 use crate::tables::se::SoundId;
 use crate::tables::town::TownId;
 use crate::util::*;
+use crate::text::Text;
 
-use super::{FuncRef, CharId, CharAttr, Emote, Pos2, Pos3, Var, Flag, Attr, InExt2, OutExt2, Text};
+use super::{FuncRef, CharId, CharAttr, Emote, Pos2, Pos3, Var, Flag, Attr, InExt2, OutExt2};
 
 type Color = u32;
 type ShopId = u8;
@@ -55,7 +56,7 @@ pub fn read_func<'a>(f: &mut impl In<'a>, arc: &Archives, end: usize) -> Result<
 	ensure!(f.pos() == end, "overshot while reading function");
 
 	let mut labels = BTreeSet::new();
-	for (i, insn) in &insns {
+	for (_, insn) in &insns {
 		match insn {
 			RawFlowInsn::Unless(_, target) => {
 				labels.insert(*target);
@@ -94,23 +95,35 @@ pub fn read_func<'a>(f: &mut impl In<'a>, arc: &Archives, end: usize) -> Result<
 }
 
 fn read_raw_insn<'a>(f: &mut impl In<'a>, arc: &Archives) -> Result<RawFlowInsn, ReadError> {
-	f.dump().oneline().to_stdout();
+	// f.dump().oneline().to_stdout();
 	let pos = f.pos();
-	Ok(match f.u8()? {
-		0x02 => RawFlowInsn::Unless(expr::read(f, arc)?, f.u16()? as usize),
-		0x03 => RawFlowInsn::Goto(f.u16()? as usize),
-		0x04 => RawFlowInsn::Switch(expr::read(f, arc)?, {
-			let mut out = Vec::new();
-			for _ in 0..f.u16()? {
-				out.push((f.u16()?, f.u16()? as usize));
+	let res = try {
+		let insn = match f.u8()? {
+			0x02 => RawFlowInsn::Unless(expr::read(f, arc)?, f.u16()? as usize),
+			0x03 => RawFlowInsn::Goto(f.u16()? as usize),
+			0x04 => RawFlowInsn::Switch(expr::read(f, arc)?, {
+				let mut out = Vec::new();
+				for _ in 0..f.u16()? {
+					out.push((f.u16()?, f.u16()? as usize));
+				}
+				out
+			}, f.u16()? as usize),
+			_ => {
+				f.seek(pos)?;
+				RawFlowInsn::Insn(Insn::read(f, arc)?)
 			}
-			out
-		}, f.u16()? as usize),
-		_ => {
-			f.seek(pos)?;
-			RawFlowInsn::Insn(Insn::read(f, arc)?)
+		};
+		// println!("{pos} {:?}", insn);
+		insn
+	};
+	match res {
+		Ok(a) => Ok(a),
+		Err(e) => {
+			f.seek(pos.saturating_sub(48))?;
+			f.dump().lines(3).mark(pos, 9).to_stderr();
+			Err(e)
 		}
-	})
+	}
 }
 
 pub fn write_insn(v: &str, f: &mut impl OutDelay<usize>, arc: &Archives) -> Result<(), WriteError> {
@@ -332,7 +345,7 @@ mod file_ref {
 mod text {
 	use super::*;
 	pub(super) fn read<'a>(f: &mut impl In<'a>) -> Result<Text, ReadError> {
-		todo!()
+		crate::text::Text::read(f)
 	}
 
 	pub(super) fn write(v: &Text, f: &mut impl Out) -> Result<(), WriteError> {

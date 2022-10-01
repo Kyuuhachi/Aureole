@@ -126,10 +126,6 @@ pub struct Scena {
 	pub functions: Vec<Vec<u8>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Text {
-}
-
 pub trait InExt2<'a>: In<'a> {
 	fn func_ref(&mut self) -> Result<FuncRef, ReadError> {
 		Ok(FuncRef(self.u16()?, self.u16()?))
@@ -280,7 +276,7 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<Scena, ReadError> {
 	let ends = func_table.iter().copied().skip(1).chain(std::iter::once(code_end));
 	for (start, end) in starts.zip(ends) {
 		let code = code::read_func(&mut f.clone().at(start)?, arc, end)?;
-		println!("{:#?}", code);
+		// println!("{:#?}", code);
 		let mut g = f.clone().at(start)?;
 		let slice = g.slice(end-start)?;
 		functions.push(slice.to_owned());
@@ -463,11 +459,10 @@ mod test {
 
 		for e in arc.archive(scena_archive)?.entries() {
 			if e.is_empty() { continue }
-			println!("{}", e.name);
 			if let Err(err) = check_roundtrip_strict(arc, &e.name, super::read, super::write) {
-				println!("{}: {err:#?}", &e.name);
+				// println!("{}: {err:#?}", &e.name);
+				println!("{}: {err}", &e.name);
 				failed = true;
-				break;
 			};
 		}
 

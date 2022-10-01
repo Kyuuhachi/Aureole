@@ -48,18 +48,24 @@ pub fn cast_error<T>(
 
 #[macro_export]
 macro_rules! __ensure {
-	($cond:expr, $str:literal $($arg:tt)*) => {
+	($cond:expr, $($t:tt)*) => {
 		if !($cond) {
-			return Err(format!($str $($arg)*).into())
+			$crate::util::bail!($($t)*)
 		}
 	};
-	($cond:expr, $e:expr) => {
-		if !($cond) {
-			return Err($e)
-		}
-	}
 }
 pub use __ensure as ensure;
+
+#[macro_export]
+macro_rules! __bail {
+	($str:literal $($arg:tt)*) => {
+		return Err(format!($str $($arg)*).into())
+	};
+	($e:expr) => {
+		return Err($e)
+	}
+}
+pub use __bail as bail;
 
 #[macro_export]
 macro_rules! __newtype {

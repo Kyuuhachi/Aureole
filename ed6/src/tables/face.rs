@@ -4,6 +4,8 @@ use hamu::write::le::*;
 use crate::archive::Archives;
 use crate::util::*;
 
+newtype!(FaceId, u16);
+
 pub fn read(_arcs: &Archives, t_face: &[u8]) -> Result<Vec<String>, ReadError> {
 	let mut f = Coverage::new(Bytes::new(t_face));
 	let mut faces = Vec::with_capacity(f.remaining() / 4);

@@ -22,7 +22,7 @@ pub fn bytecode(tokens: TokenStream) -> TokenStream {
 	let mut ctx = Ctx::new(f.clone());
 	let read_body = gather(&mut ctx, &body.table, &Item::default());
 
-	let items = ctx.items.iter().map(|(name, Item { types, .. })| quote! {
+	let items = ctx.items.iter().map(|(span, name, Item { types, .. })| quote_spanned! { *span =>
 		#name(#(#types),*)
 	});
 	let Insn = quote! {
@@ -62,15 +62,17 @@ pub fn bytecode(tokens: TokenStream) -> TokenStream {
 
 	let args = &body.args;
 	let read = quote! {
+		#[allow(clippy::needless_borrow)]
 		pub fn read<'a>(#f: &mut impl In<'a>, #args) -> Result<Self, ReadError> {
 			#read_body
 		}
 	};
 
-	let items = ctx.items.iter().map(|(name, Item { vars, write, .. })| quote! {
+	let items = ctx.items.iter().map(|(span, name, Item { vars, write, .. })| quote_spanned! { *span =>
 		Self::#name(#(#vars),*) => { #(#write)* }
 	});
 	let write = quote! {
+		#[allow(clippy::needless_borrow)]
 		pub fn write(&self, #f: &mut impl Out, #args) -> Result<(), WriteError> {
 			match self {
 				#(#items)*
@@ -79,7 +81,7 @@ pub fn bytecode(tokens: TokenStream) -> TokenStream {
 		}
 	};
 
-	let items = ctx.items.iter().map(|(name, _)| quote! {
+	let items = ctx.items.iter().map(|(span, name, _)| quote_spanned! { *span =>
 		Self::#name(..) => stringify!(#name),
 	});
 	let name = quote! {
@@ -90,7 +92,7 @@ pub fn bytecode(tokens: TokenStream) -> TokenStream {
 		}
 	};
 
-	let items = ctx.items.iter().map(|(name, Item { vars, aliases, .. })| quote! {
+	let items = ctx.items.iter().map(|(span, name, Item { vars, aliases, .. })| quote_spanned! { *span =>
 		Self::#name(#(#vars),*) => Box::new([#(Arg::#aliases(#vars)),*]),
 	}).collect::<Vec<_>>();
 	let args = quote! {
@@ -317,30 +319,26 @@ impl ToTokens for Arg {
 }
 
 impl Arg {
-	fn alias(&self) -> Option<&Ident> {
-		if let Some((_, alias)) = &self.alias {
-			Some(alias)
+	fn alias(&self) -> Ident {
+		let ty = if let Some((_, alias)) = &self.alias {
+			return alias.clone();
 		} else if let Some((_, ty)) = &self.ty {
-			if let Type::Path(ty) = Box::as_ref(ty) {
-				ty.path.get_ident()
-			} else {
-				Diagnostic::spanned(ty.span().unwrap(), Level::Error, "invalid identifier").emit();
-				None
-			}
+			ty
 		} else {
 			match &self.source {
-				Source::Simple(ident) => Some(ident),
-				Source::Call(s) => {
-					let ty = &s.ty;
-					if let Type::Path(ty) = Box::as_ref(ty) {
-						ty.path.get_ident()
-					} else {
-						Diagnostic::spanned(ty.span().unwrap(), Level::Error, "invalid identifier").emit();
-						None
-					}
-				},
+				Source::Simple(ident) => return ident.clone(),
+				Source::Call(s) => &s.ty,
+			}
+		};
+
+		if let Type::Path(ty) = Box::as_ref(ty) {
+			if let Some(ident) = ty.path.get_ident() {
+				return ident.clone()
 			}
 		}
+
+		Diagnostic::spanned(ty.span().unwrap(), Level::Error, "invalid identifier").emit();
+		Ident::new("__error", Span::call_site())
 	}
 
 	fn ty(&self) -> Box<Type> {
@@ -348,7 +346,7 @@ impl Arg {
 			ty.clone()
 		} else {
 			match &self.source {
-				Source::Simple(ident) => parse_quote! { #ident },
+				Source::Simple(ident) => parse_quote_spanned! { ident.span() => #ident },
 				Source::Call(s) => s.ty.clone(),
 			}
 		}
@@ -417,7 +415,7 @@ impl ToTokens for SourceCall {
 struct Ctx {
 	f: Ident,
 	args: BTreeMap<Ident, Box<Type>>,
-	items: Vec<(Ident, Item)>,
+	items: Vec<(Span, Ident, Item)>,
 }
 
 impl Ctx {
@@ -434,7 +432,8 @@ impl Ctx {
 struct Item {
 	name: String,
 	vars: Vec<Ident>,
-	types: Vec<Type>,
+	#[allow(clippy::vec_box)]
+	types: Vec<Box<Type>>,
 	aliases: Vec<Ident>,
 	write: Vec<TokenStream2>,
 }
@@ -452,7 +451,7 @@ fn gather(ctx: &mut Ctx, t: &Table, item: &Item) -> TokenStream2 {
 		let mut read = Vec::new();
 
 		for arg in &arm.args {
-			let varname = format_ident!("_{}", item.vars.len());
+			let varname = format_ident!("_{}", item.vars.len(), span=arg.span());
 
 			{
 				let mut val = match &arg.source {
@@ -462,8 +461,8 @@ fn gather(ctx: &mut Ctx, t: &Table, item: &Item) -> TokenStream2 {
 					},
 					Source::Call(a) => {
 						let name = &a.name;
-						let mut args = vec![quote! { #f }];
-						parse_index(&mut args, &item.vars, a.args.iter());
+						let mut args = vec![quote_spanned! { f.span() => #f }];
+						parse_index(&mut args, a.args.iter());
 						quote_spanned! { a.span() => #name::read(#(#args),*)? }
 					},
 				};
@@ -475,9 +474,8 @@ fn gather(ctx: &mut Ctx, t: &Table, item: &Item) -> TokenStream2 {
 			}
 
 			{
-				let mut val = quote! { #varname };
+				let mut val = quote_spanned! { varname.span() => #varname };
 				if let Source::Simple(a) = &arg.source {
-					// I don't like this. Is there any better way?
 					if a != "String" {
 						val = quote_spanned! { arg.span() => *#val };
 					}
@@ -493,13 +491,12 @@ fn gather(ctx: &mut Ctx, t: &Table, item: &Item) -> TokenStream2 {
 					},
 					Source::Call(a) => {
 						let name = &a.name;
-						let mut args = vec![val, quote! { #f }];
-						parse_index(&mut args, &item.vars, a.args.iter());
+						let mut args = vec![val, quote_spanned! { f.span() => #f }];
+						parse_index(&mut args, a.args.iter());
 						quote_spanned! { a.span() => #name::write(#(#args),*)? }
 					},
 				};
 				if let Source::Simple(a) = &arg.source {
-					// Pretty sure this one could be improved with a trait implemented for () and Result<(), WriteError>
 					if a == "String" {
 						val = quote_spanned! { arg.span() => #val? };
 					}
@@ -509,27 +506,24 @@ fn gather(ctx: &mut Ctx, t: &Table, item: &Item) -> TokenStream2 {
 
 			let ty = arg.ty();
 			item.vars.push(varname.clone());
-			item.types.push((*ty).clone());
+			item.types.push(ty.clone());
 
-			if let Some(alias) = arg.alias() {
-				// collisions will be errored about at type checking
-				if !ctx.args.contains_key(alias) {
-					ctx.args.insert(alias.clone(), ty);
-				}
-				item.aliases.push(alias.clone());
+			let alias = arg.alias();
+			// collisions will be errored about at type checking
+			if !ctx.args.contains_key(&alias) {
+				ctx.args.insert(alias.clone(), ty);
 			}
+			item.aliases.push(alias.clone());
 		}
 
 		let resolution = if let Some(tail) = &arm.tail {
 			gather(ctx, tail, &item)
 		} else {
 			let name = Ident::new(&item.name, arm.name.span());
-			ctx.items.push((name.clone(), item.clone()));
+			ctx.items.push((arm.name.span().join(arm.paren_token.span).unwrap(), name.clone(), item.clone()));
 
 			let vars = &item.vars;
-			let a = quote_spanned! { arm.span() => Ok(Self::#name(#(#vars),*)) };
-
-			a
+			quote_spanned! { arm.span() => Ok(Self::#name(#(#vars),*)) }
 		};
 
 		let key = &arm.key;
@@ -552,20 +546,13 @@ fn gather(ctx: &mut Ctx, t: &Table, item: &Item) -> TokenStream2 {
 	}
 }
 
-fn parse_index<'a>(args: &mut Vec<TokenStream2>, vars: &[Ident], iter: impl Iterator<Item=&'a Member>) {
+fn parse_index<'a>(args: &mut Vec<TokenStream2>, iter: impl Iterator<Item=&'a Member>) {
 	for n in iter {
-		match n {
-			Member::Named(n) => {
-				args.push(quote_spanned! { n.span() => &#n })
-			},
-			Member::Unnamed(n) => {
-				if let Some(arg) = vars.get(n.index as usize) {
-					args.push(quote! { &#arg })
-				} else {
-					Diagnostic::spanned(n.span().unwrap(), Level::Error, "invalid index").emit();
-				}
-			}
-		}
+		let ident = match n {
+			Member::Named(n) => n.clone(),
+			Member::Unnamed(n) => format_ident!("_{}", n.index, span=n.span),
+		};
+		args.push(quote_spanned! { ident.span() => &#ident })
 	}
 }
 

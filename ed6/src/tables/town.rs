@@ -39,7 +39,6 @@ pub fn read(_arcs: &Archives, t_town: &[u8]) -> Result<Vec<Town>, ReadError> {
 		let type_ = cast(type_)?;
 		names.push(Town(name, type_));
 	}
-	println!();
 	f.assert_covered()?;
 	Ok(names)
 }

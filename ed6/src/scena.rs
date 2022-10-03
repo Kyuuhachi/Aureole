@@ -114,11 +114,6 @@ pub struct Scena {
 }
 
 pub trait InExt2<'a>: In<'a> {
-	#[deprecated(note="InExt2 is used for both header and code, where the format differs")]
-	fn func_ref(&mut self) -> Result<FuncRef, ReadError> {
-		Ok(FuncRef(self.u16()?, self.u16()?))
-	}
-
 	fn pos2(&mut self) -> Result<Pos2, ReadError> {
 		Ok(Pos2(self.i32()?, self.i32()?))
 	}
@@ -130,12 +125,6 @@ pub trait InExt2<'a>: In<'a> {
 impl<'a, T: In<'a>> InExt2<'a> for T {}
 
 pub trait OutExt2: Out {
-	#[deprecated]
-	fn func_ref(&mut self, fr: FuncRef) {
-		self.u16(fr.0);
-		self.u16(fr.1);
-	}
-
 	fn pos2(&mut self, p: Pos2) {
 		self.i32(p.0);
 		self.i32(p.1);
@@ -157,7 +146,7 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<Scena, ReadError> {
 	let town = TownId(f.u16()?);
 	let bgm = BgmId(f.u8()?);
 	f.check_u8(0)?;
-	let entry_func = f.func_ref()?;
+	let entry_func = FuncRef(f.u16()?, f.u16()?);
 	let includes = f.multiple::<8, _>(&[0xFF;4], |g| Ok(arc.name(g.array()?)?.to_owned()))?;
 	f.check_u16(0)?;
 
@@ -195,8 +184,8 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<Scena, ReadError> {
 		ch: (g.u16()?, g.u16()?),
 		cp: (g.u16()?, g.u16()?),
 		flags: g.u16()?,
-		init: g.func_ref()?,
-		talk: g.func_ref()?,
+		init: FuncRef(g.u16()?, g.u16()?),
+		talk: FuncRef(g.u16()?, g.u16()?),
 	})).strict()?;
 
 	let (mut g, n) = monsters;
@@ -217,7 +206,7 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<Scena, ReadError> {
 		pos1: g.pos3()?,
 		pos2: g.pos3()?,
 		flags: g.u16()?,
-		func: g.func_ref()?,
+		func: FuncRef(g.u16()?, g.u16()?),
 		_1: g.u16()?,
 	})).strict()?;
 
@@ -227,7 +216,7 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<Scena, ReadError> {
 		radius: g.u32()?,
 		bubble_pos: g.pos3()?,
 		flags: g.u16()?,
-		func: g.func_ref()?,
+		func: FuncRef(g.u16()?, g.u16()?),
 		_1: g.u16()?,
 	})).strict()?;
 
@@ -309,7 +298,7 @@ pub fn write(arc: &Archives, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	f.u16(town.0);
 	f.u8(bgm.0);
 	f.u8(0);
-	f.func_ref(entry_func);
+	f.u16(entry_func.0); f.u16(entry_func.1);
 	f.multiple::<8, _>(&[0xFF; 4], includes, |g, a| { g.array(arc.index(a)?); Ok(()) }).strict()?;
 	f.u16(0);
 
@@ -365,8 +354,8 @@ pub fn write(arc: &Archives, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		g.u16(ch.0); g.u16(ch.1);
 		g.u16(cp.0); g.u16(cp.1);
 		g.u16(flags);
-		g.func_ref(init);
-		g.func_ref(talk);
+		g.u16(init.0); g.u16(init.1);
+		g.u16(talk.0); g.u16(talk.1);
 	}
 
 	g.label(l_monsters);
@@ -387,7 +376,7 @@ pub fn write(arc: &Archives, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		g.pos3(pos1);
 		g.pos3(pos2);
 		g.u16(flags);
-		g.func_ref(func);
+		g.u16(func.0); g.u16(func.1);
 		g.u16(_1);
 	}
 
@@ -397,7 +386,7 @@ pub fn write(arc: &Archives, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		g.u32(radius);
 		g.pos3(bubble_pos);
 		g.u16(flags);
-		g.func_ref(func);
+		g.u16(func.0); g.u16(func.1);
 		g.u16(_1);
 	}
 

@@ -93,6 +93,17 @@ impl std::iter::FromIterator<TextSegment> for Text {
 	}
 }
 
+impl<'a> std::iter::FromIterator<&'a TextSegment> for Text {
+	fn from_iter<T: IntoIterator<Item = &'a TextSegment>>(iter: T) -> Self {
+		let mut f = OutBytes::<!>::new();
+		for item in iter {
+			item.write_to(&mut f);
+		}
+		f.u8(0);
+		Text(f.finish().unwrap().into_boxed_slice())
+	}
+}
+
 pub struct Iter<'a> {
 	data: &'a [u8],
 	pos: usize,

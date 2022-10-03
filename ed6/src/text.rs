@@ -5,7 +5,7 @@ use crate::util::*;
 use crate::tables::{face::FaceId, item::ItemId};
 
 #[derive(Clone, PartialEq, Eq)]
-pub struct Text(Vec<u8>);
+pub struct Text(Box<[u8]>);
 
 impl std::fmt::Debug for Text {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -58,18 +58,40 @@ impl Text {
 				0x20.. => {}
 			}
 		}
-		let end = f.pos();
+		let end = f.pos()-1;
 		f.seek(pos)?;
-		Ok(Text(f.slice(end-pos)?.to_owned()))
+		let data = Box::from(f.slice(end-pos)?);
+		f.check_u8(0)?;
+		Ok(Text(data))
 	}
 
 	pub fn write(f: &mut impl Out, v: &Text) -> Result<(), WriteError> {
 		f.slice(&v.0);
+		f.u8(0);
 		Ok(())
 	}
 
 	pub fn iter(&self) -> Iter {
 		Iter { data: &self.0, pos: 0 }
+	}
+}
+
+impl<'a> IntoIterator for &'a Text {
+	type Item = TextSegment;
+	type IntoIter = Iter<'a>;
+
+	fn into_iter(self) -> Self::IntoIter {
+		self.iter()
+	}
+}
+
+impl std::iter::FromIterator<TextSegment> for Text {
+	fn from_iter<T: IntoIterator<Item = TextSegment>>(iter: T) -> Self {
+		let mut f = OutBytes::<!>::new();
+		for item in iter {
+			item.write_to(&mut f);
+		}
+		Text(f.finish().unwrap().into_boxed_slice())
 	}
 }
 
@@ -164,5 +186,49 @@ impl Iterator for Iter<'_> {
 				}
 			}
 		})
+	}
+}
+
+impl TextSegment {
+	fn write_to(&self, f: &mut OutBytes<!>) {
+		match self {
+			TextSegment::String(ref s) => {
+				let (text, _, error) = SHIFT_JIS.encode(s);
+				assert!(!error); // Panics, but whatever.
+				f.slice(&text);
+			}
+			TextSegment::Line => f.u8(0x01),
+			TextSegment::Wait => f.u8(0x02),
+			TextSegment::Page => f.u8(0x03),
+			TextSegment::_05 => f.u8(0x05),
+			TextSegment::_06 => f.u8(0x06),
+			TextSegment::Color(n) => {
+				f.u8(0x07);
+				f.u8(*n);
+			}
+			TextSegment::_09 => f.u8(0x09),
+			TextSegment::Item(n) => {
+				f.u8(0x1F);
+				f.u16(n.0);
+			}
+
+			TextSegment::NoA        => f.slice("#A".as_bytes()),
+			TextSegment::A(n)       => f.slice(format!("#{n}A").as_bytes()),
+			TextSegment::NoFace     => f.slice("#F".as_bytes()),
+			TextSegment::Face(FaceId(n)) => f.slice(format!("#{n}F").as_bytes()),
+			TextSegment::K(n)       => f.slice(format!("#{n}K").as_bytes()),
+			TextSegment::Pos(n)     => f.slice(format!("#{n}P").as_bytes()),
+			TextSegment::Ruby(n, s) => {
+				let s = format!("#{n}R{s}#");
+				let (text, _, error) = SHIFT_JIS.encode(&s);
+				assert!(!error);
+				f.slice(&text);
+			}
+			TextSegment::Size(n)    => f.slice(format!("#{n}S").as_bytes()),
+			TextSegment::NoSpeed    => f.slice("#W".as_bytes()),
+			TextSegment::Speed(n)   => f.slice(format!("#{n}W").as_bytes()),
+
+			TextSegment::Error(ref s) => f.slice(s),
+		}
 	}
 }

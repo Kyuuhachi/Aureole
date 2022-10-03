@@ -8,7 +8,7 @@ use std::{
 };
 
 pub mod prelude {
-	pub use super::{OutBase, Label, OutDelay, Out, OutBytes, Count, Unique};
+	pub use super::{OutBase, Label, OutDelay, Out, OutBytes, Unique};
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -208,22 +208,6 @@ pub fn cast_usize<T: TryFrom<usize, Error=TryFromIntError>>(v: usize) -> Result<
 
 primitives!(OutLe, le, to_le_bytes; u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, f32, f64; u8, u16, u32, u64, u128);
 primitives!(OutBe, be, to_be_bytes; u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, f32, f64; u8, u16, u32, u64, u128);
-
-#[deprecated]
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Count { value: usize }
-
-#[allow(deprecated)]
-impl Count {
-	pub fn new() -> Self { Self::default() }
-
-	#[allow(clippy::should_implement_trait)]
-	pub fn next(&mut self) -> usize {
-		let v = self.value;
-		self.value += 1;
-		v
-	}
-}
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Unique(usize);

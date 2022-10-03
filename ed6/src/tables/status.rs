@@ -50,9 +50,8 @@ pub fn read(_arcs: &Archives, data: &[u8]) -> Result<Vec<Vec<Status>>, ReadError
 pub fn write(_arcs: &Archives, table: &Vec<Vec<Status>>) -> Result<Vec<u8>, WriteError> {
 	let mut f = OutBytes::new();
 	let mut g = OutBytes::new();
-	let mut count = Count::new();
 	for char in table {
-		let l = count.next();
+		let l = Unique::new();
 		f.delay_u16(l);
 		g.label(l);
 		for status in char {

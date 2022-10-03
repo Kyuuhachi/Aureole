@@ -76,10 +76,9 @@ pub fn write(_arcs: &Archives, table: &BTreeMap<ItemId, Item>) -> Result<(Vec<u8
 	let mut g1 = OutBytes::new();
 	let mut f2 = OutBytes::new();
 	let mut g2 = OutBytes::new();
-	let mut count = Count::new();
 
 	for (&id, &Item { ref name_desc, flags, usable_by, ty, _unk1, stats, limit, price }) in table {
-		let l = count.next();
+		let l = Unique::new();
 		f1.delay_u16(l);
 		g1.label(l);
 		f2.delay_u16(l);
@@ -95,7 +94,7 @@ pub fn write(_arcs: &Archives, table: &BTreeMap<ItemId, Item>) -> Result<(Vec<u8
 		g1.u16(limit);
 		g1.u32(price);
 
-		g2.name_desc(count.next(), count.next(), name_desc)?;
+		g2.name_desc(Unique::new(), Unique::new(), name_desc)?;
 	}
 	Ok((f1.concat(g1).finish()?, f2.concat(g2).finish()?))
 }

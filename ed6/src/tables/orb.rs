@@ -45,13 +45,12 @@ pub fn read(_arcs: &Archives, data: &[u8]) -> Result<Vec<Orbment>, ReadError> {
 pub fn write(_arcs: &Archives, table: &Vec<Orbment>) -> Result<Vec<u8>, WriteError> {
 	let mut f = OutBytes::new();
 	let mut g = OutBytes::new();
-	let mut count = Count::new();
 
 	let nslots = 6; // 7 in sc/3rd
 	let npad = 1; // 2 in sc/3rd
 
 	for Orbment { slots, lines } in table {
-		let l = count.next();
+		let l = Unique::new();
 		f.delay_u16(l);
 		g.label(l);
 

@@ -25,19 +25,6 @@ pub struct Pos2(pub i32, pub i32);
 pub struct Pos3(pub i32, pub i32, pub i32);
 
 newtype!(Flag, u16);
-newtype!(Var, u16);
-newtype!(Attr, u8);
-newtype!(CharId, u16);
-
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[derive(derive_more::DebugCustom)]
-#[debug(fmt = "CharAttr({_0:?}, {_1})")]
-pub struct CharAttr(pub CharId, pub u8);
-
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[derive(derive_more::DebugCustom)]
-#[debug(fmt = "Emote({_0:?}, {_1})")]
-pub struct Emote(pub u8, pub u8, pub u32);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Npc {
@@ -123,10 +110,11 @@ pub struct Scena {
 	pub triggers: Vec<Trigger>,
 	pub objects: Vec<Object>,
 	pub camera_angles: Vec<CameraAngle>,
-	pub functions: Vec<Vec<u8>>,
+	pub functions: Vec<Vec<code::FlatInsn>>,
 }
 
 pub trait InExt2<'a>: In<'a> {
+	#[deprecated(note="InExt2 is used for both header and code, where the format differs")]
 	fn func_ref(&mut self) -> Result<FuncRef, ReadError> {
 		Ok(FuncRef(self.u16()?, self.u16()?))
 	}
@@ -142,6 +130,7 @@ pub trait InExt2<'a>: In<'a> {
 impl<'a, T: In<'a>> InExt2<'a> for T {}
 
 pub trait OutExt2: Out {
+	#[deprecated]
 	fn func_ref(&mut self, fr: FuncRef) {
 		self.u16(fr.0);
 		self.u16(fr.1);
@@ -185,8 +174,8 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<Scena, ReadError> {
 
 	let code_start = f.u16()? as usize;
 	f.check_u16(0)?;
+	let code_end = f.clone().u16()? as usize;
 	let func_table = (f.ptr()?, f.u16()? / 2);
-	let code_end = func_table.0.pos();
 
 	ensure!(strings.string()? == "@FileName", "expected @FileName");
 
@@ -275,11 +264,7 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<Scena, ReadError> {
 	let starts = func_table.iter().copied();
 	let ends = func_table.iter().copied().skip(1).chain(std::iter::once(code_end));
 	for (start, end) in starts.zip(ends) {
-		let code = code::read_func(&mut f.clone().at(start)?, arc, end)?;
-		// println!("{:#?}", code);
-		let mut g = f.clone().at(start)?;
-		let slice = g.slice(end-start)?;
-		functions.push(slice.to_owned());
+		functions.push(code::read(&mut f.clone().at(start)?, arc, end)?);
 	}
 
 	f.assert_covered()?;
@@ -318,7 +303,6 @@ pub fn write(arc: &Archives, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	let mut g = OutBytes::new();
 	let mut func_table = OutBytes::new();
 	let mut strings = OutBytes::new();
-	let mut count = Count::new();
 
 	f.sized_string::<10>(dir)?;
 	f.sized_string::<14>(fname)?;
@@ -329,39 +313,39 @@ pub fn write(arc: &Archives, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	f.multiple::<8, _>(&[0xFF; 4], includes, |g, a| { g.array(arc.index(a)?); Ok(()) }).strict()?;
 	f.u16(0);
 
-	let l_ch = count.next();
+	let l_ch = Unique::new();
 	f.delay_u16(l_ch);
 	f.u16(cast(ch.len())?);
 
-	let l_cp = count.next();
+	let l_cp = Unique::new();
 	f.delay_u16(l_cp);
 	f.u16(cast(cp.len())?);
 
-	let l_npcs = count.next();
+	let l_npcs = Unique::new();
 	f.delay_u16(l_npcs);
 	f.u16(cast(npcs.len())?);
 
-	let l_monsters = count.next();
+	let l_monsters = Unique::new();
 	f.delay_u16(l_monsters);
 	f.u16(cast(monsters.len())?);
 
-	let l_triggers = count.next();
+	let l_triggers = Unique::new();
 	f.delay_u16(l_triggers);
 	f.u16(cast(triggers.len())?);
 
-	let l_objects = count.next();
+	let l_objects = Unique::new();
 	f.delay_u16(l_objects);
 	f.u16(cast(objects.len())?);
 
-	let l_strings = count.next();
+	let l_strings = Unique::new();
 	f.delay_u16(l_strings);
 	strings.label(l_strings);
 	strings.string("@FileName")?;
 
-	let l_code_start = count.next();
+	let l_code_start = Unique::new();
 	f.delay_u16(l_code_start);
 	f.u16(0);
-	let l_func_table = count.next();
+	let l_func_table = Unique::new();
 	f.delay_u16(l_func_table);
 	f.u16(cast(functions.len() * 2)?);
 
@@ -419,11 +403,11 @@ pub fn write(arc: &Archives, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 
 	func_table.label(l_func_table);
 	g.label(l_code_start);
-	for func in functions {
-		let l_func = count.next();
+	for func in functions.iter() {
+		let l_func = Unique::new();
 		func_table.delay_u16(l_func);
 		g.label(l_func);
-		g.slice(func);
+		code::write(&mut g, arc, func)?;
 	}
 
 	for &CameraAngle { pos, _1, angle, pos2, pos3, zoom, fov, angle1, angle2, angle3, _2, _3, _4, _5, _6, _7 } in camera_angles {
@@ -450,7 +434,7 @@ pub fn write(arc: &Archives, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 
 #[cfg(test)]
 mod test {
-	use crate::archive::Archives;
+use crate::archive::Archives;
 	use crate::util::test::*;
 
 	#[test_case::test_case(&FC, 0x01; "fc")]
@@ -460,7 +444,6 @@ mod test {
 		for e in arc.archive(scena_archive)?.entries() {
 			if e.is_empty() { continue }
 			if let Err(err) = check_roundtrip_strict(arc, &e.name, super::read, super::write) {
-				// println!("{}: {err:#?}", &e.name);
 				println!("{}: {err}", &e.name);
 				failed = true;
 			};

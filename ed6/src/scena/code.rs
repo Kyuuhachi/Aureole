@@ -12,7 +12,7 @@ use crate::tables::town::TownId;
 use crate::util::*;
 use crate::text::Text;
 
-use super::{FuncRef, CharId, CharAttr, Emote, Pos2, Pos3, Var, Flag, Attr, InExt2, OutExt2};
+use super::{FuncRef, Pos2, Pos3, Flag, InExt2, OutExt2};
 
 type Color = u32;
 type ShopId = u8;
@@ -24,16 +24,30 @@ type Flags = u32;
 type QuestFlags = u8;
 type CharFlags = u16;
 
+newtype!(Var, u16);
+newtype!(Attr, u8);
+newtype!(CharId, u16);
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(derive_more::DebugCustom)]
+#[debug(fmt = "CharAttr({_0:?}, {_1})")]
+pub struct CharAttr(pub CharId, pub u8);
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(derive_more::DebugCustom)]
+#[debug(fmt = "Emote({_0:?}, {_1})")]
+pub struct Emote(pub u8, pub u8, pub u32);
+
 mod insn;
 pub use insn::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum FlowInsn_<E, I, L> {
+pub enum FlatInsn_<E, I, L> {
 	Unless(E, L),
 	Goto(L),
 	Switch(E, Vec<(u16, L)>, L),
 	Insn(I),
-	Label(L), // Doesn't exist in RawFlowInsn
+	Label(L), // Doesn't exist in RawFlatInsn
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -45,10 +59,10 @@ impl std::fmt::Debug for Label {
 	}
 }
 
-type RawFlowInsn = FlowInsn_<Expr, Insn, usize>;
-pub type FlowInsn = FlowInsn_<Expr, Insn, Label>;
+type AFlatInsn<A> = FlatInsn_<Expr, Insn, A>;
+pub type FlatInsn = AFlatInsn<Label>;
 
-pub fn read_func<'a>(f: &mut impl In<'a>, arc: &Archives, end: usize) -> Result<Vec<FlowInsn>, ReadError> {
+pub fn read<'a>(f: &mut impl In<'a>, arc: &Archives, end: usize) -> Result<Vec<FlatInsn>, ReadError> {
 	let mut insns = Vec::new();
 	while f.pos() < end {
 		insns.push((f.pos(), read_raw_insn(f, arc)?));
@@ -58,20 +72,20 @@ pub fn read_func<'a>(f: &mut impl In<'a>, arc: &Archives, end: usize) -> Result<
 	let mut labels = BTreeSet::new();
 	for (_, insn) in &insns {
 		match insn {
-			RawFlowInsn::Unless(_, target) => {
+			AFlatInsn::Unless(_, target) => {
 				labels.insert(*target);
 			},
-			RawFlowInsn::Goto(target) => {
+			AFlatInsn::Goto(target) => {
 				labels.insert(*target);
 			},
-			RawFlowInsn::Switch(_, branches, default) => {
+			AFlatInsn::Switch(_, branches, default) => {
 				for (_, target) in branches {
 					labels.insert(*target);
 				}
 				labels.insert(*default);
 			}
-			RawFlowInsn::Insn(_) => {}
-			RawFlowInsn::Label(_) => unreachable!(),
+			AFlatInsn::Insn(_) => {}
+			AFlatInsn::Label(_) => unreachable!(),
 		}
 	}
 
@@ -80,54 +94,105 @@ pub fn read_func<'a>(f: &mut impl In<'a>, arc: &Archives, end: usize) -> Result<
 	let mut insns2 = Vec::with_capacity(insns.len() + labels.len());
 	for (pos, insn) in insns {
 		if let Some(label) = labels.get(&pos) {
-			insns2.push(FlowInsn::Label(*label));
+			insns2.push(FlatInsn::Label(*label));
 		}
 		insns2.push(match insn {
-			RawFlowInsn::Unless(e, a) => FlowInsn::Unless(e, labels[&a]),
-			RawFlowInsn::Goto(a) => FlowInsn::Goto(labels[&a]),
-			RawFlowInsn::Switch(e, cs, a) => FlowInsn::Switch(e, cs.into_iter().map(|(a, b)| (a, labels[&b])).collect(), labels[&a]),
-			RawFlowInsn::Insn(i) => FlowInsn::Insn(i),
-			RawFlowInsn::Label(_) => unreachable!(),
+			AFlatInsn::Unless(e, l) => FlatInsn::Unless(e, labels[&l]),
+			AFlatInsn::Goto(l) => FlatInsn::Goto(labels[&l]),
+			AFlatInsn::Switch(e, cs, l) => FlatInsn::Switch(e, cs.into_iter().map(|(a, l)| (a, labels[&l])).collect(), labels[&l]),
+			AFlatInsn::Insn(i) => FlatInsn::Insn(i),
+			AFlatInsn::Label(_) => unreachable!(),
 		})
 	}
 
 	Ok(insns2)
 }
 
-fn read_raw_insn<'a>(f: &mut impl In<'a>, arc: &Archives) -> Result<RawFlowInsn, ReadError> {
-	// f.dump().oneline().to_stdout();
+fn read_raw_insn<'a>(f: &mut impl In<'a>, arc: &Archives) -> Result<AFlatInsn<usize>, ReadError> {
 	let pos = f.pos();
 	let res = try {
 		let insn = match f.u8()? {
-			0x02 => RawFlowInsn::Unless(expr::read(f, arc)?, f.u16()? as usize),
-			0x03 => RawFlowInsn::Goto(f.u16()? as usize),
-			0x04 => RawFlowInsn::Switch(expr::read(f, arc)?, {
-				let mut out = Vec::new();
+			0x02 => {
+				let e = expr::read(f, arc)?;
+				let l = f.u16()? as usize;
+				AFlatInsn::Unless(e, l)
+			}
+			0x03 => {
+				let l = f.u16()? as usize;
+				AFlatInsn::Goto(l)
+			}
+			0x04 => {
+				let e = expr::read(f, arc)?;
+				let mut cs = Vec::new();
 				for _ in 0..f.u16()? {
-					out.push((f.u16()?, f.u16()? as usize));
+					cs.push((f.u16()?, f.u16()? as usize));
 				}
-				out
-			}, f.u16()? as usize),
+				let l = f.u16()? as usize;
+				AFlatInsn::Switch(e, cs, l)
+			}
 			_ => {
 				f.seek(pos)?;
-				RawFlowInsn::Insn(Insn::read(f, arc)?)
+				let i = Insn::read(f, arc)?;
+				AFlatInsn::Insn(i)
 			}
 		};
-		// println!("{pos} {:?}", insn);
 		insn
 	};
 	match res {
 		Ok(a) => Ok(a),
 		Err(e) => {
-			f.seek(pos.saturating_sub(48))?;
-			f.dump().lines(3).mark(pos, 9).to_stderr();
+			f.seek(pos.saturating_sub(48*2))?;
+			f.dump().lines(4).mark(pos, 9).to_stderr();
 			Err(e)
 		}
 	}
 }
 
-pub fn write_insn(v: &str, f: &mut impl OutDelay<usize>, arc: &Archives) -> Result<(), WriteError> {
-	todo!()
+pub fn write(f: &mut impl OutDelay<Unique>, arc: &Archives, insns: &[FlatInsn]) -> Result<(), WriteError> {
+	let mut labels = BTreeMap::new();
+	let mut label = move |l| *labels.entry(l).or_insert_with(Unique::new);
+
+	for insn in insns {
+		write_raw_insn(f, arc, &match insn {
+			AFlatInsn::Unless(e, l) => FlatInsn_::Unless(e, label(*l)),
+			AFlatInsn::Goto(l) => FlatInsn_::Goto(label(*l)),
+			AFlatInsn::Switch(e, cs, l) => FlatInsn_::Switch(e, cs.iter().map(|(a, l)| (*a, label(*l))).collect(), label(*l)),
+			AFlatInsn::Insn(i) => FlatInsn_::Insn(i),
+			AFlatInsn::Label(l) => FlatInsn_::Label(label(*l)),
+		})?;
+	}
+	Ok(())
+}
+
+fn write_raw_insn(f: &mut impl OutDelay<Unique>, arc: &Archives, insn: &FlatInsn_<&Expr, &Insn, Unique>) -> Result<(), WriteError> {
+	match insn {
+		FlatInsn_::Unless(e, l) => {
+			f.u8(0x02);
+			expr::write(f, arc, e)?;
+			f.delay_u16(*l);
+		},
+		FlatInsn_::Goto(l) => {
+			f.u8(0x03);
+			f.delay_u16(*l);
+		},
+		FlatInsn_::Switch(e, cs, l) => {
+			f.u8(0x04);
+			expr::write(f, arc, e)?;
+			f.u16(cast(cs.len())?);
+			for (k, v) in cs {
+				f.u16(*k);
+				f.delay_u16(*v);
+			}
+			f.delay_u16(*l);
+		}
+		FlatInsn_::Insn(i) => {
+			Insn::write(f, arc, i)?
+		}
+		FlatInsn_::Label(l) => {
+			f.label(*l)
+		}
+	}
+	Ok(())
 }
 
 mod quest_list {
@@ -143,7 +208,7 @@ mod quest_list {
 		Ok(quests)
 	}
 
-	pub(super) fn write(v: &Vec<QuestId>, f: &mut impl Out) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Out, v: &Vec<QuestId>) -> Result<(), WriteError> {
 		for &i in v {
 			f.u16(i.0);
 		}
@@ -166,8 +231,17 @@ mod fork {
 		Ok(insns)
 	}
 
-	pub(super) fn write(v: &Vec<Insn>, f: &mut impl Out, arc: &Archives) -> Result<(), WriteError> {
-		todo!()
+	pub(super) fn write(f: &mut impl OutDelay<Unique>, arc: &Archives, v: &[Insn]) -> Result<(), WriteError> {
+		let l1 = Unique::new();
+		let l2 = Unique::new();
+		f.delay(move |l| Ok(u8::to_le_bytes(hamu::write::cast_usize(l(l2)? - l(l1)?)?)));
+		f.label(l1);
+		for i in v {
+			Insn::write(f, arc, i)?;
+		}
+		f.label(l2);
+		f.u8(0);
+		Ok(())
 	}
 }
 
@@ -181,13 +255,23 @@ mod fork_loop {
 			insns.push(Insn::read(f, arc)?);
 		}
 		ensure!(f.pos() == pos+len, "overshot while reading fork loop");
-		ensure!(read_raw_insn(f, arc)? == RawFlowInsn::Insn(Insn::Yield()), "invalid loop");
-		ensure!(read_raw_insn(f, arc)? == RawFlowInsn::Goto(pos), "invalid loop");
+		ensure!(read_raw_insn(f, arc)? == AFlatInsn::Insn(Insn::Yield()), "invalid loop");
+		ensure!(read_raw_insn(f, arc)? == AFlatInsn::Goto(pos), "invalid loop");
 		Ok(insns)
 	}
 
-	pub(super) fn write(v: &Vec<Insn>, f: &mut impl Out, arc: &Archives) -> Result<(), WriteError> {
-		todo!()
+	pub(super) fn write(f: &mut impl OutDelay<Unique>, arc: &Archives, v: &[Insn]) -> Result<(), WriteError> {
+		let l1 = Unique::new();
+		let l2 = Unique::new();
+		f.delay(move |l| Ok(u8::to_le_bytes(hamu::write::cast_usize(l(l2)? - l(l1)?)?)));
+		f.label(l1);
+		for i in v {
+			Insn::write(f, arc, i)?;
+		}
+		f.label(l2);
+		write_raw_insn(f, arc, &FlatInsn_::Insn(&Insn::Yield()))?;
+		write_raw_insn(f, arc, &FlatInsn_::Goto(l1))?;
+		Ok(())
 	}
 }
 
@@ -201,8 +285,13 @@ mod party_equip_slot {
 		}
 	}
 
-	pub(super) fn write(v: &i8, f: &mut impl Out, arg1: &ItemId) -> Result<(), WriteError> {
-		todo!()
+	pub(super) fn write(f: &mut impl Out, arg1: &ItemId, v: &i8) -> Result<(), WriteError> {
+		if (600..800).contains(&arg1.0) {
+			f.i8(*v);
+		} else {
+			ensure!(*v == -1, "invalid PartyEquipSlot");
+		}
+		Ok(())
 	}
 }
 
@@ -212,30 +301,84 @@ mod menu {
 		Ok(f.string()?.split_terminator('\x01').map(|a| a.to_owned()).collect())
 	}
 
-	pub(super) fn write(v: &Vec<String>, f: &mut impl Out) -> Result<(), WriteError> {
-		todo!()
+	pub(super) fn write(f: &mut impl Out, v: &[String]) -> Result<(), WriteError> {
+		let mut s = String::new();
+		for line in v {
+			s.push_str(line.as_str());
+			s.push('\x01');
+		}
+		f.string(&s)?;
+		Ok(())
 	}
 }
 
 mod emote {
 	use super::*;
 	pub(super) fn read<'a>(f: &mut impl In<'a>) -> Result<Emote, ReadError> {
-		Ok(Emote(f.u8()?, f.u8()?, f.u32()?))
+		let a = f.u8()?;
+		let b = f.u8()?;
+		let c = f.u32()?;
+		Ok(Emote(a, b, c))
 	}
 
-	pub(super) fn write(v: &Emote, f: &mut impl Out) -> Result<(), WriteError> {
-		todo!()
+	pub(super) fn write(f: &mut impl Out, &Emote(a, b, c): &Emote) -> Result<(), WriteError> {
+		f.u8(a);
+		f.u8(b);
+		f.u32(c);
+		Ok(())
 	}
 }
 
 mod char_attr {
 	use super::*;
 	pub(super) fn read<'a>(f: &mut impl In<'a>) -> Result<CharAttr, ReadError> {
-		Ok(CharAttr(CharId(f.u16()?), f.u8()?))
+		let a = CharId(f.u16()?);
+		let b = f.u8()?;
+		Ok(CharAttr(a, b))
 	}
 
-	pub(super) fn write(v: &CharAttr, f: &mut impl Out) -> Result<(), WriteError> {
-		todo!()
+	pub(super) fn write(f: &mut impl Out, &CharAttr(a, b): &CharAttr) -> Result<(), WriteError> {
+		f.u16(a.0);
+		f.u8(b);
+		Ok(())
+	}
+}
+
+mod file_ref {
+	use super::*;
+	pub(super) fn read<'a>(f: &mut impl In<'a>, arc: &Archives) -> Result<String, ReadError> {
+		Ok(arc.name(f.array()?)?.to_owned())
+	}
+
+	pub(super) fn write(f: &mut impl Out, arc: &Archives, v: &str) -> Result<(), WriteError> {
+		f.array(arc.index(v)?);
+		Ok(())
+	}
+}
+
+mod func_ref {
+	use super::*;
+	pub(super) fn read<'a>(f: &mut impl In<'a>) -> Result<FuncRef, ReadError> {
+		let a = f.u8()? as u16;
+		let b = f.u16()?;
+		Ok(FuncRef(a, b))
+	}
+
+	pub(super) fn write(f: &mut impl Out, &FuncRef(a, b): &FuncRef) -> Result<(), WriteError> {
+		f.u8(cast(a)?);
+		f.u16(b);
+		Ok(())
+	}
+}
+
+mod text {
+	use super::*;
+	pub(super) fn read<'a>(f: &mut impl In<'a>) -> Result<Text, ReadError> {
+		crate::text::Text::read(f)
+	}
+
+	pub(super) fn write(f: &mut impl Out, v: &Text) -> Result<(), WriteError> {
+		crate::text::Text::write(f, v)
 	}
 }
 
@@ -314,7 +457,7 @@ mod expr {
 					0x1E => Expr::Flag(Flag(f.u16()?)),
 					0x1F => Expr::Var(Var(f.u16()?)),
 					0x20 => Expr::Attr(Attr(f.u8()?)),
-					0x21 => Expr::CharAttr(CharAttr(CharId(f.u16()?), f.u8()?)),
+					0x21 => Expr::CharAttr(char_attr::read(f)?),
 					0x22 => Expr::Rand,
 					op => return Err(format!("unknown Expr: 0x{op:02X}").into())
 				}
@@ -325,43 +468,31 @@ mod expr {
 		Ok(stack.pop().unwrap())
 	}
 
-	pub(super) fn write(v: &Expr, f: &mut impl Out, arc: &Archives) -> Result<(), WriteError> {
-		todo!()
-	}
-}
-
-mod file_ref {
-	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>, arc: &Archives) -> Result<String, ReadError> {
-		Ok(arc.name(f.array()?)?.to_owned())
-	}
-
-	pub(super) fn write(v: &str, f: &mut impl Out, arc: &Archives) -> Result<(), WriteError> {
-		f.array(arc.index(v)?);
-		Ok(())
-	}
-}
-
-mod text {
-	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>) -> Result<Text, ReadError> {
-		crate::text::Text::read(f)
-	}
-
-	pub(super) fn write(v: &Text, f: &mut impl Out) -> Result<(), WriteError> {
-		todo!()
-	}
-}
-
-mod func_ref {
-	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>) -> Result<FuncRef, ReadError> {
-		Ok(FuncRef(f.u8()? as u16, f.u16()?))
-	}
-
-	pub(super) fn write(v: &FuncRef, f: &mut impl Out) -> Result<(), WriteError> {
-		f.u16(cast(v.0)?);
-		f.u16(v.1);
+	pub(super) fn write(f: &mut impl OutDelay<Unique>, arc: &Archives, v: &Expr) -> Result<(), WriteError> {
+		fn write_node(f: &mut impl OutDelay<Unique>, arc: &Archives, v: &Expr) -> Result<(), WriteError> {
+			match *v {
+				Expr::Binop(op, ref a, ref b) => {
+					write_node(f, arc, a)?;
+					write_node(f, arc, b)?;
+					f.u8(op.into());
+				},
+				Expr::Unop(op, ref v) => {
+					write_node(f, arc, v)?;
+					f.u8(op.into());
+				},
+				Expr::Const(n)       => { f.u8(0x00); f.u32(n); },
+				// 0x01 handled below
+				Expr::Exec(ref insn) => { f.u8(0x1C); Insn::write(f, arc, insn)?; },
+				Expr::Flag(v)        => { f.u8(0x1E); f.u16(v.0); },
+				Expr::Var(v)         => { f.u8(0x1F); f.u16(v.0); },
+				Expr::Attr(v)        => { f.u8(0x20); f.u8(v.0); },
+				Expr::CharAttr(v)    => { f.u8(0x21); char_attr::write(f, &v)?; },
+				Expr::Rand           => { f.u8(0x22); },
+			}
+			Ok(())
+		}
+		write_node(f, arc, v)?;
+		f.u8(0x01);
 		Ok(())
 	}
 }

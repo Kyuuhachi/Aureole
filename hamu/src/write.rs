@@ -4,10 +4,11 @@ use std::{
 	fmt::Debug,
 	rc::Rc,
 	ops::Range,
+	num::TryFromIntError,
 };
 
 pub mod prelude {
-	pub use super::{OutBase, Label, OutDelay, Out, OutBytes, Count};
+	pub use super::{OutBase, Label, OutDelay, Out, OutBytes, Count, Unique};
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -16,12 +17,10 @@ pub enum Error {
 	Undefined { label: String },
 	#[error("duplicate label '{label}': {v1} → {v2}")]
 	Duplicate { label: String, v1: usize, v2: usize },
-	#[error("failed to convert {label} ({value}) to {type_}: {source}")]
+	#[error("failed to convert {value} to {type_}")]
 	LabelSize {
-		label: String,
 		type_: &'static str,
 		value: String,
-		source: Box<dyn std::error::Error>
 	},
 }
 pub type Result<T, E=Error> = std::result::Result<T, E>;
@@ -134,7 +133,6 @@ impl<L: Label> OutBytes<L> {
 	) -> OutBytes<M> {
 		OutBytes::new().concat_with(self, f)
 	}
-
 }
 
 impl<L: Label> OutBase for OutBytes<L> {
@@ -186,13 +184,7 @@ macro_rules! primitives {
 				fn [<delay_ $utype _ $suf>]<L: Label>(&mut self, k: L) where Self: OutDelay<L> {
 					self.delay(move |lookup| {
 						let v = lookup(k.clone())?;
-						let v = $utype::try_from(v)
-							.map_err(Box::from).map_err(|source| Error::LabelSize {
-								source,
-								label: format!("{:?}", k),
-								type_: std::any::type_name::<$utype>(),
-								value: format!("{:?}", v),
-							})?;
+						let v = cast_usize::<$utype>(v)?;
 						Ok(v.$conv())
 					});
 				}
@@ -207,12 +199,21 @@ macro_rules! primitives {
 	} }
 }
 
+pub fn cast_usize<T: TryFrom<usize, Error=TryFromIntError>>(v: usize) -> Result<T> {
+	T::try_from(v).map_err(|_| Error::LabelSize {
+		type_: std::any::type_name::<T>(),
+		value: format!("{:?}", v),
+	})
+}
+
 primitives!(OutLe, le, to_le_bytes; u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, f32, f64; u8, u16, u32, u64, u128);
 primitives!(OutBe, be, to_be_bytes; u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, f32, f64; u8, u16, u32, u64, u128);
 
+#[deprecated]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Count { value: usize }
 
+#[allow(deprecated)]
 impl Count {
 	pub fn new() -> Self { Self::default() }
 
@@ -221,5 +222,23 @@ impl Count {
 		let v = self.value;
 		self.value += 1;
 		v
+	}
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Unique(usize);
+
+impl Debug for Unique {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "Unique(0x{:04X})", self.0)
+	}
+}
+
+impl Unique {
+	#[allow(clippy::new_without_default)]
+	pub fn new() -> Unique {
+		use std::sync::atomic::{AtomicUsize, Ordering};
+		static COUNT: AtomicUsize = AtomicUsize::new(0);
+		Unique(COUNT.fetch_add(1, Ordering::Relaxed))
 	}
 }

@@ -73,8 +73,8 @@ pub fn bytecode(tokens: TokenStream) -> TokenStream {
 	});
 	let write = quote! {
 		#[allow(clippy::needless_borrow)]
-		pub fn write(&self, #f: &mut impl Out, #args) -> Result<(), WriteError> {
-			match self {
+		pub fn write(#f: &mut impl OutDelay<Unique>, #args, insn: &Insn) -> Result<(), WriteError> {
+			match insn {
 				#(#items)*
 			}
 			Ok(())
@@ -491,8 +491,9 @@ fn gather(ctx: &mut Ctx, t: &Table, item: &Item) -> TokenStream2 {
 					},
 					Source::Call(a) => {
 						let name = &a.name;
-						let mut args = vec![val, quote_spanned! { f.span() => #f }];
+						let mut args = vec![quote_spanned! { f.span() => #f }];
 						parse_index(&mut args, a.args.iter());
+						args.push(val);
 						quote_spanned! { a.span() => #name::write(#(#args),*)? }
 					},
 				};

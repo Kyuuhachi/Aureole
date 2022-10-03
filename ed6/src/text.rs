@@ -1,10 +1,20 @@
+use encoding_rs::SHIFT_JIS;
 use hamu::read::le::*;
 use hamu::write::le::*;
 use crate::util::*;
 use crate::tables::{face::FaceId, item::ItemId};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Text(pub Vec<TextSegment>);
+#[derive(Clone, PartialEq, Eq)]
+pub struct Text(Vec<u8>);
+
+impl std::fmt::Debug for Text {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.write_str("Text::from_iter(")?;
+		f.debug_list().entries(self.iter()).finish()?;
+		f.write_str(")")?;
+		Ok(())
+	}
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TextSegment {
@@ -17,113 +27,142 @@ pub enum TextSegment {
 	Color(u8),
 	_09,
 	Item(ItemId),
-	// Can't store only the parsed number, that makes roundtripping lossy
-	A(String), // nullable
-	Face(String), // nullable
-	K(String),
-	Pos(String),
-	Ruby(String, String),
-	Size(String),
-	Speed(String), // nullable
-	BrokenNoop, // Used in FC t2410:9, I'm pretty sure it's a bug
+
+	// Hash sequence
+	NoA,
+	A(u16),
+	NoFace,
+	Face(FaceId),
+	K(u16),
+	Pos(u16),
+	Ruby(u16, String),
+	Size(u16),
+	NoSpeed,
+	Speed(u16),
+
+	// Invalid sjis, or hash sequence that did not parse correctly.
+	// The one known instance is in FC t2410:9, where a line contains #\x02.
+	Error(Vec<u8>),
 }
 
 impl Text {
 	pub fn read<'a>(f: &mut impl In<'a>) -> Result<Text, ReadError> {
-		let mut segments = Vec::new();
-		let mut curr = Vec::new();
-		fn drain(segments: &mut Vec<TextSegment>, curr: &mut Vec<u8>) -> Result<(), DecodeError> {
-			if !curr.is_empty() {
-				segments.push(TextSegment::String(decode(curr)?));
-			}
-			curr.clear();
-			Ok(())
-		}
-
+		let pos = f.pos();
 		loop {
 			match f.u8()? {
-				0x00 => { drain(&mut segments, &mut curr)?; break }
-				0x01 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::Line) }
-				0x02 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::Wait) }
-				0x03 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::Page) }
-				0x05 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::_05) }
-				0x06 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::_06) }
-				0x07 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::Color(f.u8()?)) }
-				0x09 => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::_09) }
-				// 0x18 =>
-				0x1F => { drain(&mut segments, &mut curr)?; segments.push(TextSegment::Item(ItemId(f.u16()?))) }
+				0x00 => break,
+				0x01 | 0x02 | 0x03 | 0x05 | 0x06 | 0x09 => {}
+				0x07 => { f.u8()?; }
+				0x1F => { f.u16()?; }
 				ch@(0x00..=0x1F) => bail!("b{:?}", char::from(ch)),
-				b'#' => {
-					drain(&mut segments, &mut curr)?;
-
-					let mut n = Vec::new();
-					let ch = loop {
-						match f.u8()? {
-							ch@(b'0'..=b'9') => n.push(ch),
-							ch => break ch,
-						}
-					};
-					let n = std::str::from_utf8(&n).unwrap().to_owned();
-
-					segments.push(match ch {
-						0x02 if n.is_empty() => TextSegment::BrokenNoop,
-						b'A' => TextSegment::A(n),
-						b'F' => TextSegment::Face(n),
-						b'K' => TextSegment::K(n),
-						b'P' => TextSegment::Pos(n),
-						b'R' => {
-							let mut ruby = Vec::new();
-							loop { match f.u8()? {
-								b'#' => break,
-								ch => ruby.push(ch),
-							} }
-							TextSegment::Ruby(n, decode(&ruby)?)
-						},
-						b'S' => TextSegment::Size(n),
-						b'W' => TextSegment::Speed(n),
-						ch => bail!("#{}{}", n, char::from(ch))
-					});
-				}
-				ch => curr.push(ch)
+				0x20.. => {}
 			}
 		}
-		Ok(Text(segments))
+		let end = f.pos();
+		f.seek(pos)?;
+		Ok(Text(f.slice(end-pos)?.to_owned()))
 	}
 
 	pub fn write(f: &mut impl Out, v: &Text) -> Result<(), WriteError> {
-		for seg in &v.0 {
-			match seg {
-				TextSegment::String(ref s) => f.slice(&encode(s)?),
-				TextSegment::Line => f.u8(0x01),
-				TextSegment::Wait => f.u8(0x02),
-				TextSegment::Page => f.u8(0x03),
-				TextSegment::_05 => f.u8(0x05),
-				TextSegment::_06 => f.u8(0x06),
-				TextSegment::Color(n) => {
-					f.u8(0x07);
-					f.u8(*n);
-				},
-				TextSegment::_09 => f.u8(0x09),
-				TextSegment::Item(n) => {
-					f.u8(0x1F);
-					f.u16(n.0);
-				},
-				TextSegment::A(n)       => f.slice(format!("#{n}A").as_bytes()),
-				TextSegment::Face(n)    => f.slice(format!("#{n}F").as_bytes()),
-				TextSegment::K(n)       => f.slice(format!("#{n}K").as_bytes()),
-				TextSegment::Pos(n)     => f.slice(format!("#{n}P").as_bytes()),
-				TextSegment::Ruby(n, s) => {
-					f.slice(format!("#{n}R").as_bytes());
-					f.slice(&encode(s)?);
-					f.u8(b'#');
-				}
-				TextSegment::Size(n)    => f.slice(format!("#{n}S").as_bytes()),
-				TextSegment::Speed(n)   => f.slice(format!("#{n}W").as_bytes()),
-				TextSegment::BrokenNoop => f.slice("#\x02".as_bytes())
-					,
-			}
-		}
-		f.u8(0);
+		f.slice(&v.0);
 		Ok(())
+	}
+
+	pub fn iter(&self) -> Iter {
+		Iter { data: &self.0, pos: 0 }
+	}
+}
+
+pub struct Iter<'a> {
+	data: &'a [u8],
+	pos: usize,
+}
+
+impl Iter<'_> {
+	fn parse_hash(&mut self) -> Option<TextSegment> {
+		let start = self.pos;
+		while (b'0'..=b'9').contains(&self.data[self.pos]) {
+			self.pos += 1;
+		}
+		let n = std::str::from_utf8(&self.data[start..self.pos]).unwrap();
+		let ch = self.data[self.pos];
+		self.pos += 1;
+		Some(match ch {
+			b'A' if n.is_empty() => TextSegment::NoA,
+			b'A' => TextSegment::A(n.parse().ok()?),
+			b'F' if n.is_empty() => TextSegment::NoFace,
+			b'F' => TextSegment::Face(FaceId(n.parse().ok()?)),
+			b'K' => TextSegment::K(n.parse().ok()?),
+			b'P' => TextSegment::Pos(n.parse().ok()?),
+			b'R' => {
+				let s = self.parse_string();
+				let ch = self.data[self.pos];
+				self.pos += 1;
+				if ch != b'#' {
+					return None
+				}
+				TextSegment::Ruby(n.parse().ok()?, s?)
+			},
+			b'S' => TextSegment::Size(n.parse().ok()?),
+			b'W' => TextSegment::Speed(n.parse().ok()?),
+			_ => return None
+		})
+	}
+
+	fn parse_string(&mut self) -> Option<String> {
+		let start = self.pos;
+		while self.data[self.pos] >= 0x20 && self.data[self.pos] != b'#' {
+			self.pos += 1;
+		}
+		let bytes = &self.data[start..self.pos];
+		let (text, _, error) = SHIFT_JIS.decode(bytes);
+		(!error).then(|| text.into_owned())
+	}
+}
+
+impl Iterator for Iter<'_> {
+	type Item = TextSegment;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		let start = self.pos;
+		#[allow(clippy::match_overlapping_arm)]
+		Some(match self.data[self.pos] {
+			0x00 => return None,
+			0x01 => { self.pos += 1; TextSegment::Line }
+			0x02 => { self.pos += 1; TextSegment::Wait }
+			0x03 => { self.pos += 1; TextSegment::Page }
+			0x05 => { self.pos += 1; TextSegment::_05 }
+			0x06 => { self.pos += 1; TextSegment::_06 }
+			0x07 => {
+				let n = self.data[self.pos+1];
+				self.pos += 2;
+				TextSegment::Color(n)
+			}
+			0x09 => { self.pos += 1; TextSegment::_09 }
+			0x1F => {
+				let n = u16::from_le_bytes([self.data[self.pos+1], self.data[self.pos+2]]);
+				self.pos += 2;
+				TextSegment::Item(ItemId(n))
+			}
+			0x00..=0x1F => unreachable!(),
+			b'#' => {
+				self.pos += 1;
+				if let Some(seg) = self.parse_hash() {
+					seg
+				} else {
+					if self.pos == self.data.len() {
+						self.pos -= 1;
+					}
+					TextSegment::Error(self.data[start..self.pos].to_owned())
+				}
+			}
+			0x20.. => {
+				if let Some(s) = self.parse_string() {
+					TextSegment::String(s)
+				} else {
+					TextSegment::Error(self.data[start..self.pos].to_owned())
+				}
+			}
+		})
 	}
 }

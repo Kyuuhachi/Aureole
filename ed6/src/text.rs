@@ -58,16 +58,13 @@ impl Text {
 				0x20.. => {}
 			}
 		}
-		let end = f.pos()-1;
+		let end = f.pos();
 		f.seek(pos)?;
-		let data = Box::from(f.slice(end-pos)?);
-		f.check_u8(0)?;
-		Ok(Text(data))
+		Ok(Text(Box::from(f.slice(end-pos)?)))
 	}
 
 	pub fn write(f: &mut impl Out, v: &Text) -> Result<(), WriteError> {
 		f.slice(&v.0);
-		f.u8(0);
 		Ok(())
 	}
 
@@ -91,6 +88,7 @@ impl std::iter::FromIterator<TextSegment> for Text {
 		for item in iter {
 			item.write_to(&mut f);
 		}
+		f.u8(0);
 		Text(f.finish().unwrap().into_boxed_slice())
 	}
 }

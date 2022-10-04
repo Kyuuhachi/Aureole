@@ -50,9 +50,7 @@ pub fn write(_arcs: &Archives, table: &Vec<Orbment>) -> Result<Vec<u8>, WriteErr
 	let npad = 1; // 2 in sc/3rd
 
 	for Orbment { slots, lines } in table {
-		let l = Label::new();
-		f.delay_u16(l);
-		g.label(l);
+		f.delay_u16(g.here());
 
 		ensure!(slots.len() == nslots, "must be {nslots}");
 		for s in slots {

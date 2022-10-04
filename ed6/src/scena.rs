@@ -326,9 +326,7 @@ pub fn write(arc: &Archives, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	f.delay_u16(l_objects);
 	f.u16(cast(objects.len())?);
 
-	let l_strings = Label::new();
-	f.delay_u16(l_strings);
-	strings.label(l_strings);
+	f.delay_u16(strings.here());
 	strings.string("@FileName")?;
 
 	let l_code_start = Label::new();
@@ -393,9 +391,7 @@ pub fn write(arc: &Archives, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	func_table.label(l_func_table);
 	g.label(l_code_start);
 	for func in functions.iter() {
-		let l_func = Label::new();
-		func_table.delay_u16(l_func);
-		g.label(l_func);
+		func_table.delay_u16(g.here());
 		code::write(&mut g, arc, func)?;
 	}
 

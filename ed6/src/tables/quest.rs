@@ -69,9 +69,7 @@ pub fn write(_arc: &Archives, table: &BTreeMap<QuestId, Quest>) -> Result<Vec<u8
 	let mut g = OutBytes::new();
 
 	for (&id, &Quest { section, index, bp, mira, flags, ref name, ref desc, ref extra_desc, ref steps }) in table {
-		let l = Label::new();
-		f.delay_u16(l);
-		g.label(l);
+		f.delay_u16(g.here());
 
 		g.u16(id.0);
 		g.u16(0);
@@ -85,23 +83,17 @@ pub fn write(_arc: &Archives, table: &BTreeMap<QuestId, Quest>) -> Result<Vec<u8
 
 		let mut h = OutBytes::new();
 
-		let l = Label::new();
-		g.delay_u16(l);
-		h.label(l);
+		g.delay_u16(h.here());
 		h.string(name)?;
 
-		let l = Label::new();
-		g.delay_u16(l);
-		h.label(l);
+		g.delay_u16(h.here());
 		h.string(desc)?;
 		if let Some(extra_desc) = extra_desc {
 			h.string(extra_desc)?;
 		}
 
 		for step in steps {
-			let l = Label::new();
-			g.delay_u16(l);
-			h.label(l);
+			g.delay_u16(h.here());
 			h.string(step)?;
 		}
 

@@ -78,11 +78,8 @@ pub fn write(_arcs: &Archives, table: &BTreeMap<ItemId, Item>) -> Result<(Vec<u8
 	let mut g2 = OutBytes::new();
 
 	for (&id, &Item { ref name_desc, flags, usable_by, ty, _unk1, stats, limit, price }) in table {
-		let l = Label::new();
-		f1.delay_u16(l);
-		g1.label(l);
-		f2.delay_u16(l);
-		g2.label(l);
+		f1.delay_u16(g1.here());
+		f2.delay_u16(g2.here());
 
 		g1.u16(id.0);
 		g1.u8(flags.bits());

@@ -34,6 +34,12 @@ pub trait OutDelay: OutBase {
 	fn label(&mut self, label: Label);
 	fn delay<const N: usize, F>(&mut self, cb: F) where
 		F: FnOnce(&dyn Fn(Label) -> Result<usize>) -> Result<[u8; N]> + 'static;
+
+	fn here(&mut self) -> Label {
+		let l = Label::new();
+		self.label(l);
+		l
+	}
 }
 
 pub trait Out: OutBase {

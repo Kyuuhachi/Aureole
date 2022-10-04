@@ -54,9 +54,7 @@ pub fn write(arc: &Archives, table: &BTreeMap<NameId, Name>) -> Result<Vec<u8>, 
 	let mut g = OutBytes::new();
 	let fileref = |a| Option::map_or(a, Ok([0; 4]), |a| arc.index(a));
 	for (&id, Name { ch1, ch2, cp1, cp2, ms1, ms2, name }) in table {
-		let l = Label::new();
-		f.delay_u16(l);
-		g.label(l);
+		f.delay_u16(g.here());
 		g.u16(id.0);
 		g.u16(0);
 		g.array(arc.index(ch1)?);
@@ -71,9 +69,7 @@ pub fn write(arc: &Archives, table: &BTreeMap<NameId, Name>) -> Result<Vec<u8>, 
 		g.string(name)?;
 	}
 
-	let l = Label::new();
-	f.delay_u16(l);
-	g.label(l);
+	f.delay_u16(g.here());
 	g.u32(999);
 	g.array([0; 6*4]);
 	let l = Label::new();

@@ -382,7 +382,7 @@ impl ToTokens for Source {
 struct SourceCall {
 	name: Ident,
 	paren_token: token::Paren,
-	args: Punctuated<Member, Token![,]>,
+	args: Punctuated<Box<Expr>, Token![,]>,
 	arrow_token: Token![->],
 	ty: Box<Type>,
 }
@@ -547,13 +547,9 @@ fn gather(ctx: &mut Ctx, t: &Table, item: &Item) -> TokenStream2 {
 	}
 }
 
-fn parse_index<'a>(args: &mut Vec<TokenStream2>, iter: impl Iterator<Item=&'a Member>) {
-	for n in iter {
-		let ident = match n {
-			Member::Named(n) => n.clone(),
-			Member::Unnamed(n) => format_ident!("_{}", n.index, span=n.span),
-		};
-		args.push(quote_spanned! { ident.span() => &#ident })
+fn parse_index<'a>(args: &mut Vec<TokenStream2>, iter: impl Iterator<Item=&'a Box<Expr>>) {
+	for e in iter {
+		args.push(quote_spanned! { e.span() => #e })
 	}
 }
 

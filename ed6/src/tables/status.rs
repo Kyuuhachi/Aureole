@@ -51,7 +51,7 @@ pub fn write(_arcs: &Archives, table: &Vec<Vec<Status>>) -> Result<Vec<u8>, Writ
 	let mut f = OutBytes::new();
 	let mut g = OutBytes::new();
 	for char in table {
-		let l = Unique::new();
+		let l = Label::new();
 		f.delay_u16(l);
 		g.label(l);
 		for status in char {

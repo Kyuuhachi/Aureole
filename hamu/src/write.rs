@@ -2,13 +2,12 @@ use std::{
 	hash::Hash,
 	collections::{HashMap, hash_map::Entry},
 	fmt::Debug,
-	rc::Rc,
 	ops::Range,
 	num::TryFromIntError,
 };
 
 pub mod prelude {
-	pub use super::{OutBase, Label, OutDelay, Out, OutBytes, Unique};
+	pub use super::{OutBase, Label, OutDelay, Out, OutBytes};
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -31,13 +30,10 @@ pub trait OutBase {
 	fn slice(&mut self, data: &[u8]);
 }
 
-pub trait Label: Eq + Hash + Clone + Debug + 'static {}
-impl<T: Eq + Hash + Clone + Debug + 'static> Label for T {}
-
-pub trait OutDelay<L: Label>: OutBase {
-	fn label(&mut self, label: L);
+pub trait OutDelay: OutBase {
+	fn label(&mut self, label: Label);
 	fn delay<const N: usize, F>(&mut self, cb: F) where
-		F: FnOnce(&dyn Fn(L) -> Result<usize>) -> Result<[u8; N]> + 'static;
+		F: FnOnce(&dyn Fn(Label) -> Result<usize>) -> Result<[u8; N]> + 'static;
 }
 
 pub trait Out: OutBase {
@@ -55,17 +51,17 @@ pub trait Out: OutBase {
 }
 impl<T> Out for T where T: OutBase + ?Sized {}
 
-type Delayed<L> = Box<dyn FnOnce(&dyn Fn(L) -> Result<usize>, &mut [u8]) -> Result<()>>;
+type Delayed = Box<dyn FnOnce(&dyn Fn(Label) -> Result<usize>, &mut [u8]) -> Result<()>>;
 
 #[derive(Default)]
 #[must_use]
-pub struct OutBytes<L: Label> {
+pub struct OutBytes {
 	data: Vec<u8>,
-	delays: Vec<(Range<usize>, Delayed<L>)>,
-	labels: HashMap<L, usize>,
+	delays: Vec<(Range<usize>, Delayed)>,
+	labels: HashMap<Label, usize>,
 }
 
-impl<L: Label> OutBytes<L> {
+impl OutBytes {
 	pub fn new() -> Self {
 		Self {
 			data: Vec::new(),
@@ -90,7 +86,7 @@ impl<L: Label> OutBytes<L> {
 		Ok(self.data)
 	}
 
-	fn set_label(&mut self, label: L, val: usize) {
+	fn set_label(&mut self, label: Label, val: usize) {
 		match self.labels.entry(label) {
 			Entry::Vacant(entry) => entry.insert(val),
 			Entry::Occupied(entry) => {
@@ -99,43 +95,24 @@ impl<L: Label> OutBytes<L> {
 		};
 	}
 
-	pub fn concat(self, other: Self) -> Self {
-		self.concat_with(other, |a| a)
-	}
-
-	pub fn concat_with<M: Label>(
-		mut self,
-		mut other: OutBytes<M>,
-		f: impl Fn(M) -> L + 'static,
-	) -> Self {
+	pub fn concat(mut self, mut other: OutBytes) -> Self {
 		let shift = self.len();
 		self.data.append(&mut other.data);
 
-		let f = Rc::new(f);
 		for (range, cb) in other.delays {
 			let range = range.start+shift..range.end+shift;
-			self.delays.push((range, Box::new({
-				let f = f.clone();
-				move |lookup, slice| cb(&|k| lookup(f(k)), slice)
-			})))
+			self.delays.push((range, cb))
 		}
 
 		for (k, v) in other.labels {
-			self.set_label(f(k), v+shift);
+			self.set_label(k, v+shift);
 		}
 
 		self
 	}
-
-	pub fn map<M: Label>(
-		self,
-		f: impl Fn(L) -> M + 'static,
-	) -> OutBytes<M> {
-		OutBytes::new().concat_with(self, f)
-	}
 }
 
-impl<L: Label> OutBase for OutBytes<L> {
+impl OutBase for OutBytes {
 	fn len(&self) -> usize {
 		self.data.len()
 	}
@@ -145,13 +122,13 @@ impl<L: Label> OutBase for OutBytes<L> {
 	}
 }
 
-impl<L: Label> OutDelay<L> for OutBytes<L> {
-	fn label(&mut self, label: L) {
+impl OutDelay for OutBytes {
+	fn label(&mut self, label: Label) {
 		self.set_label(label, self.len());
 	}
 
 	fn delay<const N: usize, F>(&mut self, cb: F) where
-		F: FnOnce(&dyn Fn(L) -> Result<usize>) -> Result<[u8; N]> + 'static,
+		F: FnOnce(&dyn Fn(Label) -> Result<usize>) -> Result<[u8; N]> + 'static,
 	{
 		let start = self.len();
 		self.array([0; N]);
@@ -177,11 +154,11 @@ macro_rules! primitives {
 			)*
 
 			$(
-				fn [<delay_ $utype>]<L: Label>(&mut self, k: L) where Self: OutDelay<L> {
+				fn [<delay_ $utype>](&mut self, k: Label) where Self: OutDelay {
 					self.[<delay_ $utype _ $suf>](k);
 				}
 
-				fn [<delay_ $utype _ $suf>]<L: Label>(&mut self, k: L) where Self: OutDelay<L> {
+				fn [<delay_ $utype _ $suf>](&mut self, k: Label) where Self: OutDelay {
 					self.delay(move |lookup| {
 						let v = lookup(k.clone())?;
 						let v = cast_usize::<$utype>(v)?;
@@ -210,19 +187,19 @@ primitives!(OutLe, le, to_le_bytes; u8, u16, u32, u64, u128, i8, i16, i32, i64, 
 primitives!(OutBe, be, to_be_bytes; u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, f32, f64; u8, u16, u32, u64, u128);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Unique(usize);
+pub struct Label(usize);
 
-impl Debug for Unique {
+impl Debug for Label {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "Unique(0x{:04X})", self.0)
+		write!(f, "Label(0x{:04X})", self.0)
 	}
 }
 
-impl Unique {
+impl Label {
 	#[allow(clippy::new_without_default)]
-	pub fn new() -> Unique {
+	pub fn new() -> Label {
 		use std::sync::atomic::{AtomicUsize, Ordering};
 		static COUNT: AtomicUsize = AtomicUsize::new(0);
-		Unique(COUNT.fetch_add(1, Ordering::Relaxed))
+		Label(COUNT.fetch_add(1, Ordering::Relaxed))
 	}
 }

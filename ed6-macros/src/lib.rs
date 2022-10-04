@@ -73,7 +73,7 @@ pub fn bytecode(tokens: TokenStream) -> TokenStream {
 	});
 	let write = quote! {
 		#[allow(clippy::needless_borrow)]
-		pub fn write(#f: &mut impl OutDelay<Unique>, #args, insn: &Insn) -> Result<(), WriteError> {
+		pub fn write(#f: &mut impl OutDelay, #args, insn: &Insn) -> Result<(), WriteError> {
 			match insn {
 				#(#items)*
 			}

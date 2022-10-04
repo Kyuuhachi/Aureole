@@ -48,7 +48,7 @@ pub fn write(_arcs: &Archives, towns: &Vec<Town>) -> Result<Vec<u8>, WriteError>
 	let mut g = OutBytes::new();
 	f.u16(cast(towns.len())?);
 	for &Town(ref name, kind) in towns {
-		let l = Unique::new();
+		let l = Label::new();
 		f.delay_u16(l);
 		g.label(l);
 		g.string(name)?;

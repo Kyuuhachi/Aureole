@@ -84,7 +84,7 @@ impl<'a> IntoIterator for &'a Text {
 
 impl std::iter::FromIterator<TextSegment> for Text {
 	fn from_iter<T: IntoIterator<Item = TextSegment>>(iter: T) -> Self {
-		let mut f = OutBytes::<!>::new();
+		let mut f = OutBytes::new();
 		for item in iter {
 			item.write_to(&mut f);
 		}
@@ -95,7 +95,7 @@ impl std::iter::FromIterator<TextSegment> for Text {
 
 impl<'a> std::iter::FromIterator<&'a TextSegment> for Text {
 	fn from_iter<T: IntoIterator<Item = &'a TextSegment>>(iter: T) -> Self {
-		let mut f = OutBytes::<!>::new();
+		let mut f = OutBytes::new();
 		for item in iter {
 			item.write_to(&mut f);
 		}
@@ -199,7 +199,7 @@ impl Iterator for Iter<'_> {
 }
 
 impl TextSegment {
-	fn write_to(&self, f: &mut OutBytes<!>) {
+	fn write_to(&self, f: &mut OutBytes) {
 		match self {
 			TextSegment::String(ref s) => {
 				let (text, _, error) = SHIFT_JIS.encode(s);

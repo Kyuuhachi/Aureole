@@ -92,10 +92,12 @@ pub trait OutExt: Out {
 		Ok(())
 	}
 
-	fn name_desc<L: Label>(&mut self, l1: L, l2: L, nd: &super::NameDesc) -> Result<(), WriteError> where Self: OutDelay<L> {
+	fn name_desc(&mut self, nd: &super::NameDesc) -> Result<(), WriteError> where Self: OutDelay {
 		let super::NameDesc { name, desc } = nd;
-		self.delay_u16(l1.clone());
-		self.delay_u16(l2.clone());
+		let l1 = Label::new();
+		let l2 = Label::new();
+		self.delay_u16(l1);
+		self.delay_u16(l2);
 		self.label(l1);
 		self.string(name)?;
 		self.label(l2);

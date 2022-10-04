@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use hamu::read::le::*;
 use hamu::write::le::*;
+use hamu::write::Label as HLabel;
 use crate::archive::Archives;
 use crate::tables::{bgmtbl::BgmId, Element};
 use crate::tables::btlset::BattleId;
@@ -148,9 +149,9 @@ fn read_raw_insn<'a>(f: &mut impl In<'a>, arc: &Archives) -> Result<AFlatInsn<us
 	}
 }
 
-pub fn write(f: &mut impl OutDelay<Unique>, arc: &Archives, insns: &[FlatInsn]) -> Result<(), WriteError> {
+pub fn write(f: &mut impl OutDelay, arc: &Archives, insns: &[FlatInsn]) -> Result<(), WriteError> {
 	let mut labels = BTreeMap::new();
-	let mut label = move |l| *labels.entry(l).or_insert_with(Unique::new);
+	let mut label = move |l| *labels.entry(l).or_insert_with(HLabel::new);
 
 	for insn in insns {
 		write_raw_insn(f, arc, &match insn {
@@ -164,7 +165,7 @@ pub fn write(f: &mut impl OutDelay<Unique>, arc: &Archives, insns: &[FlatInsn]) 
 	Ok(())
 }
 
-fn write_raw_insn(f: &mut impl OutDelay<Unique>, arc: &Archives, insn: &FlatInsn_<&Expr, &Insn, Unique>) -> Result<(), WriteError> {
+fn write_raw_insn(f: &mut impl OutDelay, arc: &Archives, insn: &FlatInsn_<&Expr, &Insn, HLabel>) -> Result<(), WriteError> {
 	match insn {
 		FlatInsn_::Unless(e, l) => {
 			f.u8(0x02);
@@ -231,9 +232,9 @@ mod fork {
 		Ok(insns)
 	}
 
-	pub(super) fn write(f: &mut impl OutDelay<Unique>, arc: &Archives, v: &[Insn]) -> Result<(), WriteError> {
-		let l1 = Unique::new();
-		let l2 = Unique::new();
+	pub(super) fn write(f: &mut impl OutDelay, arc: &Archives, v: &[Insn]) -> Result<(), WriteError> {
+		let l1 = HLabel::new();
+		let l2 = HLabel::new();
 		f.delay(move |l| Ok(u8::to_le_bytes(hamu::write::cast_usize(l(l2)? - l(l1)?)?)));
 		f.label(l1);
 		for i in v {
@@ -260,9 +261,9 @@ mod fork_loop {
 		Ok(insns)
 	}
 
-	pub(super) fn write(f: &mut impl OutDelay<Unique>, arc: &Archives, v: &[Insn]) -> Result<(), WriteError> {
-		let l1 = Unique::new();
-		let l2 = Unique::new();
+	pub(super) fn write(f: &mut impl OutDelay, arc: &Archives, v: &[Insn]) -> Result<(), WriteError> {
+		let l1 = HLabel::new();
+		let l2 = HLabel::new();
 		f.delay(move |l| Ok(u8::to_le_bytes(hamu::write::cast_usize(l(l2)? - l(l1)?)?)));
 		f.label(l1);
 		for i in v {
@@ -468,8 +469,8 @@ mod expr {
 		Ok(stack.pop().unwrap())
 	}
 
-	pub(super) fn write(f: &mut impl OutDelay<Unique>, arc: &Archives, v: &Expr) -> Result<(), WriteError> {
-		fn write_node(f: &mut impl OutDelay<Unique>, arc: &Archives, v: &Expr) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl OutDelay, arc: &Archives, v: &Expr) -> Result<(), WriteError> {
+		fn write_node(f: &mut impl OutDelay, arc: &Archives, v: &Expr) -> Result<(), WriteError> {
 			match *v {
 				Expr::Binop(op, ref a, ref b) => {
 					write_node(f, arc, a)?;

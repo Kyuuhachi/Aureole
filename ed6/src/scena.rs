@@ -302,39 +302,39 @@ pub fn write(arc: &Archives, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	f.multiple::<8, _>(&[0xFF; 4], includes, |g, a| { g.array(arc.index(a)?); Ok(()) }).strict()?;
 	f.u16(0);
 
-	let l_ch = Unique::new();
+	let l_ch = Label::new();
 	f.delay_u16(l_ch);
 	f.u16(cast(ch.len())?);
 
-	let l_cp = Unique::new();
+	let l_cp = Label::new();
 	f.delay_u16(l_cp);
 	f.u16(cast(cp.len())?);
 
-	let l_npcs = Unique::new();
+	let l_npcs = Label::new();
 	f.delay_u16(l_npcs);
 	f.u16(cast(npcs.len())?);
 
-	let l_monsters = Unique::new();
+	let l_monsters = Label::new();
 	f.delay_u16(l_monsters);
 	f.u16(cast(monsters.len())?);
 
-	let l_triggers = Unique::new();
+	let l_triggers = Label::new();
 	f.delay_u16(l_triggers);
 	f.u16(cast(triggers.len())?);
 
-	let l_objects = Unique::new();
+	let l_objects = Label::new();
 	f.delay_u16(l_objects);
 	f.u16(cast(objects.len())?);
 
-	let l_strings = Unique::new();
+	let l_strings = Label::new();
 	f.delay_u16(l_strings);
 	strings.label(l_strings);
 	strings.string("@FileName")?;
 
-	let l_code_start = Unique::new();
+	let l_code_start = Label::new();
 	f.delay_u16(l_code_start);
 	f.u16(0);
-	let l_func_table = Unique::new();
+	let l_func_table = Label::new();
 	f.delay_u16(l_func_table);
 	f.u16(cast(functions.len() * 2)?);
 
@@ -393,7 +393,7 @@ pub fn write(arc: &Archives, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	func_table.label(l_func_table);
 	g.label(l_code_start);
 	for func in functions.iter() {
-		let l_func = Unique::new();
+		let l_func = Label::new();
 		func_table.delay_u16(l_func);
 		g.label(l_func);
 		code::write(&mut g, arc, func)?;

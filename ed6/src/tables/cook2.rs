@@ -59,7 +59,7 @@ pub fn write(_arcs: &Archives, table: &BTreeMap<RecipeId, Recipe>) -> Result<Vec
 	let mut g = OutBytes::new();
 
 	for (&id, &Recipe { ref name_desc, ref ingredients, flags, result, heal }) in table {
-		let l = Unique::new();
+		let l = Label::new();
 		f.delay_u16(l);
 		g.label(l);
 
@@ -69,7 +69,7 @@ pub fn write(_arcs: &Archives, table: &BTreeMap<RecipeId, Recipe>) -> Result<Vec
 		g.u16(result.0);
 		g.u16(0);
 		g.u16(heal);
-		g.name_desc(Unique::new(), Unique::new(), name_desc)?;
+		g.name_desc(name_desc)?;
 	}
 	Ok(f.concat(g).finish()?)
 }

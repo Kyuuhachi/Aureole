@@ -23,18 +23,18 @@ pub fn read(arc: &GameData, data: &[u8]) -> Result<BTreeMap<NameId, Name>, ReadE
 	let mut f = Coverage::new(Bytes::new(data));
 	let n = f.clone().u16()? / 2;
 	let mut table = BTreeMap::new();
-	let fileref = |a| if a == [0; 4] { Ok(None) } else { arc.name(a).map(|a| Some(a.to_owned())) };
+	let fileref = |a| if a == 0 { Ok(None) } else { arc.name(a).map(|a| Some(a.to_owned())) };
 
 	for _ in 0..n-1 {
 		let mut g = f.ptr()?;
 		let id = NameId(g.u16()?);
 		g.check_u16(0)?;
-		let ch1 = arc.name(g.array()?)?.to_owned();
-		let ch2 = arc.name(g.array()?)?.to_owned();
-		let cp1 = arc.name(g.array()?)?.to_owned();
-		let cp2 = arc.name(g.array()?)?.to_owned();
-		let ms1 = fileref(g.array()?)?;
-		let ms2 = fileref(g.array()?)?;
+		let ch1 = arc.name(g.u32()?)?.to_owned();
+		let ch2 = arc.name(g.u32()?)?.to_owned();
+		let cp1 = arc.name(g.u32()?)?.to_owned();
+		let cp2 = arc.name(g.u32()?)?.to_owned();
+		let ms1 = fileref(g.u32()?)?;
+		let ms2 = fileref(g.u32()?)?;
 		let name = g.ptr()?.string()?;
 		table.insert(id, Name { ch1, ch2, cp1, cp2, ms1, ms2, name });
 	}
@@ -52,17 +52,17 @@ pub fn read(arc: &GameData, data: &[u8]) -> Result<BTreeMap<NameId, Name>, ReadE
 pub fn write(arc: &GameData, table: &BTreeMap<NameId, Name>) -> Result<Vec<u8>, WriteError> {
 	let mut f = OutBytes::new();
 	let mut g = OutBytes::new();
-	let fileref = |a| Option::map_or(a, Ok([0; 4]), |a| arc.index(a));
+	let fileref = |a| Option::map_or(a, Ok(0), |a| arc.index(a));
 	for (&id, Name { ch1, ch2, cp1, cp2, ms1, ms2, name }) in table {
 		f.delay_u16(g.here());
 		g.u16(id.0);
 		g.u16(0);
-		g.array(arc.index(ch1)?);
-		g.array(arc.index(ch2)?);
-		g.array(arc.index(cp1)?);
-		g.array(arc.index(cp2)?);
-		g.array(fileref(ms1.as_deref())?);
-		g.array(fileref(ms2.as_deref())?);
+		g.u32(arc.index(ch1)?);
+		g.u32(arc.index(ch2)?);
+		g.u32(arc.index(cp1)?);
+		g.u32(arc.index(cp2)?);
+		g.u32(fileref(ms1.as_deref())?);
+		g.u32(fileref(ms2.as_deref())?);
 		let (l, l_) = Label::new();
 		g.delay_u16(l);
 		g.label(l_);

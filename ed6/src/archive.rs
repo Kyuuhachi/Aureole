@@ -208,24 +208,22 @@ impl Archives {
 }
 
 impl GameDataImpl for Archives {
-	fn name(&self, [a,b,c,d]: [u8; 4]) -> io::Result<&str> {
-		let index = u16::from_le_bytes([a,b]);
-		let mut arch  = u16::from_le_bytes([c,d]);
+	fn name(&self, a: u32) -> io::Result<&str> {
+		let index = (a & 0xFFFF) as u16;
+		let mut arch  = (a >> 16) as u16;
 		if arch == 0x1A && !self.archives.contains_key(&0x1A) {
 			arch = 0x1B;
 		}
 		self.archive(arch)?.name(index as usize)
 	}
 
-	fn index(&self, name: &str) -> io::Result<[u8; 4]> {
+	fn index(&self, name: &str) -> io::Result<u32> {
 		let mut arch = *self.names.get(name).ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
 		let index = self.archive(arch)?.index(name)?;
 		if arch == 0x1B {
 			arch = 0x1A;
 		}
-		let [a,b] = u16::to_le_bytes(index as u16);
-		let [c,d] = u16::to_le_bytes(arch);
-		Ok([a,b,c,d])
+		Ok((index as u32) | (arch as u32) << 16)
 	}
 
 	fn get(&self, name: &str) -> io::Result<&[u8]> {

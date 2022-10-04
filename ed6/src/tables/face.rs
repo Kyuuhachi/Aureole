@@ -10,7 +10,7 @@ pub fn read(_arcs: &GameData, t_face: &[u8]) -> Result<Vec<String>, ReadError> {
 	let mut f = Coverage::new(Bytes::new(t_face));
 	let mut faces = Vec::with_capacity(f.remaining() / 4);
 	while f.remaining() > 0 {
-		faces.push(_arcs.name(f.array()?)?.to_owned())
+		faces.push(_arcs.name(f.u32()?)?.to_owned())
 	}
 	f.assert_covered()?;
 	Ok(faces)
@@ -19,7 +19,7 @@ pub fn read(_arcs: &GameData, t_face: &[u8]) -> Result<Vec<String>, ReadError> {
 pub fn write(_arcs: &GameData, names: &Vec<String>) -> Result<Vec<u8>, WriteError> {
 	let mut out = OutBytes::new();
 	for name in names {
-		out.array(_arcs.index(name.as_ref()).unwrap())
+		out.u32(_arcs.index(name.as_ref()).unwrap())
 	}
 	Ok(out.finish()?)
 }

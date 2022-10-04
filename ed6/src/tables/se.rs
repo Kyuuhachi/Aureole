@@ -22,7 +22,7 @@ pub fn read(_arcs: &GameData, data: &[u8]) -> Result<BTreeMap<SoundId, Sound>, R
 	while f.remaining() > 12 {
 		let id = SoundId(f.u16()?);
 		let unk = f.u16()?;
-		let file = _arcs.name(f.array()?)?.to_owned();
+		let file = _arcs.name(f.u32()?)?.to_owned();
 		let flag1 = cast_bool(f.u16()?)?;
 		let flag2 = cast_bool(f.u16()?)?;
 		table.insert(id, Sound { unk, file, flag1, flag2 });
@@ -43,7 +43,7 @@ pub fn write(_arcs: &GameData, table: &BTreeMap<SoundId, Sound>) -> Result<Vec<u
 	for (&id, &Sound { unk, ref file, flag1, flag2 }) in table {
 		out.u16(id.0);
 		out.u16(unk);
-		out.array(_arcs.index(file)?);
+		out.u32(_arcs.index(file)?);
 		out.u16(flag1.into());
 		out.u16(flag2.into());
 	}

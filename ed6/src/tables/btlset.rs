@@ -124,7 +124,7 @@ fn read_battles<'a>(
 	let mut battlefields = BTreeMap::new();
 	let mut at_rolls = BTreeMap::new();
 
-	let fileref = |a| if a == [0; 4] { Ok(None) } else { arc.name(a).map(|a| Some(a.to_owned())) };
+	let fileref = |a| if a == 0 { Ok(None) } else { arc.name(a).map(|a| Some(a.to_owned())) };
 
 	let mut table = BTreeMap::new();
 
@@ -139,7 +139,7 @@ fn read_battles<'a>(
 		let unk3 = g.u16()?;
 		let unk4 = g.u16()?;
 
-		let enemies: [_; 8] = array(|| Ok(fileref(g.array()?)?)).strict()?;
+		let enemies: [_; 8] = array(|| Ok(fileref(g.u32()?)?)).strict()?;
 
 		let placement1 = read_placement(&mut g, &mut placements)?;
 		let placement2 = read_placement(&mut g, &mut placements)?;
@@ -200,7 +200,7 @@ fn read_auto_battles<'a>(
 ) -> Result<BTreeMap<BattleId, AutoBattle>, ReadError> {
 	let mut battlefields = BTreeMap::new();
 
-	let fileref = |a| if a == [0; 4] { Ok(None) } else { arc.name(a).map(|a| Some(a.to_owned())) };
+	let fileref = |a| if a == 0 { Ok(None) } else { arc.name(a).map(|a| Some(a.to_owned())) };
 
 	let mut table = BTreeMap::new();
 
@@ -213,8 +213,8 @@ fn read_auto_battles<'a>(
 		let battlefield = read_battlefield(&mut g, &mut battlefields)?;
 		g.check_u16(0)?;
 
-		let side1: [_; 8] = array(|| Ok(fileref(g.array()?)?)).strict()?;
-		let side2: [_; 8] = array(|| Ok(fileref(g.array()?)?)).strict()?;
+		let side1: [_; 8] = array(|| Ok(fileref(g.u32()?)?)).strict()?;
+		let side2: [_; 8] = array(|| Ok(fileref(g.u32()?)?)).strict()?;
 
 		let bgm: BgmId = BgmId(g.u8()?);
 		g.check_u8(0)?;

@@ -147,7 +147,7 @@ pub fn read(arc: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	let bgm = BgmId(f.u8()?);
 	f.check_u8(0)?;
 	let entry_func = FuncRef(f.u16()?, f.u16()?);
-	let includes = f.multiple::<8, _>(&[0xFF;4], |g| Ok(arc.name(g.array()?)?.to_owned()))?;
+	let includes = f.multiple::<8, _>(&[0xFF;4], |g| Ok(arc.name(g.u32()?)?.to_owned()))?;
 	f.check_u16(0)?;
 
 	let head_end = f.clone().u16()? as usize;
@@ -169,11 +169,11 @@ pub fn read(arc: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	ensure!(strings.string()? == "@FileName", "expected @FileName");
 
 	let (mut g, n) = ch;
-	let ch = list(n as usize, || Ok(arc.name(g.array()?)?.to_owned())).strict()?;
+	let ch = list(n as usize, || Ok(arc.name(g.u32()?)?.to_owned())).strict()?;
 	g.check_u8(0xFF)?;
 
 	let (mut g, n) = cp;
-	let cp = list(n as usize, || Ok(arc.name(g.array()?)?.to_owned())).strict()?;
+	let cp = list(n as usize, || Ok(arc.name(g.u32()?)?.to_owned())).strict()?;
 	g.check_u8(0xFF)?;
 
 	let (mut g, n) = npcs;
@@ -299,7 +299,7 @@ pub fn write(arc: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	f.u8(bgm.0);
 	f.u8(0);
 	f.u16(entry_func.0); f.u16(entry_func.1);
-	f.multiple::<8, _>(&[0xFF; 4], includes, |g, a| { g.array(arc.index(a)?); Ok(()) }).strict()?;
+	f.multiple::<8, _>(&[0xFF; 4], includes, |g, a| { g.u32(arc.index(a)?); Ok(()) }).strict()?;
 	f.u16(0);
 
 	let (l_ch, l_ch_) = Label::new();
@@ -337,11 +337,11 @@ pub fn write(arc: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	f.u16(cast(functions.len() * 2)?);
 
 	g.label(l_ch_);
-	for ch in ch { g.array(arc.index(ch)?); }
+	for ch in ch { g.u32(arc.index(ch)?); }
 	g.u8(0xFF);
 
 	g.label(l_cp_);
-	for cp in cp { g.array(arc.index(cp)?); }
+	for cp in cp { g.u32(arc.index(cp)?); }
 	g.u8(0xFF);
 
 	g.label(l_npcs_);

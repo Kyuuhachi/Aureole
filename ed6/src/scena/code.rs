@@ -392,11 +392,11 @@ mod char_attr {
 mod file_ref {
 	use super::*;
 	pub(super) fn read<'a>(f: &mut impl In<'a>, arc: &GameData) -> Result<String, ReadError> {
-		Ok(arc.name(f.array()?)?.to_owned())
+		Ok(arc.name(f.u32()?)?.to_owned())
 	}
 
 	pub(super) fn write(f: &mut impl Out, arc: &GameData, v: &str) -> Result<(), WriteError> {
-		f.array(arc.index(v)?);
+		f.u32(arc.index(v)?);
 		Ok(())
 	}
 }

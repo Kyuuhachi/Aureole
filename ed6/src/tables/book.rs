@@ -16,7 +16,7 @@ pub fn read(arc: &GameData, data: &[u8]) -> Result<BTreeMap<ItemId, NameDesc>, R
 	while f.remaining() > 12 {
 		let id = ItemId(f.u16()?);
 		f.check_u16(0)?;
-		let file = arc.name(f.array()?)?;
+		let file = arc.name(f.u32()?)?;
 		let index = f.u16()?;
 		f.check_u16(0)?;
 

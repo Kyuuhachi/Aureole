@@ -11,8 +11,8 @@ impl GameData {
 }
 
 pub trait GameDataImpl {
-	fn name(&self, v: [u8; 4]) -> io::Result<&str>;
-	fn index(&self, name: &str) -> io::Result<[u8; 4]>;
+	fn name(&self, v: u32) -> io::Result<&str>;
+	fn index(&self, name: &str) -> io::Result<u32>;
 	fn get(&self, name: &str) -> io::Result<&[u8]>;
 	// This is not a great abstraction, but it's the best I can come up with right now
 	fn get_decomp(&self, name: &str) -> io::Result<Vec<u8>> {

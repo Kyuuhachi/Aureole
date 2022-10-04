@@ -11,7 +11,7 @@ pub fn read(_arcs: &GameData, data: &[u8]) -> Result<Vec<World>, ReadError> {
 	let mut f = Coverage::new(Bytes::new(data));
 	let mut table = Vec::with_capacity(f.remaining() / 4);
 	while f.remaining() > 12 {
-		let scena = _arcs.name(f.array()?)?.to_owned();
+		let scena = _arcs.name(f.u32()?)?.to_owned();
 		let x = f.u32()?;
 		let y = f.u32()?;
 		table.push(World { scena, x, y });
@@ -26,7 +26,7 @@ pub fn read(_arcs: &GameData, data: &[u8]) -> Result<Vec<World>, ReadError> {
 pub fn write(_arcs: &GameData, table: &Vec<World>) -> Result<Vec<u8>, WriteError> {
 	let mut out = OutBytes::new();
 	for &World { ref scena, x, y } in table {
-		out.array(_arcs.index(scena).unwrap());
+		out.u32(_arcs.index(scena).unwrap());
 		out.u32(x);
 		out.u32(y);
 	}

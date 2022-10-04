@@ -1,7 +1,7 @@
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
-use crate::archive::Archives;
+use crate::gamedata::GameData;
 use crate::util::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -18,7 +18,7 @@ pub struct Status {
 	pub spd: u16,
 }
 
-pub fn read(_arcs: &Archives, data: &[u8]) -> Result<Vec<Vec<Status>>, ReadError> {
+pub fn read(_arcs: &GameData, data: &[u8]) -> Result<Vec<Vec<Status>>, ReadError> {
 	let mut f = Coverage::new(Bytes::new(data));
 	let n = f.clone().u16()? / 2;
 	let m = (f.clone().at(2)?.u16()? - f.clone().u16()?)/22;
@@ -47,7 +47,7 @@ pub fn read(_arcs: &Archives, data: &[u8]) -> Result<Vec<Vec<Status>>, ReadError
 	Ok(table)
 }
 
-pub fn write(_arcs: &Archives, table: &Vec<Vec<Status>>) -> Result<Vec<u8>, WriteError> {
+pub fn write(_arcs: &GameData, table: &Vec<Vec<Status>>) -> Result<Vec<u8>, WriteError> {
 	let mut f = OutBytes::new();
 	let mut g = OutBytes::new();
 	for char in table {
@@ -70,11 +70,11 @@ pub fn write(_arcs: &Archives, table: &Vec<Vec<Status>>) -> Result<Vec<u8>, Writ
 
 #[cfg(test)]
 mod test {
-	use crate::archive::Archives;
+	use crate::gamedata::GameData;
 	use crate::util::test::*;
 
 	#[test_case::test_case(&FC; "fc")]
-	fn roundtrip(arc: &Archives) -> Result<(), Error> {
+	fn roundtrip(arc: &GameData) -> Result<(), Error> {
 		check_roundtrip_strict(arc, "t_status._dt", super::read, super::write)?;
 		Ok(())
 	}

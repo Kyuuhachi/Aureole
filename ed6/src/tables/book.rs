@@ -2,12 +2,12 @@ use std::collections::BTreeMap;
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 
-use crate::archive::Archives;
+use crate::gamedata::GameData;
 use crate::util::*;
 use super::item::ItemId;
 
 // TODO I don't like that this one calls .get_decomp. I prefer for the parsers to be pure.
-pub fn read(arc: &Archives, data: &[u8]) -> Result<BTreeMap<ItemId, NameDesc>, ReadError> {
+pub fn read(arc: &GameData, data: &[u8]) -> Result<BTreeMap<ItemId, NameDesc>, ReadError> {
 	let mut f = Coverage::new(Bytes::new(data));
 	let mut table = BTreeMap::new();
 
@@ -42,11 +42,11 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<BTreeMap<ItemId, NameDesc>, R
 
 #[cfg(test)]
 mod test {
-	use crate::archive::Archives;
+	use crate::gamedata::GameData;
 	use crate::util::test::*;
 
 	#[test_case::test_case(&FC; "fc")]
-	fn parse(arc: &Archives) -> Result<(), Error> {
+	fn parse(arc: &GameData) -> Result<(), Error> {
 		let data = arc.get_decomp("t_book00._dt")?;
 		let _parsed = super::read(arc, &data)?;
 		Ok(())

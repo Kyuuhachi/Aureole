@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
-use crate::archive::Archives;
+use crate::gamedata::GameData;
 use crate::util::*;
 
 newtype!(NameId, u16);
@@ -19,7 +19,7 @@ pub struct Name {
 	pub name: String,
 }
 
-pub fn read(arc: &Archives, data: &[u8]) -> Result<BTreeMap<NameId, Name>, ReadError> {
+pub fn read(arc: &GameData, data: &[u8]) -> Result<BTreeMap<NameId, Name>, ReadError> {
 	let mut f = Coverage::new(Bytes::new(data));
 	let n = f.clone().u16()? / 2;
 	let mut table = BTreeMap::new();
@@ -49,7 +49,7 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<BTreeMap<NameId, Name>, ReadE
 	Ok(table)
 }
 
-pub fn write(arc: &Archives, table: &BTreeMap<NameId, Name>) -> Result<Vec<u8>, WriteError> {
+pub fn write(arc: &GameData, table: &BTreeMap<NameId, Name>) -> Result<Vec<u8>, WriteError> {
 	let mut f = OutBytes::new();
 	let mut g = OutBytes::new();
 	let fileref = |a| Option::map_or(a, Ok([0; 4]), |a| arc.index(a));
@@ -82,11 +82,11 @@ pub fn write(arc: &Archives, table: &BTreeMap<NameId, Name>) -> Result<Vec<u8>, 
 
 #[cfg(test)]
 mod test {
-	use crate::archive::Archives;
+	use crate::gamedata::GameData;
 	use crate::util::test::*;
 
 	#[test_case::test_case(&FC; "fc")]
-	fn roundtrip(arc: &Archives) -> Result<(), Error> {
+	fn roundtrip(arc: &GameData) -> Result<(), Error> {
 		check_roundtrip_strict(arc, "t_name._dt", super::read, super::write)?;
 		Ok(())
 	}

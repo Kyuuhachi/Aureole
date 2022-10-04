@@ -1,3 +1,4 @@
+use crate::gamedata::GameData;
 use crate::archive::Archives;
 
 #[derive(Debug, thiserror::Error)]
@@ -25,7 +26,8 @@ impl std::convert::From<String> for Error {
 }
 
 lazy_static::lazy_static! {
-	pub static ref FC: Archives = Archives::new("../data/fc").unwrap();
+	pub static ref FC: GameData
+		= GameData::new(Archives::new("../data/fc").unwrap());
 }
 
 pub fn check_equal<T: PartialEq + std::fmt::Debug>(a: &T, b: &T) -> Result<(), Error> {
@@ -52,10 +54,10 @@ pub fn check_equal<T: PartialEq + std::fmt::Debug>(a: &T, b: &T) -> Result<(), E
 }
 
 pub fn check_roundtrip<T>(
-	arc: &Archives,
+	arc: &GameData,
 	name: &str,
-	read: impl Fn(&Archives, &[u8]) -> Result<T, super::ReadError>,
-	write: impl Fn(&Archives, &T) -> Result<Vec<u8>, super::WriteError>,
+	read: impl Fn(&GameData, &[u8]) -> Result<T, super::ReadError>,
+	write: impl Fn(&GameData, &T) -> Result<Vec<u8>, super::WriteError>,
 ) -> Result<T, Error> where
 	T: PartialEq + std::fmt::Debug,
 {
@@ -68,10 +70,10 @@ pub fn check_roundtrip<T>(
 }
 
 pub fn check_roundtrip_strict<T>(
-	arc: &Archives,
+	arc: &GameData,
 	name: &str,
-	read: impl Fn(&Archives, &[u8]) -> Result<T, super::ReadError>,
-	write: impl Fn(&Archives, &T) -> Result<Vec<u8>, super::WriteError>,
+	read: impl Fn(&GameData, &[u8]) -> Result<T, super::ReadError>,
+	write: impl Fn(&GameData, &T) -> Result<Vec<u8>, super::WriteError>,
 ) -> Result<T, Error> where
 	T: PartialEq + std::fmt::Debug,
 {

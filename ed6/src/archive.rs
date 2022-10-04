@@ -1,7 +1,15 @@
-use std::{collections::HashMap, path::{Path, PathBuf}, io, fs::File, ops::Range};
+use std::{
+	collections::HashMap,
+	path::{Path, PathBuf},
+	io,
+	fs::File,
+	ops::Range,
+};
 use mapr::Mmap;
-use hamu::read::{le::*, coverage::*};
+use hamu::read::coverage::*;
+use hamu::read::le::*;
 
+use crate::gamedata::GameDataImpl;
 use crate::decompress;
 use crate::util;
 
@@ -190,7 +198,17 @@ impl Archives {
 		self.archives.get(&n).ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))
 	}
 
-	pub fn name(&self, [a,b,c,d]: [u8; 4]) -> io::Result<&str> {
+	pub fn get_decomp(&self, name: &str) -> std::io::Result<Vec<u8>> {
+		self.get(name).and_then(decompress::decompress)
+	}
+
+	pub fn archives(&self) -> impl Iterator<Item=(u8, &Archive)> {
+		self.archives.iter().map(|(a, b)| (*a as u8, b))
+	}
+}
+
+impl GameDataImpl for Archives {
+	fn name(&self, [a,b,c,d]: [u8; 4]) -> io::Result<&str> {
 		let index = u16::from_le_bytes([a,b]);
 		let mut arch  = u16::from_le_bytes([c,d]);
 		if arch == 0x1A && !self.archives.contains_key(&0x1A) {
@@ -199,7 +217,7 @@ impl Archives {
 		self.archive(arch)?.name(index as usize)
 	}
 
-	pub fn index(&self, name: &str) -> io::Result<[u8; 4]> {
+	fn index(&self, name: &str) -> io::Result<[u8; 4]> {
 		let mut arch = *self.names.get(name).ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
 		let index = self.archive(arch)?.index(name)?;
 		if arch == 0x1B {
@@ -210,16 +228,22 @@ impl Archives {
 		Ok([a,b,c,d])
 	}
 
-	pub fn get(&self, name: &str) -> io::Result<&[u8]> {
+	fn get(&self, name: &str) -> io::Result<&[u8]> {
 		let arch = *self.names.get(name).ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
 		self.archive(arch)?.get(name)
 	}
 
-	pub fn get_decomp(&self, name: &str) -> std::io::Result<Vec<u8>> {
+	fn get_decomp(&self, name: &str) -> io::Result<Vec<u8>> {
 		self.get(name).and_then(decompress::decompress)
 	}
 
-	pub fn archives(&self) -> impl Iterator<Item=(u8, &Archive)> {
-		self.archives.iter().map(|(a, b)| (*a as u8, b))
+	fn list(&self) -> Box<dyn Iterator<Item=&str> + '_> {
+		Box::new(
+			self.archives()
+			.map(|a| a.1)
+			.flat_map(|a| a.entries())
+			.filter(|a| !a.is_empty())
+			.map(|a| a.name.as_str())
+		)
 	}
 }

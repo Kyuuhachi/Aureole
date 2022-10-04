@@ -1,7 +1,7 @@
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
-use crate::archive::Archives;
+use crate::gamedata::GameData;
 use crate::tables::bgmtbl::BgmId;
 use crate::tables::btlset::BattleId;
 use crate::tables::town::TownId;
@@ -138,7 +138,7 @@ pub trait OutExt2: Out {
 }
 impl<T: Out> OutExt2 for T {}
 
-pub fn read(arc: &Archives, data: &[u8]) -> Result<Scena, ReadError> {
+pub fn read(arc: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	let mut f = Coverage::new(Bytes::new(data));
 
 	let dir = f.sized_string::<10>()?;
@@ -271,7 +271,7 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<Scena, ReadError> {
 	})
 }
 
-pub fn write(arc: &Archives, scena: &Scena) -> Result<Vec<u8>, WriteError> {
+pub fn write(arc: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	let &Scena {
 		ref dir,
 		ref fname,
@@ -419,17 +419,16 @@ pub fn write(arc: &Archives, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 
 #[cfg(test)]
 mod test {
-use crate::archive::Archives;
+use crate::gamedata::GameData;
 	use crate::util::test::*;
 
-	#[test_case::test_case(&FC, 0x01; "fc")]
-	fn roundtrip(arc: &Archives, scena_archive: u16) -> Result<(), Error> {
+	#[test_case::test_case(&FC, "", "._sn"; "fc")]
+	fn roundtrip(arc: &GameData, prefix: &str, suffix: &str) -> Result<(), Error> {
 		let mut failed = false;
 
-		for e in arc.archive(scena_archive)?.entries() {
-			if e.is_empty() { continue }
-			if let Err(err) = check_roundtrip_strict(arc, &e.name, super::read, super::write) {
-				println!("{}: {err}", &e.name);
+		for name in arc.list().filter(|&a| a.starts_with(prefix) && a.ends_with(suffix)) {
+			if let Err(err) = check_roundtrip_strict(arc, name, super::read, super::write) {
+				println!("{name}: {err}");
 				failed = true;
 			};
 		}

@@ -1,7 +1,7 @@
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
-use crate::archive::Archives;
+use crate::gamedata::GameData;
 use crate::util::*;
 use super::Element;
 
@@ -11,7 +11,7 @@ pub struct Orbment {
 	pub lines: Vec<Vec<u8>>,
 }
 
-pub fn read(_arcs: &Archives, data: &[u8]) -> Result<Vec<Orbment>, ReadError> {
+pub fn read(_arcs: &GameData, data: &[u8]) -> Result<Vec<Orbment>, ReadError> {
 	let mut f = Coverage::new(Bytes::new(data));
 	let n = f.clone().u16()? / 2;
 	let mut table = Vec::with_capacity(n as usize);
@@ -42,7 +42,7 @@ pub fn read(_arcs: &Archives, data: &[u8]) -> Result<Vec<Orbment>, ReadError> {
 	Ok(table)
 }
 
-pub fn write(_arcs: &Archives, table: &Vec<Orbment>) -> Result<Vec<u8>, WriteError> {
+pub fn write(_arcs: &GameData, table: &Vec<Orbment>) -> Result<Vec<u8>, WriteError> {
 	let mut f = OutBytes::new();
 	let mut g = OutBytes::new();
 
@@ -69,11 +69,11 @@ pub fn write(_arcs: &Archives, table: &Vec<Orbment>) -> Result<Vec<u8>, WriteErr
 
 #[cfg(test)]
 mod test {
-	use crate::archive::Archives;
+	use crate::gamedata::GameData;
 	use crate::util::test::*;
 
 	#[test_case::test_case(&FC; "fc")]
-	fn roundtrip(arc: &Archives) -> Result<(), Error> {
+	fn roundtrip(arc: &GameData) -> Result<(), Error> {
 		check_roundtrip_strict(arc, "t_orb._dt", super::read, super::write)?;
 		Ok(())
 	}

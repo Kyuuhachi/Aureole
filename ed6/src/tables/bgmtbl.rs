@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
-use crate::archive::Archives;
+use crate::gamedata::GameData;
 use crate::util::*;
 
 newtype!(BgmId, u8);
@@ -15,7 +15,7 @@ pub struct Bgm {
 }
 
 // I'm throwing away the record order in the file here, hope that doesn't matter.
-pub fn read(_arcs: &Archives, t_town: &[u8]) -> Result<BTreeMap<BgmId, Bgm>, ReadError> {
+pub fn read(_arcs: &GameData, t_town: &[u8]) -> Result<BTreeMap<BgmId, Bgm>, ReadError> {
 	let mut f = Coverage::new(Bytes::new(t_town));
 	let mut table = BTreeMap::new();
 	while f.remaining() > 16 {
@@ -34,7 +34,7 @@ pub fn read(_arcs: &Archives, t_town: &[u8]) -> Result<BTreeMap<BgmId, Bgm>, Rea
 	Ok(table)
 }
 
-pub fn write(_arcs: &Archives, table: &BTreeMap<BgmId, Bgm>) -> Result<Vec<u8>, WriteError> {
+pub fn write(_arcs: &GameData, table: &BTreeMap<BgmId, Bgm>) -> Result<Vec<u8>, WriteError> {
 	let mut f = OutBytes::new();
 	for (&id, &Bgm { ref name, loops }) in table {
 		f.u8(id.0);
@@ -50,11 +50,11 @@ pub fn write(_arcs: &Archives, table: &BTreeMap<BgmId, Bgm>) -> Result<Vec<u8>, 
 
 #[cfg(test)]
 mod test {
-	use crate::archive::Archives;
+	use crate::gamedata::GameData;
 	use crate::util::test::*;
 
 	#[test_case::test_case(&FC; "fc")]
-	fn roundtrip(arc: &Archives) -> Result<(), Error> {
+	fn roundtrip(arc: &GameData) -> Result<(), Error> {
 		check_roundtrip(arc, "t_bgmtbl._dt", super::read, super::write)?;
 		Ok(())
 	}

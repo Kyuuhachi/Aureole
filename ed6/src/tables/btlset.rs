@@ -4,7 +4,7 @@ use std::rc::Rc;
 use enumflags2::*;
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
-use crate::archive::Archives;
+use crate::gamedata::GameData;
 use crate::tables::bgmtbl::BgmId;
 use crate::util::*;
 
@@ -117,7 +117,7 @@ fn read_battlefield<'a>(
 }
 
 fn read_battles<'a>(
-	arc: &Archives,
+	arc: &GameData,
 	mut f: impl In<'a> + Clone,
 ) -> Result<BTreeMap<BattleId, Battle>, ReadError> {
 	let mut placements = BTreeMap::new();
@@ -195,7 +195,7 @@ fn read_battles<'a>(
 }
 
 fn read_auto_battles<'a>(
-	arc: &Archives,
+	arc: &GameData,
 	mut f: impl In<'a> + Clone,
 ) -> Result<BTreeMap<BattleId, AutoBattle>, ReadError> {
 	let mut battlefields = BTreeMap::new();
@@ -237,7 +237,7 @@ fn read_auto_battles<'a>(
 }
 
 #[allow(clippy::type_complexity)]
-pub fn read(arc: &Archives, data: &[u8]) -> Result<(BTreeMap<BattleId, Battle>, BTreeMap<BattleId, AutoBattle>), ReadError> {
+pub fn read(arc: &GameData, data: &[u8]) -> Result<(BTreeMap<BattleId, Battle>, BTreeMap<BattleId, AutoBattle>), ReadError> {
 	let mut f = Coverage::new(Bytes::new(data));
 
 	let battles = read_battles(arc, f.ptr()?)?;
@@ -251,11 +251,11 @@ pub fn read(arc: &Archives, data: &[u8]) -> Result<(BTreeMap<BattleId, Battle>, 
 
 #[cfg(test)]
 mod test {
-	use crate::archive::Archives;
+	use crate::gamedata::GameData;
 	use crate::util::test::*;
 
 	#[test_case::test_case(&FC; "fc")]
-	fn parse(arc: &Archives) -> Result<(), Error> {
+	fn parse(arc: &GameData) -> Result<(), Error> {
 		let data = arc.get_decomp("t_btlset._dt")?;
 		let _parsed = super::read(arc, &data)?;
 		Ok(())

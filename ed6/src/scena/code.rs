@@ -4,7 +4,7 @@ use hamu::read::le::*;
 use hamu::write::le::*;
 use hamu::write::Label as HLabel;
 use hamu::write::LabelDef as HLabelDef;
-use crate::archive::Archives;
+use crate::gamedata::GameData;
 use crate::tables::{bgmtbl::BgmId, Element};
 use crate::tables::btlset::BattleId;
 use crate::tables::item::ItemId;
@@ -79,7 +79,7 @@ enum RawOInsn<'a> {
 	Label(HLabelDef),
 }
 
-pub fn read<'a>(f: &mut impl In<'a>, arc: &Archives, end: usize) -> Result<Vec<FlatInsn>, ReadError> {
+pub fn read<'a>(f: &mut impl In<'a>, arc: &GameData, end: usize) -> Result<Vec<FlatInsn>, ReadError> {
 	let mut insns = Vec::new();
 	while f.pos() < end {
 		insns.push((f.pos(), read_raw_insn(f, arc)?));
@@ -123,7 +123,7 @@ pub fn read<'a>(f: &mut impl In<'a>, arc: &Archives, end: usize) -> Result<Vec<F
 	Ok(insns2)
 }
 
-fn read_raw_insn<'a>(f: &mut impl In<'a>, arc: &Archives) -> Result<RawIInsn, ReadError> {
+fn read_raw_insn<'a>(f: &mut impl In<'a>, arc: &GameData) -> Result<RawIInsn, ReadError> {
 	let pos = f.pos();
 	let res = try {
 		let insn = match f.u8()? {
@@ -163,7 +163,7 @@ fn read_raw_insn<'a>(f: &mut impl In<'a>, arc: &Archives) -> Result<RawIInsn, Re
 	}
 }
 
-pub fn write(f: &mut impl OutDelay, arc: &Archives, insns: &[FlatInsn]) -> Result<(), WriteError> {
+pub fn write(f: &mut impl OutDelay, arc: &GameData, insns: &[FlatInsn]) -> Result<(), WriteError> {
 	let mut labels = BTreeMap::new();
 	let mut labeldefs = BTreeMap::new();
 	let mut label = |k| {
@@ -208,7 +208,7 @@ pub fn write(f: &mut impl OutDelay, arc: &Archives, insns: &[FlatInsn]) -> Resul
 	Ok(())
 }
 
-fn write_raw_insn(f: &mut impl OutDelay, arc: &Archives, insn: RawOInsn) -> Result<(), WriteError> {
+fn write_raw_insn(f: &mut impl OutDelay, arc: &GameData, insn: RawOInsn) -> Result<(), WriteError> {
 	match insn {
 		RawOInsn::Unless(e, l) => {
 			f.u8(0x02);
@@ -263,7 +263,7 @@ mod quest_list {
 
 mod fork {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>, arc: &Archives) -> Result<Vec<Insn>, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl In<'a>, arc: &GameData) -> Result<Vec<Insn>, ReadError> {
 		let len = f.u8()? as usize;
 		let pos = f.pos();
 		let mut insns = Vec::new();
@@ -275,7 +275,7 @@ mod fork {
 		Ok(insns)
 	}
 
-	pub(super) fn write(f: &mut impl OutDelay, arc: &Archives, v: &[Insn]) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl OutDelay, arc: &GameData, v: &[Insn]) -> Result<(), WriteError> {
 		let (l1, l1_) = HLabel::new();
 		let (l2, l2_) = HLabel::new();
 		f.delay(move |l| Ok(u8::to_le_bytes(hamu::write::cast_usize(l(l2)? - l(l1)?)?)));
@@ -291,7 +291,7 @@ mod fork {
 
 mod fork_loop {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>, arc: &Archives) -> Result<Vec<Insn>, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl In<'a>, arc: &GameData) -> Result<Vec<Insn>, ReadError> {
 		let len = f.u8()? as usize;
 		let pos = f.pos();
 		let mut insns = Vec::new();
@@ -304,7 +304,7 @@ mod fork_loop {
 		Ok(insns)
 	}
 
-	pub(super) fn write(f: &mut impl OutDelay, arc: &Archives, v: &[Insn]) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl OutDelay, arc: &GameData, v: &[Insn]) -> Result<(), WriteError> {
 		let (l1, l1_) = HLabel::new();
 		let (l2, l2_) = HLabel::new();
 		let l1c = l1.clone();
@@ -391,11 +391,11 @@ mod char_attr {
 
 mod file_ref {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>, arc: &Archives) -> Result<String, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl In<'a>, arc: &GameData) -> Result<String, ReadError> {
 		Ok(arc.name(f.array()?)?.to_owned())
 	}
 
-	pub(super) fn write(f: &mut impl Out, arc: &Archives, v: &str) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Out, arc: &GameData, v: &str) -> Result<(), WriteError> {
 		f.array(arc.index(v)?);
 		Ok(())
 	}
@@ -483,7 +483,7 @@ pub enum Expr {
 
 mod expr {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>, arc: &Archives) -> Result<Expr, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl In<'a>, arc: &GameData) -> Result<Expr, ReadError> {
 		let mut stack = Vec::new();
 		loop {
 			let op = f.u8()?;
@@ -513,8 +513,8 @@ mod expr {
 		Ok(stack.pop().unwrap())
 	}
 
-	pub(super) fn write(f: &mut impl OutDelay, arc: &Archives, v: &Expr) -> Result<(), WriteError> {
-		fn write_node(f: &mut impl OutDelay, arc: &Archives, v: &Expr) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl OutDelay, arc: &GameData, v: &Expr) -> Result<(), WriteError> {
+		fn write_node(f: &mut impl OutDelay, arc: &GameData, v: &Expr) -> Result<(), WriteError> {
 			match *v {
 				Expr::Binop(op, ref a, ref b) => {
 					write_node(f, arc, a)?;

@@ -3,6 +3,7 @@
 #![feature(try_blocks)]
 
 pub mod decompress;
+pub mod gamedata;
 pub mod archive;
 pub mod tables;
 pub mod util;

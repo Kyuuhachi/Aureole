@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
-use crate::archive::Archives;
+use crate::gamedata::GameData;
 use crate::util::*;
 
 newtype!(SoundId, u16);
@@ -16,7 +16,7 @@ pub struct Sound {
 	pub flag2: bool,
 }
 
-pub fn read(_arcs: &Archives, data: &[u8]) -> Result<BTreeMap<SoundId, Sound>, ReadError> {
+pub fn read(_arcs: &GameData, data: &[u8]) -> Result<BTreeMap<SoundId, Sound>, ReadError> {
 	let mut f = Coverage::new(Bytes::new(data));
 	let mut table = BTreeMap::new();
 	while f.remaining() > 12 {
@@ -38,7 +38,7 @@ pub fn read(_arcs: &Archives, data: &[u8]) -> Result<BTreeMap<SoundId, Sound>, R
 	Ok(table)
 }
 
-pub fn write(_arcs: &Archives, table: &BTreeMap<SoundId, Sound>) -> Result<Vec<u8>, WriteError> {
+pub fn write(_arcs: &GameData, table: &BTreeMap<SoundId, Sound>) -> Result<Vec<u8>, WriteError> {
 	let mut out = OutBytes::new();
 	for (&id, &Sound { unk, ref file, flag1, flag2 }) in table {
 		out.u16(id.0);
@@ -59,11 +59,11 @@ pub fn write(_arcs: &Archives, table: &BTreeMap<SoundId, Sound>) -> Result<Vec<u
 
 #[cfg(test)]
 mod test {
-	use crate::archive::Archives;
+	use crate::gamedata::GameData;
 	use crate::util::test::*;
 
 	#[test_case::test_case(&FC; "fc")]
-	fn roundtrip(arc: &Archives) -> Result<(), Error> {
+	fn roundtrip(arc: &GameData) -> Result<(), Error> {
 		check_roundtrip_strict(arc, "t_se._dt", super::read, super::write)?;
 		Ok(())
 	}

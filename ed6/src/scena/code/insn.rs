@@ -1,7 +1,7 @@
 use super::*;
 
 ed6_macros::bytecode! {
-	|arc: &Archives|
+	|arc: &GameData|
 	match {
 		0x01 => Return(),
 		0x05 => Call(func_ref() -> FuncRef),

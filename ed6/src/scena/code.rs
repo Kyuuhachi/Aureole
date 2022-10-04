@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use hamu::read::le::*;
 use hamu::write::le::*;
 use hamu::write::Label as HLabel;
+use hamu::write::LabelDef as HLabelDef;
 use crate::archive::Archives;
 use crate::tables::{bgmtbl::BgmId, Element};
 use crate::tables::btlset::BattleId;
@@ -42,15 +43,6 @@ pub struct Emote(pub u8, pub u8, pub u32);
 mod insn;
 pub use insn::*;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum FlatInsn_<E, I, L> {
-	Unless(E, L),
-	Goto(L),
-	Switch(E, Vec<(u16, L)>, L),
-	Insn(I),
-	Label(L), // Doesn't exist in RawFlatInsn
-}
-
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Label(usize);
 
@@ -60,8 +52,32 @@ impl std::fmt::Debug for Label {
 	}
 }
 
-type AFlatInsn<A> = FlatInsn_<Expr, Insn, A>;
-pub type FlatInsn = AFlatInsn<Label>;
+// I *could* make this generic over <Expr, Insn, Label, LabelDef>, but honestly, no.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FlatInsn {
+	Unless(Expr, Label),
+	Goto(Label),
+	Switch(Expr, Vec<(u16, Label)>, Label),
+	Insn(Insn),
+	Label(Label),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum RawIInsn {
+	Unless(Expr, usize),
+	Goto(usize),
+	Switch(Expr, Vec<(u16, usize)>, usize),
+	Insn(Insn),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum RawOInsn<'a> {
+	Unless(&'a Expr, HLabel),
+	Goto(HLabel),
+	Switch(&'a Expr, Vec<(u16, HLabel)>, HLabel),
+	Insn(&'a Insn),
+	Label(HLabelDef),
+}
 
 pub fn read<'a>(f: &mut impl In<'a>, arc: &Archives, end: usize) -> Result<Vec<FlatInsn>, ReadError> {
 	let mut insns = Vec::new();
@@ -73,20 +89,19 @@ pub fn read<'a>(f: &mut impl In<'a>, arc: &Archives, end: usize) -> Result<Vec<F
 	let mut labels = BTreeSet::new();
 	for (_, insn) in &insns {
 		match insn {
-			AFlatInsn::Unless(_, target) => {
+			RawIInsn::Unless(_, target) => {
 				labels.insert(*target);
 			},
-			AFlatInsn::Goto(target) => {
+			RawIInsn::Goto(target) => {
 				labels.insert(*target);
 			},
-			AFlatInsn::Switch(_, branches, default) => {
+			RawIInsn::Switch(_, branches, default) => {
 				for (_, target) in branches {
 					labels.insert(*target);
 				}
 				labels.insert(*default);
 			}
-			AFlatInsn::Insn(_) => {}
-			AFlatInsn::Label(_) => unreachable!(),
+			RawIInsn::Insn(_) => {}
 		}
 	}
 
@@ -98,29 +113,28 @@ pub fn read<'a>(f: &mut impl In<'a>, arc: &Archives, end: usize) -> Result<Vec<F
 			insns2.push(FlatInsn::Label(*label));
 		}
 		insns2.push(match insn {
-			AFlatInsn::Unless(e, l) => FlatInsn::Unless(e, labels[&l]),
-			AFlatInsn::Goto(l) => FlatInsn::Goto(labels[&l]),
-			AFlatInsn::Switch(e, cs, l) => FlatInsn::Switch(e, cs.into_iter().map(|(a, l)| (a, labels[&l])).collect(), labels[&l]),
-			AFlatInsn::Insn(i) => FlatInsn::Insn(i),
-			AFlatInsn::Label(_) => unreachable!(),
+			RawIInsn::Unless(e, l) => FlatInsn::Unless(e, labels[&l]),
+			RawIInsn::Goto(l) => FlatInsn::Goto(labels[&l]),
+			RawIInsn::Switch(e, cs, l) => FlatInsn::Switch(e, cs.into_iter().map(|(a, l)| (a, labels[&l])).collect(), labels[&l]),
+			RawIInsn::Insn(i) => FlatInsn::Insn(i),
 		})
 	}
 
 	Ok(insns2)
 }
 
-fn read_raw_insn<'a>(f: &mut impl In<'a>, arc: &Archives) -> Result<AFlatInsn<usize>, ReadError> {
+fn read_raw_insn<'a>(f: &mut impl In<'a>, arc: &Archives) -> Result<RawIInsn, ReadError> {
 	let pos = f.pos();
 	let res = try {
 		let insn = match f.u8()? {
 			0x02 => {
 				let e = expr::read(f, arc)?;
 				let l = f.u16()? as usize;
-				AFlatInsn::Unless(e, l)
+				RawIInsn::Unless(e, l)
 			}
 			0x03 => {
 				let l = f.u16()? as usize;
-				AFlatInsn::Goto(l)
+				RawIInsn::Goto(l)
 			}
 			0x04 => {
 				let e = expr::read(f, arc)?;
@@ -129,12 +143,12 @@ fn read_raw_insn<'a>(f: &mut impl In<'a>, arc: &Archives) -> Result<AFlatInsn<us
 					cs.push((f.u16()?, f.u16()? as usize));
 				}
 				let l = f.u16()? as usize;
-				AFlatInsn::Switch(e, cs, l)
+				RawIInsn::Switch(e, cs, l)
 			}
 			_ => {
 				f.seek(pos)?;
 				let i = Insn::read(f, arc)?;
-				AFlatInsn::Insn(i)
+				RawIInsn::Insn(i)
 			}
 		};
 		insn
@@ -151,46 +165,75 @@ fn read_raw_insn<'a>(f: &mut impl In<'a>, arc: &Archives) -> Result<AFlatInsn<us
 
 pub fn write(f: &mut impl OutDelay, arc: &Archives, insns: &[FlatInsn]) -> Result<(), WriteError> {
 	let mut labels = BTreeMap::new();
-	let mut label = move |l| *labels.entry(l).or_insert_with(HLabel::new);
+	let mut labeldefs = BTreeMap::new();
+	let mut label = |k| {
+		if let std::collections::btree_map::Entry::Vacant(e) = labels.entry(k) {
+			let (l, l_) = HLabel::new();
+			e.insert(l);
+			labeldefs.insert(k, l_);
+		}
+	};
 
 	for insn in insns {
-		write_raw_insn(f, arc, &match insn {
-			AFlatInsn::Unless(e, l) => FlatInsn_::Unless(e, label(*l)),
-			AFlatInsn::Goto(l) => FlatInsn_::Goto(label(*l)),
-			AFlatInsn::Switch(e, cs, l) => FlatInsn_::Switch(e, cs.iter().map(|(a, l)| (*a, label(*l))).collect(), label(*l)),
-			AFlatInsn::Insn(i) => FlatInsn_::Insn(i),
-			AFlatInsn::Label(l) => FlatInsn_::Label(label(*l)),
+		match insn {
+			FlatInsn::Unless(_, target) => {
+				label(*target);
+			},
+			FlatInsn::Goto(target) => {
+				label(*target);
+			},
+			FlatInsn::Switch(_, branches, default) => {
+				for (_, target) in branches {
+					label(*target);
+				}
+				label(*default);
+			}
+			FlatInsn::Insn(_) => {}
+			FlatInsn::Label(l) => label(*l),
+		}
+	}
+
+	for insn in insns {
+		write_raw_insn(f, arc, match insn {
+			FlatInsn::Unless(e, l) => RawOInsn::Unless(e, labels[l].clone()),
+			FlatInsn::Goto(l) => RawOInsn::Goto(labels[l].clone()),
+			FlatInsn::Switch(e, cs, l) => RawOInsn::Switch(e, cs.iter().map(|(a, l)| (*a, labels[l].clone())).collect(), labels[l].clone()),
+			FlatInsn::Insn(i) => RawOInsn::Insn(i),
+			FlatInsn::Label(l) => RawOInsn::Label(labeldefs.remove(l).unwrap()),
 		})?;
 	}
+
+	ensure!(labeldefs.is_empty(), "unreferenced labels: {:?}", Vec::from_iter(labeldefs.keys()));
+
 	Ok(())
 }
 
-fn write_raw_insn(f: &mut impl OutDelay, arc: &Archives, insn: &FlatInsn_<&Expr, &Insn, HLabel>) -> Result<(), WriteError> {
+fn write_raw_insn(f: &mut impl OutDelay, arc: &Archives, insn: RawOInsn) -> Result<(), WriteError> {
 	match insn {
-		FlatInsn_::Unless(e, l) => {
+		RawOInsn::Unless(e, l) => {
 			f.u8(0x02);
 			expr::write(f, arc, e)?;
-			f.delay_u16(*l);
+			f.delay_u16(l);
 		},
-		FlatInsn_::Goto(l) => {
+		RawOInsn::Goto(l) => {
 			f.u8(0x03);
-			f.delay_u16(*l);
+			f.delay_u16(l);
 		},
-		FlatInsn_::Switch(e, cs, l) => {
+		RawOInsn::Switch(e, cs, l) => {
 			f.u8(0x04);
 			expr::write(f, arc, e)?;
 			f.u16(cast(cs.len())?);
 			for (k, v) in cs {
-				f.u16(*k);
-				f.delay_u16(*v);
+				f.u16(k);
+				f.delay_u16(v);
 			}
-			f.delay_u16(*l);
+			f.delay_u16(l);
 		}
-		FlatInsn_::Insn(i) => {
+		RawOInsn::Insn(i) => {
 			Insn::write(f, arc, i)?
 		}
-		FlatInsn_::Label(l) => {
-			f.label(*l)
+		RawOInsn::Label(l) => {
+			f.label(l)
 		}
 	}
 	Ok(())
@@ -233,14 +276,14 @@ mod fork {
 	}
 
 	pub(super) fn write(f: &mut impl OutDelay, arc: &Archives, v: &[Insn]) -> Result<(), WriteError> {
-		let l1 = HLabel::new();
-		let l2 = HLabel::new();
+		let (l1, l1_) = HLabel::new();
+		let (l2, l2_) = HLabel::new();
 		f.delay(move |l| Ok(u8::to_le_bytes(hamu::write::cast_usize(l(l2)? - l(l1)?)?)));
-		f.label(l1);
+		f.label(l1_);
 		for i in v {
 			Insn::write(f, arc, i)?;
 		}
-		f.label(l2);
+		f.label(l2_);
 		f.u8(0);
 		Ok(())
 	}
@@ -256,22 +299,23 @@ mod fork_loop {
 			insns.push(Insn::read(f, arc)?);
 		}
 		ensure!(f.pos() == pos+len, "overshot while reading fork loop");
-		ensure!(read_raw_insn(f, arc)? == AFlatInsn::Insn(Insn::Yield()), "invalid loop");
-		ensure!(read_raw_insn(f, arc)? == AFlatInsn::Goto(pos), "invalid loop");
+		ensure!(read_raw_insn(f, arc)? == RawIInsn::Insn(Insn::Yield()), "invalid loop");
+		ensure!(read_raw_insn(f, arc)? == RawIInsn::Goto(pos), "invalid loop");
 		Ok(insns)
 	}
 
 	pub(super) fn write(f: &mut impl OutDelay, arc: &Archives, v: &[Insn]) -> Result<(), WriteError> {
-		let l1 = HLabel::new();
-		let l2 = HLabel::new();
-		f.delay(move |l| Ok(u8::to_le_bytes(hamu::write::cast_usize(l(l2)? - l(l1)?)?)));
-		f.label(l1);
+		let (l1, l1_) = HLabel::new();
+		let (l2, l2_) = HLabel::new();
+		let l1c = l1.clone();
+		f.delay(|l| Ok(u8::to_le_bytes(hamu::write::cast_usize(l(l2)? - l(l1)?)?)));
+		f.label(l1_);
 		for i in v {
 			Insn::write(f, arc, i)?;
 		}
-		f.label(l2);
-		write_raw_insn(f, arc, &FlatInsn_::Insn(&Insn::Yield()))?;
-		write_raw_insn(f, arc, &FlatInsn_::Goto(l1))?;
+		f.label(l2_);
+		write_raw_insn(f, arc, RawOInsn::Insn(&Insn::Yield()))?;
+		write_raw_insn(f, arc, RawOInsn::Goto(l1c))?;
 		Ok(())
 	}
 }

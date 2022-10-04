@@ -1,6 +1,6 @@
 use std::{
 	hash::Hash,
-	collections::{HashMap, hash_map::Entry},
+	collections::HashMap,
 	fmt::Debug,
 	ops::Range,
 	num::TryFromIntError,
@@ -14,8 +14,6 @@ pub mod prelude {
 pub enum Error {
 	#[error("undefined label '{label}'")]
 	Undefined { label: String },
-	#[error("duplicate label '{label}': {v1} → {v2}")]
-	Duplicate { label: String, v1: usize, v2: usize },
 	#[error("failed to convert {value} to {type_}")]
 	LabelSize {
 		type_: &'static str,
@@ -31,13 +29,13 @@ pub trait OutBase {
 }
 
 pub trait OutDelay: OutBase {
-	fn label(&mut self, label: Label);
+	fn label(&mut self, label: LabelDef);
 	fn delay<const N: usize, F>(&mut self, cb: F) where
 		F: FnOnce(&dyn Fn(Label) -> Result<usize>) -> Result<[u8; N]> + 'static;
 
 	fn here(&mut self) -> Label {
-		let l = Label::new();
-		self.label(l);
+		let (l, l_) = Label::new();
+		self.label(l_);
 		l
 	}
 }
@@ -64,7 +62,7 @@ type Delayed = Box<dyn FnOnce(&dyn Fn(Label) -> Result<usize>, &mut [u8]) -> Res
 pub struct OutBytes {
 	data: Vec<u8>,
 	delays: Vec<(Range<usize>, Delayed)>,
-	labels: HashMap<Label, usize>,
+	labels: HashMap<LabelDef, usize>,
 }
 
 impl OutBytes {
@@ -80,7 +78,7 @@ impl OutBytes {
 		for (range, cb) in self.delays {
 			cb(
 				&|k| {
-					self.labels.get(&k)
+					self.labels.get(&LabelDef(k.0))
 						.copied()
 						.ok_or_else(|| Error::Undefined {
 							label: format!("{:?}", k),
@@ -90,15 +88,6 @@ impl OutBytes {
 			)?;
 		}
 		Ok(self.data)
-	}
-
-	fn set_label(&mut self, label: Label, val: usize) {
-		match self.labels.entry(label) {
-			Entry::Vacant(entry) => entry.insert(val),
-			Entry::Occupied(entry) => {
-				panic!("Duplicate label {:?} (prev: {:#X}, new: {:#X})", entry.key(), entry.get(), val)
-			}
-		};
 	}
 
 	pub fn concat(mut self, mut other: OutBytes) -> Self {
@@ -111,7 +100,7 @@ impl OutBytes {
 		}
 
 		for (k, v) in other.labels {
-			self.set_label(k, v+shift);
+			self.labels.insert(k, v+shift);
 		}
 
 		self
@@ -129,8 +118,8 @@ impl OutBase for OutBytes {
 }
 
 impl OutDelay for OutBytes {
-	fn label(&mut self, label: Label) {
-		self.set_label(label, self.len());
+	fn label(&mut self, label: LabelDef) {
+		self.labels.insert(label, self.len());
 	}
 
 	fn delay<const N: usize, F>(&mut self, cb: F) where
@@ -192,8 +181,10 @@ pub fn cast_usize<T: TryFrom<usize, Error=TryFromIntError>>(v: usize) -> Result<
 primitives!(OutLe, le, to_le_bytes; u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, f32, f64; u8, u16, u32, u64, u128);
 primitives!(OutBe, be, to_be_bytes; u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, f32, f64; u8, u16, u32, u64, u128);
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Label(usize);
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct LabelDef(usize);
 
 impl Debug for Label {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -201,11 +192,18 @@ impl Debug for Label {
 	}
 }
 
+impl Debug for LabelDef {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "LabelDef(0x{:04X})", self.0)
+	}
+}
+
 impl Label {
 	#[allow(clippy::new_without_default)]
-	pub fn new() -> Label {
+	pub fn new() -> (Label, LabelDef) {
 		use std::sync::atomic::{AtomicUsize, Ordering};
 		static COUNT: AtomicUsize = AtomicUsize::new(0);
-		Label(COUNT.fetch_add(1, Ordering::Relaxed))
+		let n = COUNT.fetch_add(1, Ordering::Relaxed);
+		(Label(n), LabelDef(n))
 	}
 }

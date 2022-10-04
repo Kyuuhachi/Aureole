@@ -302,49 +302,49 @@ pub fn write(arc: &Archives, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	f.multiple::<8, _>(&[0xFF; 4], includes, |g, a| { g.array(arc.index(a)?); Ok(()) }).strict()?;
 	f.u16(0);
 
-	let l_ch = Label::new();
+	let (l_ch, l_ch_) = Label::new();
 	f.delay_u16(l_ch);
 	f.u16(cast(ch.len())?);
 
-	let l_cp = Label::new();
+	let (l_cp, l_cp_) = Label::new();
 	f.delay_u16(l_cp);
 	f.u16(cast(cp.len())?);
 
-	let l_npcs = Label::new();
+	let (l_npcs, l_npcs_) = Label::new();
 	f.delay_u16(l_npcs);
 	f.u16(cast(npcs.len())?);
 
-	let l_monsters = Label::new();
+	let (l_monsters, l_monsters_) = Label::new();
 	f.delay_u16(l_monsters);
 	f.u16(cast(monsters.len())?);
 
-	let l_triggers = Label::new();
+	let (l_triggers, l_triggers_) = Label::new();
 	f.delay_u16(l_triggers);
 	f.u16(cast(triggers.len())?);
 
-	let l_objects = Label::new();
+	let (l_objects, l_objects_) = Label::new();
 	f.delay_u16(l_objects);
 	f.u16(cast(objects.len())?);
 
 	f.delay_u16(strings.here());
 	strings.string("@FileName")?;
 
-	let l_code_start = Label::new();
+	let (l_code_start, l_code_start_) = Label::new();
 	f.delay_u16(l_code_start);
 	f.u16(0);
-	let l_func_table = Label::new();
+	let (l_func_table, l_func_table_) = Label::new();
 	f.delay_u16(l_func_table);
 	f.u16(cast(functions.len() * 2)?);
 
-	g.label(l_ch);
+	g.label(l_ch_);
 	for ch in ch { g.array(arc.index(ch)?); }
 	g.u8(0xFF);
 
-	g.label(l_cp);
+	g.label(l_cp_);
 	for cp in cp { g.array(arc.index(cp)?); }
 	g.u8(0xFF);
 
-	g.label(l_npcs);
+	g.label(l_npcs_);
 	for &Npc { ref name, pos, angle, ch, cp, flags, init, talk } in npcs {
 		strings.string(name)?;
 		g.pos3(pos);
@@ -356,7 +356,7 @@ pub fn write(arc: &Archives, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		g.u16(talk.0); g.u16(talk.1);
 	}
 
-	g.label(l_monsters);
+	g.label(l_monsters_);
 	for &Monster { ref name, pos, angle, _1, flags, _2, battle, flag, _3 } in monsters {
 		strings.string(name)?;
 		g.pos3(pos);
@@ -369,7 +369,7 @@ pub fn write(arc: &Archives, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		g.u16(_3);
 	}
 
-	g.label(l_triggers);
+	g.label(l_triggers_);
 	for &Trigger { pos1, pos2, flags, func, _1 } in triggers {
 		g.pos3(pos1);
 		g.pos3(pos2);
@@ -378,7 +378,7 @@ pub fn write(arc: &Archives, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		g.u16(_1);
 	}
 
-	g.label(l_objects);
+	g.label(l_objects_);
 	for &Object { pos, radius, bubble_pos, flags, func, _1 } in objects {
 		g.pos3(pos);
 		g.u32(radius);
@@ -388,8 +388,8 @@ pub fn write(arc: &Archives, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		g.u16(_1);
 	}
 
-	func_table.label(l_func_table);
-	g.label(l_code_start);
+	func_table.label(l_func_table_);
+	g.label(l_code_start_);
 	for func in functions.iter() {
 		func_table.delay_u16(g.here());
 		code::write(&mut g, arc, func)?;

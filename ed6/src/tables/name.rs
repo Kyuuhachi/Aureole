@@ -63,18 +63,18 @@ pub fn write(arc: &Archives, table: &BTreeMap<NameId, Name>) -> Result<Vec<u8>, 
 		g.array(arc.index(cp2)?);
 		g.array(fileref(ms1.as_deref())?);
 		g.array(fileref(ms2.as_deref())?);
-		let l = Label::new();
+		let (l, l_) = Label::new();
 		g.delay_u16(l);
-		g.label(l);
+		g.label(l_);
 		g.string(name)?;
 	}
 
 	f.delay_u16(g.here());
 	g.u32(999);
 	g.array([0; 6*4]);
-	let l = Label::new();
+	let (l, l_) = Label::new();
 	g.delay_u16(l);
-	g.label(l);
+	g.label(l_);
 	g.string(" ")?;
 
 	Ok(f.concat(g).finish()?)

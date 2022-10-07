@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::collections::{BTreeMap, BTreeSet};
 
 use hamu::read::le::*;
@@ -21,8 +22,10 @@ use super::{
 
 mod insn;
 pub use insn::*;
+pub mod decompile;
+pub use decompile::decompile;
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Label(pub usize);
 
 impl std::fmt::Debug for Label {
@@ -143,10 +146,10 @@ fn read_raw_insn<'a>(f: &mut impl In<'a>, arc: &GameData) -> Result<RawIInsn, Re
 }
 
 pub fn write(f: &mut impl OutDelay, arc: &GameData, insns: &[FlatInsn]) -> Result<(), WriteError> {
-	let mut labels = BTreeMap::new();
-	let mut labeldefs = BTreeMap::new();
+	let mut labels = HashMap::new();
+	let mut labeldefs = HashMap::new();
 	let mut label = |k| {
-		if let std::collections::btree_map::Entry::Vacant(e) = labels.entry(k) {
+		if let std::collections::hash_map::Entry::Vacant(e) = labels.entry(k) {
 			let (l, l_) = HLabel::new();
 			e.insert(l);
 			labeldefs.insert(k, l_);

@@ -1,18 +1,21 @@
+use ed6::scena::code::decompile::TreeInsn;
 use ed6::scena::{Scena, Npc, Monster, Trigger, Object, FuncRef, CharId, Pos2, Pos3};
-use ed6::scena::code::{InsnArgRef as I, FlatInsn, Label, Insn, Expr, ExprBinop, ExprUnop};
+use ed6::scena::code::{InsnArgRef as I, FlatInsn, Label, Insn, Expr, ExprBinop, ExprUnop, decompile};
 use ed6::text::{Text, TextSegment};
 
 pub struct Context {
-	blind: bool,
-	indent: usize,
+	pub blind: bool,
+	pub decompile: bool,
+	pub indent: usize,
 	is_line: bool,
-	output: String,
+	pub output: String,
 }
 
 impl Context {
 	pub fn new() -> Self {
 		Self {
 			blind: false,
+			decompile: true,
 			indent: 0,
 			is_line: true,
 			output: String::new(),
@@ -24,10 +27,10 @@ impl Context {
 		self
 	}
 
-	pub fn output(self) -> String {
-		self.output
+	pub fn flat(mut self) -> Self {
+		self.decompile = false;
+		self
 	}
-
 }
 
 impl Default for Context {
@@ -40,10 +43,6 @@ impl Context {
 	fn write(&mut self, arg: &str) {
 		assert!(!arg.contains('\n'));
 		assert!(!arg.contains('\t'));
-		self.write_lax(arg)
-	}
-
-	fn write_lax(&mut self, arg: &str) {
 		if self.is_line {
 			for _ in 0..self.indent {
 				self.output.push('\t');
@@ -63,8 +62,7 @@ impl Context {
 		self.line();
 	}
 
-	fn block(&mut self, body: impl FnOnce(&mut Self)) {
-		self.writeln(":");
+	fn indent(&mut self, body: impl FnOnce(&mut Self)) {
 		self.indent += 1;
 		body(self);
 		self.indent -= 1;
@@ -199,13 +197,32 @@ pub fn dump(f: &mut Context, scena: &Scena) {
 	for (i, func) in functions.iter().enumerate() {
 		f.write("fn ");
 		val(f, I::FuncRef(&FuncRef(0, i as u16)));
-		flat_func(f, func);
+		let result = if f.decompile {
+			decompile(func).map_err(Some)
+		} else {
+			Err(None)
+		};
+		match result {
+			Ok(result) => {
+				f.writeln(":");
+				f.indent(|f| tree_func(f, &result));
+			}
+			Err(err) => {
+				f.write(" flat:");
+				if let Some(err) = err {
+					f.write(&format!(" // {err}"));
+				}
+				f.line();
+				f.indent(|f| flat_func(f, func));
+			}
+		}
 		f.line();
 	}
 }
 
 fn object(f: &mut Context, vals: &[(&str, I)]) {
-	f.block(|f| {
+	f.writeln(":");
+	f.indent(|f| {
 		for (k, v) in vals {
 			f.write(k);
 			f.write(" ");
@@ -215,45 +232,109 @@ fn object(f: &mut Context, vals: &[(&str, I)]) {
 	});
 }
 
-fn flat_func(f: &mut Context, func: &[FlatInsn]) {
-	f.block(|f| {
-		for i in func {
-			match i {
-				FlatInsn::Unless(e, l) => {
-					f.write("Unless ");
-					val(f, I::Expr(e));
-					f.write(" ");
+pub fn flat_func(f: &mut Context, func: &[FlatInsn]) {
+	for i in func {
+		match i {
+			FlatInsn::Unless(e, l) => {
+				f.write("Unless ");
+				val(f, I::Expr(e));
+				f.write(" ");
+				label(f, l);
+				f.line();
+			},
+			FlatInsn::Goto(l) => {
+				f.write("Goto ");
+				label(f, l);
+				f.line();
+			},
+			FlatInsn::Switch(e, cs, l) => {
+				f.write("Switch ");
+				val(f, I::Expr(e));
+				f.write(" {");
+				for (v, l) in cs {
+					val(f, I::u16(v));
+					f.write(": ");
 					label(f, l);
-				},
-				FlatInsn::Goto(l) => {
-					f.write("Goto ");
-					label(f, l);
-				},
-				FlatInsn::Switch(e, cs, l) => {
-					f.write("Switch ");
-					val(f, I::Expr(e));
-					f.write(" {");
-					for (v, l) in cs {
-						val(f, I::u16(v));
-						f.write(": ");
-						label(f, l);
-						f.write(", ");
-					}
-					f.write("default: ");
-					label(f, l);
-					f.write("}");
-				},
-				FlatInsn::Insn(i) => {
-					insn(f, i);
-				},
-				FlatInsn::Label(l) => {
-					f.write("@");
-					label(f, l);
-				},
-			}
-			f.line();
+					f.write(", ");
+				}
+				f.write("default: ");
+				label(f, l);
+				f.write("}");
+				f.line();
+			},
+			FlatInsn::Insn(i) => {
+				insn(f, i);
+				f.line();
+			},
+			FlatInsn::Label(l) => {
+				f.write("@");
+				label(f, l);
+				f.line();
+			},
 		}
-	});
+	}
+}
+
+pub fn tree_func(f: &mut Context, func: &[TreeInsn]) {
+	for i in func {
+		match i {
+			TreeInsn::If(cs) => {
+				let mut first = true;
+				for (e, body) in cs {
+					match (first, e) {
+						(true, Some(e)) => {
+							f.write("if ");
+							val(f, I::Expr(e));
+						},
+						(false, Some(e)) => {
+							f.write("elif ");
+							val(f, I::Expr(e));
+						},
+						(false, None) => {
+							f.write("else");
+						},
+						(true, None) => panic!(),
+					}
+					first = false;
+					f.writeln(":");
+					f.indent(|f| tree_func(f, body));
+				}
+			},
+			TreeInsn::Switch(e, cs) => {
+				f.write("switch ");
+				val(f, I::Expr(e));
+				f.writeln(":");
+				f.indent(|f| {
+					for (v, body) in cs {
+						match v {
+							Some(v) => val(f, I::u16(v)),
+							None => f.write("default"),
+						}
+						f.writeln(" =>");
+						f.indent(|f| tree_func(f, body));
+					}
+				});
+			},
+			TreeInsn::While(e, body) => {
+				f.write("while ");
+				val(f, I::Expr(e));
+				f.writeln(":");
+				f.indent(|f| tree_func(f, body));
+			},
+			TreeInsn::Break => {
+				f.write("break");
+				f.line();
+			},
+			TreeInsn::Continue => {
+				f.write("continue");
+				f.line();
+			},
+			TreeInsn::Insn(i) => {
+				insn(f, i);
+				f.line();
+			},
+		}
+	}
 }
 
 fn insn(f: &mut Context, i: &Insn) {
@@ -305,15 +386,13 @@ fn val(f: &mut Context, a: I) {
 
 		I::Expr(v) => expr(f, v),
 		I::Fork(v) => {
-			f.write("[");
-			f.indent += 1;
-			f.line();
-			for i in v {
-				insn(f, i);
-				f.line();
-			}
-			f.indent -= 1;
-			f.write("]");
+			f.writeln(":");
+			f.indent(|f| {
+				for i in v {
+					insn(f, i);
+					f.line();
+				}
+			})
 		},
 		I::FuncRef(v) => {
 			if v.0 != 0 {

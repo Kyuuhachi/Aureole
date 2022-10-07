@@ -460,4 +460,16 @@ use crate::gamedata::GameData;
 		assert!(!failed);
 		Ok(())
 	}
+
+	#[test_case::test_case(&FC, "", "._sn"; "fc")]
+	fn decompile(arc: &GameData, prefix: &str, suffix: &str) -> Result<(), Error> {
+		for name in arc.list().filter(|&a| a.starts_with(prefix) && a.ends_with(suffix)) {
+			let scena = super::read(arc, &arc.get_decomp(name)?)?;
+			for (i, func) in scena.functions.iter().enumerate() {
+				crate::scena::code::decompile(func).map_err(|e| format!("{name}:{i}: {e}"))?;
+			}
+		}
+
+		Ok(())
+	}
 }

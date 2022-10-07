@@ -282,8 +282,6 @@ pub fn read(arc: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 
 	f.assert_covered()?;
 
-	ensure!(ch.len() == cp.len(), "invalid chcp lists\n\t{ch:?}\n\t{cp:?}");
-
 	Ok(Scena {
 		dir, fname,
 		town, bgm,

@@ -20,6 +20,10 @@ pub fn bytecode(tokens: TokenStream) -> TokenStream {
 	let body = parse_macro_input!(tokens as Body);
 	let f = Ident::new("f", Span::call_site());
 	let mut ctx = Ctx::new(f.clone());
+
+	// Used in the dump
+	ctx.args.insert(Ident::new("String", Span::call_site()), parse_quote!{ String });
+
 	let read_body = gather(&mut ctx, &body.table, &Item::default());
 
 	let items = ctx.items.iter().map(|(span, name, Item { types, .. })| quote_spanned! { *span =>
@@ -45,7 +49,7 @@ pub fn bytecode(tokens: TokenStream) -> TokenStream {
 	let items = ctx.args.iter().map(|(k, v)| quote!(#k(&'a #v)));
 	let InsnArgRef = quote! {
 		#[allow(non_camel_case_types)]
-		#[derive(Debug, Clone)]
+		#[derive(Debug, Clone, Copy)]
 		pub enum InsnArgRef<'a> {
 			#(#items),*
 		}

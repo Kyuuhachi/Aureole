@@ -140,12 +140,12 @@ ed6_macros::bytecode! {
 		0x8D => CharIdle      (u16 as CharId, Pos2, Pos2, u32 alias Speed),
 		0x8E => CharWalkTo    (u16 as CharId, Pos3, u32 alias Speed, u8),
 		0x8F => CharWalkTo2   (u16 as CharId, Pos3, u32 alias Speed, u8), // how are these two different?
-		0x90 => DontGoThere   (u16, Pos3 alias RelativePos3, u32, u8),
-		0x91 => _Char91       (u16 as CharId, Pos3 alias RelativePos3, i32, u8),
+		0x90 => DontGoThere   (u16, Pos3 alias RelPos3, u32, u8),
+		0x91 => _Char91       (u16 as CharId, Pos3 alias RelPos3, i32, u8),
 		0x92 => _Char92       (u16 as CharId, u16 as CharId, u32, u32 alias Time, u8),
 		0x93 => _Char93       (u16 as CharId, u16, u32, u32, u8),
 		0x94 => _94       (u8, u16 as CharId, u16, u32, u32, u8), // used with chickens
-		0x95 => CharJump      (u16 as CharId, Pos3 alias RelativePos3, u32 alias Time, u32),
+		0x95 => CharJump      (u16 as CharId, Pos3 alias RelPos3, u32 alias Time, u32),
 		0x96 => _Char96       (u16 as CharId, Pos3, i32, i32),
 		0x97 => _Char97       (u16 as CharId, Pos2, i32 alias Angle32, u32 alias Time, u16), // used with pigeons
 		0x99 => CharAnimation (u16 as CharId, u8, u8, u32 alias Time),

@@ -14,7 +14,7 @@ pub type Backtrace = Box<std::backtrace::Backtrace>;
 #[derive(Debug, thiserror::Error)]
 #[error("cannot convert {value} into {type_}\n{source}")]
 pub struct CastError {
-	source: Box<dyn std::error::Error>,
+	source: Box<dyn std::error::Error + Sync + Send>,
 	type_: &'static str,
 	value: String,
 }
@@ -22,7 +22,7 @@ pub struct CastError {
 pub fn cast<A, B>(a: A) -> Result<B, CastError> where
 	A: std::fmt::Debug + Clone,
 	B: TryFrom<A>,
-	B::Error: std::error::Error + 'static,
+	B::Error: std::error::Error + Sync + Send + 'static,
 {
 	a.clone().try_into().map_err(|e| cast_error::<B>(a, e))
 }
@@ -37,7 +37,7 @@ pub fn cast_bool(a: impl Into<u64> + std::fmt::Debug + Clone) -> Result<bool, Ca
 
 pub fn cast_error<T>(
 	val: impl std::fmt::Debug,
-	cause: impl Into<Box<dyn std::error::Error>>,
+	cause: impl Into<Box<dyn std::error::Error + Sync + Send>>,
 ) -> CastError {
 	CastError {
 		type_: std::any::type_name::<T>(),

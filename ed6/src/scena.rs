@@ -26,6 +26,30 @@ pub struct Pos3(pub i32, pub i32, pub i32);
 
 newtype!(Flag, u16);
 
+newtype!(Color, u32);
+newtype!(ShopId, u8);
+newtype!(Member, u8);
+newtype!(MagicId, u16);
+newtype!(MemberAttr, u8);
+
+newtype!(Flags, u32);
+newtype!(QuestFlags, u8);
+newtype!(CharFlags, u16);
+
+newtype!(Var, u16);
+newtype!(Attr, u8);
+newtype!(CharId, u16);
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(derive_more::DebugCustom)]
+#[debug(fmt = "CharAttr({_0:?}, {_1})")]
+pub struct CharAttr(pub CharId, pub u8);
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(derive_more::DebugCustom)]
+#[debug(fmt = "Emote({_0:?}, {_1})")]
+pub struct Emote(pub u8, pub u8, pub u32);
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Npc {
 	pub name: String,
@@ -33,7 +57,7 @@ pub struct Npc {
 	pub angle: u16,
 	pub ch: (u16, u16), // First entry seems to always be zero. Probably include index, just like for functions.
 	pub cp: (u16, u16),
-	pub flags: u16,
+	pub flags: CharFlags,
 	pub init: FuncRef,
 	pub talk: FuncRef,
 }
@@ -44,7 +68,7 @@ pub struct Monster {
 	pub pos: Pos3,
 	pub angle: u16,
 	pub _1: u16, // This looks like a chcp index, but npcs have 4×u16 while this only has 1×u16?
-	pub flags: u16,
+	pub flags: CharFlags,
 	pub _2: i32, // Always -1
 	pub battle: BattleId,
 	pub flag: Flag, // set when defeated
@@ -183,7 +207,7 @@ pub fn read(arc: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 		angle: g.u16()?,
 		ch: (g.u16()?, g.u16()?),
 		cp: (g.u16()?, g.u16()?),
-		flags: g.u16()?,
+		flags: CharFlags(g.u16()?),
 		init: FuncRef(g.u16()?, g.u16()?),
 		talk: FuncRef(g.u16()?, g.u16()?),
 	})).strict()?;
@@ -194,7 +218,7 @@ pub fn read(arc: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 		pos: g.pos3()?,
 		angle: g.u16()?,
 		_1: g.u16()?,
-		flags: g.u16()?,
+		flags: CharFlags(g.u16()?),
 		_2: g.i32()?,
 		battle: BattleId(g.u16()?),
 		flag: Flag(g.u16()?),
@@ -257,6 +281,8 @@ pub fn read(arc: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	}
 
 	f.assert_covered()?;
+
+	ensure!(ch.len() == cp.len(), "invalid chcp lists\n\t{ch:?}\n\t{cp:?}");
 
 	Ok(Scena {
 		dir, fname,
@@ -351,7 +377,7 @@ pub fn write(arc: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		g.u16(angle);
 		g.u16(ch.0); g.u16(ch.1);
 		g.u16(cp.0); g.u16(cp.1);
-		g.u16(flags);
+		g.u16(flags.0);
 		g.u16(init.0); g.u16(init.1);
 		g.u16(talk.0); g.u16(talk.1);
 	}
@@ -362,7 +388,7 @@ pub fn write(arc: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		g.pos3(pos);
 		g.u16(angle);
 		g.u16(_1);
-		g.u16(flags);
+		g.u16(flags.0);
 		g.i32(_2);
 		g.u16(battle.0);
 		g.u16(flag.0);

@@ -14,37 +14,16 @@ use crate::tables::town::TownId;
 use crate::util::*;
 use crate::text::Text;
 
-use super::{FuncRef, Pos2, Pos3, Flag, InExt2, OutExt2};
-
-type Color = u32;
-type ShopId = u8;
-type Member = u8;
-type MagicId = u16;
-type MemberAttr = u8;
-
-type Flags = u32;
-type QuestFlags = u8;
-type CharFlags = u16;
-
-newtype!(Var, u16);
-newtype!(Attr, u8);
-newtype!(CharId, u16);
-
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[derive(derive_more::DebugCustom)]
-#[debug(fmt = "CharAttr({_0:?}, {_1})")]
-pub struct CharAttr(pub CharId, pub u8);
-
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[derive(derive_more::DebugCustom)]
-#[debug(fmt = "Emote({_0:?}, {_1})")]
-pub struct Emote(pub u8, pub u8, pub u32);
+use super::{
+	Attr, CharAttr, CharFlags, CharId, Color, Emote, Flag, Flags, FuncRef, InExt2, MagicId, Member,
+	MemberAttr, OutExt2, Pos2, Pos3, QuestFlags, ShopId, Var,
+};
 
 mod insn;
 pub use insn::*;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Label(usize);
+pub struct Label(pub usize);
 
 impl std::fmt::Debug for Label {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -473,7 +452,7 @@ pub enum Expr {
 	Const(u32),
 	Binop(ExprBinop, Box<Expr>, Box<Expr>),
 	Unop(ExprUnop, Box<Expr>),
-	Exec(Box<Insn>),
+	Insn(Box<Insn>),
 	Flag(Flag),
 	Var(Var),
 	Attr(Attr),
@@ -498,7 +477,7 @@ mod expr {
 				match op {
 					0x00 => Expr::Const(f.u32()?),
 					0x01 => break,
-					0x1C => Expr::Exec(Box::new(Insn::read(f, arc)?)),
+					0x1C => Expr::Insn(Box::new(Insn::read(f, arc)?)),
 					0x1E => Expr::Flag(Flag(f.u16()?)),
 					0x1F => Expr::Var(Var(f.u16()?)),
 					0x20 => Expr::Attr(Attr(f.u8()?)),
@@ -527,7 +506,7 @@ mod expr {
 				},
 				Expr::Const(n)       => { f.u8(0x00); f.u32(n); },
 				// 0x01 handled below
-				Expr::Exec(ref insn) => { f.u8(0x1C); Insn::write(f, arc, insn)?; },
+				Expr::Insn(ref insn) => { f.u8(0x1C); Insn::write(f, arc, insn)?; },
 				Expr::Flag(v)        => { f.u8(0x1E); f.u16(v.0); },
 				Expr::Var(v)         => { f.u8(0x1F); f.u16(v.0); },
 				Expr::Attr(v)        => { f.u8(0x20); f.u8(v.0); },

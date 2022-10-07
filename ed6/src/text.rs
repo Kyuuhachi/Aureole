@@ -27,8 +27,15 @@ pub enum TextSegment {
 	Color(u8),
 	_09,
 	Item(ItemId),
+	Hash(HashSegment),
 
-	// Hash sequence
+	// Invalid sjis, or hash sequence that did not parse correctly.
+	// The one known instance is in FC t2410:9, where a line contains #\x02.
+	Error(Vec<u8>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HashSegment {
 	NoA,
 	A(u16),
 	NoFace,
@@ -39,10 +46,6 @@ pub enum TextSegment {
 	Size(u16),
 	NoSpeed,
 	Speed(u16),
-
-	// Invalid sjis, or hash sequence that did not parse correctly.
-	// The one known instance is in FC t2410:9, where a line contains #\x02.
-	Error(Vec<u8>),
 }
 
 impl Text {
@@ -110,7 +113,7 @@ pub struct Iter<'a> {
 }
 
 impl Iter<'_> {
-	fn parse_hash(&mut self) -> Option<TextSegment> {
+	fn parse_hash(&mut self) -> Option<HashSegment> {
 		let start = self.pos;
 		while (b'0'..=b'9').contains(&self.data[self.pos]) {
 			self.pos += 1;
@@ -119,12 +122,12 @@ impl Iter<'_> {
 		let ch = self.data[self.pos];
 		self.pos += 1;
 		Some(match ch {
-			b'A' if n.is_empty() => TextSegment::NoA,
-			b'A' => TextSegment::A(n.parse().ok()?),
-			b'F' if n.is_empty() => TextSegment::NoFace,
-			b'F' => TextSegment::Face(FaceId(n.parse().ok()?)),
-			b'K' => TextSegment::K(n.parse().ok()?),
-			b'P' => TextSegment::Pos(n.parse().ok()?),
+			b'A' if n.is_empty() => HashSegment::NoA,
+			b'A' => HashSegment::A(n.parse().ok()?),
+			b'F' if n.is_empty() => HashSegment::NoFace,
+			b'F' => HashSegment::Face(FaceId(n.parse().ok()?)),
+			b'K' => HashSegment::K(n.parse().ok()?),
+			b'P' => HashSegment::Pos(n.parse().ok()?),
 			b'R' => {
 				let s = self.parse_string();
 				let ch = self.data[self.pos];
@@ -132,10 +135,10 @@ impl Iter<'_> {
 				if ch != b'#' {
 					return None
 				}
-				TextSegment::Ruby(n.parse().ok()?, s?)
+				HashSegment::Ruby(n.parse().ok()?, s?)
 			},
-			b'S' => TextSegment::Size(n.parse().ok()?),
-			b'W' => TextSegment::Speed(n.parse().ok()?),
+			b'S' => HashSegment::Size(n.parse().ok()?),
+			b'W' => HashSegment::Speed(n.parse().ok()?),
 			_ => return None
 		})
 	}
@@ -179,7 +182,7 @@ impl Iterator for Iter<'_> {
 			b'#' => {
 				self.pos += 1;
 				if let Some(seg) = self.parse_hash() {
-					seg
+					TextSegment::Hash(seg)
 				} else {
 					if self.pos == self.data.len() {
 						self.pos -= 1;
@@ -221,23 +224,31 @@ impl TextSegment {
 				f.u16(n.0);
 			}
 
-			TextSegment::NoA        => f.slice("#A".as_bytes()),
-			TextSegment::A(n)       => f.slice(format!("#{n}A").as_bytes()),
-			TextSegment::NoFace     => f.slice("#F".as_bytes()),
-			TextSegment::Face(FaceId(n)) => f.slice(format!("#{n}F").as_bytes()),
-			TextSegment::K(n)       => f.slice(format!("#{n}K").as_bytes()),
-			TextSegment::Pos(n)     => f.slice(format!("#{n}P").as_bytes()),
-			TextSegment::Ruby(n, s) => {
-				let s = format!("#{n}R{s}#");
+			TextSegment::Hash(a) => {
+				let s = a.to_hash();
 				let (text, _, error) = SHIFT_JIS.encode(&s);
 				assert!(!error);
 				f.slice(&text);
 			}
-			TextSegment::Size(n)    => f.slice(format!("#{n}S").as_bytes()),
-			TextSegment::NoSpeed    => f.slice("#W".as_bytes()),
-			TextSegment::Speed(n)   => f.slice(format!("#{n}W").as_bytes()),
 
 			TextSegment::Error(ref s) => f.slice(s),
+		}
+	}
+}
+
+impl HashSegment {
+	pub fn to_hash(&self) -> std::borrow::Cow<str> {
+		match self {
+			HashSegment::NoA             => "#A".into(),
+			HashSegment::A(n)            => format!("#{n}A").into(),
+			HashSegment::NoFace          => "#F".into(),
+			HashSegment::Face(FaceId(n)) => format!("#{n}F").into(),
+			HashSegment::K(n)            => format!("#{n}K").into(),
+			HashSegment::Pos(n)          => format!("#{n}P").into(),
+			HashSegment::Ruby(n, s)      => format!("#{n}R{s}#").into(),
+			HashSegment::Size(n)         => format!("#{n}S").into(),
+			HashSegment::NoSpeed         => "#W".into(),
+			HashSegment::Speed(n)        => format!("#{n}W").into(),
 		}
 	}
 }

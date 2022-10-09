@@ -187,3 +187,142 @@ fn block0<'a>(ctx: &Context<'a>, pos: &mut usize, end: usize, cont: Option<&'a L
 	}
 	Ok((out, None))
 }
+
+#[derive(Debug, thiserror::Error)]
+pub enum CompileError {
+	#[error("else clause must be last")]
+	ElseNotLast,
+	#[error("invalid break statement")]
+	InvalidBreak,
+	#[error("invalid continue statement")]
+	InvalidContinue,
+	#[error("duplicate key {}", key.map_or("default".to_owned(), |a| a.to_string()))]
+	DuplicateCase { key: Option<u16> },
+}
+
+pub fn recompile(insns: &[TreeInsn]) -> Result<Vec<FlatInsn>, CompileError> {
+	let mut out = Vec::new();
+	recompile0(insns, &mut out, &mut 0, None, None)?;
+	fixup_labels(&mut out);
+	Ok(out)
+}
+
+fn recompile0(insns: &[TreeInsn], out: &mut Vec<FlatInsn>, count: &mut usize, cont: Option<Label>, brk: Option<Label>) -> Result<(), CompileError> {
+	for i in insns {
+		match i {
+			TreeInsn::If(clauses) => {
+				if let Some((last, clauses)) = clauses.split_last() {
+					let end = Label(*count); *count += 1;
+					for clause in clauses {
+						let l2 = Label(*count); *count += 1;
+						if let Some(e) = &clause.0 {
+							out.push(FlatInsn::Unless(e.clone(), l2));
+						} else {
+							return Err(CompileError::ElseNotLast);
+						}
+						recompile0(&clause.1, out, count, cont, brk)?;
+						out.push(FlatInsn::Goto(end));
+						out.push(FlatInsn::Label(l2));
+					}
+					if let Some(e) = &last.0 {
+						out.push(FlatInsn::Unless(e.clone(), end));
+					}
+					recompile0(&last.1, out, count, cont, brk)?;
+					out.push(FlatInsn::Label(end));
+				}
+			}
+
+			TreeInsn::Switch(e, clauses) => {
+				let brk = Label(*count); *count += 1;
+				let pos = out.len();
+				let mut labels = Vec::new();
+				let mut default = None;
+				for arm in clauses.split_inclusive(|a| !a.1.is_empty()) {
+					let label = Label(*count); *count += 1;
+					out.push(FlatInsn::Label(label));
+					// TODO check duplicate cases
+					for case in arm {
+						if let Some(key) = case.0 {
+							labels.push((key, label));
+						} else {
+							default = Some(label);
+						}
+					}
+					let body = &arm.last().unwrap().1;
+					recompile0(body, out, count, cont, Some(brk))?;
+				}
+				out.insert(pos, FlatInsn::Switch(e.clone(), labels, default.unwrap_or(brk)));
+				out.push(FlatInsn::Label(brk));
+			}
+
+			TreeInsn::While(e, body) => {
+				let cont = Label(*count); *count += 1;
+				let brk = Label(*count); *count += 1;
+				out.push(FlatInsn::Label(cont));
+				out.push(FlatInsn::Unless(e.clone(), brk));
+				recompile0(body, out, count, Some(cont), Some(brk))?;
+				out.push(FlatInsn::Goto(cont));
+				out.push(FlatInsn::Label(brk));
+			}
+
+			TreeInsn::Break => {
+				out.push(FlatInsn::Goto(brk.ok_or(CompileError::InvalidBreak)?));
+			}
+
+			TreeInsn::Continue => {
+				out.push(FlatInsn::Goto(cont.ok_or(CompileError::InvalidBreak)?));
+			}
+
+			TreeInsn::Insn(i) => {
+				out.push(FlatInsn::Insn(i.clone()));
+			}
+		}
+	}
+	Ok(())
+}
+
+fn fixup_labels(insns: &mut Vec<FlatInsn>) {
+	let mut labels = HashMap::new();
+	let mut n = 0;
+	let mut current = None;
+	insns.retain_mut(|insn| {
+		match insn {
+			FlatInsn::Label(l) => {
+				if let Some(replace) = current {
+					labels.insert(*l, replace);
+					false
+				} else {
+					let replace = Label(n);
+					n += 1;
+					current = Some(replace);
+					labels.insert(*l, replace);
+					true
+				}
+			},
+			_ => {
+				current = None;
+				true
+			}
+		}
+	});
+
+	let label = |a: &mut Label| { *a = labels[a] };
+	for insn in insns {
+		match insn {
+			FlatInsn::Unless(_, target) => {
+				label(target);
+			},
+			FlatInsn::Goto(target) => {
+				label(target);
+			},
+			FlatInsn::Switch(_, branches, default) => {
+				for (_, target) in branches {
+					label(target);
+				}
+				label(default);
+			}
+			FlatInsn::Insn(_) => {}
+			FlatInsn::Label(l) => label(l),
+		}
+	}
+}

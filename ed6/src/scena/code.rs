@@ -23,7 +23,6 @@ use super::{
 mod insn;
 pub use insn::*;
 pub mod decompile;
-pub use decompile::decompile;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Label(pub usize);

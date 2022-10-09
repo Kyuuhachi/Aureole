@@ -467,7 +467,28 @@ use crate::gamedata::GameData;
 		for name in arc.list().filter(|&a| a.starts_with(prefix) && a.ends_with(suffix)) {
 			let scena = super::read(arc, &arc.get_decomp(name)?)?;
 			for (i, func) in scena.functions.iter().enumerate() {
-				crate::scena::code::decompile(func).map_err(|e| format!("{name}:{i}: {e}"))?;
+				let decomp = super::code::decompile::decompile(func).map_err(|e| format!("{name}:{i}: {e}"))?;
+				let recomp = super::code::decompile::recompile(&decomp).map_err(|e| format!("{name}:{i}: {e}"))?;
+				if &recomp != func {
+					println!("{name}:{i}: incorrect recompile");
+
+					let mut ctx = super::text::Context::new();
+					ctx.indent += 1;
+					super::text::flat_func(&mut ctx, func);
+					println!("{}", ctx.output);
+
+					let mut ctx = super::text::Context::new();
+					ctx.indent += 1;
+					super::text::tree_func(&mut ctx, &decomp);
+					println!("{}", ctx.output);
+
+					let mut ctx = super::text::Context::new();
+					ctx.indent += 1;
+					super::text::flat_func(&mut ctx, &recomp);
+					println!("{}", ctx.output);
+
+					panic!()
+				}
 			}
 		}
 

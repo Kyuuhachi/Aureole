@@ -121,12 +121,12 @@ fn block0<'a>(ctx: &Context<'a>, pos: &mut usize, end: usize, cont: Option<&'a L
 
 				let ends = cases.iter().map(|a| &a.1).skip(1);
 
-				let last_case = ctx.label(*pos..end, cases.last().unwrap().1)?;
+				let last_case = cases.last().unwrap();
 				let mut brk = None;
 				for case_end in ends.clone() {
 					let case_end = ctx.label(*pos..end, case_end)?;
 					if let Some(FlatInsn::Goto(label)) = ctx[*pos..case_end].last() {
-						if ctx.label(last_case..end, label).is_ok() {
+						if ctx.label(case_end..end, label).is_ok() {
 							brk = Some(label);
 						}
 					}
@@ -140,9 +140,9 @@ fn block0<'a>(ctx: &Context<'a>, pos: &mut usize, end: usize, cont: Option<&'a L
 
 				match brk {
 					Some(brk) => {
-						if brk != cases.last().unwrap().1 {
+						if brk != last_case.1 {
 							let the_end = ctx.label(*pos..end, brk)?;
-							arms.push((None, block(ctx, pos, the_end, cont, Some(brk))?));
+							arms.push((last_case.0, block(ctx, pos, the_end, cont, Some(brk))?));
 						}
 						out.push(TreeInsn::Switch(e.clone(), arms));
 					}
@@ -150,7 +150,7 @@ fn block0<'a>(ctx: &Context<'a>, pos: &mut usize, end: usize, cont: Option<&'a L
 						let (mut body, jump) = block_partial(ctx, pos, end, cont, None)?;
 						if jump.is_some() && *pos < ctx.len() && ctx[*pos] == FlatInsn::Label(*jump.unwrap()) {
 							body.push(TreeInsn::Break);
-							arms.push((None, body));
+							arms.push((last_case.0, body));
 							out.push(TreeInsn::Switch(e.clone(), arms));
 						} else {
 							out.push(TreeInsn::Switch(e.clone(), arms));

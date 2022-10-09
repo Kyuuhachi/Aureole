@@ -8,6 +8,7 @@ use crate::tables::town::TownId;
 use crate::util::*;
 
 pub mod code;
+pub mod text;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[derive(derive_more::DebugCustom)]

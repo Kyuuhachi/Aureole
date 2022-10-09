@@ -1,7 +1,7 @@
-use ed6::scena::code::decompile::TreeInsn;
-use ed6::scena::{Scena, Npc, Monster, Trigger, Object, FuncRef, CharId, Pos2, Pos3};
-use ed6::scena::code::{InsnArgRef as I, FlatInsn, Label, Insn, Expr, ExprBinop, ExprUnop, decompile};
-use ed6::text::{Text, TextSegment};
+use super::{Scena, Npc, Monster, Trigger, Object, FuncRef, CharId, Pos2, Pos3};
+use super::code::{InsnArgRef as I, FlatInsn, Label, Insn, Expr, ExprBinop, ExprUnop};
+use super::code::decompile::{decompile, TreeInsn};
+use crate::text::{Text, TextSegment};
 
 pub struct Context {
 	pub blind: bool,

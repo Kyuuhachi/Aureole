@@ -7,7 +7,6 @@ members = [
 
 	"ed6-macros",
 	"ed6",
-	"text",
 	"tools",
 ]
 

@@ -472,17 +472,19 @@ use crate::gamedata::GameData;
 				if &recomp != func {
 					println!("{name}:{i}: incorrect recompile");
 
-					let mut ctx = super::text::Context::new();
+					let mut ctx = super::text::Context::new().blind();
 					ctx.indent += 1;
 					super::text::flat_func(&mut ctx, func);
-					println!("{}", ctx.output);
+					print!("{}", ctx.output);
+					println!("\n======\n");
 
-					let mut ctx = super::text::Context::new();
+					let mut ctx = super::text::Context::new().blind();
 					ctx.indent += 1;
 					super::text::tree_func(&mut ctx, &decomp);
-					println!("{}", ctx.output);
+					print!("{}", ctx.output);
+					println!("\n======\n");
 
-					let mut ctx = super::text::Context::new();
+					let mut ctx = super::text::Context::new().blind();
 					ctx.indent += 1;
 					super::text::flat_func(&mut ctx, &recomp);
 					println!("{}", ctx.output);

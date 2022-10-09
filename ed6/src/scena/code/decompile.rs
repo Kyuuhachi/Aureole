@@ -143,7 +143,6 @@ fn block0<'a>(ctx: &Context<'a>, pos: &mut usize, end: usize, cont: Option<&'a L
 						if brk != cases.last().unwrap().1 {
 							let the_end = ctx.label(*pos..end, brk)?;
 							arms.push((None, block(ctx, pos, the_end, cont, Some(brk))?));
-							*pos = end;
 						}
 						out.push(TreeInsn::Switch(e.clone(), arms));
 					}

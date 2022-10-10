@@ -26,8 +26,16 @@ pub fn bytecode(tokens: TokenStream) -> TokenStream {
 
 	let read_body = gather(&mut ctx, &body.table, &Item::default());
 
-	let items = ctx.items.iter().map(|(span, name, Item { types, .. })| quote_spanned! { *span =>
-		#name(#(#types),*)
+	let items = ctx.items.iter().map(|(span, name, Item { hex, types, .. })| {
+		let hex_str = hex.iter()
+			.map(|a| format!("{a:02X}"))
+			.collect::<Box<_>>()
+			.join(" ");
+		let doc = hex_str;
+		quote_spanned! { *span =>
+			#[doc = #doc]
+			#name(#(#types),*)
+		}
 	});
 	let Insn = quote! {
 		#[allow(non_camel_case_types)]
@@ -223,7 +231,7 @@ impl ToTokens for Table {
 
 #[derive(Clone, Debug)]
 struct InsnArm {
-	key: LitInt,
+	key: (LitInt, u8),
 	arrow_token: Token![=>],
 	name: Ident,
 	paren_token: token::Paren,
@@ -235,7 +243,11 @@ impl Parse for InsnArm {
 	fn parse(input: ParseStream) -> Result<Self> {
 		let content;
 		Ok(Self {
-			key: input.parse()?,
+			key: {
+				let lit: LitInt = input.parse()?;
+				let val = lit.base10_parse()?;
+				(lit, val)
+			},
 			arrow_token: input.parse()?,
 			name: input.parse()?,
 			paren_token: parenthesized!(content in input),
@@ -270,7 +282,7 @@ impl Parse for InsnArm {
 
 impl ToTokens for InsnArm {
 	fn to_tokens(&self, ts: &mut TokenStream2) {
-		self.key.to_tokens(ts);
+		self.key.0.to_tokens(ts);
 		self.arrow_token.to_tokens(ts);
 		self.name.to_tokens(ts);
 		self.paren_token.surround(ts, |ts| {
@@ -434,6 +446,7 @@ impl Ctx {
 
 #[derive(Debug, Clone, Default)]
 struct Item {
+	hex: Vec<u8>,
 	name: String,
 	vars: Vec<Ident>,
 	#[allow(clippy::vec_box)]
@@ -449,7 +462,8 @@ fn gather(ctx: &mut Ctx, t: &Table, item: &Item) -> TokenStream2 {
 		let f = &ctx.f;
 
 		item.name.push_str(&arm.name.to_string());
-		let key = &arm.key;
+		let key = &arm.key.0;
+		item.hex.push(arm.key.1);
 		item.write.push(quote_spanned! { key.span() => #f.u8(#key); });
 
 		let mut read = Vec::new();
@@ -531,7 +545,7 @@ fn gather(ctx: &mut Ctx, t: &Table, item: &Item) -> TokenStream2 {
 			quote_spanned! { arm.span() => Ok(Self::#name(#(#vars),*)) }
 		};
 
-		let key = &arm.key;
+		let key = &arm.key.0;
 		arms.push(quote_spanned! { arm.span() =>
 			#key => {
 				#(#read)*

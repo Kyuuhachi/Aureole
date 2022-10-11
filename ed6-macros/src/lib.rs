@@ -478,7 +478,7 @@ impl ToTokens for SourceCall {
 struct Table {
 	match_token: Token![match],
 	brace_token: token::Brace,
-	arms: Punctuated<TableArm, Token![,]>,
+	arms: Punctuated<WithAttrs<TableArm>, Token![,]>,
 }
 
 impl Parse for Table {
@@ -682,11 +682,11 @@ fn gather_arm(ctx: &mut Ctx, arm: &InsnArm, mut item: Item) -> TokenStream2 {
 		let mut arms = Vec::new();
 		for arm in &tail.arms {
 			let mut item = item.clone();
-			item.name = format_ident!("{}{}", &item.name, &arm.insn.name, span=arm.insn.name.span());
-			let key = &arm.key;
+			item.name = format_ident!("{}{}", &item.name, &arm.value.insn.name, span=arm.value.insn.name.span());
+			item.attrs.extend(arm.attrs.clone());
+			let key = &arm.value.key;
 			item.write.push(quote_spanned! { arm.span() => __f.u8(#key); });
-			let body = gather_arm(ctx, &arm.insn, item);
-			let key = &arm.key;
+			let body = gather_arm(ctx, &arm.value.insn, item);
 			arms.push(quote_spanned! { arm.span() => #key => #body, });
 		}
 		let name = &item.name;

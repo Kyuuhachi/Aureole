@@ -416,7 +416,7 @@ fn val(f: &mut Context, a: I) {
 
 		I::Pos2(Pos2(x,z))   => f.write(&format!("({x}, -, {z})")),
 		I::Pos3(Pos3(x,y,z)) => f.write(&format!("({x}, {y}, {z})")),
-		I::RelPos3(Pos3(x,y,z)) => f.write(&format!("({x:+}, {y:+}, {z:+})")),
+		// I::RelPos3(Pos3(x,y,z)) => f.write(&format!("({x:+}, {y:+}, {z:+})")),
 
 		I::Emote(v) => f.write(&format!("{v:?}")),
 		I::Member(v) => f.write(&format!("{v:?}")),

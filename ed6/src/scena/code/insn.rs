@@ -32,11 +32,11 @@ ed6_macros::bytecode! {
 		EventEnd(u8),
 		_1B(u16, u16),
 		_1C(u16, u16),
-		BgmSet(u8 as BgmId),
+		BgmPlay(u8 as BgmId),
 		_1E(),
 		BgmSetVolume(u8, u32 alias Time),
-		_20(u32 alias Time),
-		_21(), // Always paired with _20
+		BgmStop(u32 alias Time),
+		BgmFadeWait(),
 		SoundPlay(u16 as SoundId, u8, u8),
 		SoundStop(u16 as SoundId),
 		SoundLoop(u16 as SoundId, u8),
@@ -84,7 +84,7 @@ ed6_macros::bytecode! {
 		CharForkAwait(u16 as CharId, u8 alias ForkId, u8),
 		Yield(), // Used in tight loops, probably wait until next frame
 		Event(func_ref() -> FuncRef), // Not sure how this differs from Call
-		_Char4A(u16 as CharId, u8),
+		_Char4A(u16 as CharId, u8), // Argument is almost always 255, but sometimes 0, and in a single case 1
 		_Char4B(u16 as CharId, u8),
 		skip!(1),
 		Var(u16 as Var, expr(arc) -> Expr),
@@ -99,7 +99,7 @@ ed6_macros::bytecode! {
 		TextReset(u8),
 		skip!(1),
 		TextWait(),
-		_59(),
+		_59(), // Always directly after a TextReset 1, and exists in all but one such case. I suspect that one is a bug.
 		TextSetPos(i16, i16, i16, i16),
 		TextTalk(u16 as CharId, text() -> Text),
 		TextTalkNamed(u16 as CharId, String alias TextTitle, text() -> Text),
@@ -110,9 +110,9 @@ ed6_macros::bytecode! {
 		_61(u16 as CharId),
 		Emote(u16 as CharId, i32, u32 alias Time, emote() -> Emote, u8),
 		EmoteStop(u16 as CharId),
-		_64(u8, u16),
+		_64(u8, u16), // I suspect these two are ObjectId, but ObjectId is u16?
 		_65(u8, u16),
-		_Cam66(u16),
+		CamFollow(u16), // A bool
 		CamOffset(i32, i32, i32, u32 alias Time),
 		skip!(1),
 		CamLookAt(u16 as CharId, u32 alias Time),
@@ -147,28 +147,28 @@ ed6_macros::bytecode! {
 		CharSetChcp   (u16 as CharId, u16 alias ChcpId),
 		CharSetFrame  (u16 as CharId, u16),
 		CharSetPos    (u16 as CharId, Pos3, u16 alias Angle),
-		_Char89       (u16 as CharId, Pos3, u16),
+		CharSetPos2   (u16 as CharId, Pos3, u16 alias Angle),
 		CharLookAt    (u16 as CharId, u16 as CharId, u16 alias Time16),
-		_Char8B       (u16 as CharId, Pos2, u16),
+		CharLookAtPos (u16 as CharId, Pos2, u16 alias Time16),
 		CharSetAngle  (u16 as CharId, u16 alias Angle, u16 alias Time16),
 		CharIdle      (u16 as CharId, Pos2, Pos2, u32 alias Speed),
 		CharWalkTo    (u16 as CharId, Pos3, u32 alias Speed, u8),
 		CharWalkTo2   (u16 as CharId, Pos3, u32 alias Speed, u8), // how are these two different?
-		DontGoThere   (u16, Pos3 alias RelPos3, u32, u8),
-		_Char91       (u16 as CharId, Pos3 alias RelPos3, i32, u8),
-		_Char92       (u16 as CharId, u16 as CharId, u32, u32 alias Time, u8),
-		_Char93       (u16 as CharId, u16, u32, u32, u8),
-		_94       (u8, u16 as CharId, u16, u32, u32, u8), // used with chickens
-		CharJump      (u16 as CharId, Pos3 alias RelPos3, u32, u32),
+		DontGoThere   (u16 as CharId, i32, i32, i32, u32, u8),
+		_Char91       (u16 as CharId, i32, i32, i32, i32, u8),
+		_Char92       (u16 as CharId, u16 as CharId, u32, u32 alias Speed, u8),
+		_Char93       (u16 as CharId, u16 as CharId, u32, u32 alias Speed, u8),
+		_94       (u8, u16 as CharId, u16 alias Angle, u32, u32 alias Speed, u8),
+		CharJump      (u16 as CharId, i32, i32, i32, u32, u32),
 		_Char96       (u16 as CharId, Pos3, i32, i32),
-		_Char97       (u16 as CharId, Pos2, i32 alias Angle32, u32 alias Time, u16), // used with pigeons
+		_Char97       (u16 as CharId, Pos2, i32 alias Angle32, u32, u16), // used with pigeons
 		skip!(1),
 		CharAnimation (u16 as CharId, u8, u8, u32 alias Time),
 		CharFlagsSet  (u16 as CharId, u16 as CharFlags),
 		CharFlagsUnset(u16 as CharId, u16 as CharFlags),
-		_Char9C       (u16 as CharId, u16),
+		_Char9C       (u16 as CharId, u16), // always 32
 		_Char9D       (u16 as CharId, u16),
-		CharShake     (u16 as CharId, u32, u32, u32, u32 alias Time),
+		CharShake     (u16 as CharId, u32, u32, u32, u32),
 		CharColor     (u16 as CharId, u32 as Color, u32 alias Time),
 		skip!(1),
 		_CharA1(u16 as CharId, u16),
@@ -184,7 +184,7 @@ ed6_macros::bytecode! {
 		ImageShow(file_ref(arc) -> String alias VisFileRef, u16, u16, u32 alias Time),
 		ImageHide(u32 alias Time),
 		QuestSubmit(u8 as ShopId, u16 as QuestId),
-		_B0(u16, u8), // Used along with 6F, 70, and 73 during T0700#11
+		_ObjB0(u16 alias ObjectId, u8), // Used along with 6F, 70, and 73 during T0700#11
 		OpLoad(String alias OpFileRef),
 		_B2(u8, u8, u16),
 		Video(match {
@@ -198,9 +198,9 @@ ed6_macros::bytecode! {
 		#[game(Fc)]
 		_B6(u8),
 		#[game(Fc)]
-		_B7(u8 as Member, u8, u8),
+		_B7(u8 as Member, u8, u8), // Related to PartyAdd
 		#[game(Fc)]
-		_B8(u8 as Member),
+		_B8(u8 as Member), // Related to PartyRemove
 		#[game(Fc)]
 		ReadBook(u16 as ItemId, u16),
 		#[game(Fc)]

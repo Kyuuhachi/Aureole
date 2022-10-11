@@ -156,7 +156,7 @@ struct Body {
 	args: Punctuated<PatType, Token![,]>,
 	or2_token: Token![|],
 	bracket_token: token::Bracket,
-	insns: Punctuated<Arm, Token![,]>,
+	insns: Punctuated<AttrArm, Token![,]>,
 }
 
 impl Parse for Body {
@@ -200,6 +200,30 @@ impl ToTokens for Body {
 		self.bracket_token.surround(ts, |ts| {
 			self.insns.to_tokens(ts);
 		});
+	}
+}
+
+#[derive(Clone, Debug)]
+struct AttrArm {
+	attrs: Vec<Attribute>,
+	value: Arm,
+}
+
+impl Parse for AttrArm {
+	fn parse(input: ParseStream) -> Result<Self> {
+		Ok(Self {
+			attrs: Attribute::parse_outer(input)?,
+			value: input.parse()?,
+		})
+	}
+}
+
+impl ToTokens for AttrArm {
+	fn to_tokens(&self, ts: &mut TokenStream2) {
+		for a in &self.attrs {
+			a.to_tokens(ts);
+		}
+		self.value.to_tokens(ts);
 	}
 }
 
@@ -532,7 +556,7 @@ fn gather_top(ctx: &mut Ctx, t: &Body) -> TokenStream2 {
 
 	let mut n = 0;
 	for arm in &t.insns {
-		match arm {
+		match &arm.value {
 			Arm::SkipArm(arm) => {
 				n += arm.number.1 as usize;
 			},

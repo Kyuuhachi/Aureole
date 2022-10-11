@@ -193,15 +193,25 @@ ed6_macros::bytecode! {
 		}),
 		ReturnToTitle(u8),
 		// fc only region
+		#[game(Fc)]
 		PartySlot(u8 as Member, u8, u8),
+		#[game(Fc)]
 		_B6(u8),
+		#[game(Fc)]
 		_B7(u8 as Member, u8, u8),
+		#[game(Fc)]
 		_B8(u8 as Member),
+		#[game(Fc)]
 		ReadBook(u16 as ItemId, u16),
+		#[game(Fc)]
 		PartyHasSpell(u8 as Member, u16 as MagicId),
+		#[game(Fc)]
 		PartyHasSlot(u8 as Member, u8),
+		#[game(Fc)]
 		skip!(34),
+		#[game(Fc)]
 		SaveClearData(),
+		#[game(Fc)]
 		skip!(33),
 	]
 }

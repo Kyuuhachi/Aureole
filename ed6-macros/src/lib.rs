@@ -157,7 +157,7 @@ struct Body {
 	args: Punctuated<PatType, Token![,]>,
 	or2_token: Token![|],
 	bracket_token: token::Bracket,
-	insns: Punctuated<AttrArm, Token![,]>,
+	insns: Punctuated<WithAttrs<Arm>, Token![,]>,
 }
 
 impl Parse for Body {
@@ -205,12 +205,12 @@ impl ToTokens for Body {
 }
 
 #[derive(Clone, Debug)]
-struct AttrArm {
+struct WithAttrs<T> {
 	attrs: Vec<Attribute>,
-	value: Arm,
+	value: T,
 }
 
-impl Parse for AttrArm {
+impl<T: Parse> Parse for WithAttrs<T> {
 	fn parse(input: ParseStream) -> Result<Self> {
 		Ok(Self {
 			attrs: Attribute::parse_outer(input)?,
@@ -219,7 +219,7 @@ impl Parse for AttrArm {
 	}
 }
 
-impl ToTokens for AttrArm {
+impl<T: ToTokens> ToTokens for WithAttrs<T> {
 	fn to_tokens(&self, ts: &mut TokenStream2) {
 		for a in &self.attrs {
 			a.to_tokens(ts);

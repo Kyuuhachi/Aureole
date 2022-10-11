@@ -25,9 +25,10 @@ pub fn bytecode(tokens: TokenStream) -> TokenStream {
 
 	let read_body = gather_top(&mut ctx, &body);
 
-	let items = ctx.items.iter().map(|(span, Item { hex, name, types, .. })| {
+	let items = ctx.items.iter().map(|(span, Item { hex, attrs, name, types, .. })| {
 		let doc = format!("{hex:02X}");
 		quote_spanned! { *span =>
+			#(#attrs)*
 			#[doc = #doc]
 			#name(#(#types),*)
 		}
@@ -543,6 +544,7 @@ impl Ctx {
 #[derive(Debug, Clone)]
 struct Item {
 	hex: u8,
+	attrs: Vec<Attribute>,
 	name: Ident,
 	vars: Vec<Ident>,
 	#[allow(clippy::vec_box)]
@@ -556,14 +558,22 @@ fn gather_top(ctx: &mut Ctx, t: &Body) -> TokenStream2 {
 
 	let mut n = 0;
 	for arm in &t.insns {
+		let mut attrs = arm.attrs.clone();
+		let game_attr = attrs.iter().position(|a| a.path.is_ident("game"))
+			.map(|i| attrs.remove(i));
 		match &arm.value {
 			Arm::SkipArm(arm) => {
 				n += arm.number.1 as usize;
+				for attr in &attrs {
+					// Doesn't work so great for non-ident paths, but whatever
+					Diagnostic::spanned(attr.path.span().unwrap(), Level::Error, format!("cannot find attribute `{}` in this scope", attr.path.to_token_stream())).emit();
+				}
 			},
 			Arm::InsnArm(arm) => {
 				let hex = n as u8;
 				let mut item = Item {
 					hex,
+					attrs,
 					name: arm.name.clone(),
 					vars: Vec::new(),
 					types: Vec::new(),

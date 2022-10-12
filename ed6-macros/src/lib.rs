@@ -26,7 +26,7 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 	let body = parse_macro_input!(tokens as Body);
 	let mut ctx = Ctx::default();
 	// Used in the dump
-	ctx.args.insert(Ident::new("String", Span::call_site()), parse_quote!{ String });
+	ctx.args.insert(Ident::new("String", Span::call_site()), quote! { String });
 
 	let read_body = gather_top(&mut ctx, &body);
 
@@ -38,12 +38,12 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		}
 	}).collect::<TokenStream>();
 
-	let Insn_body = ctx.items.iter().map(|(span, Item { hex, attrs, name, types, .. })| {
+	let Insn_body = ctx.items.iter().map(|(span, Item { hex, attrs, name, def, .. })| {
 		let doc = format!("{hex:02X}");
 		q!{span;
 			#(#attrs)*
 			#[doc = #doc]
-			#name(#(#types),*),
+			#name(#def),
 		}
 	}).collect::<TokenStream>();
 
@@ -445,17 +445,6 @@ impl Arg {
 		Diagnostic::spanned(ty.span().unwrap(), Level::Error, "invalid identifier").emit();
 		Ident::new("__error", Span::call_site())
 	}
-
-	fn ty(&self) -> Box<Type> {
-		if let Some((_, ty)) = &self.ty {
-			ty.clone()
-		} else {
-			match &self.source {
-				Source::Simple(ident) => parse_quote_spanned! { ident.span() => #ident },
-				Source::Call(s) => s.ty.clone(),
-			}
-		}
-	}
 }
 
 #[derive(Clone, Debug)]
@@ -572,7 +561,7 @@ impl ToTokens for TableArm {
 #[derive(Default)]
 #[allow(non_snake_case)]
 struct Ctx {
-	args: BTreeMap<Ident, Box<Type>>,
+	args: BTreeMap<Ident, TokenStream>,
 	attrs: Vec<Attribute>,
 	items: Vec<(Span, Item)>,
 }
@@ -584,8 +573,8 @@ struct Item {
 	name: Ident,
 	vars: Punctuated<Ident, Token![,]>,
 	#[allow(clippy::vec_box)]
-	types: Vec<Box<Type>>,
 	aliases: Vec<Ident>,
+	def: TokenStream,
 	write: TokenStream,
 }
 
@@ -618,8 +607,8 @@ fn gather_top(ctx: &mut Ctx, t: &Body) -> TokenStream {
 					attrs,
 					name: arm.name.clone(),
 					vars: Punctuated::new(),
-					types: Vec::new(),
 					aliases: Vec::new(),
+					def: TokenStream::new(),
 					write: TokenStream::new(),
 				};
 				item.write.extend(q!{arm; __f.u8(#hex); });
@@ -630,11 +619,8 @@ fn gather_top(ctx: &mut Ctx, t: &Body) -> TokenStream {
 		}
 	}
 	if n != 256 {
-		let span = if let Some(last) = t.insns.last() {
-			last.span()
-		} else {
-			Span::call_site()
-		};
+		// TODO I'd rather put this at the close bracket, but that's unstable
+		let span = t.insns.last().map_or_else(Span::call_site, |last| last.span());
 		Diagnostic::spanned(span.unwrap(), Level::Warning, format!("Instructions sum up to {n}, not 256")).emit();
 	}
 
@@ -708,9 +694,16 @@ fn gather_arm(ctx: &mut Ctx, arm: &InsnArm, mut item: Item) -> TokenStream {
 			item.write.extend(q!{arg; #val; });
 		}
 
-		let ty = arg.ty();
+		let ty = if let Some((_, ty)) = &arg.ty {
+			ty.to_token_stream()
+		} else {
+			match &arg.source {
+				Source::Simple(ident) => ident.to_token_stream(),
+				Source::Call(s) => s.ty.to_token_stream(),
+			}
+		};
 		item.vars.push(varname.clone());
-		item.types.push(ty.clone());
+		item.def.extend(q!{ty; #ty, });
 
 		let alias = arg.alias();
 		// collisions will be errored about at type checking

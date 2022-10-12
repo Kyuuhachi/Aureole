@@ -3,8 +3,8 @@
 use std::collections::BTreeMap;
 
 use convert_case::{Case, Casing, Boundary};
-use proc_macro::{TokenStream, Diagnostic, Level};
-use proc_macro2::{TokenStream as TokenStream2, Span};
+use proc_macro::{TokenStream as TokenStream0, Diagnostic, Level};
+use proc_macro2::{TokenStream, Span};
 use quote::{quote, quote_spanned, format_ident, ToTokens};
 use syn::{
 	*,
@@ -16,131 +16,106 @@ use syn::{
 // {{{1 Main
 #[proc_macro]
 #[allow(non_snake_case)]
-pub fn bytecode(tokens: TokenStream) -> TokenStream {
+pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 	let body = parse_macro_input!(tokens as Body);
-	let mut ctx = Ctx::new();
-
+	let mut ctx = Ctx::default();
 	// Used in the dump
 	ctx.args.insert(Ident::new("String", Span::call_site()), parse_quote!{ String });
 
+	let func_args = &body.args;
+
 	let read_body = gather_top(&mut ctx, &body);
 
-	let items = ctx.items.iter().map(|(span, Item { hex, attrs, name, types, .. })| {
+	let write_body = ctx.items.iter().map(|(span, Item { name, vars, write, .. })| quote_spanned! { *span =>
+		Self::#name(#(#vars),*) => { #(#write)* }
+	}).collect::<TokenStream>();
+
+	let Insn_body = ctx.items.iter().map(|(span, Item { hex, attrs, name, types, .. })| {
 		let doc = format!("{hex:02X}");
 		quote_spanned! { *span =>
 			#(#attrs)*
 			#[doc = #doc]
-			#name(#(#types),*)
+			#name(#(#types),*),
 		}
-	});
-	let Insn = quote! {
+	}).collect::<TokenStream>();
+
+	let InsnArg_body    = ctx.args.iter().map(|(k, v)| quote!{ #k(#v), }).collect::<TokenStream>();
+	let InsnArgRef_body = ctx.args.iter().map(|(k, v)| quote!{ #k(&'a #v,), }).collect::<TokenStream>();
+	let InsnArgMut_body = ctx.args.iter().map(|(k, v)| quote!{ #k(&'a mut #v), }).collect::<TokenStream>();
+
+	let name_body = ctx.items.iter().map(|(span, Item { name, .. })| quote_spanned! { *span =>
+		Self::#name(..) => stringify!(#name),
+	}).collect::<TokenStream>();
+
+	let args_body = ctx.items.iter().map(|(span, Item { name, vars, aliases, .. })| quote_spanned! { *span =>
+		Self::#name(#(#vars),*) => Box::new([#(Arg::#aliases(#vars)),*]),
+	}).collect::<TokenStream>();
+
+	quote! {
 		#[allow(non_camel_case_types)]
 		#[derive(Debug, Clone, PartialEq, Eq)]
 		pub enum Insn {
-			#(#items),*
+			#Insn_body
 		}
-	};
 
-	let items = ctx.args.iter().map(|(k, v)| quote!(#k(#v)));
-	let InsnArg = quote! {
 		#[allow(non_camel_case_types)]
 		#[derive(Debug, Clone)]
 		pub enum InsnArg {
-			#(#items),*
+			#InsnArg_body
 		}
-	};
 
-	let items = ctx.args.iter().map(|(k, v)| quote!(#k(&'a #v)));
-	let InsnArgRef = quote! {
 		#[allow(non_camel_case_types)]
 		#[derive(Debug, Clone, Copy)]
 		pub enum InsnArgRef<'a> {
-			#(#items),*
+			#InsnArgRef_body
 		}
-	};
 
-	let items = ctx.args.iter().map(|(k, v)| quote!(#k(&'a mut #v)));
-	let InsnArgMut = quote! {
 		#[allow(non_camel_case_types)]
 		#[derive(Debug)]
 		pub enum InsnArgMut<'a> {
-			#(#items),*
+			#InsnArgMut_body
 		}
-	};
-
-	let args = &body.args;
-	let read = quote! {
-		#[allow(clippy::needless_borrow)]
-		pub fn read<'a>(__f: &mut impl In<'a>, #args) -> Result<Self, ReadError> {
-			#read_body
-		}
-	};
-
-	let items = ctx.items.iter().map(|(span, Item { name, vars, write, .. })| quote_spanned! { *span =>
-		Self::#name(#(#vars),*) => { #(#write)* }
-	});
-	let write = quote! {
-		#[allow(clippy::needless_borrow)]
-		pub fn write(__f: &mut impl OutDelay, #args, __insn: &Insn) -> Result<(), WriteError> {
-			match __insn {
-				#(#items)*
-			}
-			Ok(())
-		}
-	};
-
-	let items = ctx.items.iter().map(|(span, Item { name, .. })| quote_spanned! { *span =>
-		Self::#name(..) => stringify!(#name),
-	});
-	let name = quote! {
-		pub fn name(&self) -> &'static str {
-			match self {
-				#(#items)*
-			}
-		}
-	};
-
-	let items = ctx.items.iter().map(|(span, Item { name, vars, aliases, .. })| quote_spanned! { *span =>
-		Self::#name(#(#vars),*) => Box::new([#(Arg::#aliases(#vars)),*]),
-	}).collect::<Vec<_>>();
-	let args = quote! {
-		pub fn args(&self) -> Box<[InsnArgRef]> {
-			use InsnArgRef as Arg;
-			match self {
-				#(#items)*
-			}
-		}
-	};
-	let args_mut = quote! {
-		pub fn args_mut(&mut self) -> Box<[InsnArgMut]> {
-			use InsnArgMut as Arg;
-			match self {
-				#(#items)*
-			}
-		}
-	};
-	let into_args = quote! {
-		pub fn into_args(self) -> Box<[InsnArg]> {
-			use InsnArg as Arg;
-			match self {
-				#(#items)*
-			}
-		}
-	};
-
-	quote! {
-		#Insn
-		#InsnArg
-		#InsnArgRef
-		#InsnArgMut
 
 		impl Insn {
-			#read
-			#write
-			#name
-			#args
-			#args_mut
-			#into_args
+			#[allow(clippy::needless_borrow)]
+			pub fn read<'a>(__f: &mut impl In<'a>, #func_args) -> Result<Self, ReadError> {
+				#read_body
+			}
+
+			#[allow(clippy::needless_borrow)]
+			pub fn write(__f: &mut impl OutDelay, #func_args, __insn: &Insn) -> Result<(), WriteError> {
+				match __insn {
+					#write_body
+				}
+				Ok(())
+			}
+
+			pub fn name(&self) -> &'static str {
+				match self {
+					#name_body
+				}
+			}
+
+			pub fn args(&self) -> Box<[InsnArgRef]> {
+				use InsnArgRef as Arg;
+				match self {
+					#args_body
+				}
+			}
+
+			pub fn args_mut(&mut self) -> Box<[InsnArgMut]> {
+				use InsnArgMut as Arg;
+				match self {
+					#args_body
+				}
+			}
+
+			pub fn into_args(self) -> Box<[InsnArg]> {
+				use InsnArg as Arg;
+				match self {
+					#args_body
+				}
+			}
 		}
 	}.into()
 }
@@ -194,7 +169,7 @@ impl Parse for Body {
 }
 
 impl ToTokens for Body {
-	fn to_tokens(&self, ts: &mut TokenStream2) {
+	fn to_tokens(&self, ts: &mut TokenStream) {
 		self.or1_token.to_tokens(ts);
 		self.args.to_tokens(ts);
 		self.or2_token.to_tokens(ts);
@@ -220,7 +195,7 @@ impl<T: Parse> Parse for WithAttrs<T> {
 }
 
 impl<T: ToTokens> ToTokens for WithAttrs<T> {
-	fn to_tokens(&self, ts: &mut TokenStream2) {
+	fn to_tokens(&self, ts: &mut TokenStream) {
 		for a in &self.attrs {
 			a.to_tokens(ts);
 		}
@@ -245,7 +220,7 @@ impl Parse for Arm {
 }
 
 impl ToTokens for Arm {
-	fn to_tokens(&self, ts: &mut TokenStream2) {
+	fn to_tokens(&self, ts: &mut TokenStream) {
 		match self {
 			Arm::SkipArm(a) => a.to_tokens(ts),
 			Arm::InsnArm(a) => a.to_tokens(ts),
@@ -278,7 +253,7 @@ impl Parse for SkipArm {
 }
 
 impl ToTokens for SkipArm {
-	fn to_tokens(&self, ts: &mut TokenStream2) {
+	fn to_tokens(&self, ts: &mut TokenStream) {
 		self.skip_token.to_tokens(ts);
 		self.bang_token.to_tokens(ts);
 		self.paren_token.surround(ts, |ts| {
@@ -331,7 +306,7 @@ impl Parse for InsnArm {
 }
 
 impl ToTokens for InsnArm {
-	fn to_tokens(&self, ts: &mut TokenStream2) {
+	fn to_tokens(&self, ts: &mut TokenStream) {
 		self.name.to_tokens(ts);
 		self.paren_token.surround(ts, |ts| {
 			self.args.to_tokens(ts);
@@ -368,7 +343,7 @@ impl Parse for Arg {
 }
 
 impl ToTokens for Arg {
-	fn to_tokens(&self, ts: &mut TokenStream2) {
+	fn to_tokens(&self, ts: &mut TokenStream) {
 		self.source.to_tokens(ts);
 		if let Some((a, b)) = &self.ty {
 			a.to_tokens(ts);
@@ -433,7 +408,7 @@ impl Parse for Source {
 }
 
 impl ToTokens for Source {
-	fn to_tokens(&self, ts: &mut TokenStream2) {
+	fn to_tokens(&self, ts: &mut TokenStream) {
 		match self {
 			Source::Simple(a) => a.to_tokens(ts),
 			Source::Call(a) => a.to_tokens(ts),
@@ -464,7 +439,7 @@ impl Parse for SourceCall {
 }
 
 impl ToTokens for SourceCall {
-	fn to_tokens(&self, ts: &mut TokenStream2) {
+	fn to_tokens(&self, ts: &mut TokenStream) {
 		self.name.to_tokens(ts);
 		self.paren_token.surround(ts, |ts| {
 			self.args.to_tokens(ts);
@@ -493,7 +468,7 @@ impl Parse for Table {
 }
 
 impl ToTokens for Table {
-	fn to_tokens(&self, ts: &mut TokenStream2) {
+	fn to_tokens(&self, ts: &mut TokenStream) {
 		self.match_token.to_tokens(ts);
 		self.brace_token.surround(ts, |ts| {
 			self.arms.to_tokens(ts);
@@ -519,7 +494,7 @@ impl Parse for TableArm {
 }
 
 impl ToTokens for TableArm {
-	fn to_tokens(&self, ts: &mut TokenStream2) {
+	fn to_tokens(&self, ts: &mut TokenStream) {
 		self.key.to_tokens(ts);
 		self.arrow_token.to_tokens(ts);
 		self.insn.to_tokens(ts);
@@ -527,18 +502,11 @@ impl ToTokens for TableArm {
 }
 // }}}1
 
+#[derive(Default)]
+#[allow(non_snake_case)]
 struct Ctx {
 	args: BTreeMap<Ident, Box<Type>>,
 	items: Vec<(Span, Item)>,
-}
-
-impl Ctx {
-	fn new() -> Self {
-		Self {
-			args: Default::default(),
-			items: Default::default(),
-		}
-	}
 }
 
 #[derive(Debug, Clone)]
@@ -550,10 +518,10 @@ struct Item {
 	#[allow(clippy::vec_box)]
 	types: Vec<Box<Type>>,
 	aliases: Vec<Ident>,
-	write: Vec<TokenStream2>,
+	write: Vec<TokenStream>,
 }
 
-fn gather_top(ctx: &mut Ctx, t: &Body) -> TokenStream2 {
+fn gather_top(ctx: &mut Ctx, t: &Body) -> TokenStream {
 	let mut arms = Vec::new();
 
 	let mut n = 0;
@@ -561,6 +529,7 @@ fn gather_top(ctx: &mut Ctx, t: &Body) -> TokenStream2 {
 		let mut attrs = arm.attrs.clone();
 		let game_attr = attrs.iter().position(|a| a.path.is_ident("game"))
 			.map(|i| attrs.remove(i));
+
 		match &arm.value {
 			Arm::SkipArm(arm) => {
 				n += arm.number.1 as usize;
@@ -604,7 +573,7 @@ fn gather_top(ctx: &mut Ctx, t: &Body) -> TokenStream2 {
 	}
 }
 
-fn gather_arm(ctx: &mut Ctx, arm: &InsnArm, mut item: Item) -> TokenStream2 {
+fn gather_arm(ctx: &mut Ctx, arm: &InsnArm, mut item: Item) -> TokenStream {
 	let mut read = Vec::new();
 
 	for arg in &arm.args {

@@ -77,7 +77,7 @@ ed6_macros::bytecode! {
 		ItemAdd(u16 as ItemId, u16),
 		ItemRemove(u16 as ItemId, u16),
 		ItemHas(u16 as ItemId), // or is it ItemGetCount?
-		PartyEquip(u8 as Member, u16 as ItemId, party_equip_slot(&_1) -> i8),
+		PartyEquip(u8 as Member, u16 as ItemId, party_equip_slot(_1) -> i8),
 		PartyPosition(u8 as Member),
 		CharForkFunc(u16 as CharId, u8 alias ForkId, func_ref() -> FuncRef),
 		CharForkQuit(u16 as CharId, u8 alias ForkId),

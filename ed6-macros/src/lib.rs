@@ -55,12 +55,10 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		}
 
 		impl Insn {
-			#[allow(clippy::needless_borrow)]
 			pub fn read<'a>(__f: &mut impl In<'a>, #func_args) -> Result<Self, ReadError> {
 				#read_body
 			}
 
-			#[allow(clippy::needless_borrow)]
 			pub fn write(__f: &mut impl OutDelay, #func_args, __insn: &Insn) -> Result<(), WriteError> {
 				match __insn {
 					#write_body
@@ -559,7 +557,6 @@ impl ToTokens for TableArm {
 // }}}1
 
 #[derive(Default)]
-#[allow(non_snake_case)]
 struct Ctx {
 	args: BTreeMap<Ident, TokenStream>,
 	attrs: Vec<Attribute>,
@@ -572,7 +569,6 @@ struct Item {
 	attrs: Vec<Attribute>,
 	name: Ident,
 	vars: Punctuated<Ident, Token![,]>,
-	#[allow(clippy::vec_box)]
 	aliases: Vec<Ident>,
 	def: TokenStream,
 	write: TokenStream,
@@ -648,7 +644,9 @@ fn gather_arm(ctx: &mut Ctx, arm: &InsnArm, mut item: Item) -> TokenStream {
 					let name = &a.name;
 					let mut args = vec![q!{a=> __f }];
 					for e in &a.args {
-						args.push(q!{e=> #e })
+						args.push(q!{e=>
+							#[allow(clippy::needless_borrow)] &#e
+						})
 					}
 					q!{a=> #name::read(#(#args),*)? }
 				},

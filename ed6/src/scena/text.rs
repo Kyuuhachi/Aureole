@@ -1,5 +1,5 @@
 use super::{Scena, Npc, Monster, Trigger, Object, FuncRef, CharId, Pos2, Pos3};
-use super::code::{InsnArgRef as I, FlatInsn, Label, Insn, Expr, ExprBinop, ExprUnop};
+use super::code::{InsnArg as I, FlatInsn, Label, Insn, Expr, ExprBinop, ExprUnop};
 use super::code::decompile::{decompile, TreeInsn};
 use crate::text::{Text, TextSegment};
 

@@ -42,12 +42,31 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 	let InsnArg_names = ctx.args.keys().collect::<Vec<_>>();
 	let InsnArg_types = ctx.args.values().collect::<Vec<_>>();
 
-	let name_body = ctx.items.iter().map(|(span, Item { name, .. })| quote_spanned! { *span =>
-		Self::#name(..) => stringify!(#name),
+	let name_body = ctx.items.iter().map(|(span, Item { name, .. })| {
+		quote_spanned! { *span =>
+			Self::#name(..) => stringify!(#name),
+		}
 	}).collect::<TokenStream>();
 
-	let args_body = ctx.items.iter().map(|(span, Item { name, vars, aliases, .. })| quote_spanned! { *span =>
-		Self::#name(#(#vars),*) => Box::new([#(Arg::#aliases(#vars)),*]),
+	let args_body = ctx.items.iter().map(|(span, Item { name, vars, aliases, .. })| {
+		quote_spanned! { *span =>
+			Self::#name(#(#vars),*) => Box::new([#(Arg::#aliases(#vars)),*]),
+		}
+	}).collect::<TokenStream>();
+
+	let arg_types_body = ctx.items.iter().map(|(span, Item { name, aliases, .. })| {
+		quote_spanned! { *span =>
+			stringify!(#name) => Box::new([#(Arg::#aliases),*]),
+		}
+	}).collect::<TokenStream>();
+
+	let from_args_body = ctx.items.iter().map(|(span, Item { name, vars, aliases, .. })| {
+		quote_spanned! { *span =>
+			stringify!(#name) => {
+				#(let #vars = if let Some(Arg::#aliases(v)) = it.next() { v } else { return None; };)*
+				Self::#name(#(#vars),*)
+			},
+		}
 	}).collect::<TokenStream>();
 
 	quote! {
@@ -73,6 +92,12 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		#[derive(Debug)]
 		pub enum InsnArgMut<'a> {
 			#(#InsnArg_names(&'a mut #InsnArg_types),)*
+		}
+
+		#[allow(non_camel_case_types)]
+		#[derive(Debug, Clone, Copy)]
+		pub enum InsnArgType {
+			#(#InsnArg_names,)*
 		}
 
 		impl Insn {
@@ -109,11 +134,33 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 				}
 			}
 
-			pub fn into_parts(self) -> Box<[InsnArgOwned]> {
+			pub fn into_parts(self) -> (&'static str, Box<[InsnArgOwned]>) {
 				use InsnArgOwned as Arg;
-				match self {
+				let name = self.name();
+				let args: Box<[Arg]> = match self {
 					#args_body
-				}
+				};
+				(name, args)
+			}
+
+			pub fn arg_types(name: &str) -> Option<Box<[InsnArgType]>> {
+				use InsnArgType as Arg;
+				let types: Box<[Arg]> = match name {
+					#arg_types_body
+					_ => return None,
+				};
+				Some(types)
+			}
+
+			pub fn from_parts(name: &str, args: impl IntoIterator<Item=InsnArgOwned>) -> Option<Insn> {
+				use InsnArgOwned as Arg;
+				let mut it = args.into_iter();
+				let v = match name {
+					#from_args_body
+					_ => return None,
+				};
+				if let Some(_) = it.next() { return None; }
+				Some(v)
 			}
 		}
 	}.into()

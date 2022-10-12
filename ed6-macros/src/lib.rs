@@ -14,7 +14,7 @@ use syn::{
 };
 
 macro_rules! q {
-	($a:expr; $($b:tt)*) => {
+	($a:expr=> $($b:tt)*) => {
 		::quote::quote_spanned! { ($a).span() => $($b)* }
 	}
 }
@@ -33,14 +33,14 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 	let func_args = &body.args;
 
 	let write_body = ctx.items.iter().map(|(span, Item { name, vars, write, .. })| {
-		q!{span;
+		q!{span=>
 			Self::#name(#vars) => { #write }
 		}
 	}).collect::<TokenStream>();
 
 	let Insn_body = ctx.items.iter().map(|(span, Item { hex, attrs, name, def, .. })| {
 		let doc = format!("{hex:02X}");
-		q!{span;
+		q!{span=>
 			#(#attrs)*
 			#[doc = #doc]
 			#name(#def),
@@ -74,27 +74,27 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 	let InsnArg_types = ctx.args.values().collect::<Vec<_>>();
 
 	let name_body = ctx.items.iter().map(|(span, Item { name, .. })| {
-		q!{span;
+		q!{span=>
 			Self::#name(..) => stringify!(#name),
 		}
 	}).collect::<TokenStream>();
 
 	let args_body = ctx.items.iter().map(|(span, Item { name, vars, aliases, .. })| {
 		let varnames = vars.into_iter();
-		q!{span;
+		q!{span=>
 			Self::#name(#vars) => Box::new([#(Arg::#aliases(#varnames)),*]),
 		}
 	}).collect::<TokenStream>();
 
 	let arg_types_body = ctx.items.iter().map(|(span, Item { name, aliases, .. })| {
-		q!{span;
+		q!{span=>
 			stringify!(#name) => Box::new([#(Arg::#aliases),*]),
 		}
 	}).collect::<TokenStream>();
 
 	let from_args_body = ctx.items.iter().map(|(span, Item { name, vars, aliases, .. })| {
 		let varnames = vars.into_iter();
-		q!{span;
+		q!{span=>
 			stringify!(#name) => {
 				#(let #varnames = if let Some(Arg::#aliases(v)) = it.next() { v } else { return None; };)*
 				Self::#name(#vars)
@@ -611,9 +611,9 @@ fn gather_top(ctx: &mut Ctx, t: &Body) -> TokenStream {
 					def: TokenStream::new(),
 					write: TokenStream::new(),
 				};
-				item.write.extend(q!{arm; __f.u8(#hex); });
+				item.write.extend(q!{arm=> __f.u8(#hex); });
 				let read = gather_arm(ctx, arm, item);
-				arms.push(q!{arm; #hex => { #read } });
+				arms.push(q!{arm=> #hex => { #read } });
 				n += 1;
 			},
 		}
@@ -624,7 +624,7 @@ fn gather_top(ctx: &mut Ctx, t: &Body) -> TokenStream {
 		Diagnostic::spanned(span.unwrap(), Level::Warning, format!("Instructions sum up to {n}, not 256")).emit();
 	}
 
-	q!{t.bracket_token.span;
+	q!{t.bracket_token.span=>
 		match __f.u8()? {
 			#(#arms)*
 			_v => Err(format!("invalid Insn: 0x{:02X}", _v).into())
@@ -642,56 +642,56 @@ fn gather_arm(ctx: &mut Ctx, arm: &InsnArm, mut item: Item) -> TokenStream {
 			let mut val = match &arg.source {
 				Source::Simple(name) => {
 					let name = to_snake(name);
-					q!{name; __f.#name()? }
+					q!{name=> __f.#name()? }
 				},
 				Source::Call(a) => {
 					let name = &a.name;
-					let mut args = vec![q!{a; __f }];
+					let mut args = vec![q!{a=> __f }];
 					for e in &a.args {
-						args.push(q!{e; #e })
+						args.push(q!{e=> #e })
 					}
-					q!{a; #name::read(#(#args),*)? }
+					q!{a=> #name::read(#(#args),*)? }
 				},
 			};
 			if let Some((a, ty)) = &arg.ty {
 				let span = a.span().join(ty.span()).unwrap();
-				val = q!{span; cast(#val)? };
+				val = q!{span=> cast(#val)? };
 			}
-			read.extend(q!{arg; let #varname = #val; });
+			read.extend(q!{arg=> let #varname = #val; });
 		}
 
 		{
-			let mut val = q!{varname; #varname };
+			let mut val = q!{varname=> #varname };
 			if let Source::Simple(a) = &arg.source {
 				if a != "String" {
-					val = q!{arg; *#val };
+					val = q!{arg=> *#val };
 				}
 			}
 			if let Some((a, ty)) = &arg.ty {
 				let span = a.span().join(ty.span()).unwrap();
-				val = q!{span; cast(#val)? };
+				val = q!{span=> cast(#val)? };
 			}
 			val = match &arg.source {
 				Source::Simple(name) => {
 					let name = to_snake(name);
-					q!{name; __f.#name(#val) }
+					q!{name=> __f.#name(#val) }
 				},
 				Source::Call(a) => {
 					let name = &a.name;
-					let mut args = vec![q!{a; __f }];
+					let mut args = vec![q!{a=> __f }];
 					for e in &a.args {
-						args.push(q!{e; #e })
+						args.push(q!{e=> #e })
 					}
 					args.push(val);
-					q!{a; #name::write(#(#args),*)? }
+					q!{a=> #name::write(#(#args),*)? }
 				},
 			};
 			if let Source::Simple(a) = &arg.source {
 				if a == "String" {
-					val = q!{arg; #val? };
+					val = q!{arg=> #val? };
 				}
 			}
-			item.write.extend(q!{arg; #val; });
+			item.write.extend(q!{arg=> #val; });
 		}
 
 		let ty = if let Some((_, ty)) = &arg.ty {
@@ -703,7 +703,7 @@ fn gather_arm(ctx: &mut Ctx, arm: &InsnArm, mut item: Item) -> TokenStream {
 			}
 		};
 		item.vars.push(varname.clone());
-		item.def.extend(q!{ty; #ty, });
+		item.def.extend(q!{ty=> #ty, });
 
 		let alias = arg.alias();
 		// collisions will be errored about at type checking
@@ -720,12 +720,12 @@ fn gather_arm(ctx: &mut Ctx, arm: &InsnArm, mut item: Item) -> TokenStream {
 			item.name = format_ident!("{}{}", &item.name, &arm.value.insn.name, span=arm.value.insn.name.span());
 			item.attrs.extend(arm.attrs.clone());
 			let key = &arm.value.key;
-			item.write.extend(q!{arm; __f.u8(#key); });
+			item.write.extend(q!{arm=> __f.u8(#key); });
 			let body = gather_arm(ctx, &arm.value.insn, item);
-			arms.push(q!{arm; #key => { #body } });
+			arms.push(q!{arm=> #key => { #body } });
 		}
 		let name = &item.name;
-		q!{tail;
+		q!{tail=>
 			match __f.u8()? {
 				#(#arms)*
 				_v => Err(format!("invalid Insn::{}*: 0x{:02X}", stringify!(#name), _v).into())
@@ -735,7 +735,7 @@ fn gather_arm(ctx: &mut Ctx, arm: &InsnArm, mut item: Item) -> TokenStream {
 		ctx.items.push((arm.span(), item.clone()));
 		let name = &item.name;
 		let vars = &item.vars;
-		q!{arm; Ok(Self::#name(#vars)) }
+		q!{arm=> Ok(Self::#name(#vars)) }
 	});
 
 	read

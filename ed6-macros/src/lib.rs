@@ -39,9 +39,8 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		}
 	}).collect::<TokenStream>();
 
-	let InsnArgOwned_body = ctx.args.iter().map(|(k, v)| quote!{ #k(#v), }).collect::<TokenStream>();
-	let InsnArg_body      = ctx.args.iter().map(|(k, v)| quote!{ #k(&'a #v,), }).collect::<TokenStream>();
-	let InsnArgMut_body   = ctx.args.iter().map(|(k, v)| quote!{ #k(&'a mut #v), }).collect::<TokenStream>();
+	let InsnArg_names = ctx.args.keys().collect::<Vec<_>>();
+	let InsnArg_types = ctx.args.values().collect::<Vec<_>>();
 
 	let name_body = ctx.items.iter().map(|(span, Item { name, .. })| quote_spanned! { *span =>
 		Self::#name(..) => stringify!(#name),
@@ -61,19 +60,19 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		#[allow(non_camel_case_types)]
 		#[derive(Debug, Clone)]
 		pub enum InsnArgOwned {
-			#InsnArg_body
+			#(#InsnArg_names(#InsnArg_types),)*
 		}
 
 		#[allow(non_camel_case_types)]
 		#[derive(Debug, Clone, Copy)]
 		pub enum InsnArg<'a> {
-			#InsnArgRef_body
+			#(#InsnArg_names(&'a #InsnArg_types),)*
 		}
 
 		#[allow(non_camel_case_types)]
 		#[derive(Debug)]
 		pub enum InsnArgMut<'a> {
-			#InsnArgMut_body
+			#(#InsnArg_names(&'a mut #InsnArg_types),)*
 		}
 
 		impl Insn {

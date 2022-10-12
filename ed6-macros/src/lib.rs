@@ -39,6 +39,29 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		}
 	}).collect::<TokenStream>();
 
+	let main = quote! {
+		#[allow(non_camel_case_types)]
+		#[derive(Debug, Clone, PartialEq, Eq)]
+		pub enum Insn {
+			#Insn_body
+		}
+
+		impl Insn {
+			#[allow(clippy::needless_borrow)]
+			pub fn read<'a>(__f: &mut impl In<'a>, #func_args) -> Result<Self, ReadError> {
+				#read_body
+			}
+
+			#[allow(clippy::needless_borrow)]
+			pub fn write(__f: &mut impl OutDelay, #func_args, __insn: &Insn) -> Result<(), WriteError> {
+				match __insn {
+					#write_body
+				}
+				Ok(())
+			}
+		}
+	};
+
 	let InsnArg_names = ctx.args.keys().collect::<Vec<_>>();
 	let InsnArg_types = ctx.args.values().collect::<Vec<_>>();
 
@@ -69,13 +92,7 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		}
 	}).collect::<TokenStream>();
 
-	quote! {
-		#[allow(non_camel_case_types)]
-		#[derive(Debug, Clone, PartialEq, Eq)]
-		pub enum Insn {
-			#Insn_body
-		}
-
+	let introspection = quote! {
 		#[allow(non_camel_case_types)]
 		#[derive(Debug, Clone)]
 		pub enum InsnArgOwned {
@@ -101,19 +118,6 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		}
 
 		impl Insn {
-			#[allow(clippy::needless_borrow)]
-			pub fn read<'a>(__f: &mut impl In<'a>, #func_args) -> Result<Self, ReadError> {
-				#read_body
-			}
-
-			#[allow(clippy::needless_borrow)]
-			pub fn write(__f: &mut impl OutDelay, #func_args, __insn: &Insn) -> Result<(), WriteError> {
-				match __insn {
-					#write_body
-				}
-				Ok(())
-			}
-
 			pub fn name(&self) -> &'static str {
 				match self {
 					#name_body
@@ -163,6 +167,11 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 				Some(v)
 			}
 		}
+	};
+
+	quote! {
+		#main
+		#introspection
 	}.into()
 }
 

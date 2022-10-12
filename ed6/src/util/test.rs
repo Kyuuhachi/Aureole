@@ -1,4 +1,4 @@
-use crate::gamedata::GameData;
+use crate::gamedata::{GameData, InstructionSet};
 use crate::archive::Archives;
 
 #[derive(Debug, thiserror::Error)]
@@ -27,7 +27,7 @@ impl std::convert::From<String> for Error {
 
 lazy_static::lazy_static! {
 	pub static ref FC: GameData
-		= GameData::new(Archives::new("../data/fc").unwrap());
+		= GameData::new(Archives::new("../data/fc").unwrap(), InstructionSet::Fc);
 }
 
 pub fn check_equal<T: PartialEq + std::fmt::Debug>(a: &T, b: &T) -> Result<(), Error> {

@@ -4,10 +4,26 @@ use std::io;
 pub struct GameData {
 	#[deref]
 	data: Box<dyn GameDataImpl + Sync>,
+	insn_set: InstructionSet,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum InstructionSet {
+	Fc, FcEvo,
+	Sc, ScEvo,
+	Tc, TcEvo, // It's called 3rd, I know, but that's not a valid identifier
+	Zero, ZeroEvo,
+	Azure, AzureEvo,
 }
 
 impl GameData {
-    pub fn new(data: impl GameDataImpl + Sync + 'static) -> Self { Self { data: Box::new(data) } }
+	pub fn new(data: impl GameDataImpl + Sync + 'static, insn_set: InstructionSet) -> Self {
+		Self { data: Box::new(data), insn_set }
+	}
+
+	pub fn game(&self) -> InstructionSet {
+		self.insn_set
+	}
 }
 
 pub trait GameDataImpl {

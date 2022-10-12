@@ -186,6 +186,7 @@ struct Body {
 	or1_token: Token![|],
 	args: Punctuated<PatType, Token![,]>,
 	or2_token: Token![|],
+	attrs: Vec<Attribute>,
 	bracket_token: token::Bracket,
 	insns: Punctuated<WithAttrs<Arm>, Token![,]>,
 }
@@ -202,7 +203,7 @@ impl Parse for Body {
 						break;
 					}
 					let value = PatType {
-						attrs: Vec::new(),
+						attrs: Attribute::parse_outer(input)?,
 						pat: input.parse()?,
 						colon_token: input.parse()?,
 						ty: input.parse()?,
@@ -217,6 +218,7 @@ impl Parse for Body {
 				inputs
 			},
 			or2_token: input.parse()?,
+			attrs: Attribute::parse_outer(input)?,
 			bracket_token: bracketed!(content in input),
 			insns: Punctuated::parse_terminated(&content)?,
 		})
@@ -561,6 +563,7 @@ impl ToTokens for TableArm {
 #[allow(non_snake_case)]
 struct Ctx {
 	args: BTreeMap<Ident, Box<Type>>,
+	attrs: Vec<Attribute>,
 	items: Vec<(Span, Item)>,
 }
 
@@ -573,11 +576,16 @@ struct Item {
 	#[allow(clippy::vec_box)]
 	types: Vec<Box<Type>>,
 	aliases: Vec<Ident>,
-	write: Vec<TokenStream>,
+	write: TokenStream,
 }
 
 fn gather_top(ctx: &mut Ctx, t: &Body) -> TokenStream {
 	let mut arms = Vec::new();
+
+	let mut attrs = t.attrs.clone();
+	let games_attr = attrs.iter().position(|a| a.path.is_ident("games"))
+		.map(|i| attrs.remove(i));
+	ctx.attrs = attrs;
 
 	let mut n = 0;
 	for arm in &t.insns {

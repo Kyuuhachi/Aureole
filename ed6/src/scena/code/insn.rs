@@ -1,7 +1,9 @@
 use super::*;
 
 ed6_macros::bytecode! {
-	|arc: &GameData| [
+	|arc: &GameData|
+	#[games(arc.insn_set() => crate::gamedata::InstructionSet::{Fc, FcEvo})]
+	[
 		skip!(1), // null
 		Return(),
 		skip!(3), // control flow

@@ -711,7 +711,7 @@ fn gather_arm(ctx: &mut Ctx, arm: &InsnArm, mut item: Item) -> TokenStream {
 		item.aliases.push(alias.clone());
 	}
 
-	read.extend(if let Some(tail) = &arm.tail {
+	if let Some(tail) = &arm.tail {
 		let mut arms = Vec::new();
 		for arm in &tail.arms {
 			let mut item = item.clone();
@@ -723,18 +723,18 @@ fn gather_arm(ctx: &mut Ctx, arm: &InsnArm, mut item: Item) -> TokenStream {
 			arms.push(q!{arm=> #key => { #body } });
 		}
 		let name = &item.name;
-		q!{tail=>
+		read.extend(q!{tail=>
 			match __f.u8()? {
 				#(#arms)*
 				_v => Err(format!("invalid Insn::{}*: 0x{:02X}", stringify!(#name), _v).into())
 			}
-		}
+		})
 	} else {
 		ctx.items.push((arm.span(), item.clone()));
 		let name = &item.name;
 		let vars = &item.vars;
-		q!{arm=> Ok(Self::#name(#vars)) }
-	});
+		read.extend(q!{arm=> Ok(Self::#name(#vars)) })
+	};
 
 	read
 }

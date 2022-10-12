@@ -22,12 +22,14 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 	// Used in the dump
 	ctx.args.insert(Ident::new("String", Span::call_site()), parse_quote!{ String });
 
-	let func_args = &body.args;
-
 	let read_body = gather_top(&mut ctx, &body);
 
-	let write_body = ctx.items.iter().map(|(span, Item { name, vars, write, .. })| quote_spanned! { *span =>
-		Self::#name(#(#vars),*) => { #(#write)* }
+	let func_args = &body.args;
+
+	let write_body = ctx.items.iter().map(|(span, Item { name, vars, write, .. })| {
+		quote_spanned! { *span =>
+			Self::#name(#vars) => { #write }
+		}
 	}).collect::<TokenStream>();
 
 	let Insn_body = ctx.items.iter().map(|(span, Item { hex, attrs, name, types, .. })| {
@@ -72,8 +74,9 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 	}).collect::<TokenStream>();
 
 	let args_body = ctx.items.iter().map(|(span, Item { name, vars, aliases, .. })| {
+		let varnames = vars.into_iter();
 		quote_spanned! { *span =>
-			Self::#name(#(#vars),*) => Box::new([#(Arg::#aliases(#vars)),*]),
+			Self::#name(#vars) => Box::new([#(Arg::#aliases(#varnames)),*]),
 		}
 	}).collect::<TokenStream>();
 
@@ -84,10 +87,11 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 	}).collect::<TokenStream>();
 
 	let from_args_body = ctx.items.iter().map(|(span, Item { name, vars, aliases, .. })| {
+		let varnames = vars.into_iter();
 		quote_spanned! { *span =>
 			stringify!(#name) => {
-				#(let #vars = if let Some(Arg::#aliases(v)) = it.next() { v } else { return None; };)*
-				Self::#name(#(#vars),*)
+				#(let #varnames = if let Some(Arg::#aliases(v)) = it.next() { v } else { return None; };)*
+				Self::#name(#vars)
 			},
 		}
 	}).collect::<TokenStream>();
@@ -572,7 +576,7 @@ struct Item {
 	hex: u8,
 	attrs: Vec<Attribute>,
 	name: Ident,
-	vars: Vec<Ident>,
+	vars: Punctuated<Ident, Token![,]>,
 	#[allow(clippy::vec_box)]
 	types: Vec<Box<Type>>,
 	aliases: Vec<Ident>,
@@ -607,14 +611,14 @@ fn gather_top(ctx: &mut Ctx, t: &Body) -> TokenStream {
 					hex,
 					attrs,
 					name: arm.name.clone(),
-					vars: Vec::new(),
+					vars: Punctuated::new(),
 					types: Vec::new(),
 					aliases: Vec::new(),
-					write: Vec::new(),
+					write: TokenStream::new(),
 				};
-				item.write.push(quote_spanned! { arm.span() => __f.u8(#hex); });
+				item.write.extend(quote_spanned! { arm.span() => __f.u8(#hex); });
 				let read = gather_arm(ctx, arm, item);
-				arms.push(quote_spanned! { arm.span() => #hex => #read, });
+				arms.push(quote_spanned! { arm.span() => #hex => { #read } });
 				n += 1;
 			},
 		}
@@ -637,7 +641,7 @@ fn gather_top(ctx: &mut Ctx, t: &Body) -> TokenStream {
 }
 
 fn gather_arm(ctx: &mut Ctx, arm: &InsnArm, mut item: Item) -> TokenStream {
-	let mut read = Vec::new();
+	let mut read = TokenStream::new();
 
 	for arg in &arm.args {
 		let varname = format_ident!("_{}", item.vars.len(), span=arg.span());
@@ -661,7 +665,7 @@ fn gather_arm(ctx: &mut Ctx, arm: &InsnArm, mut item: Item) -> TokenStream {
 				let span = a.span().join(ty.span()).unwrap();
 				val = quote_spanned! { span => cast(#val)? };
 			}
-			read.push(quote_spanned! { arg.span() => let #varname = #val; });
+			read.extend(quote_spanned! { arg.span() => let #varname = #val; });
 		}
 
 		{
@@ -695,7 +699,7 @@ fn gather_arm(ctx: &mut Ctx, arm: &InsnArm, mut item: Item) -> TokenStream {
 					val = quote_spanned! { arg.span() => #val? };
 				}
 			}
-			item.write.push(quote_spanned! { arg.span() => #val; });
+			item.write.extend(quote_spanned! { arg.span() => #val; });
 		}
 
 		let ty = arg.ty();
@@ -710,16 +714,16 @@ fn gather_arm(ctx: &mut Ctx, arm: &InsnArm, mut item: Item) -> TokenStream {
 		item.aliases.push(alias.clone());
 	}
 
-	read.push(if let Some(tail) = &arm.tail {
+	read.extend(if let Some(tail) = &arm.tail {
 		let mut arms = Vec::new();
 		for arm in &tail.arms {
 			let mut item = item.clone();
 			item.name = format_ident!("{}{}", &item.name, &arm.value.insn.name, span=arm.value.insn.name.span());
 			item.attrs.extend(arm.attrs.clone());
 			let key = &arm.value.key;
-			item.write.push(quote_spanned! { arm.span() => __f.u8(#key); });
+			item.write.extend(quote_spanned! { arm.span() => __f.u8(#key); });
 			let body = gather_arm(ctx, &arm.value.insn, item);
-			arms.push(quote_spanned! { arm.span() => #key => #body, });
+			arms.push(quote_spanned! { arm.span() => #key => { #body } });
 		}
 		let name = &item.name;
 		quote_spanned! { tail.span() =>
@@ -732,10 +736,10 @@ fn gather_arm(ctx: &mut Ctx, arm: &InsnArm, mut item: Item) -> TokenStream {
 		ctx.items.push((arm.span(), item.clone()));
 		let name = &item.name;
 		let vars = &item.vars;
-		quote_spanned! { arm.span() => Ok(Self::#name(#(#vars),*)) }
+		quote_spanned! { arm.span() => Ok(Self::#name(#vars)) }
 	});
 
-	quote_spanned! { arm.span() => { #(#read)* } }
+	read
 }
 
 fn to_snake(ident: &Ident) -> Ident {

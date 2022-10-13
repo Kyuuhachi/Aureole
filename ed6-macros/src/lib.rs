@@ -23,10 +23,9 @@ macro_rules! q {
 #[proc_macro]
 #[allow(non_snake_case)]
 pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
-	let body = parse_macro_input!(tokens as Body);
-	let ctx = gather_top(&body);
+	let ctx = parse_macro_input!(tokens with gather_top);
 
-	let func_args = &body.args;
+	let func_args = &ctx.func_args;
 	let read_body = &ctx.read_body;
 	let attrs = &ctx.attrs;
 
@@ -188,46 +187,6 @@ mod kw {
 }
 
 // {{{1 AST and parse
-#[derive(Clone, Debug)]
-struct Body {
-	paren_token: token::Paren,
-	args: Punctuated<PatType, Token![,]>,
-	attrs: Vec<Attribute>,
-	bracket_token: token::Bracket,
-	insns: Punctuated<WithAttrs<Arm>, Token![,]>,
-}
-
-impl Parse for Body {
-	fn parse(input: ParseStream) -> Result<Self> {
-		let (content1, content2);
-		Ok(Self {
-			paren_token: parenthesized!(content1 in input),
-			args: Punctuated::parse_terminated_with(&content1, |input| {
-				Ok(PatType {
-					attrs: Attribute::parse_outer(input)?,
-					pat: input.parse()?,
-					colon_token: input.parse()?,
-					ty: input.parse()?,
-				})
-			})?,
-			attrs: Attribute::parse_outer(input)?,
-			bracket_token: bracketed!(content2 in input),
-			insns: Punctuated::parse_terminated(&content2)?,
-		})
-	}
-}
-
-impl ToTokens for Body {
-	fn to_tokens(&self, ts: &mut TokenStream) {
-		self.paren_token.surround(ts, |ts| {
-			self.args.to_tokens(ts);
-		});
-		self.bracket_token.surround(ts, |ts| {
-			self.insns.to_tokens(ts);
-		});
-	}
-}
-
 #[derive(Clone, Debug)]
 struct WithAttrs<T> {
 	attrs: Vec<Attribute>,
@@ -543,6 +502,7 @@ impl ToTokens for TableArm {
 #[derive(Default)]
 struct Ctx {
 	args: BTreeMap<Ident, TokenStream>,
+	func_args: Punctuated<PatType, Token![,]>,
 	attrs: Vec<Attribute>,
 	items: Vec<(Span, Item)>,
 	read_body: TokenStream,
@@ -559,7 +519,18 @@ struct Item {
 	write: TokenStream,
 }
 
-fn gather_top(t: &Body) -> Ctx {
+fn gather_top(input: ParseStream) -> Result<Ctx> {
+	let content;
+	let _ = parenthesized!(content in input);
+	let func_args = Punctuated::parse_terminated_with(&content, |input| {
+		Ok(PatType {
+			attrs: Attribute::parse_outer(input)?,
+			pat: input.parse()?,
+			colon_token: input.parse()?,
+			ty: input.parse()?,
+		})
+	})?;
+
 	let mut items = Vec::new();
 	let mut args = BTreeMap::new();
 	let mut read_body = TokenStream::new();
@@ -567,17 +538,21 @@ fn gather_top(t: &Body) -> Ctx {
 	// Used in the dump
 	args.insert(Ident::new("String", Span::call_site()), quote! { String });
 
-	let mut attrs = t.attrs.clone();
+	let mut attrs = Attribute::parse_outer(input)?;
 	let games_attr = attrs.iter().position(|a| a.path.is_ident("games"))
 		.map(|i| attrs.remove(i));
 
+	let content;
+	let bracket_token = bracketed!(content in input);
+	let input = &content;
+
 	let mut n = 0;
-	for arm in &t.insns {
-		let mut attrs = arm.attrs.clone();
+	while !input.is_empty() {
+		let mut attrs = Attribute::parse_outer(input)?;
 		let game_attr = attrs.iter().position(|a| a.path.is_ident("game"))
 			.map(|i| attrs.remove(i));
 
-		match &arm.value {
+		match Arm::parse(input)? {
 			Arm::SkipArm(arm) => {
 				n += arm.number.1 as usize;
 				for attr in &attrs {
@@ -597,31 +572,36 @@ fn gather_top(t: &Body) -> Ctx {
 					write: TokenStream::new(),
 				};
 				item.write.extend(q!{arm=> __f.u8(#hex); });
-				let read = gather_arm(&mut items, &mut args, arm, item);
+				let read = gather_arm(&mut items, &mut args, &arm, item);
 				read_body.extend(q!{arm=> #hex => { #read } });
 				n += 1;
 			},
 		}
+
+		if input.is_empty() {
+			break;
+		}
+		input.parse::<Token![,]>()?;
 	}
 	if n != 256 {
 		// TODO I'd rather put this at the close bracket, but that's unstable
-		let span = t.insns.last().map_or_else(Span::call_site, |last| last.span());
-		Diagnostic::spanned(span.unwrap(), Level::Warning, format!("Instructions sum up to {n}, not 256")).emit();
+		Diagnostic::spanned(bracket_token.span.unwrap(), Level::Warning, format!("Instructions sum up to {n}, not 256")).emit();
 	}
 
-	let read_body = q!{t.bracket_token.span=>
+	let read_body = q!{bracket_token.span=>
 		match __f.u8()? {
 			#read_body
 			_v => Err(format!("invalid Insn: 0x{:02X}", _v).into())
 		}
 	};
 
-	Ctx {
+	Ok(Ctx {
 		args,
+		func_args,
 		attrs,
 		items,
 		read_body,
-	}
+	})
 }
 
 fn gather_arm(items: &mut Vec<(Span, Item)>, args: &mut BTreeMap<Ident, TokenStream>, arm: &InsnArm, mut item: Item) -> TokenStream {

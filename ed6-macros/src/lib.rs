@@ -24,13 +24,11 @@ macro_rules! q {
 #[allow(non_snake_case)]
 pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 	let body = parse_macro_input!(tokens as Body);
-	let mut ctx = Ctx::default();
-	// Used in the dump
-	ctx.args.insert(Ident::new("String", Span::call_site()), quote! { String });
-
-	let read_body = gather_top(&mut ctx, &body);
+	let ctx = gather_top(&body);
 
 	let func_args = &body.args;
+	let read_body = &ctx.read_body;
+	let attrs = &ctx.attrs;
 
 	let write_body = ctx.items.iter().map(|(span, Item { name, vars, write, .. })| {
 		q!{span=>
@@ -50,6 +48,7 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 	let main = quote! {
 		#[allow(non_camel_case_types)]
 		#[derive(Debug, Clone, PartialEq, Eq)]
+		#(#attrs)*
 		pub enum Insn {
 			#Insn_body
 		}
@@ -561,6 +560,7 @@ struct Ctx {
 	args: BTreeMap<Ident, TokenStream>,
 	attrs: Vec<Attribute>,
 	items: Vec<(Span, Item)>,
+	read_body: TokenStream,
 }
 
 #[derive(Debug, Clone)]
@@ -574,13 +574,17 @@ struct Item {
 	write: TokenStream,
 }
 
-fn gather_top(ctx: &mut Ctx, t: &Body) -> TokenStream {
-	let mut arms = Vec::new();
+fn gather_top(t: &Body) -> Ctx {
+	let mut items = Vec::new();
+	let mut args = BTreeMap::new();
+	let mut read_body = TokenStream::new();
+
+	// Used in the dump
+	args.insert(Ident::new("String", Span::call_site()), quote! { String });
 
 	let mut attrs = t.attrs.clone();
 	let games_attr = attrs.iter().position(|a| a.path.is_ident("games"))
 		.map(|i| attrs.remove(i));
-	ctx.attrs = attrs;
 
 	let mut n = 0;
 	for arm in &t.insns {
@@ -608,8 +612,8 @@ fn gather_top(ctx: &mut Ctx, t: &Body) -> TokenStream {
 					write: TokenStream::new(),
 				};
 				item.write.extend(q!{arm=> __f.u8(#hex); });
-				let read = gather_arm(ctx, arm, item);
-				arms.push(q!{arm=> #hex => { #read } });
+				let read = gather_arm(&mut items, &mut args, arm, item);
+				read_body.extend(q!{arm=> #hex => { #read } });
 				n += 1;
 			},
 		}
@@ -620,15 +624,22 @@ fn gather_top(ctx: &mut Ctx, t: &Body) -> TokenStream {
 		Diagnostic::spanned(span.unwrap(), Level::Warning, format!("Instructions sum up to {n}, not 256")).emit();
 	}
 
-	q!{t.bracket_token.span=>
+	let read_body = q!{t.bracket_token.span=>
 		match __f.u8()? {
-			#(#arms)*
+			#read_body
 			_v => Err(format!("invalid Insn: 0x{:02X}", _v).into())
 		}
+	};
+
+	Ctx {
+		args,
+		attrs,
+		items,
+		read_body,
 	}
 }
 
-fn gather_arm(ctx: &mut Ctx, arm: &InsnArm, mut item: Item) -> TokenStream {
+fn gather_arm(items: &mut Vec<(Span, Item)>, args: &mut BTreeMap<Ident, TokenStream>, arm: &InsnArm, mut item: Item) -> TokenStream {
 	let mut read = TokenStream::new();
 
 	for arg in &arm.args {
@@ -705,8 +716,8 @@ fn gather_arm(ctx: &mut Ctx, arm: &InsnArm, mut item: Item) -> TokenStream {
 
 		let alias = arg.alias();
 		// collisions will be errored about at type checking
-		if !ctx.args.contains_key(&alias) {
-			ctx.args.insert(alias.clone(), ty);
+		if !args.contains_key(&alias) {
+			args.insert(alias.clone(), ty);
 		}
 		item.aliases.push(alias.clone());
 	}
@@ -719,7 +730,7 @@ fn gather_arm(ctx: &mut Ctx, arm: &InsnArm, mut item: Item) -> TokenStream {
 			item.attrs.extend(arm.attrs.clone());
 			let key = &arm.value.key;
 			item.write.extend(q!{arm=> __f.u8(#key); });
-			let body = gather_arm(ctx, &arm.value.insn, item);
+			let body = gather_arm(items, args, &arm.value.insn, item);
 			arms.push(q!{arm=> #key => { #body } });
 		}
 		let name = &item.name;
@@ -730,7 +741,7 @@ fn gather_arm(ctx: &mut Ctx, arm: &InsnArm, mut item: Item) -> TokenStream {
 			}
 		})
 	} else {
-		ctx.items.push((arm.span(), item.clone()));
+		items.push((arm.span(), item.clone()));
 		let name = &item.name;
 		let vars = &item.vars;
 		read.extend(q!{arm=> Ok(Self::#name(#vars)) })

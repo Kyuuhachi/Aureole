@@ -190,9 +190,8 @@ mod kw {
 // {{{1 AST and parse
 #[derive(Clone, Debug)]
 struct Body {
-	or1_token: Token![|],
+	paren_token: token::Paren,
 	args: Punctuated<PatType, Token![,]>,
-	or2_token: Token![|],
 	attrs: Vec<Attribute>,
 	bracket_token: token::Bracket,
 	insns: Punctuated<WithAttrs<Arm>, Token![,]>,
@@ -200,43 +199,29 @@ struct Body {
 
 impl Parse for Body {
 	fn parse(input: ParseStream) -> Result<Self> {
-		let content;
+		let (content1, content2);
 		Ok(Self {
-			or1_token: input.parse()?,
-			args: {
-				let mut inputs = Punctuated::new();
-				loop {
-					if input.peek(Token![|]) {
-						break;
-					}
-					let value = PatType {
-						attrs: Attribute::parse_outer(input)?,
-						pat: input.parse()?,
-						colon_token: input.parse()?,
-						ty: input.parse()?,
-					};
-					inputs.push_value(value);
-					if input.peek(Token![|]) {
-						break;
-					}
-					let punct: Token![,] = input.parse()?;
-					inputs.push_punct(punct);
-				}
-				inputs
-			},
-			or2_token: input.parse()?,
+			paren_token: parenthesized!(content1 in input),
+			args: Punctuated::parse_terminated_with(&content1, |input| {
+				Ok(PatType {
+					attrs: Attribute::parse_outer(input)?,
+					pat: input.parse()?,
+					colon_token: input.parse()?,
+					ty: input.parse()?,
+				})
+			})?,
 			attrs: Attribute::parse_outer(input)?,
-			bracket_token: bracketed!(content in input),
-			insns: Punctuated::parse_terminated(&content)?,
+			bracket_token: bracketed!(content2 in input),
+			insns: Punctuated::parse_terminated(&content2)?,
 		})
 	}
 }
 
 impl ToTokens for Body {
 	fn to_tokens(&self, ts: &mut TokenStream) {
-		self.or1_token.to_tokens(ts);
-		self.args.to_tokens(ts);
-		self.or2_token.to_tokens(ts);
+		self.paren_token.surround(ts, |ts| {
+			self.args.to_tokens(ts);
+		});
 		self.bracket_token.surround(ts, |ts| {
 			self.insns.to_tokens(ts);
 		});

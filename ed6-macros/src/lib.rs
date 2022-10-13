@@ -66,8 +66,8 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		}
 	};
 
-	let InsnArg_names = ctx.args.keys().collect::<Vec<_>>();
-	let InsnArg_types = ctx.args.values().collect::<Vec<_>>();
+	let InsnArg_names = ctx.arg_types.keys().collect::<Vec<_>>();
+	let InsnArg_types = ctx.arg_types.values().collect::<Vec<_>>();
 
 	let name_body = ctx.items.iter().map(|(span, Item { name, .. })| {
 		q!{span=>
@@ -440,9 +440,8 @@ impl ToTokens for TableArm {
 }
 // }}}1
 
-#[derive(Default)]
 struct Ctx {
-	args: BTreeMap<Ident, TokenStream>,
+	arg_types: BTreeMap<Ident, TokenStream>,
 	func_args: Punctuated<PatType, Token![,]>,
 	attrs: Vec<Attribute>,
 	items: Vec<(Span, Item)>,
@@ -473,11 +472,11 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 	})?;
 
 	let mut items = Vec::new();
-	let mut args = BTreeMap::new();
+	let mut arg_types = BTreeMap::new();
 	let mut read_body = TokenStream::new();
 
 	// Used in the dump
-	args.insert(Ident::new("String", Span::call_site()), quote! { String });
+	arg_types.insert(Ident::new("String", Span::call_site()), quote! { String });
 
 	let mut attrs = Attribute::parse_outer(input)?;
 	let games_attr = attrs.iter().position(|a| a.path.is_ident("games"))
@@ -525,7 +524,7 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 				write: TokenStream::new(),
 			};
 			item.write.extend(q!{arm=> __f.u8(#hex); });
-			let read = gather_arm(&mut items, &mut args, &arm, item);
+			let read = gather_arm(&mut items, &mut arg_types, &arm, item);
 			read_body.extend(q!{arm=> #hex => { #read } });
 			n += 1;
 		}
@@ -549,7 +548,7 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 	};
 
 	Ok(Ctx {
-		args,
+		arg_types,
 		func_args,
 		attrs,
 		items,
@@ -557,7 +556,7 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 	})
 }
 
-fn gather_arm(items: &mut Vec<(Span, Item)>, args: &mut BTreeMap<Ident, TokenStream>, arm: &InsnArm, mut item: Item) -> TokenStream {
+fn gather_arm(items: &mut Vec<(Span, Item)>, arg_types: &mut BTreeMap<Ident, TokenStream>, arm: &InsnArm, mut item: Item) -> TokenStream {
 	let mut read = TokenStream::new();
 
 	for arg in &arm.args {
@@ -634,8 +633,8 @@ fn gather_arm(items: &mut Vec<(Span, Item)>, args: &mut BTreeMap<Ident, TokenStr
 
 		let alias = arg.alias();
 		// collisions will be errored about at type checking
-		if !args.contains_key(&alias) {
-			args.insert(alias.clone(), ty);
+		if !arg_types.contains_key(&alias) {
+			arg_types.insert(alias.clone(), ty);
 		}
 		item.aliases.push(alias.clone());
 	}
@@ -648,7 +647,7 @@ fn gather_arm(items: &mut Vec<(Span, Item)>, args: &mut BTreeMap<Ident, TokenStr
 			item.attrs.extend(arm.attrs.clone());
 			let key = &arm.value.key;
 			item.write.extend(q!{arm=> __f.u8(#key); });
-			let body = gather_arm(items, args, &arm.value.insn, item);
+			let body = gather_arm(items, arg_types, &arm.value.insn, item);
 			arms.push(q!{arm=> #key => { #body } });
 		}
 		let name = &item.name;

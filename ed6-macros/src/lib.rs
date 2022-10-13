@@ -488,7 +488,13 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 	let input = &content;
 
 	let mut n = 0;
-	while !input.is_empty() {
+	let mut last_span;
+	loop {
+		last_span = input.span();
+		if input.is_empty() {
+			break;
+		}
+
 		let mut attrs = Attribute::parse_outer(input)?;
 		let game_attr = attrs.iter().position(|a| a.path.is_ident("game"))
 			.map(|i| attrs.remove(i));
@@ -524,6 +530,7 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 			n += 1;
 		}
 
+		last_span = input.span();
 		if input.is_empty() {
 			break;
 		}
@@ -531,7 +538,7 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 	}
 	if n != 256 {
 		// TODO I'd rather put this at the close bracket, but that's unstable
-		Diagnostic::spanned(bracket_token.span.unwrap(), Level::Warning, format!("Instructions sum up to {n}, not 256")).emit();
+		Diagnostic::spanned(last_span.unwrap(), Level::Warning, format!("Instructions sum up to {n}, not 256")).emit();
 	}
 
 	let read_body = q!{bracket_token.span=>

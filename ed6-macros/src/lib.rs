@@ -212,65 +212,6 @@ impl<T: ToTokens> ToTokens for WithAttrs<T> {
 }
 
 #[derive(Clone, Debug)]
-enum Arm {
-	SkipArm(SkipArm),
-	InsnArm(InsnArm),
-}
-
-impl Parse for Arm {
-	fn parse(input: ParseStream) -> Result<Self> {
-		if input.peek(kw::skip) {
-			Ok(Arm::SkipArm(input.parse()?))
-		} else {
-			Ok(Arm::InsnArm(input.parse()?))
-		}
-	}
-}
-
-impl ToTokens for Arm {
-	fn to_tokens(&self, ts: &mut TokenStream) {
-		match self {
-			Arm::SkipArm(a) => a.to_tokens(ts),
-			Arm::InsnArm(a) => a.to_tokens(ts),
-		}
-	}
-}
-
-#[derive(Clone, Debug)]
-struct SkipArm {
-	skip_token: kw::skip,
-	bang_token: Token![!],
-	paren_token: token::Paren,
-	number: (LitInt, u8),
-}
-
-impl Parse for SkipArm {
-	fn parse(input: ParseStream) -> Result<Self> {
-		let content;
-		Ok(Self {
-			skip_token: input.parse()?,
-			bang_token: input.parse()?,
-			paren_token: parenthesized!(content in input),
-			number: {
-				let lit: LitInt = content.parse()?;
-				let val = lit.base10_parse()?;
-				(lit, val)
-			},
-		})
-	}
-}
-
-impl ToTokens for SkipArm {
-	fn to_tokens(&self, ts: &mut TokenStream) {
-		self.skip_token.to_tokens(ts);
-		self.bang_token.to_tokens(ts);
-		self.paren_token.surround(ts, |ts| {
-			self.number.0.to_tokens(ts);
-		});
-	}
-}
-
-#[derive(Clone, Debug)]
 struct InsnArm {
 	name: Ident,
 	paren_token: token::Paren,
@@ -552,30 +493,35 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 		let game_attr = attrs.iter().position(|a| a.path.is_ident("game"))
 			.map(|i| attrs.remove(i));
 
-		match Arm::parse(input)? {
-			Arm::SkipArm(arm) => {
-				n += arm.number.1 as usize;
-				for attr in &attrs {
-					// Doesn't work so great for non-ident paths, but whatever
-					Diagnostic::spanned(attr.path.span().unwrap(), Level::Error, format!("cannot find attribute `{}` in this scope", attr.path.to_token_stream())).emit();
-				}
-			},
-			Arm::InsnArm(arm) => {
-				let hex = n as u8;
-				let mut item = Item {
-					hex,
-					attrs,
-					name: arm.name.clone(),
-					vars: Punctuated::new(),
-					aliases: Vec::new(),
-					def: TokenStream::new(),
-					write: TokenStream::new(),
-				};
-				item.write.extend(q!{arm=> __f.u8(#hex); });
-				let read = gather_arm(&mut items, &mut args, &arm, item);
-				read_body.extend(q!{arm=> #hex => { #read } });
-				n += 1;
-			},
+		if input.peek(kw::skip) {
+			input.parse::<kw::skip>()?;
+			input.parse::<Token![!]>()?;
+			let content;
+			let _ = parenthesized!(content in input);
+			let lit = content.parse::<LitInt>()?;
+			let val = lit.base10_parse::<u8>()?;
+
+			n += val as usize;
+			for attr in &attrs {
+				// Doesn't work so great for non-ident paths, but whatever
+				Diagnostic::spanned(attr.path.span().unwrap(), Level::Error, format!("cannot find attribute `{}` in this scope", attr.path.to_token_stream())).emit();
+			}
+		} else {
+			let arm = InsnArm::parse(input)?;
+			let hex = n as u8;
+			let mut item = Item {
+				hex,
+				attrs,
+				name: arm.name.clone(),
+				vars: Punctuated::new(),
+				aliases: Vec::new(),
+				def: TokenStream::new(),
+				write: TokenStream::new(),
+			};
+			item.write.extend(q!{arm=> __f.u8(#hex); });
+			let read = gather_arm(&mut items, &mut args, &arm, item);
+			read_body.extend(q!{arm=> #hex => { #read } });
+			n += 1;
 		}
 
 		if input.is_empty() {

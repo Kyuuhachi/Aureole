@@ -464,7 +464,7 @@ struct Item {
 
 fn gather_top(input: ParseStream) -> Result<Ctx> {
 	let content;
-	let _ = parenthesized!(content in input);
+	parenthesized!(content in input);
 	let func_args = Punctuated::parse_terminated_with(&content, |input| {
 		Ok(PatType {
 			attrs: Attribute::parse_outer(input)?,
@@ -495,13 +495,13 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 		}
 		input.parse::<Token![::]>()?;
 		let content;
-		let _ = braced!(content in input);
+		braced!(content in input);
 		let games = Punctuated::<Ident, Token![,]>::parse_terminated(&content)?;
 		Ok((expr, ty, games))
 	})?;
 
 	let content;
-	let bracket_token = bracketed!(content in input);
+	bracketed!(content in input);
 	let input = &content;
 
 	let mut n = 0;
@@ -526,7 +526,7 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 			input.parse::<kw::skip>()?;
 			input.parse::<Token![!]>()?;
 			let content;
-			let _ = parenthesized!(content in input);
+			parenthesized!(content in input);
 			let lit = content.parse::<LitInt>()?;
 			let val = lit.base10_parse::<u8>()?;
 

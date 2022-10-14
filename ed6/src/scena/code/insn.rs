@@ -194,7 +194,7 @@ ed6_macros::bytecode! {
 			0x01 => _01(u8),
 		}),
 		ReturnToTitle(u8),
-		// fc only region
+
 		#[game(Fc)]
 		PartySlot(u8 as Member, u8, u8),
 		#[game(Fc)]
@@ -215,6 +215,9 @@ ed6_macros::bytecode! {
 		SaveClearData(),
 		#[game(Fc)]
 		skip!(33),
+
+		#[game(FcEvo)]
+		skip!(75),
 	]
 }
 

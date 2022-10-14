@@ -37,7 +37,15 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 	}).collect::<TokenStream>();
 
 	let Insn_body = ctx.items.iter().map(|(span, Item { hex, attrs, name, def, .. })| {
-		let doc = format!("{hex:02X}");
+		let mut hex2 = BTreeMap::<u8, Vec<String>>::new();
+		for (game, hex) in hex {
+			hex2.entry(*hex).or_insert_with(Vec::new).push(game.to_string());
+		}
+		let mut doc = String::new();
+		for (hex, games) in hex2 {
+			doc.push_str(&format!("{} => {hex:02X}", games.join(", ")));
+			doc.push('\n');
+		}
 		q!{span=>
 			#(#attrs)*
 			#[doc = #doc]
@@ -57,7 +65,7 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 			pub fn read<'a>(__f: &mut impl In<'a>, #func_args) -> Result<Self, ReadError> {
 				match (#game_expr, __f.u8()?) {
 					#read_body
-					(_, _v) => Err(format!("invalid Insn: 0x{:02X}", _v).into())
+					(_g, _v) => Err(format!("invalid Insn on {:?}: 0x{:02X}", _g, _v).into())
 				}
 			}
 
@@ -456,7 +464,7 @@ struct Ctx {
 
 #[derive(Debug, Clone)]
 struct Item {
-	hex: u8,
+	hex: Vec<(Ident, u8)>,
 	attrs: Vec<Attribute>,
 	name: Ident,
 	vars: Punctuated<Ident, Token![,]>,
@@ -489,7 +497,7 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 		.map(|i| attrs.remove(i))
 		.expect("no #[games]");
 
-	let (game_expr, game_ty, games) = games_attr.parse_args_with(|input: ParseStream| {
+	let (game_expr, game_ty, all_games) = games_attr.parse_args_with(|input: ParseStream| {
 		let expr = input.parse::<Expr>()?;
 		input.parse::<Token![=>]>()?;
 		let mut ty = TokenStream::new();
@@ -499,15 +507,16 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 		input.parse::<Token![::]>()?;
 		let content;
 		braced!(content in input);
-		let games = Punctuated::<Ident, Token![,]>::parse_terminated(&content)?;
-		Ok((expr, ty, games))
+		let all_games = Punctuated::<Ident, Token![,]>::parse_terminated(&content)?
+			.iter().cloned().collect::<Vec<_>>();
+		Ok((expr, ty, all_games))
 	})?;
 
 	let content;
 	bracketed!(content in input);
 	let input = &content;
 
-	let mut n = 0;
+	let mut n = vec![0; all_games.len()];
 	let mut last_span;
 	loop {
 		last_span = input.span();
@@ -519,11 +528,21 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 		let game_attr = attrs.iter().position(|a| a.path.is_ident("game"))
 			.map(|i| attrs.remove(i));
 
-		let insn_games = if let Some(game_attr) = game_attr {
+		let games = if let Some(game_attr) = game_attr {
 			game_attr.parse_args_with(Punctuated::<Ident, Token![,]>::parse_terminated)?
+				.iter().cloned().collect()
 		} else {
-			games.clone()
+			all_games.clone()
 		};
+
+		let game_idx: Vec<usize> = games.iter().filter_map(|game| {
+			if let Some(n) = all_games.iter().position(|a| a == game) {
+				Some(n)
+			} else {
+				Diagnostic::spanned(game.span().unwrap(), Level::Error, format!("unknown game `{game}`")).emit();
+				None
+			}
+		}).collect();
 
 		if input.peek(kw::skip) {
 			input.parse::<kw::skip>()?;
@@ -533,16 +552,19 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 			let lit = content.parse::<LitInt>()?;
 			let val = lit.base10_parse::<u8>()?;
 
-			n += val as usize;
+			for idx in &game_idx {
+				n[*idx] += val as usize;
+			}
+
 			for attr in &attrs {
 				// Doesn't work so great for non-ident paths, but whatever
 				Diagnostic::spanned(attr.path.span().unwrap(), Level::Error, format!("cannot find attribute `{}` in this scope", attr.path.to_token_stream())).emit();
 			}
 		} else {
 			let arm = InsnArm::parse(input)?;
-			let hex = n as u8;
+			let hex = game_idx.iter().map(|idx| n[*idx] as u8).collect::<Vec<_>>();
 			let mut item = Item {
-				hex,
+				hex: games.iter().cloned().zip(hex.iter().copied()).collect(),
 				attrs,
 				name: arm.name.clone(),
 				vars: Punctuated::new(),
@@ -550,10 +572,18 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 				def: TokenStream::new(),
 				write: TokenStream::new(),
 			};
-			item.write.extend(q!{arm=> __f.u8(match #game_expr { _ => #hex }); });
+			item.write.extend(q!{arm=>
+				__f.u8(match {#game_expr} { // the braces give better span information
+					#(#game_ty::#games => #hex,)*
+					_g => return Err(format!("`{}` is not supported on `{:?}`", stringify!(&item.name), _g).into())
+				});
+			});
 			let read = gather_arm(&mut items, &mut arg_types, &arm, item);
-			read_body.extend(q!{arm=> (_, #hex) => { #read } });
-			n += 1;
+			read_body.extend(q!{arm=> #((#game_ty::#games, #hex))|* => { #read } });
+
+			for idx in &game_idx {
+				n[*idx] += 1;
+			}
 		}
 
 		last_span = input.span();
@@ -562,8 +592,11 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 		}
 		input.parse::<Token![,]>()?;
 	}
-	if n != 256 {
-		Diagnostic::spanned(last_span.unwrap(), Level::Warning, format!("instructions sum up to {n}, not 256")).emit();
+
+	for (game, n) in all_games.iter().zip(n.iter()) {
+		if *n != 256 {
+			Diagnostic::spanned(last_span.unwrap(), Level::Warning, format!("instructions do not sum up to 256: {game} => {n}")).emit();
+		}
 	}
 
 	Ok(Ctx {

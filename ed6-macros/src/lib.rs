@@ -480,7 +480,22 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 
 	let mut attrs = Attribute::parse_outer(input)?;
 	let games_attr = attrs.iter().position(|a| a.path.is_ident("games"))
-		.map(|i| attrs.remove(i));
+		.map(|i| attrs.remove(i))
+		.expect("no #[games]");
+
+	let (game_expr, game_ty, games) = games_attr.parse_args_with(|input: ParseStream| {
+		let expr = input.parse::<Expr>()?;
+		input.parse::<Token![=>]>()?;
+		let mut ty = TokenStream::new();
+		while !(input.is_empty() || input.peek(Token![::]) && input.peek3(token::Brace)) {
+			ty.extend(input.parse::<proc_macro2::TokenTree>())
+		}
+		input.parse::<Token![::]>()?;
+		let content;
+		let _ = braced!(content in input);
+		let games = Punctuated::<Ident, Token![,]>::parse_terminated(&content)?;
+		Ok((expr, ty, games))
+	})?;
 
 	let content;
 	let bracket_token = bracketed!(content in input);
@@ -497,6 +512,12 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 		let mut attrs = Attribute::parse_outer(input)?;
 		let game_attr = attrs.iter().position(|a| a.path.is_ident("game"))
 			.map(|i| attrs.remove(i));
+
+		let insn_games = if let Some(game_attr) = game_attr {
+			game_attr.parse_args_with(Punctuated::<Ident, Token![,]>::parse_terminated)?
+		} else {
+			games.clone()
+		};
 
 		if input.peek(kw::skip) {
 			input.parse::<kw::skip>()?;
@@ -536,8 +557,7 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 		input.parse::<Token![,]>()?;
 	}
 	if n != 256 {
-		// TODO I'd rather put this at the close bracket, but that's unstable
-		Diagnostic::spanned(last_span.unwrap(), Level::Warning, format!("Instructions sum up to {n}, not 256")).emit();
+		Diagnostic::spanned(last_span.unwrap(), Level::Warning, format!("instructions sum up to {n}, not 256")).emit();
 	}
 
 	let read_body = q!{bracket_token.span=>

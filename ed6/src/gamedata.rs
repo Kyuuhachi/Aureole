@@ -21,7 +21,7 @@ impl GameData {
 		Self { data: Box::new(data), insn_set }
 	}
 
-	pub fn game(&self) -> InstructionSet {
+	pub fn insn_set(&self) -> InstructionSet {
 		self.insn_set
 	}
 }

@@ -28,6 +28,7 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 	let func_args = &ctx.func_args;
 	let read_body = &ctx.read_body;
 	let attrs = &ctx.attrs;
+	let game_expr = &ctx.game_expr;
 
 	let write_body = ctx.items.iter().map(|(span, Item { name, vars, write, .. })| {
 		q!{span=>
@@ -54,9 +55,9 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 
 		impl Insn {
 			pub fn read<'a>(__f: &mut impl In<'a>, #func_args) -> Result<Self, ReadError> {
-				match __f.u8()? {
+				match (#game_expr, __f.u8()?) {
 					#read_body
-					_v => Err(format!("invalid Insn: 0x{:02X}", _v).into())
+					(_, _v) => Err(format!("invalid Insn: 0x{:02X}", _v).into())
 				}
 			}
 
@@ -449,6 +450,8 @@ struct Ctx {
 	attrs: Vec<Attribute>,
 	items: Vec<(Span, Item)>,
 	read_body: TokenStream,
+	game_expr: Expr,
+	game_ty: TokenStream,
 }
 
 #[derive(Debug, Clone)]
@@ -547,9 +550,9 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 				def: TokenStream::new(),
 				write: TokenStream::new(),
 			};
-			item.write.extend(q!{arm=> __f.u8(#hex); });
+			item.write.extend(q!{arm=> __f.u8(match #game_expr { _ => #hex }); });
 			let read = gather_arm(&mut items, &mut arg_types, &arm, item);
-			read_body.extend(q!{arm=> #hex => { #read } });
+			read_body.extend(q!{arm=> (_, #hex) => { #read } });
 			n += 1;
 		}
 
@@ -569,6 +572,8 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 		attrs,
 		items,
 		read_body,
+		game_expr,
+		game_ty,
 	})
 }
 

@@ -54,7 +54,10 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 
 		impl Insn {
 			pub fn read<'a>(__f: &mut impl In<'a>, #func_args) -> Result<Self, ReadError> {
-				#read_body
+				match __f.u8()? {
+					#read_body
+					_v => Err(format!("invalid Insn: 0x{:02X}", _v).into())
+				}
 			}
 
 			pub fn write(__f: &mut impl OutDelay, #func_args, __insn: &Insn) -> Result<(), WriteError> {
@@ -559,13 +562,6 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 	if n != 256 {
 		Diagnostic::spanned(last_span.unwrap(), Level::Warning, format!("instructions sum up to {n}, not 256")).emit();
 	}
-
-	let read_body = q!{bracket_token.span=>
-		match __f.u8()? {
-			#read_body
-			_v => Err(format!("invalid Insn: 0x{:02X}", _v).into())
-		}
-	};
 
 	Ok(Ctx {
 		arg_types,

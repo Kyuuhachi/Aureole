@@ -63,7 +63,24 @@ enum RawOInsn<'a> {
 pub fn read<'a>(f: &mut impl In<'a>, arc: &GameData, end: usize) -> Result<Vec<FlatInsn>, ReadError> {
 	let mut insns = Vec::new();
 	while f.pos() < end {
-		insns.push((f.pos(), read_raw_insn(f, arc)?));
+		let pos = f.pos();
+		match read_raw_insn(f, arc) {
+			Ok(insn) => insns.push((pos, insn)),
+			Err(err) => {
+				let start = pos.saturating_sub(48*2);
+				f.seek(start)?;
+				let mut d = f.dump().lines(4).mark(pos, 9);
+				for (i, insn) in &insns {
+					if *i >= start {
+						d = d.mark(*i, 3);
+						println!("{i:04X} {insn:?}");
+					}
+				}
+				d.to_stderr();
+				f.seek(pos)?;
+				return Err(err)
+			}
+		}
 	}
 	ensure!(f.pos() == end, "overshot while reading function");
 
@@ -106,42 +123,32 @@ pub fn read<'a>(f: &mut impl In<'a>, arc: &GameData, end: usize) -> Result<Vec<F
 
 fn read_raw_insn<'a>(f: &mut impl In<'a>, arc: &GameData) -> Result<RawIInsn, ReadError> {
 	let pos = f.pos();
-	let res = try {
-		let insn = match f.u8()? {
-			0x02 => {
-				let e = expr::read(f, arc)?;
-				let l = f.u16()? as usize;
-				RawIInsn::Unless(e, l)
-			}
-			0x03 => {
-				let l = f.u16()? as usize;
-				RawIInsn::Goto(l)
-			}
-			0x04 => {
-				let e = expr::read(f, arc)?;
-				let mut cs = Vec::new();
-				for _ in 0..f.u16()? {
-					cs.push((f.u16()?, f.u16()? as usize));
-				}
-				let l = f.u16()? as usize;
-				RawIInsn::Switch(e, cs, l)
-			}
-			_ => {
-				f.seek(pos)?;
-				let i = Insn::read(f, arc)?;
-				RawIInsn::Insn(i)
-			}
-		};
-		insn
-	};
-	match res {
-		Ok(a) => Ok(a),
-		Err(e) => {
-			f.seek(pos.saturating_sub(48*2))?;
-			f.dump().lines(4).mark(pos, 9).to_stderr();
-			Err(e)
+	let insn = match f.u8()? {
+		0x02 => {
+			let e = expr::read(f, arc)?;
+			let l = f.u16()? as usize;
+			RawIInsn::Unless(e, l)
 		}
-	}
+		0x03 => {
+			let l = f.u16()? as usize;
+			RawIInsn::Goto(l)
+		}
+		0x04 => {
+			let e = expr::read(f, arc)?;
+			let mut cs = Vec::new();
+			for _ in 0..f.u16()? {
+				cs.push((f.u16()?, f.u16()? as usize));
+			}
+			let l = f.u16()? as usize;
+			RawIInsn::Switch(e, cs, l)
+		}
+		_ => {
+			f.seek(pos)?;
+			let i = Insn::read(f, arc)?;
+			RawIInsn::Insn(i)
+		}
+	};
+	Ok(insn)
 }
 
 pub fn write(f: &mut impl OutDelay, arc: &GameData, insns: &[FlatInsn]) -> Result<(), WriteError> {

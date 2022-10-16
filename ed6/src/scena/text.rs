@@ -383,6 +383,7 @@ fn val(f: &mut Context, a: I) {
 		I::ShopId(v)   => f.write(&format!("{v:?}")),
 		I::SoundId(v)  => f.write(&format!("{v:?}")),
 		I::TownId(v)   => f.write(&format!("{v:?}")),
+		I::VisId(v)    => f.write(&format!("{v:?}")),
 
 		I::Expr(v) => expr(f, v),
 		I::Fork(v) => {

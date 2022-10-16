@@ -28,7 +28,8 @@ ed6_macros::bytecode! {
 			0x01 => Show(),
 			0x02 => Set(i32, Pos2, file_ref(arc) -> String alias MapFileRef),
 		}),
-		Save(),
+		#[game(Fc)] Save(),
+		#[game(FcEvo)] SaveEvo(u8),
 		skip!(1),
 		EventBegin(u8),
 		EventEnd(u8),
@@ -195,29 +196,33 @@ ed6_macros::bytecode! {
 		}),
 		ReturnToTitle(u8),
 
-		#[game(Fc)]
-		PartySlot(u8 as Member, u8, u8),
-		#[game(Fc)]
-		_B6(u8),
-		#[game(Fc)]
-		_B7(u8 as Member, u8, u8), // Related to PartyAdd
-		#[game(Fc)]
-		_B8(u8 as Member), // Related to PartyRemove
-		#[game(Fc)]
-		ReadBook(u16 as ItemId, u16),
-		#[game(Fc)]
-		PartyHasSpell(u8 as Member, u16 as MagicId),
-		#[game(Fc)]
-		PartyHasSlot(u8 as Member, u8),
-		#[game(Fc)]
-		skip!(34),
-		#[game(Fc)]
-		SaveClearData(),
-		#[game(Fc)]
-		skip!(33),
+		#[game(Fc,FcEvo)] PartySlot(u8 as Member, u8, u8),
+		#[game(Fc,FcEvo)] _FcB6(u8),
+		#[game(Fc,FcEvo)] _FcB7(u8 as Member, u8, u8), // Related to PartyAdd
+		#[game(Fc,FcEvo)] _FcB8(u8 as Member), // Related to PartyRemove
+		#[game(Fc,FcEvo)] ReadBook(u16 as ItemId, u16),
+		#[game(Fc,FcEvo)] PartyHasSpell(u8 as Member, u16 as MagicId),
+		#[game(Fc,FcEvo)] PartyHasSlot(u8 as Member, u8),
+		#[game(Fc)] skip!(34),
+		#[game(Fc)] SaveClearData(),
+		#[game(Fc)] skip!(33),
 
-		#[game(FcEvo)]
-		skip!(75),
+		#[game(FcEvo)] skip!(10),
+		#[game(FcEvo)] VisLoad(u8 alias VisId, u16, u16, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u32 as Color, u8, u8, String),
+		#[game(FcEvo)] EvoC7(u8 alias VisId, u8, u32 as Color, u32, u32, u32),
+		#[game(FcEvo)] EvoC8(u8, u8 alias VisId, u8),
+		#[game(FcEvo)] skip!(19),
+		#[game(FcEvo)] EvoDC(),
+		#[game(FcEvo)] EvoDD(),
+		#[game(FcEvo)] EvoDE(),
+		#[game(FcEvo)] skip!(2),
+		#[game(FcEvo)] EvoE1(u8, Pos3),
+		#[game(FcEvo)] skip!(2),
+		#[game(FcEvo)] EvoCtp(String), // Refers to /data/map2/{}.ctp
+		#[game(FcEvo)] EvoVoiceLine(u16),
+		#[game(FcEvo)] EvoE8(text() -> Text),
+		#[game(FcEvo)] EvoE7(u8, u8),
+		#[game(FcEvo)] skip!(24),
 	]
 }
 

@@ -7,7 +7,7 @@ use super::{Backtrace, ensure};
 #[derive(Debug, thiserror::Error)]
 pub enum ReadError {
 	#[error("{source}")]
-	Io { #[from] source: std::io::Error, backtrace: Backtrace },
+	Lookup { #[from] source: crate::gamedata::LookupError, backtrace: Backtrace },
 
 	#[error("{source}")]
 	Read { #[from] source: hamu::read::Error, backtrace: Backtrace },

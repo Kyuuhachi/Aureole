@@ -6,6 +6,9 @@ pub enum Error {
 	#[error("{source}")]
 	Io { #[from] source: std::io::Error, backtrace: std::backtrace::Backtrace },
 
+	#[error("{source}")]
+	Lookup { #[from] source: crate::gamedata::LookupError, backtrace: std::backtrace::Backtrace },
+
 	#[error(transparent)]
 	Read { #[from] #[backtrace] source: crate::util::ReadError },
 

@@ -9,7 +9,7 @@ use mapr::Mmap;
 use hamu::read::coverage::*;
 use hamu::read::le::*;
 
-use crate::gamedata::GameDataImpl;
+use crate::gamedata::{GameDataImpl, LookupError};
 use crate::decompress;
 use crate::util;
 
@@ -140,23 +140,23 @@ impl Archive {
 	}
 
 
-	pub fn name(&self, index: usize) -> io::Result<&str> {
-		let ent = self.entries.get(index).ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-		Ok(ent.name.as_str())
+	pub fn name(&self, index: usize) -> Option<&str> {
+		let ent = self.entries.get(index)?;
+		Some(ent.name.as_str())
 	}
 
-	pub fn index(&self, name: &str) -> io::Result<usize> {
-		self.names.get(name).ok_or_else(|| io::Error::from(io::ErrorKind::NotFound)).copied()
+	pub fn index(&self, name: &str) -> Option<usize> {
+		self.names.get(name).copied()
 	}
 
-	pub fn entry(&self, name: &str) -> io::Result<&Entry> {
+	pub fn entry(&self, name: &str) -> Option<&Entry> {
 		let index = self.index(name)?;
-		Ok(self.entries.get(index).unwrap())
+		Some(self.entries.get(index).unwrap())
 	}
 
-	pub fn get(&self, name: &str) -> io::Result<&[u8]> {
+	pub fn get(&self, name: &str) -> Option<&[u8]> {
 		let ent = self.entry(name)?;
-		Ok(&self.dat[ent.range.clone()])
+		Some(&self.dat[ent.range.clone()])
 	}
 
 	pub fn entries(&self) -> &[Entry] {
@@ -194,12 +194,8 @@ impl Archives {
 		})
 	}
 
-	pub fn archive(&self, n: u16) -> io::Result<&Archive> {
-		self.archives.get(&n).ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))
-	}
-
-	pub fn get_decomp(&self, name: &str) -> std::io::Result<Vec<u8>> {
-		self.get(name).and_then(decompress::decompress)
+	pub fn archive(&self, n: u16) -> Option<&Archive> {
+		self.archives.get(&n)
 	}
 
 	pub fn archives(&self) -> impl Iterator<Item=(u8, &Archive)> {
@@ -208,31 +204,36 @@ impl Archives {
 }
 
 impl GameDataImpl for Archives {
-	fn name(&self, a: u32) -> io::Result<&str> {
+	fn name(&self, a: u32) -> Result<&str, LookupError> {
 		let index = (a & 0xFFFF) as u16;
 		let mut arch  = (a >> 16) as u16;
 		if arch == 0x1A && !self.archives.contains_key(&0x1A) {
 			arch = 0x1B;
 		}
-		self.archive(arch)?.name(index as usize)
+		let name = self.archive(arch).ok_or(a)?
+			.name(index as usize).ok_or(a)?;
+		Ok(name)
 	}
 
-	fn index(&self, name: &str) -> io::Result<u32> {
-		let mut arch = *self.names.get(name).ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-		let index = self.archive(arch)?.index(name)?;
+	fn index(&self, name: &str) -> Result<u32, LookupError> {
+		let mut arch = *self.names.get(name).ok_or(name)?;
+		let index = self.archive(arch).ok_or(name)?
+			.index(name).ok_or(name)?;
 		if arch == 0x1B {
 			arch = 0x1A;
 		}
 		Ok((index as u32) | (arch as u32) << 16)
 	}
 
-	fn get(&self, name: &str) -> io::Result<&[u8]> {
-		let arch = *self.names.get(name).ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-		self.archive(arch)?.get(name)
+	fn get(&self, name: &str) -> Result<&[u8], LookupError> {
+		let arch = *self.names.get(name).ok_or(name)?;
+		let data = self.archive(arch).ok_or(name)?
+			.get(name).ok_or(name)?;
+		Ok(data)
 	}
 
-	fn get_decomp(&self, name: &str) -> io::Result<Vec<u8>> {
-		self.get(name).and_then(decompress::decompress)
+	fn get_decomp(&self, name: &str) -> Result<Vec<u8>, LookupError> {
+		self.get(name).and_then(|a| decompress::decompress(a).map_err(|_| name.into()))
 	}
 
 	fn list(&self) -> Box<dyn Iterator<Item=&str> + '_> {

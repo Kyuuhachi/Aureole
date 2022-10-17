@@ -486,6 +486,7 @@ mod test {
 	macro_rules! tests {
 		($a:item) => {
 			#[test_case::test_case(InstructionSet::Fc, "../data/fc", "../data/fc.extract/01/", "._sn"; "fc")]
+			#[test_case::test_case(InstructionSet::FcEvo, "../data/fc", "../data/vita/extract/fc/gamedata/data/data/scenario/0/", ".bin"; "fc_evo")]
 			$a
 		}
 	}
@@ -510,7 +511,7 @@ mod test {
 			let data = std::fs::read(&path)?;
 
 			if let Err(err) = check_roundtrip_strict_data(&arc, &data, super::read, super::write) {
-				println!("{name}: {err}");
+				println!("{name}: {err:?}");
 				failed = true;
 			};
 		}

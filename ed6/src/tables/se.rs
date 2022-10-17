@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
-use crate::gamedata::GameData;
+use crate::gamedata::Lookup;
 use crate::util::*;
 
 newtype!(SoundId, u16);
@@ -16,13 +16,13 @@ pub struct Sound {
 	pub flag2: bool,
 }
 
-pub fn read(_arcs: &GameData, data: &[u8]) -> Result<BTreeMap<SoundId, Sound>, ReadError> {
+pub fn read(lookup: &dyn Lookup, data: &[u8]) -> Result<BTreeMap<SoundId, Sound>, ReadError> {
 	let mut f = Coverage::new(Bytes::new(data));
 	let mut table = BTreeMap::new();
 	while f.remaining() > 12 {
 		let id = SoundId(f.u16()?);
 		let unk = f.u16()?;
-		let file = _arcs.name(f.u32()?)?.to_owned();
+		let file = lookup.name(f.u32()?)?.to_owned();
 		let flag1 = cast_bool(f.u16()?)?;
 		let flag2 = cast_bool(f.u16()?)?;
 		table.insert(id, Sound { unk, file, flag1, flag2 });
@@ -38,12 +38,12 @@ pub fn read(_arcs: &GameData, data: &[u8]) -> Result<BTreeMap<SoundId, Sound>, R
 	Ok(table)
 }
 
-pub fn write(_arcs: &GameData, table: &BTreeMap<SoundId, Sound>) -> Result<Vec<u8>, WriteError> {
+pub fn write(lookup: &dyn Lookup, table: &BTreeMap<SoundId, Sound>) -> Result<Vec<u8>, WriteError> {
 	let mut out = OutBytes::new();
 	for (&id, &Sound { unk, ref file, flag1, flag2 }) in table {
 		out.u16(id.0);
 		out.u16(unk);
-		out.u32(_arcs.index(file)?);
+		out.u32(lookup.index(file)?);
 		out.u16(flag1.into());
 		out.u16(flag2.into());
 	}
@@ -58,14 +58,6 @@ pub fn write(_arcs: &GameData, table: &BTreeMap<SoundId, Sound>) -> Result<Vec<u
 }
 
 #[cfg(test)]
-#[cfg(feature="null")]
 mod test {
-	use crate::gamedata::GameData;
-	use crate::util::test::*;
-
-	#[test_case::test_case(&FC; "fc")]
-	fn roundtrip(arc: &GameData) -> Result<(), Error> {
-		check_roundtrip_strict(arc, "t_se._dt", super::read, super::write)?;
-		Ok(())
-	}
+	crate::util::test::simple_roundtrip_arc!("t_se._dt");
 }

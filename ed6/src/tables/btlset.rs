@@ -4,7 +4,7 @@ use std::rc::Rc;
 use enumflags2::*;
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
-use crate::gamedata::GameData;
+use crate::gamedata::Lookup;
 use crate::tables::bgmtbl::BgmId;
 use crate::util::*;
 
@@ -117,14 +117,14 @@ fn read_battlefield<'a>(
 }
 
 fn read_battles<'a>(
-	arc: &GameData,
+	lookup: &dyn Lookup,
 	mut f: impl In<'a> + Clone,
 ) -> Result<BTreeMap<BattleId, Battle>, ReadError> {
 	let mut placements = BTreeMap::new();
 	let mut battlefields = BTreeMap::new();
 	let mut at_rolls = BTreeMap::new();
 
-	let fileref = |a| if a == 0 { Ok(None) } else { arc.name(a).map(|a| Some(a.to_owned())) };
+	let fileref = |a| if a == 0 { Ok(None) } else { lookup.name(a).map(|a| Some(a.to_owned())) };
 
 	let mut table = BTreeMap::new();
 
@@ -195,12 +195,12 @@ fn read_battles<'a>(
 }
 
 fn read_auto_battles<'a>(
-	arc: &GameData,
+	lookup: &dyn Lookup,
 	mut f: impl In<'a> + Clone,
 ) -> Result<BTreeMap<BattleId, AutoBattle>, ReadError> {
 	let mut battlefields = BTreeMap::new();
 
-	let fileref = |a| if a == 0 { Ok(None) } else { arc.name(a).map(|a| Some(a.to_owned())) };
+	let fileref = |a| if a == 0 { Ok(None) } else { lookup.name(a).map(|a| Some(a.to_owned())) };
 
 	let mut table = BTreeMap::new();
 
@@ -237,11 +237,11 @@ fn read_auto_battles<'a>(
 }
 
 #[allow(clippy::type_complexity)]
-pub fn read(arc: &GameData, data: &[u8]) -> Result<(BTreeMap<BattleId, Battle>, BTreeMap<BattleId, AutoBattle>), ReadError> {
+pub fn read(lookup: &dyn Lookup, data: &[u8]) -> Result<(BTreeMap<BattleId, Battle>, BTreeMap<BattleId, AutoBattle>), ReadError> {
 	let mut f = Coverage::new(Bytes::new(data));
 
-	let battles = read_battles(arc, f.ptr()?)?;
-	let auto_battles = read_auto_battles(arc, f.ptr()?)?;
+	let battles = read_battles(lookup, f.ptr()?)?;
+	let auto_battles = read_auto_battles(lookup, f.ptr()?)?;
 
 	// f.assert_covered()?; // Does not have full coverage
 	Ok((battles, auto_battles))
@@ -250,14 +250,12 @@ pub fn read(arc: &GameData, data: &[u8]) -> Result<(BTreeMap<BattleId, Battle>, 
 // I'll skip the writing for now.
 
 #[cfg(test)]
-#[cfg(feature="null")]
 mod test {
-	use crate::gamedata::GameData;
 	use crate::util::test::*;
 
 	#[test_case::test_case(&FC; "fc")]
-	fn parse(arc: &GameData) -> Result<(), Error> {
-		let data = arc.get_decomp("t_btlset._dt")?;
+	fn parse(arc: &crate::archive::Archives) -> Result<(), Error> {
+		let data = arc.get_decomp("t_btlset._dt").unwrap();
 		let _parsed = super::read(arc, &data)?;
 		Ok(())
 	}

@@ -626,9 +626,12 @@ fn gather_arm(items: &mut Vec<(Span, Item)>, arg_types: &mut BTreeMap<Ident, Tok
 					let name = &a.name;
 					let mut args = vec![q!{a=> __f }];
 					for e in &a.args {
-						args.push(q!{e=>
-							#[allow(clippy::needless_borrow)] &#e
-						})
+						if item.vars.is_empty() {
+							args.push(q!{e=> #e })
+						} else {
+							let v = item.vars.iter();
+							args.push(q!{e=> #[allow(clippy::let_and_return)] { #(let #v = &#v;)* #e } })
+						}
 					}
 					q!{a=> #name::read(#(#args),*)? }
 				},

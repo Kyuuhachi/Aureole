@@ -40,7 +40,7 @@ impl Default for Context {
 }
 
 impl Context {
-	fn write(&mut self, arg: &str) {
+	pub fn write(&mut self, arg: &str) {
 		assert!(!arg.contains('\n'));
 		assert!(!arg.contains('\t'));
 		if self.is_line {
@@ -52,17 +52,17 @@ impl Context {
 		self.is_line = false
 	}
 
-	fn line(&mut self) {
+	pub fn line(&mut self) {
 		self.output.push('\n');
 		self.is_line = true;
 	}
 
-	fn writeln(&mut self, arg: &str) {
+	pub fn writeln(&mut self, arg: &str) {
 		self.write(arg);
 		self.line();
 	}
 
-	fn indent(&mut self, body: impl FnOnce(&mut Self)) {
+	pub fn indent(&mut self, body: impl FnOnce(&mut Self)) {
 		self.indent += 1;
 		body(self);
 		self.indent -= 1;

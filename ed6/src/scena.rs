@@ -1,7 +1,7 @@
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
-use crate::gamedata::GameData;
+use crate::gamedata::Lookup;
 use crate::tables::bgmtbl::BgmId;
 use crate::tables::btlset::BattleId;
 use crate::tables::town::TownId;
@@ -191,7 +191,7 @@ pub trait OutExt2: Out {
 }
 impl<T: Out> OutExt2 for T {}
 
-pub fn read(arc: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
+pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Result<Scena, ReadError> {
 	let mut f = Coverage::new(Bytes::new(data));
 
 	let path = f.sized_string::<10>()?;
@@ -200,7 +200,7 @@ pub fn read(arc: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	let bgm = BgmId(f.u8()?);
 	f.check_u8(0)?;
 	let item = FuncRef(f.u16()?, f.u16()?);
-	let includes = f.multiple::<8, _>(&[0xFF;4], |g| Ok(arc.name(g.u32()?)?.to_owned()))?;
+	let includes = f.multiple::<8, _>(&[0xFF;4], |g| Ok(lookup.name(g.u32()?)?.to_owned()))?;
 	f.check_u16(0)?;
 
 	let head_end = f.clone().u16()? as usize;
@@ -222,11 +222,11 @@ pub fn read(arc: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	ensure!(strings.string()? == "@FileName", "expected @FileName");
 
 	let (mut g, n) = ch;
-	let ch = list(n as usize, || Ok(arc.name(g.u32()?)?.to_owned())).strict()?;
+	let ch = list(n as usize, || Ok(lookup.name(g.u32()?)?.to_owned())).strict()?;
 	g.check_u8(0xFF)?;
 
 	let (mut g, n) = cp;
-	let cp = list(n as usize, || Ok(arc.name(g.u32()?)?.to_owned())).strict()?;
+	let cp = list(n as usize, || Ok(lookup.name(g.u32()?)?.to_owned())).strict()?;
 	g.check_u8(0xFF)?;
 
 	let (mut g, n) = npcs;
@@ -307,7 +307,7 @@ pub fn read(arc: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	let starts = func_table.iter().copied();
 	let ends = func_table.iter().copied().skip(1).chain(std::iter::once(code_end));
 	for (start, end) in starts.zip(ends) {
-		functions.push(code::read(&mut f.clone().at(start)?, arc, end)?);
+		functions.push(code::read(&mut f.clone().at(start)?, iset, lookup, end)?);
 	}
 
 	f.assert_covered()?;
@@ -325,7 +325,7 @@ pub fn read(arc: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	})
 }
 
-pub fn write(arc: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
+pub fn write(iset: code::InstructionSet, lookup: &dyn Lookup, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	let &Scena {
 		ref path,
 		ref map,
@@ -353,7 +353,7 @@ pub fn write(arc: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	f.u8(bgm.0);
 	f.u8(0);
 	f.u16(item.0); f.u16(item.1);
-	f.multiple::<8, _>(&[0xFF; 4], includes, |g, a| { g.u32(arc.index(a)?); Ok(()) }).strict()?;
+	f.multiple::<8, _>(&[0xFF; 4], includes, |g, a| { g.u32(lookup.index(a)?); Ok(()) }).strict()?;
 	f.u16(0);
 
 	let (l_ch, l_ch_) = Label::new();
@@ -391,11 +391,11 @@ pub fn write(arc: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	f.u16(cast(functions.len() * 2)?);
 
 	g.label(l_ch_);
-	for ch in ch { g.u32(arc.index(ch)?); }
+	for ch in ch { g.u32(lookup.index(ch)?); }
 	g.u8(0xFF);
 
 	g.label(l_cp_);
-	for cp in cp { g.u32(arc.index(cp)?); }
+	for cp in cp { g.u32(lookup.index(cp)?); }
 	g.u8(0xFF);
 
 	g.label(l_npcs_);
@@ -448,7 +448,7 @@ pub fn write(arc: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	g.label(l_code_start_);
 	for func in functions.iter() {
 		func_table.delay_u16(g.here());
-		code::write(&mut g, arc, func)?;
+		code::write(&mut g, iset, lookup, func)?;
 	}
 
 	for &Entry {
@@ -478,8 +478,7 @@ pub fn write(arc: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 
 #[cfg(test)]
 mod test {
-	use crate::gamedata::GameData;
-	use crate::gamedata::InstructionSet;
+	use super::code::InstructionSet;
 	use crate::archive::Archives;
 	use crate::util::test::*;
 
@@ -493,7 +492,7 @@ mod test {
 
 	tests! {
 	fn roundtrip(iset: InstructionSet, datapath: &str, scenapath: &str, suffix: &str) -> Result<(), Error> {
-		let arc = GameData::new(Archives::new(datapath).unwrap(), iset);
+		let arc = Archives::new(datapath).unwrap();
 		let mut failed = false;
 
 		let mut paths = std::fs::read_dir(scenapath)?
@@ -510,7 +509,11 @@ mod test {
 
 			let data = std::fs::read(&path)?;
 
-			if let Err(err) = check_roundtrip_strict(&data, |a| super::read(&arc, a), |a| super::write(&arc, a)) {
+			if let Err(err) = check_roundtrip_strict(
+				&data,
+				|a| super::read(iset, &arc, a),
+				|a| super::write(iset, &arc, a),
+			) {
 				println!("{name}: {err:?}");
 				failed = true;
 			};
@@ -524,7 +527,7 @@ mod test {
 
 	tests! {
 	fn decompile(iset: InstructionSet, datapath: &str, scenapath: &str, suffix: &str) -> Result<(), Error> {
-		let arc = GameData::new(Archives::new(datapath).unwrap(), iset);
+		let arc = Archives::new(datapath).unwrap();
 		let mut failed = false;
 
 		let mut paths = std::fs::read_dir(scenapath)?
@@ -541,7 +544,7 @@ mod test {
 
 			let data = std::fs::read(&path)?;
 
-			let scena = super::read(&arc, &data)?;
+			let scena = super::read(iset, &arc, &data)?;
 			for (i, func) in scena.functions.iter().enumerate() {
 				let decomp = super::code::decompile::decompile(func).map_err(|e| format!("{name}:{i}: {e}"))?;
 				let recomp = super::code::decompile::recompile(&decomp).map_err(|e| format!("{name}:{i}: {e}"))?;

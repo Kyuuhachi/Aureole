@@ -5,7 +5,7 @@ use hamu::read::le::*;
 use hamu::write::le::*;
 use hamu::write::Label as HLabel;
 use hamu::write::LabelDef as HLabelDef;
-use crate::gamedata::GameData;
+use crate::gamedata::Lookup;
 use crate::tables::{bgmtbl::BgmId, Element};
 use crate::tables::btlset::BattleId;
 use crate::tables::item::ItemId;
@@ -23,6 +23,15 @@ use super::{
 mod insn;
 pub use insn::*;
 pub mod decompile;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum InstructionSet {
+	Fc, FcEvo,
+	Sc, ScEvo,
+	Tc, TcEvo, // It's called 3rd, I know, but that's not a valid identifier
+	Zero, ZeroEvo,
+	Azure, AzureEvo,
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Label(pub usize);
@@ -60,11 +69,11 @@ enum RawOInsn<'a> {
 	Label(HLabelDef),
 }
 
-pub fn read<'a>(f: &mut impl In<'a>, arc: &GameData, end: usize) -> Result<Vec<FlatInsn>, ReadError> {
+pub fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet, lookup: &dyn Lookup, end: usize) -> Result<Vec<FlatInsn>, ReadError> {
 	let mut insns = Vec::new();
 	while f.pos() < end {
 		let pos = f.pos();
-		match read_raw_insn(f, arc) {
+		match read_raw_insn(f, iset, lookup) {
 			Ok(insn) => insns.push((pos, insn)),
 			Err(err) => {
 				let start = pos.saturating_sub(48*2);
@@ -121,11 +130,11 @@ pub fn read<'a>(f: &mut impl In<'a>, arc: &GameData, end: usize) -> Result<Vec<F
 	Ok(insns2)
 }
 
-fn read_raw_insn<'a>(f: &mut impl In<'a>, arc: &GameData) -> Result<RawIInsn, ReadError> {
+fn read_raw_insn<'a>(f: &mut impl In<'a>, iset: InstructionSet, lookup: &dyn Lookup) -> Result<RawIInsn, ReadError> {
 	let pos = f.pos();
 	let insn = match f.u8()? {
 		0x02 => {
-			let e = expr::read(f, arc)?;
+			let e = expr::read(f, iset, lookup)?;
 			let l = f.u16()? as usize;
 			RawIInsn::Unless(e, l)
 		}
@@ -134,7 +143,7 @@ fn read_raw_insn<'a>(f: &mut impl In<'a>, arc: &GameData) -> Result<RawIInsn, Re
 			RawIInsn::Goto(l)
 		}
 		0x04 => {
-			let e = expr::read(f, arc)?;
+			let e = expr::read(f, iset, lookup)?;
 			let mut cs = Vec::new();
 			for _ in 0..f.u16()? {
 				cs.push((f.u16()?, f.u16()? as usize));
@@ -144,14 +153,14 @@ fn read_raw_insn<'a>(f: &mut impl In<'a>, arc: &GameData) -> Result<RawIInsn, Re
 		}
 		_ => {
 			f.seek(pos)?;
-			let i = Insn::read(f, arc)?;
+			let i = Insn::read(f, iset, lookup)?;
 			RawIInsn::Insn(i)
 		}
 	};
 	Ok(insn)
 }
 
-pub fn write(f: &mut impl OutDelay, arc: &GameData, insns: &[FlatInsn]) -> Result<(), WriteError> {
+pub fn write(f: &mut impl OutDelay, iset: InstructionSet, lookup: &dyn Lookup, insns: &[FlatInsn]) -> Result<(), WriteError> {
 	let mut labels = HashMap::new();
 	let mut labeldefs = HashMap::new();
 	let mut label = |k| {
@@ -182,7 +191,7 @@ pub fn write(f: &mut impl OutDelay, arc: &GameData, insns: &[FlatInsn]) -> Resul
 	}
 
 	for insn in insns {
-		write_raw_insn(f, arc, match insn {
+		write_raw_insn(f, iset, lookup, match insn {
 			FlatInsn::Unless(e, l) => RawOInsn::Unless(e, labels[l].clone()),
 			FlatInsn::Goto(l) => RawOInsn::Goto(labels[l].clone()),
 			FlatInsn::Switch(e, cs, l) => RawOInsn::Switch(e, cs.iter().map(|(a, l)| (*a, labels[l].clone())).collect(), labels[l].clone()),
@@ -196,11 +205,11 @@ pub fn write(f: &mut impl OutDelay, arc: &GameData, insns: &[FlatInsn]) -> Resul
 	Ok(())
 }
 
-fn write_raw_insn(f: &mut impl OutDelay, arc: &GameData, insn: RawOInsn) -> Result<(), WriteError> {
+fn write_raw_insn(f: &mut impl OutDelay, iset: InstructionSet, lookup: &dyn Lookup, insn: RawOInsn) -> Result<(), WriteError> {
 	match insn {
 		RawOInsn::Unless(e, l) => {
 			f.u8(0x02);
-			expr::write(f, arc, e)?;
+			expr::write(f, iset, lookup, e)?;
 			f.delay_u16(l);
 		},
 		RawOInsn::Goto(l) => {
@@ -209,7 +218,7 @@ fn write_raw_insn(f: &mut impl OutDelay, arc: &GameData, insn: RawOInsn) -> Resu
 		},
 		RawOInsn::Switch(e, cs, l) => {
 			f.u8(0x04);
-			expr::write(f, arc, e)?;
+			expr::write(f, iset, lookup, e)?;
 			f.u16(cast(cs.len())?);
 			for (k, v) in cs {
 				f.u16(k);
@@ -218,7 +227,7 @@ fn write_raw_insn(f: &mut impl OutDelay, arc: &GameData, insn: RawOInsn) -> Resu
 			f.delay_u16(l);
 		}
 		RawOInsn::Insn(i) => {
-			Insn::write(f, arc, i)?
+			Insn::write(f, iset, lookup, i)?
 		}
 		RawOInsn::Label(l) => {
 			f.label(l)
@@ -284,7 +293,7 @@ pub enum Expr {
 
 mod expr {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>, arc: &GameData) -> Result<Expr, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet, lookup: &dyn Lookup) -> Result<Expr, ReadError> {
 		let mut stack = Vec::new();
 		loop {
 			let op = f.u8()?;
@@ -299,7 +308,7 @@ mod expr {
 				match op {
 					0x00 => Expr::Const(f.u32()?),
 					0x01 => break,
-					0x1C => Expr::Insn(Box::new(Insn::read(f, arc)?)),
+					0x1C => Expr::Insn(Box::new(Insn::read(f, iset, lookup)?)),
 					0x1E => Expr::Flag(Flag(f.u16()?)),
 					0x1F => Expr::Var(Var(f.u16()?)),
 					0x20 => Expr::Attr(Attr(f.u8()?)),
@@ -314,21 +323,21 @@ mod expr {
 		Ok(stack.pop().unwrap())
 	}
 
-	pub(super) fn write(f: &mut impl OutDelay, arc: &GameData, v: &Expr) -> Result<(), WriteError> {
-		fn write_node(f: &mut impl OutDelay, arc: &GameData, v: &Expr) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl OutDelay, iset: InstructionSet, lookup: &dyn Lookup, v: &Expr) -> Result<(), WriteError> {
+		fn write_node(f: &mut impl OutDelay, iset: InstructionSet, lookup: &dyn Lookup, v: &Expr) -> Result<(), WriteError> {
 			match *v {
 				Expr::Binop(op, ref a, ref b) => {
-					write_node(f, arc, a)?;
-					write_node(f, arc, b)?;
+					write_node(f, iset, lookup, a)?;
+					write_node(f, iset, lookup, b)?;
 					f.u8(op.into());
 				},
 				Expr::Unop(op, ref v) => {
-					write_node(f, arc, v)?;
+					write_node(f, iset, lookup, v)?;
 					f.u8(op.into());
 				},
 				Expr::Const(n)       => { f.u8(0x00); f.u32(n); },
 				// 0x01 handled below
-				Expr::Insn(ref insn) => { f.u8(0x1C); Insn::write(f, arc, insn)?; },
+				Expr::Insn(ref insn) => { f.u8(0x1C); Insn::write(f, iset, lookup, insn)?; },
 				Expr::Flag(v)        => { f.u8(0x1E); f.u16(v.0); },
 				Expr::Var(v)         => { f.u8(0x1F); f.u16(v.0); },
 				Expr::Attr(v)        => { f.u8(0x20); f.u8(v.0); },
@@ -337,7 +346,7 @@ mod expr {
 			}
 			Ok(())
 		}
-		write_node(f, arc, v)?;
+		write_node(f, iset, lookup, v)?;
 		f.u8(0x01);
 		Ok(())
 	}

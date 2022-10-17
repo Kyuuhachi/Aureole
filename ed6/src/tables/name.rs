@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
-use crate::gamedata::GameData;
+use crate::gamedata::Lookup;
 use crate::util::*;
 
 newtype!(NameId, u16);
@@ -19,20 +19,20 @@ pub struct Name {
 	pub name: String,
 }
 
-pub fn read(arc: &GameData, data: &[u8]) -> Result<BTreeMap<NameId, Name>, ReadError> {
+pub fn read(lookup: &dyn Lookup, data: &[u8]) -> Result<BTreeMap<NameId, Name>, ReadError> {
 	let mut f = Coverage::new(Bytes::new(data));
 	let n = f.clone().u16()? / 2;
 	let mut table = BTreeMap::new();
-	let fileref = |a| if a == 0 { Ok(None) } else { arc.name(a).map(|a| Some(a.to_owned())) };
+	let fileref = |a| if a == 0 { Ok(None) } else { lookup.name(a).map(|a| Some(a.to_owned())) };
 
 	for _ in 0..n-1 {
 		let mut g = f.ptr()?;
 		let id = NameId(g.u16()?);
 		g.check_u16(0)?;
-		let ch1 = arc.name(g.u32()?)?.to_owned();
-		let ch2 = arc.name(g.u32()?)?.to_owned();
-		let cp1 = arc.name(g.u32()?)?.to_owned();
-		let cp2 = arc.name(g.u32()?)?.to_owned();
+		let ch1 = lookup.name(g.u32()?)?.to_owned();
+		let ch2 = lookup.name(g.u32()?)?.to_owned();
+		let cp1 = lookup.name(g.u32()?)?.to_owned();
+		let cp2 = lookup.name(g.u32()?)?.to_owned();
 		let ms1 = fileref(g.u32()?)?;
 		let ms2 = fileref(g.u32()?)?;
 		let name = g.ptr()?.string()?;
@@ -49,18 +49,18 @@ pub fn read(arc: &GameData, data: &[u8]) -> Result<BTreeMap<NameId, Name>, ReadE
 	Ok(table)
 }
 
-pub fn write(arc: &GameData, table: &BTreeMap<NameId, Name>) -> Result<Vec<u8>, WriteError> {
+pub fn write(lookup: &dyn Lookup, table: &BTreeMap<NameId, Name>) -> Result<Vec<u8>, WriteError> {
 	let mut f = OutBytes::new();
 	let mut g = OutBytes::new();
-	let fileref = |a| Option::map_or(a, Ok(0), |a| arc.index(a));
+	let fileref = |a| Option::map_or(a, Ok(0), |a| lookup.index(a));
 	for (&id, Name { ch1, ch2, cp1, cp2, ms1, ms2, name }) in table {
 		f.delay_u16(g.here());
 		g.u16(id.0);
 		g.u16(0);
-		g.u32(arc.index(ch1)?);
-		g.u32(arc.index(ch2)?);
-		g.u32(arc.index(cp1)?);
-		g.u32(arc.index(cp2)?);
+		g.u32(lookup.index(ch1)?);
+		g.u32(lookup.index(ch2)?);
+		g.u32(lookup.index(cp1)?);
+		g.u32(lookup.index(cp2)?);
 		g.u32(fileref(ms1.as_deref())?);
 		g.u32(fileref(ms2.as_deref())?);
 		let (l, l_) = Label::new();
@@ -81,14 +81,6 @@ pub fn write(arc: &GameData, table: &BTreeMap<NameId, Name>) -> Result<Vec<u8>, 
 }
 
 #[cfg(test)]
-#[cfg(feature="null")]
 mod test {
-	use crate::gamedata::GameData;
-	use crate::util::test::*;
-
-	#[test_case::test_case(&FC; "fc")]
-	fn roundtrip(arc: &GameData) -> Result<(), Error> {
-		check_roundtrip_strict(arc, "t_name._dt", super::read, super::write)?;
-		Ok(())
-	}
+	crate::util::test::simple_roundtrip_arc!("t_name._dt");
 }

@@ -1,14 +1,14 @@
 use super::*;
 
 ed6_macros::bytecode! {
-	(arc: &GameData)
-	#[games(arc.insn_set() => crate::gamedata::InstructionSet::{Fc, FcEvo})]
+	(iset: InstructionSet, lookup: &dyn Lookup)
+	#[games(iset => InstructionSet::{Fc, FcEvo})]
 	[
 		skip!(1), // null
 		Return(), // [return]
 		skip!(3), // control flow
 		Call(func_ref() -> FuncRef), // [call]
-		NewScene(file_ref(arc) -> String alias ScenaFileRef, u8, u8, u8, u8), // [new_scene] (last two args are unaccounted for)
+		NewScene(file_ref(lookup) -> String alias ScenaFileRef, u8, u8, u8, u8), // [new_scene] (last two args are unaccounted for)
 		skip!(1),
 		Sleep(u32 alias Time), // [delay]
 		SystemFlagsSet(u32 as SystemFlags), // [set_system_flag]
@@ -26,7 +26,7 @@ ed6_macros::bytecode! {
 		Map(match {
 			0x00 => Hide(),
 			0x01 => Show(),
-			0x02 => Set(i32, Pos2, file_ref(arc) -> String alias MapFileRef),
+			0x02 => Set(i32, Pos2, file_ref(lookup) -> String alias MapFileRef),
 		}),
 		#[game(Fc)] Save(),
 		#[game(FcEvo)] SaveEvo(u8),
@@ -82,19 +82,19 @@ ed6_macros::bytecode! {
 		PartyPosition(u8 as Member),
 		ForkFunc(u16 as CharId, u8 alias ForkId, func_ref() -> FuncRef), // [execute]
 		ForkQuit(u16 as CharId, u8 alias ForkId), // [terminate]
-		Fork(u16 as CharId, u8 alias ForkId, u8, fork(arc) -> Vec<Insn> alias Fork), // [preset]? In t0311, only used with a single instruction inside
-		ForkLoop(u16 as CharId, u8 alias ForkId, u8, fork_loop(arc) -> Vec<Insn> alias Fork),
+		Fork(u16 as CharId, u8 alias ForkId, u8, fork(iset, lookup) -> Vec<Insn> alias Fork), // [preset]? In t0311, only used with a single instruction inside
+		ForkLoop(u16 as CharId, u8 alias ForkId, u8, fork_loop(iset, lookup) -> Vec<Insn> alias Fork),
 		ForkAwait(u16 as CharId, u8 alias ForkId, u8), // [wait_terminate]
 		NextFrame(), // [next_frame]
 		Event(func_ref() -> FuncRef), // [event] Not sure how this differs from Call
 		_Char4A(u16 as CharId, u8), // Argument is almost always 255, but sometimes 0, and in a single case 1
 		_Char4B(u16 as CharId, u8),
 		skip!(1),
-		Var(u16 as Var, expr(arc) -> Expr),
+		Var(u16 as Var, expr(iset, lookup) -> Expr),
 		skip!(1),
-		Attr(u8 as Attr, expr(arc) -> Expr), // [system[n]]
+		Attr(u8 as Attr, expr(iset, lookup) -> Expr), // [system[n]]
 		skip!(1),
-		CharAttr(char_attr() -> CharAttr, expr(arc) -> Expr),
+		CharAttr(char_attr() -> CharAttr, expr(iset, lookup) -> Expr),
 		TextStart(u16 as CharId), // [talk_start]
 		TextEnd(u16 as CharId), // [talk_end]
 		TextMessage(text() -> Text), // [mes]
@@ -184,7 +184,7 @@ ed6_macros::bytecode! {
 		ShopOpen(u8 as ShopId),
 		skip!(2),
 		RecipeLearn(u16), // TODO check type
-		ImageShow(file_ref(arc) -> String alias VisFileRef, u16, u16, u32 alias Time), // [portrait_open]
+		ImageShow(file_ref(lookup) -> String alias VisFileRef, u16, u16, u32 alias Time), // [portrait_open]
 		ImageHide(u32 alias Time), // [portrait_close]
 		QuestSubmit(u8 as ShopId, u16 as QuestId),
 		_ObjB0(u16 alias ObjectId, u8), // Used along with 6F, 70, and 73 during T0700#11
@@ -208,9 +208,12 @@ ed6_macros::bytecode! {
 		#[game(Fc)] skip!(33),
 
 		#[game(FcEvo)] skip!(10),
-		#[game(FcEvo)] EvoVisC6(u8 alias VisId, u16, u16, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u32 as Color, u8, u8, String),
+		#[game(FcEvo)] EvoVisLoad(u8 alias VisId, u16, u16, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u32 as Color, u8, u8, String),
 		#[game(FcEvo)] EvoVisC7(u8 alias VisId, u8, u32 as Color, u32, u32, u32),
-		#[game(FcEvo)] EvoVisC8(u8, u8 alias VisId, u8),
+		#[game(FcEvo)] EvoVis(match {
+			0 => C8(u8 alias VisId, u8),
+			1 => Close(u8 alias VisId, u8),
+		}),
 		#[game(FcEvo)] skip!(19),
 		#[game(FcEvo)] EvoDC(),
 		#[game(FcEvo)] EvoDD(),
@@ -250,25 +253,25 @@ mod quest_list {
 
 mod fork {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>, arc: &GameData) -> Result<Vec<Insn>, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet, lookup: &dyn Lookup) -> Result<Vec<Insn>, ReadError> {
 		let len = f.u8()? as usize;
 		let pos = f.pos();
 		let mut insns = Vec::new();
 		while f.pos() < pos+len {
-			insns.push(Insn::read(f, arc)?);
+			insns.push(Insn::read(f, iset, lookup)?);
 		}
 		ensure!(f.pos() == pos+len, "overshot while reading fork");
 		f.check_u8(0)?;
 		Ok(insns)
 	}
 
-	pub(super) fn write(f: &mut impl OutDelay, arc: &GameData, v: &[Insn]) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl OutDelay, iset: InstructionSet, lookup: &dyn Lookup, v: &[Insn]) -> Result<(), WriteError> {
 		let (l1, l1_) = HLabel::new();
 		let (l2, l2_) = HLabel::new();
 		f.delay(move |l| Ok(u8::to_le_bytes(hamu::write::cast_usize(l(l2)? - l(l1)?)?)));
 		f.label(l1_);
 		for i in v {
-			Insn::write(f, arc, i)?;
+			Insn::write(f, iset, lookup, i)?;
 		}
 		f.label(l2_);
 		f.u8(0);
@@ -278,31 +281,31 @@ mod fork {
 
 mod fork_loop {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>, arc: &GameData) -> Result<Vec<Insn>, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet, lookup: &dyn Lookup) -> Result<Vec<Insn>, ReadError> {
 		let len = f.u8()? as usize;
 		let pos = f.pos();
 		let mut insns = Vec::new();
 		while f.pos() < pos+len {
-			insns.push(Insn::read(f, arc)?);
+			insns.push(Insn::read(f, iset, lookup)?);
 		}
 		ensure!(f.pos() == pos+len, "overshot while reading fork loop");
-		ensure!(read_raw_insn(f, arc)? == RawIInsn::Insn(Insn::NextFrame()), "invalid loop");
-		ensure!(read_raw_insn(f, arc)? == RawIInsn::Goto(pos), "invalid loop");
+		ensure!(read_raw_insn(f, iset, lookup)? == RawIInsn::Insn(Insn::NextFrame()), "invalid loop");
+		ensure!(read_raw_insn(f, iset, lookup)? == RawIInsn::Goto(pos), "invalid loop");
 		Ok(insns)
 	}
 
-	pub(super) fn write(f: &mut impl OutDelay, arc: &GameData, v: &[Insn]) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl OutDelay, iset: InstructionSet, lookup: &dyn Lookup, v: &[Insn]) -> Result<(), WriteError> {
 		let (l1, l1_) = HLabel::new();
 		let (l2, l2_) = HLabel::new();
 		let l1c = l1.clone();
 		f.delay(|l| Ok(u8::to_le_bytes(hamu::write::cast_usize(l(l2)? - l(l1)?)?)));
 		f.label(l1_);
 		for i in v {
-			Insn::write(f, arc, i)?;
+			Insn::write(f, iset, lookup, i)?;
 		}
 		f.label(l2_);
-		write_raw_insn(f, arc, RawOInsn::Insn(&Insn::NextFrame()))?;
-		write_raw_insn(f, arc, RawOInsn::Goto(l1c))?;
+		write_raw_insn(f, iset, lookup, RawOInsn::Insn(&Insn::NextFrame()))?;
+		write_raw_insn(f, iset, lookup, RawOInsn::Goto(l1c))?;
 		Ok(())
 	}
 }
@@ -378,12 +381,12 @@ pub(super) mod char_attr {
 
 mod file_ref {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>, arc: &GameData) -> Result<String, ReadError> {
-		Ok(arc.name(f.u32()?)?.to_owned())
+	pub(super) fn read<'a>(f: &mut impl In<'a>, lookup: &dyn Lookup) -> Result<String, ReadError> {
+		Ok(lookup.name(f.u32()?)?.to_owned())
 	}
 
-	pub(super) fn write(f: &mut impl Out, arc: &GameData, v: &str) -> Result<(), WriteError> {
-		f.u32(arc.index(v)?);
+	pub(super) fn write(f: &mut impl Out, lookup: &dyn Lookup, v: &str) -> Result<(), WriteError> {
+		f.u32(lookup.index(v)?);
 		Ok(())
 	}
 }

@@ -1,4 +1,3 @@
-use crate::gamedata::{GameData, InstructionSet};
 use crate::archive::Archives;
 
 #[derive(Debug, thiserror::Error)]
@@ -29,8 +28,7 @@ impl std::convert::From<String> for Error {
 }
 
 lazy_static::lazy_static! {
-	pub static ref FC: GameData
-		= GameData::new(Archives::new("../data/fc").unwrap(), InstructionSet::Fc);
+	pub static ref FC: Archives = Archives::new("../data/fc").unwrap();
 }
 
 pub fn check_equal<T: PartialEq + std::fmt::Debug>(a: &T, b: &T) -> Result<(), Error> {
@@ -92,3 +90,35 @@ pub fn check_roundtrip_strict<T>(
 	}
 	Ok(val)
 }
+
+#[macro_export]
+macro_rules! __simple_roundtrip {
+	($name:literal) => {
+		#[test_case::test_case(&$crate::util::test::FC; "fc")]
+		fn roundtrip(arc: &$crate::archive::Archives) -> Result<(), $crate::util::test::Error> {
+			$crate::util::test::check_roundtrip_strict(
+				&arc.get_decomp($name).unwrap(),
+				super::read,
+				|a| super::write(a),
+			)?;
+			Ok(())
+		}
+	};
+}
+pub use __simple_roundtrip as simple_roundtrip;
+
+#[macro_export]
+macro_rules! __simple_roundtrip_arc {
+	($name:literal) => {
+		#[test_case::test_case(&$crate::util::test::FC; "fc")]
+		fn roundtrip(arc: &$crate::archive::Archives) -> Result<(), $crate::util::test::Error> {
+			$crate::util::test::check_roundtrip_strict(
+				&arc.get_decomp($name).unwrap(),
+				|a| super::read(arc, a),
+				|a| super::write(arc, a),
+			)?;
+			Ok(())
+		}
+	};
+}
+pub use __simple_roundtrip_arc as simple_roundtrip_arc;

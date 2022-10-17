@@ -1,7 +1,6 @@
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
-use crate::gamedata::GameData;
 use crate::util::*;
 
 newtype!(TownId, u16);
@@ -24,7 +23,7 @@ pub enum TownType {
 	Cafe       = 8, // Cafe             飲食・喫茶
 }
 
-pub fn read(_arcs: &GameData, t_town: &[u8]) -> Result<Vec<Town>, ReadError> {
+pub fn read(t_town: &[u8]) -> Result<Vec<Town>, ReadError> {
 	let mut f = Coverage::new(Bytes::new(t_town));
 	let n = f.u16()?;
 	let mut names = Vec::with_capacity(n as usize);
@@ -43,7 +42,7 @@ pub fn read(_arcs: &GameData, t_town: &[u8]) -> Result<Vec<Town>, ReadError> {
 	Ok(names)
 }
 
-pub fn write(_arcs: &GameData, towns: &Vec<Town>) -> Result<Vec<u8>, WriteError> {
+pub fn write(towns: &[Town]) -> Result<Vec<u8>, WriteError> {
 	let mut f = OutBytes::new();
 	let mut g = OutBytes::new();
 	f.u16(cast(towns.len())?);
@@ -60,14 +59,12 @@ pub fn write(_arcs: &GameData, towns: &Vec<Town>) -> Result<Vec<u8>, WriteError>
 }
 
 #[cfg(test)]
-#[cfg(feature="null")]
 mod test {
-	use crate::gamedata::GameData;
 	use crate::util::test::*;
 
 	#[test_case::test_case(&FC; "fc")]
-	fn roundtrip(arc: &GameData) -> Result<(), Error> {
-		check_roundtrip(arc, "t_town._dt", super::read, super::write)?;
+	fn roundtrip(arc: &crate::archive::Archives) -> Result<(), Error> {
+		check_roundtrip(&arc.get_decomp("t_town._dt").unwrap(), super::read, |a| super::write(a))?;
 		Ok(())
 	}
 }

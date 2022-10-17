@@ -4,7 +4,6 @@ use enumflags2::*;
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
-use crate::gamedata::GameData;
 use crate::util::*;
 
 newtype!(ItemId, u16);
@@ -35,7 +34,7 @@ pub struct Item {
 	pub price: u32,
 }
 
-pub fn read(_arcs: &GameData, t_item: &[u8], t_item2: &[u8]) -> Result<BTreeMap<ItemId, Item>, ReadError> {
+pub fn read(t_item: &[u8], t_item2: &[u8]) -> Result<BTreeMap<ItemId, Item>, ReadError> {
 	let mut f1 = Coverage::new(Bytes::new(t_item));
 	let mut f2 = Coverage::new(Bytes::new(t_item2));
 	let n = f1.clone().u16()? / 2;
@@ -71,7 +70,7 @@ pub fn read(_arcs: &GameData, t_item: &[u8], t_item2: &[u8]) -> Result<BTreeMap<
 	Ok(table)
 }
 
-pub fn write(_arcs: &GameData, table: &BTreeMap<ItemId, Item>) -> Result<(Vec<u8>, Vec<u8>), WriteError> {
+pub fn write(table: &BTreeMap<ItemId, Item>) -> Result<(Vec<u8>, Vec<u8>), WriteError> {
 	let mut f1 = OutBytes::new();
 	let mut g1 = OutBytes::new();
 	let mut f2 = OutBytes::new();
@@ -97,18 +96,16 @@ pub fn write(_arcs: &GameData, table: &BTreeMap<ItemId, Item>) -> Result<(Vec<u8
 }
 
 #[cfg(test)]
-#[cfg(feature="null")]
 mod test {
-	use crate::gamedata::GameData;
 	use crate::util::test::*;
 
 	#[test_case::test_case(&FC; "fc")]
-	fn roundtrip(arc: &GameData) -> Result<(), Error> {
-		let t_item = arc.get_decomp("t_item._dt")?;
-		let t_item2 = arc.get_decomp("t_item2._dt")?;
-		let items = super::read(arc, &t_item, &t_item2)?;
-		let (t_item_, t_item2_) = super::write(arc, &items)?;
-		let items2 = super::read(arc, &t_item_, &t_item2_)?;
+	fn roundtrip(arc: &crate::archive::Archives) -> Result<(), Error> {
+		let t_item = arc.get_decomp("t_item._dt").unwrap();
+		let t_item2 = arc.get_decomp("t_item2._dt").unwrap();
+		let items = super::read(&t_item, &t_item2)?;
+		let (t_item_, t_item2_) = super::write(&items)?;
+		let items2 = super::read(&t_item_, &t_item2_)?;
 		check_equal(&items, &items2)?;
 		Ok(())
 	}

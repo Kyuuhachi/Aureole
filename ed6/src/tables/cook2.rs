@@ -4,8 +4,6 @@ use enumflags2::*;
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
-
-use crate::gamedata::GameData;
 use crate::util::*;
 use super::item::ItemId;
 
@@ -31,7 +29,7 @@ pub struct Recipe {
 	pub heal: u16,
 }
 
-pub fn read(_arcs: &GameData, data: &[u8]) -> Result<BTreeMap<RecipeId, Recipe>, ReadError> {
+pub fn read(data: &[u8]) -> Result<BTreeMap<RecipeId, Recipe>, ReadError> {
 	let mut f = Coverage::new(Bytes::new(data));
 	let n = f.clone().u16()? / 2;
 	let mut table = BTreeMap::new();
@@ -54,7 +52,7 @@ pub fn read(_arcs: &GameData, data: &[u8]) -> Result<BTreeMap<RecipeId, Recipe>,
 	Ok(table)
 }
 
-pub fn write(_arcs: &GameData, table: &BTreeMap<RecipeId, Recipe>) -> Result<Vec<u8>, WriteError> {
+pub fn write(table: &BTreeMap<RecipeId, Recipe>) -> Result<Vec<u8>, WriteError> {
 	let mut f = OutBytes::new();
 	let mut g = OutBytes::new();
 
@@ -73,14 +71,6 @@ pub fn write(_arcs: &GameData, table: &BTreeMap<RecipeId, Recipe>) -> Result<Vec
 }
 
 #[cfg(test)]
-#[cfg(feature="null")]
 mod test {
-	use crate::gamedata::GameData;
-	use crate::util::test::*;
-
-	#[test_case::test_case(&FC; "fc")]
-	fn roundtrip(arc: &GameData) -> Result<(), Error> {
-		check_roundtrip_strict(arc, "t_cook2._dt", super::read, super::write)?;
-		Ok(())
-	}
+	crate::util::test::simple_roundtrip!("t_cook2._dt");
 }

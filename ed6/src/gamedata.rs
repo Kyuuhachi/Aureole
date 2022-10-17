@@ -1,29 +1,3 @@
-#[derive(derive_more::Deref)]
-pub struct GameData {
-	#[deref]
-	data: Box<dyn GameDataImpl + Sync>,
-	insn_set: InstructionSet,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum InstructionSet {
-	Fc, FcEvo,
-	Sc, ScEvo,
-	Tc, TcEvo, // It's called 3rd, I know, but that's not a valid identifier
-	Zero, ZeroEvo,
-	Azure, AzureEvo,
-}
-
-impl GameData {
-	pub fn new(data: impl GameDataImpl + Sync + 'static, insn_set: InstructionSet) -> Self {
-		Self { data: Box::new(data), insn_set }
-	}
-
-	pub fn insn_set(&self) -> InstructionSet {
-		self.insn_set
-	}
-}
-
 type Backtrace = Box<std::backtrace::Backtrace>;
 
 #[derive(Debug, thiserror::Error)]
@@ -53,12 +27,12 @@ impl std::convert::From<u32> for LookupError {
 	}
 }
 
-pub trait GameDataImpl {
+pub trait Lookup {
 	fn name(&self, index: u32) -> Result<&str, LookupError>;
 	fn index(&self, name: &str) -> Result<u32, LookupError>;
 }
 
-impl GameDataImpl for Vec<Box<dyn GameDataImpl>> {
+impl Lookup for Vec<Box<dyn Lookup>> {
 	fn name(&self, index: u32) -> Result<&str, LookupError> {
 		self.iter()
 			.find_map(|a| a.name(index).ok())
@@ -72,7 +46,7 @@ impl GameDataImpl for Vec<Box<dyn GameDataImpl>> {
 	}
 }
 
-impl<A, B> GameDataImpl for (A, B) where A: GameDataImpl, B: GameDataImpl {
+impl<A, B> Lookup for (A, B) where A: Lookup, B: Lookup {
 	fn name(&self, index: u32) -> Result<&str, LookupError> {
 		self.0.name(index).or_else(|_| self.1.name(index))
 	}
@@ -82,9 +56,9 @@ impl<A, B> GameDataImpl for (A, B) where A: GameDataImpl, B: GameDataImpl {
 	}
 }
 
-pub struct SkyGameData<T: GameDataImpl>(pub u16, pub T);
+pub struct SkyGameData<T: Lookup>(pub u16, pub T);
 
-impl<T: GameDataImpl> GameDataImpl for SkyGameData<T> {
+impl<T: Lookup> Lookup for SkyGameData<T> {
 	fn name(&self, index: u32) -> Result<&str, LookupError> {
 		if index >> 16 == self.0 as u32 {
 			self.1.name(index & 0xFFFF)
@@ -98,7 +72,7 @@ impl<T: GameDataImpl> GameDataImpl for SkyGameData<T> {
 	}
 }
 
-impl GameDataImpl for crate::archive::Archives {
+impl Lookup for crate::archive::Archives {
 	fn name(&self, a: u32) -> Result<&str, LookupError> {
 		self.name(a).ok_or_else(|| a.into())
 	}

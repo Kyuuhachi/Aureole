@@ -194,6 +194,27 @@ impl Archives {
 		})
 	}
 
+	pub fn get(&self, name: &str) -> Result<&[u8], LookupError> {
+		let arch = *self.names.get(name).ok_or(name)?;
+		let data = self.archive(arch).ok_or(name)?
+			.get(name).ok_or(name)?;
+		Ok(data)
+	}
+
+	pub fn get_decomp(&self, name: &str) -> Result<Vec<u8>, LookupError> {
+		self.get(name).and_then(|a| decompress::decompress(a).map_err(|_| name.into()))
+	}
+
+	pub fn list(&self) -> Box<dyn Iterator<Item=&str> + '_> {
+		Box::new(
+			self.archives()
+			.map(|a| a.1)
+			.flat_map(|a| a.entries())
+			.filter(|a| !a.is_empty())
+			.map(|a| a.name.as_str())
+		)
+	}
+
 	pub fn archive(&self, n: u16) -> Option<&Archive> {
 		self.archives.get(&n)
 	}
@@ -223,26 +244,5 @@ impl GameDataImpl for Archives {
 			arch = 0x1A;
 		}
 		Ok((index as u32) | (arch as u32) << 16)
-	}
-
-	fn get(&self, name: &str) -> Result<&[u8], LookupError> {
-		let arch = *self.names.get(name).ok_or(name)?;
-		let data = self.archive(arch).ok_or(name)?
-			.get(name).ok_or(name)?;
-		Ok(data)
-	}
-
-	fn get_decomp(&self, name: &str) -> Result<Vec<u8>, LookupError> {
-		self.get(name).and_then(|a| decompress::decompress(a).map_err(|_| name.into()))
-	}
-
-	fn list(&self) -> Box<dyn Iterator<Item=&str> + '_> {
-		Box::new(
-			self.archives()
-			.map(|a| a.1)
-			.flat_map(|a| a.entries())
-			.filter(|a| !a.is_empty())
-			.map(|a| a.name.as_str())
-		)
 	}
 }

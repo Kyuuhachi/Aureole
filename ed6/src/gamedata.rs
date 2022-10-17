@@ -56,10 +56,6 @@ impl std::convert::From<u32> for LookupError {
 pub trait GameDataImpl {
 	fn name(&self, index: u32) -> Result<&str, LookupError>;
 	fn index(&self, name: &str) -> Result<u32, LookupError>;
-	fn get(&self, name: &str) -> Result<&[u8], LookupError>;
-	// This is not a great abstraction, but it's the best I can come up with right now
-	fn get_decomp(&self, name: &str) -> Result<Vec<u8>, LookupError>;
-	fn list(&self) -> Box<dyn Iterator<Item=&str> + '_>;
 }
 
 impl GameDataImpl for Vec<Box<dyn GameDataImpl>> {
@@ -74,27 +70,6 @@ impl GameDataImpl for Vec<Box<dyn GameDataImpl>> {
 			.find_map(|a| a.index(name).ok())
 			.ok_or_else(|| name.into())
 	}
-
-	fn get(&self, name: &str) -> Result<&[u8], LookupError> {
-		self.iter()
-			.find_map(|a| a.get(name).ok())
-			.ok_or_else(|| name.into())
-	}
-
-	fn get_decomp(&self, name: &str) -> Result<Vec<u8>, LookupError> {
-		self.iter()
-			.find_map(|a| a.get_decomp(name).ok())
-			.ok_or_else(|| name.into())
-	}
-
-	fn list(&self) -> Box<dyn Iterator<Item=&str> + '_> {
-		let mut seen = std::collections::HashSet::new();
-		Box::new(
-			self.iter()
-			.flat_map(|a| a.list())
-			.filter(move |a| seen.insert(*a))
-		)
-	}
 }
 
 impl<A, B> GameDataImpl for (A, B) where A: GameDataImpl, B: GameDataImpl {
@@ -104,19 +79,6 @@ impl<A, B> GameDataImpl for (A, B) where A: GameDataImpl, B: GameDataImpl {
 
 	fn index(&self, name: &str) -> Result<u32, LookupError> {
 		self.0.index(name).or_else(|_| self.1.index(name))
-	}
-
-	fn get(&self, name: &str) -> Result<&[u8], LookupError> {
-		self.0.get(name).or_else(|_| self.1.get(name))
-	}
-
-	fn get_decomp(&self, name: &str) -> Result<Vec<u8>, LookupError> {
-		self.0.get_decomp(name).or_else(|_| self.1.get_decomp(name))
-	}
-
-	fn list(&self) -> Box<dyn Iterator<Item=&str> + '_> {
-		let mut seen = std::collections::HashSet::new();
-		Box::new(self.0.list().chain(self.1.list()).filter(move |a| seen.insert(*a)))
 	}
 }
 
@@ -133,17 +95,5 @@ impl<T: GameDataImpl> GameDataImpl for SkyGameData<T> {
 
 	fn index(&self, name: &str) -> Result<u32, LookupError> {
 		Ok(self.1.index(name)? | ((self.0 as u32) << 16))
-	}
-
-	fn get(&self, name: &str) -> Result<&[u8], LookupError> {
-		self.1.get(name)
-	}
-
-	fn get_decomp(&self, name: &str) -> Result<Vec<u8>, LookupError> {
-		self.1.get_decomp(name)
-	}
-
-	fn list(&self) -> Box<dyn Iterator<Item=&str> + '_> {
-		self.1.list()
 	}
 }

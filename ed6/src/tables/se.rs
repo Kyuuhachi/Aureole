@@ -58,6 +58,7 @@ pub fn write(_arcs: &GameData, table: &BTreeMap<SoundId, Sound>) -> Result<Vec<u
 }
 
 #[cfg(test)]
+#[cfg(feature="null")]
 mod test {
 	use crate::gamedata::GameData;
 	use crate::util::test::*;

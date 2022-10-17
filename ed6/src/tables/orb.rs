@@ -68,6 +68,7 @@ pub fn write(_arcs: &GameData, table: &Vec<Orbment>) -> Result<Vec<u8>, WriteErr
 }
 
 #[cfg(test)]
+#[cfg(feature="null")]
 mod test {
 	use crate::gamedata::GameData;
 	use crate::util::test::*;

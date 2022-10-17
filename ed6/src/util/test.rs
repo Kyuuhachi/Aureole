@@ -57,44 +57,30 @@ pub fn check_equal<T: PartialEq + std::fmt::Debug>(a: &T, b: &T) -> Result<(), E
 }
 
 pub fn check_roundtrip<T>(
-	arc: &GameData,
-	name: &str,
-	read: impl Fn(&GameData, &[u8]) -> Result<T, super::ReadError>,
-	write: impl Fn(&GameData, &T) -> Result<Vec<u8>, super::WriteError>,
+	data: &[u8],
+	read: impl Fn(&[u8]) -> Result<T, super::ReadError>,
+	write: impl Fn(&T) -> Result<Vec<u8>, super::WriteError>,
 ) -> Result<T, Error> where
 	T: PartialEq + std::fmt::Debug,
 {
-	let data = arc.get_decomp(name)?;
-	let val = read(arc, &data)?;
-	let data2 = write(arc, &val)?;
-	let val2 = read(arc, &data2)?;
+	let val = read(data)?;
+	let data2 = write(&val)?;
+	let val2 = read(&data2)?;
 	check_equal(&val, &val2)?;
 	Ok(val)
 }
 
 pub fn check_roundtrip_strict<T>(
-	arc: &GameData,
-	name: &str,
-	read: impl Fn(&GameData, &[u8]) -> Result<T, super::ReadError>,
-	write: impl Fn(&GameData, &T) -> Result<Vec<u8>, super::WriteError>,
-) -> Result<T, Error> where
-	T: PartialEq + std::fmt::Debug,
-{
-	check_roundtrip_strict_data(arc, &arc.get_decomp(name)?, read, write)
-}
-
-pub fn check_roundtrip_strict_data<T>(
-	arc: &GameData,
 	data: &[u8],
-	read: impl Fn(&GameData, &[u8]) -> Result<T, super::ReadError>,
-	write: impl Fn(&GameData, &T) -> Result<Vec<u8>, super::WriteError>,
+	read: impl Fn(&[u8]) -> Result<T, super::ReadError>,
+	write: impl Fn(&T) -> Result<Vec<u8>, super::WriteError>,
 ) -> Result<T, Error> where
 	T: PartialEq + std::fmt::Debug,
 {
-	let val = read(arc, data)?;
-	let data2 = write(arc, &val)?;
+	let val = read(data)?;
+	let data2 = write(&val)?;
 	if data != data2 {
-		let val2 = read(arc, &data2)?;
+		let val2 = read(&data2)?;
 		check_equal(&val, &val2)?;
 
 		let diff = similar::capture_diff_slices(similar::Algorithm::Patience, data, &data2);

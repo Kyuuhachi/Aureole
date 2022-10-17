@@ -25,6 +25,7 @@ pub fn write(_arcs: &GameData, names: &Vec<String>) -> Result<Vec<u8>, WriteErro
 }
 
 #[cfg(test)]
+#[cfg(feature="null")]
 mod test {
 	use crate::gamedata::GameData;
 	use crate::util::test::*;

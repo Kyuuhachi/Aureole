@@ -250,6 +250,7 @@ pub fn read(arc: &GameData, data: &[u8]) -> Result<(BTreeMap<BattleId, Battle>, 
 // I'll skip the writing for now.
 
 #[cfg(test)]
+#[cfg(feature="null")]
 mod test {
 	use crate::gamedata::GameData;
 	use crate::util::test::*;

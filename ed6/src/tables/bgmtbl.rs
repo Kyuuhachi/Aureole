@@ -49,6 +49,7 @@ pub fn write(_arcs: &GameData, table: &BTreeMap<BgmId, Bgm>) -> Result<Vec<u8>, 
 }
 
 #[cfg(test)]
+#[cfg(feature="null")]
 mod test {
 	use crate::gamedata::GameData;
 	use crate::util::test::*;

@@ -104,6 +104,7 @@ pub fn write(_arc: &GameData, table: &BTreeMap<QuestId, Quest>) -> Result<Vec<u8
 }
 
 #[cfg(test)]
+#[cfg(feature="null")]
 mod test {
 	use crate::gamedata::GameData;
 	use crate::util::test::*;

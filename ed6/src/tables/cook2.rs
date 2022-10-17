@@ -73,6 +73,7 @@ pub fn write(_arcs: &GameData, table: &BTreeMap<RecipeId, Recipe>) -> Result<Vec
 }
 
 #[cfg(test)]
+#[cfg(feature="null")]
 mod test {
 	use crate::gamedata::GameData;
 	use crate::util::test::*;

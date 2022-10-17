@@ -510,7 +510,7 @@ mod test {
 
 			let data = std::fs::read(&path)?;
 
-			if let Err(err) = check_roundtrip_strict_data(&arc, &data, super::read, super::write) {
+			if let Err(err) = check_roundtrip_strict(&data, |a| super::read(&arc, a), |a| super::write(&arc, a)) {
 				println!("{name}: {err:?}");
 				failed = true;
 			};

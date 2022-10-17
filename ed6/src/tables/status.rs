@@ -69,6 +69,7 @@ pub fn write(_arcs: &GameData, table: &Vec<Vec<Status>>) -> Result<Vec<u8>, Writ
 }
 
 #[cfg(test)]
+#[cfg(feature="null")]
 mod test {
 	use crate::gamedata::GameData;
 	use crate::util::test::*;

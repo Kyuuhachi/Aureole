@@ -1,3 +1,5 @@
+#![cfg(feature="null")]
+
 use std::collections::BTreeMap;
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;

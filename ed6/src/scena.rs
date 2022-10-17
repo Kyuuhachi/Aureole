@@ -31,14 +31,38 @@ newtype!(Color, u32);
 newtype!(ShopId, u8);
 newtype!(Member, u8);
 newtype!(MagicId, u16);
+
+// 254 STATUS_RECOVERY
 newtype!(MemberAttr, u8);
 
-newtype!(Flags, u32);
+// 0x00000001 SF_CAMERA_AUTO
+// 0x00400000 SF_ENTRY_DISABLE
+// 0x02000000 SF_FADEBGM_DISABLE
+newtype!(SystemFlags, u32);
+
 newtype!(QuestFlags, u8);
+
+// 0x0002 PF_NOVEC
+// 0x0004 PF_NOHEIGHT
+// 0x0008 PF_NODISP
+// 0x0010 PF_NOTURN
+// 0x0020 PF_NOANIME
+// 0x0040 PF_NOATARI
+// 0x0080 PF_UNDEF
 newtype!(CharFlags, u16);
 
-newtype!(Var, u16);
+// 0x0004 MOF_NODISP
+// 0x0020 MOF_LOOPPLAY
+newtype!(ObjectFlags, u16);
+
+newtype!(Var, u16); // called Work internally
+
+// 0 SW_ENTRY_NO
+// 1 SW_BGM_NO
+// 40 SW_CURSOR_FORM (24 MSCRS_NORMAL, FFFF MSCRS_VOID)
+// 45 SW_MOVIE_STATE
 newtype!(Attr, u8);
+
 newtype!(CharId, u16);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -52,22 +76,69 @@ pub struct CharAttr(pub CharId, pub u8);
 pub struct Emote(pub u8, pub u8, pub u32);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Npc {
-	pub name: String,
-	pub pos: Pos3,
-	pub angle: u16,
-	pub ch: (u16, u16), // First entry seems to always be zero. Probably include index, just like for functions.
-	pub cp: (u16, u16),
-	pub flags: CharFlags,
-	pub init: FuncRef,
-	pub talk: FuncRef,
+pub struct Scena {
+	pub path: String, // [Path; フォルダ]
+	pub map: String, // [Map; マップファイル]
+	pub town: TownId, // [Town; 町名]
+	pub bgm: BgmId, // [BGM; BGM 番号]
+	pub item: FuncRef, // [Item; アイテム使用時イベント]
+	pub includes: Vec<String>, // [Scp0..7; スクリプト(１つだけは必須), これ以降は必要な場合のみ定義する]
+
+	// The script puts cp before ch.
+	pub ch: Vec<String>, // [Char_Data; キャラデータファイル]
+	pub cp: Vec<String>, // [Char_Ptn; キャラパターンファイル]
+
+	pub npcs: Vec<Npc>,
+	pub monsters: Vec<Monster>,
+	pub triggers: Vec<Trigger>,
+	pub objects: Vec<Object>,
+	pub entries: Vec<Entry>,
+	pub functions: Vec<Vec<code::FlatInsn>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Monster {
+pub struct Entry {  // [Entry]
+	pub pos: Pos3,  // [PlyX, PlyY, PlyZ; Ｘ/Ｙ/Ｚ座標(1m単位)]
+	pub chr: u16,   // [PlyChr; キャラパターン] a chcp?
+	pub angle: i16, // [PlyVec; キャラ方角]
+
+	pub cam_from: Pos3,  // [CameraFrom: カメラ位置(1m単位)]
+	pub cam_at: Pos3,    // [CameraAt; 注目点⟩]
+	pub cam_zoom: i32,   // [CameraZoom; ズーム(1mm単位)]
+	pub cam_pers: i32,   // [CameraPers; パース]
+	pub cam_deg: i16,    // [CameraDeg; 角度(1度単位)]
+	pub cam_limit1: i16, // [CameraLimitDeg; カメラの回転可能角度]
+	pub cam_limit2: i16, // ↑
+	pub north: i16,      // [NorthDeg; 北角度]
+
+	// Where's [NorthDeg]?
+	pub flags: u16,   // [Flag]
+	pub town: TownId, // [Place; 地名]
+	pub init: FuncRef, // [Init; 初期化用イベント]
+	pub reinit: FuncRef, // [ReInit; ロード後の再初期化用イベント]
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Npc { // [Player]
+	// They put name last, but that sucks
+	pub name: String, // [Name]
+	pub pos: Pos3, // [X, Y, Z]
+	pub angle: i16, // [ANG]
+	// these four are called X Pt No Bs
+	pub x: u16, // [X]
+	pub cp: u16, // [Pt]
+	pub frame: u16, // [No]
+	pub ch: u16, // [Bs]
+	pub flags: CharFlags, // [BXPNAWTDS]
+	pub init: FuncRef, // [MOVE_FUNC]
+	pub talk: FuncRef, // [EVENT_FUNC]
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Monster { // [Monster]
 	pub name: String,
 	pub pos: Pos3,
-	pub angle: u16,
+	pub angle: i16,
 	pub _1: u16, // This looks like a chcp index, but npcs have 4×u16 while this only has 1×u16?
 	pub flags: CharFlags,
 	pub _2: i32, // Always -1
@@ -77,65 +148,22 @@ pub struct Monster {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Trigger {
-	pub pos1: Pos3,
-	pub pos2: Pos3,
-	pub flags: u16,
-	pub func: FuncRef,
-	pub _1: u16,
+pub struct Trigger { // [Event]
+	pub pos1: Pos3, // [X, Y, Z]
+	pub pos2: Pos3, // [X, Y, Z]
+	pub flags: u16, // [  SN6428]
+	pub func: FuncRef, // [Scp:Func]
+	pub _1: u16, // (absent)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Object {
-	pub pos: Pos3,
-	pub radius: u32,
-	pub bubble_pos: Pos3,
-	pub flags: u16,
-	pub func: FuncRef,
-	pub _1: u16,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CameraAngle {
-	// According to some debug strings, the camera has
-	// CAM_X, CAM_Y, CAM_Z,
-	// CAM_WX, CAM_WY, CAM_WZ,
-	// CAM_AX, CAM_AY, CAM_AZ,
-	// CAM_DEG, CAM_ZOM, CAM_PER, CAM_VZDEF
-	pub pos: Pos3,
-	pub _1: u16,
-	pub angle: u16,
-	pub pos2: Pos3,
-	pub pos3: Pos3,
-	pub zoom: i32,
-	pub fov: i32,
-	pub angle1: i16,
-	pub angle2: i16,
-	pub angle3: i16,
-	pub _2: u16,
-	pub _3: u16,
-	pub _4: u16,
-	pub _5: u16,
-	pub _6: u32,
-	pub _7: u16,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Scena {
-	pub dir: String,
-	pub fname: String,
-	pub town: TownId,
-	pub bgm: BgmId,
-	pub entry_func: FuncRef, // Other funcrefs are (-1, -1) when null, but this one is (0, -1).
-	pub includes: Vec<String>,
-	pub ch: Vec<String>,
-	pub cp: Vec<String>,
-	pub npcs: Vec<Npc>,
-	pub monsters: Vec<Monster>,
-	pub triggers: Vec<Trigger>,
-	pub objects: Vec<Object>,
-	pub camera_angles: Vec<CameraAngle>,
-	pub functions: Vec<Vec<code::FlatInsn>>,
+pub struct Object { // [LookPoint]
+	pub pos: Pos3, // [X, Y, Z]
+	pub radius: u32, // [R],
+	pub bubble_pos: Pos3, // (absent)
+	pub flags: ObjectFlags, // [_N____],
+	pub func: FuncRef, // [Scp:Func]
+	pub _1: u16, // (absent)
 }
 
 pub trait InExt2<'a>: In<'a> {
@@ -166,12 +194,12 @@ impl<T: Out> OutExt2 for T {}
 pub fn read(arc: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	let mut f = Coverage::new(Bytes::new(data));
 
-	let dir = f.sized_string::<10>()?;
-	let fname = f.sized_string::<14>()?;
+	let path = f.sized_string::<10>()?;
+	let map = f.sized_string::<14>()?;
 	let town = TownId(f.u16()?);
 	let bgm = BgmId(f.u8()?);
 	f.check_u8(0)?;
-	let entry_func = FuncRef(f.u16()?, f.u16()?);
+	let item = FuncRef(f.u16()?, f.u16()?);
 	let includes = f.multiple::<8, _>(&[0xFF;4], |g| Ok(arc.name(g.u32()?)?.to_owned()))?;
 	f.check_u16(0)?;
 
@@ -205,9 +233,11 @@ pub fn read(arc: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	let npcs = list(n as usize, || Ok(Npc {
 		name: strings.string()?,
 		pos: g.pos3()?,
-		angle: g.u16()?,
-		ch: (g.u16()?, g.u16()?),
-		cp: (g.u16()?, g.u16()?),
+		angle: g.i16()?,
+		x: g.u16()?,
+		cp: g.u16()?,
+		frame: g.u16()?,
+		ch: g.u16()?,
 		flags: CharFlags(g.u16()?),
 		init: FuncRef(g.u16()?, g.u16()?),
 		talk: FuncRef(g.u16()?, g.u16()?),
@@ -217,7 +247,7 @@ pub fn read(arc: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	let monsters = list(n as usize, || Ok(Monster {
 		name: strings.string()?,
 		pos: g.pos3()?,
-		angle: g.u16()?,
+		angle: g.i16()?,
 		_1: g.u16()?,
 		flags: CharFlags(g.u16()?),
 		_2: g.i32()?,
@@ -240,7 +270,7 @@ pub fn read(arc: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 		pos: g.pos3()?,
 		radius: g.u32()?,
 		bubble_pos: g.pos3()?,
-		flags: g.u16()?,
+		flags: ObjectFlags(g.u16()?),
 		func: FuncRef(g.u16()?, g.u16()?),
 		_1: g.u16()?,
 	})).strict()?;
@@ -251,28 +281,27 @@ pub fn read(arc: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 		"Unexpected func table: {func_table:X?} does not start with {code_start:X?}"
 	);
 
-	let mut camera_angles = Vec::new();
+	let mut entries = Vec::new();
 	while f.pos() < head_end {
-		camera_angles.push(CameraAngle {
+		entries.push(Entry {
 			pos: f.pos3()?,
-			_1: f.u16()?,
-			angle: f.u16()?,
-			pos2: f.pos3()?,
-			pos3: f.pos3()?,
-			zoom: f.i32()?,
-			fov: f.i32()?,
-			angle1: f.i16()?,
-			angle2: f.i16()?,
-			angle3: f.i16()?,
-			_2: f.u16()?,
-			_3: f.u16()?,
-			_4: f.u16()?,
-			_5: f.u16()?,
-			_6: f.u32()?,
-			_7: f.u16()?,
+			chr: f.u16()?,
+			angle: f.i16()?,
+			cam_from: f.pos3()?,
+			cam_at: f.pos3()?,
+			cam_zoom: f.i32()?,
+			cam_pers: f.i32()?,
+			cam_deg: f.i16()?,
+			cam_limit1: f.i16()?,
+			cam_limit2: f.i16()?,
+			north: f.i16()?,
+			flags: f.u16()?,
+			town: TownId(f.u16()?),
+			init: FuncRef(f.u16()?, f.u16()?),
+			reinit: FuncRef(f.u16()?, f.u16()?),
 		});
 	}
-	ensure!(f.pos() == head_end, "overshot with camera angles");
+	ensure!(f.pos() == head_end, "overshot with entries");
 
 	let mut functions = Vec::with_capacity(func_table.len());
 	let starts = func_table.iter().copied();
@@ -284,25 +313,25 @@ pub fn read(arc: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	f.assert_covered()?;
 
 	Ok(Scena {
-		dir, fname,
+		path, map,
 		town, bgm,
-		entry_func,
+		item,
 		includes,
 		ch, cp,
 		npcs, monsters,
 		triggers, objects,
-		camera_angles,
+		entries,
 		functions,
 	})
 }
 
 pub fn write(arc: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	let &Scena {
-		ref dir,
-		ref fname,
+		ref path,
+		ref map,
 		town,
 		bgm,
-		entry_func,
+		item,
 		ref includes,
 		ref ch,
 		ref cp,
@@ -310,7 +339,7 @@ pub fn write(arc: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		ref monsters,
 		ref triggers,
 		ref objects,
-		ref camera_angles,
+		ref entries,
 		ref functions,
 	} = scena;
 	let mut f = OutBytes::new();
@@ -318,12 +347,12 @@ pub fn write(arc: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	let mut func_table = OutBytes::new();
 	let mut strings = OutBytes::new();
 
-	f.sized_string::<10>(dir)?;
-	f.sized_string::<14>(fname)?;
+	f.sized_string::<10>(path)?;
+	f.sized_string::<14>(map)?;
 	f.u16(town.0);
 	f.u8(bgm.0);
 	f.u8(0);
-	f.u16(entry_func.0); f.u16(entry_func.1);
+	f.u16(item.0); f.u16(item.1);
 	f.multiple::<8, _>(&[0xFF; 4], includes, |g, a| { g.u32(arc.index(a)?); Ok(()) }).strict()?;
 	f.u16(0);
 
@@ -370,12 +399,14 @@ pub fn write(arc: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	g.u8(0xFF);
 
 	g.label(l_npcs_);
-	for &Npc { ref name, pos, angle, ch, cp, flags, init, talk } in npcs {
+	for &Npc { ref name, pos, angle, x, cp, frame, ch, flags, init, talk } in npcs {
 		strings.string(name)?;
 		g.pos3(pos);
-		g.u16(angle);
-		g.u16(ch.0); g.u16(ch.1);
-		g.u16(cp.0); g.u16(cp.1);
+		g.i16(angle);
+		g.u16(x);
+		g.u16(cp);
+		g.u16(frame);
+		g.u16(ch);
 		g.u16(flags.0);
 		g.u16(init.0); g.u16(init.1);
 		g.u16(talk.0); g.u16(talk.1);
@@ -385,7 +416,7 @@ pub fn write(arc: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	for &Monster { ref name, pos, angle, _1, flags, _2, battle, flag, _3 } in monsters {
 		strings.string(name)?;
 		g.pos3(pos);
-		g.u16(angle);
+		g.i16(angle);
 		g.u16(_1);
 		g.u16(flags.0);
 		g.i32(_2);
@@ -408,7 +439,7 @@ pub fn write(arc: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		g.pos3(pos);
 		g.u32(radius);
 		g.pos3(bubble_pos);
-		g.u16(flags);
+		g.u16(flags.0);
 		g.u16(func.0); g.u16(func.1);
 		g.u16(_1);
 	}
@@ -420,23 +451,26 @@ pub fn write(arc: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		code::write(&mut g, arc, func)?;
 	}
 
-	for &CameraAngle { pos, _1, angle, pos2, pos3, zoom, fov, angle1, angle2, angle3, _2, _3, _4, _5, _6, _7 } in camera_angles {
+	for &Entry {
+		pos, chr, angle,
+		cam_from, cam_at, cam_zoom, cam_pers, cam_deg, cam_limit1, cam_limit2, north,
+		flags, town, init, reinit,
+	} in entries {
 		f.pos3(pos);
-		f.u16(_1);
-		f.u16(angle);
-		f.pos3(pos2);
-		f.pos3(pos3);
-		f.i32(zoom);
-		f.i32(fov);
-		f.i16(angle1);
-		f.i16(angle2);
-		f.i16(angle3);
-		f.u16(_2);
-		f.u16(_3);
-		f.u16(_4);
-		f.u16(_5);
-		f.u32(_6);
-		f.u16(_7);
+		f.u16(chr);
+		f.i16(angle);
+		f.pos3(cam_from);
+		f.pos3(cam_at);
+		f.i32(cam_zoom);
+		f.i32(cam_pers);
+		f.i16(cam_deg);
+		f.i16(cam_limit1);
+		f.i16(cam_limit2);
+		f.i16(north);
+		f.u16(flags);
+		f.u16(town.0);
+		f.u16(init.0); f.u16(init.1);
+		f.u16(reinit.0); f.u16(reinit.1);
 	}
 
 	Ok(f.concat(g).concat(func_table).concat(strings).finish()?)

@@ -5,18 +5,18 @@ ed6_macros::bytecode! {
 	#[games(arc.insn_set() => crate::gamedata::InstructionSet::{Fc, FcEvo})]
 	[
 		skip!(1), // null
-		Return(),
+		Return(), // [return]
 		skip!(3), // control flow
-		Call(func_ref() -> FuncRef),
-		NewScene(file_ref(arc) -> String alias ScenaFileRef, u8, u8, u8, u8),
+		Call(func_ref() -> FuncRef), // [call]
+		NewScene(file_ref(arc) -> String alias ScenaFileRef, u8, u8, u8, u8), // [new_scene] (last two args are unaccounted for)
 		skip!(1),
-		Sleep(u32 alias Time),
-		FlagsSet(u32 as Flags),
-		FlagsUnset(u32 as Flags),
-		FadeOn(u32 alias Time, u32 as Color, u8),
-		FadeOff(u32 alias Time, u32 as Color),
-		_0D(),
-		Blur(u32 alias Time),
+		Sleep(u32 alias Time), // [delay]
+		SystemFlagsSet(u32 as SystemFlags), // [set_system_flag]
+		SystemFlagsUnset(u32 as SystemFlags), // [reset_system_flag]
+		FadeOut(u32 alias Time, u32 as Color, u8), // [fade_out]
+		FadeIn(u32 alias Time, u32 as Color), // [fade_in]
+		FadeWait(), // [fade_wait]
+		CrossFade(u32 alias Time), // [cross_fade]
 		Battle(u16 as BattleId, u16, u16, u16, u8, u16, i8),
 		ExitSetEnabled(u8 alias ExitId, u8),
 		Fog(u8, u8, u8, u32, u32, u32), // First three are color; TODO parse it as one. Last is always 0.
@@ -31,20 +31,20 @@ ed6_macros::bytecode! {
 		#[game(Fc)] Save(),
 		#[game(FcEvo)] SaveEvo(u8),
 		skip!(1),
-		EventBegin(u8),
-		EventEnd(u8),
+		EventBegin(u8), // [event_begin]
+		EventEnd(u8), // [event_end]
 		_1B(u16, u16),
 		_1C(u16, u16),
-		BgmPlay(u8 as BgmId),
-		_1E(),
-		BgmSetVolume(u8, u32 alias Time),
-		BgmStop(u32 alias Time),
-		BgmFadeWait(),
-		SoundPlay(u16 as SoundId, u8, u8),
+		BgmPlay(u8 as BgmId), // [play_bgm]
+		BgmResume(), // [resume_bgm]
+		BgmVolume(u8, u32 alias Time), // [volume_bgm]
+		BgmStop(u32 alias Time), // [stop_bgm]
+		BgmWait(), // [wait_bgm]
+		SoundPlay(u16 as SoundId, u8, u8), // [sound]
 		SoundStop(u16 as SoundId),
 		SoundLoop(u16 as SoundId, u8),
 		_Sound25(u16 as SoundId, Pos3, u32, u32, u8, u32),
-		_Sound26(u16 as SoundId),
+		SoundLoad(u16 as SoundId), // [sound_load]
 		skip!(1),
 		Quest(u16 as QuestId, match {
 			0x01 => TaskSet(u16 alias QuestTask),
@@ -59,11 +59,11 @@ ed6_macros::bytecode! {
 		QuestList(quest_list() -> Vec<QuestId> alias QuestList),
 		QuestBonusBp(u16 as QuestId, u16),
 		QuestBonusMira(u16 as QuestId, u16),
-		PartyAdd(u8 as Member, u8),
-		PartyRemove(u8 as Member, u8),
+		PartyAdd(u8 as Member, u8), // [join_party]
+		PartyRemove(u8 as Member, u8), // [separate_party]
 		skip!(1),
-		_Party30(u8),
-		PartySetAttr(u8 as Member, u8 as MemberAttr, u16),
+		_Party30(u8 as Member),
+		PartySetAttr(u8 as Member, u8 as MemberAttr, u16), // [set_status]
 		skip!(2),
 		PartyAddArt(u8 as Member, u16 as MagicId),
 		PartyAddCraft(u8 as Member, u16 as MagicId),
@@ -71,73 +71,73 @@ ed6_macros::bytecode! {
 		PartySet(u8 as Member, u8, u8),
 		SepithAdd(u8 as Element alias SepithElement, u16),
 		SepithRemove(u8 as Element alias SepithElement, u16),
-		MiraAdd(u16),
+		MiraAdd(u16), // [get_gold]
 		MiraSub(u16),
 		BpAdd(u16),
 		skip!(1), // I have a guess what this is, but it doesn't exist in any scripts
 		ItemAdd(u16 as ItemId, u16),
-		ItemRemove(u16 as ItemId, u16),
+		ItemRemove(u16 as ItemId, u16), // [release_item]
 		ItemHas(u16 as ItemId), // or is it ItemGetCount?
 		PartyEquip(u8 as Member, u16 as ItemId, party_equip_slot(_1) -> i8),
 		PartyPosition(u8 as Member),
-		CharForkFunc(u16 as CharId, u8 alias ForkId, func_ref() -> FuncRef),
-		CharForkQuit(u16 as CharId, u8 alias ForkId),
-		CharFork(u16 as CharId, u8 alias ForkId, u8, fork(arc) -> Vec<Insn> alias Fork),
-		CharForkLoop(u16 as CharId, u8 alias ForkId, u8, fork_loop(arc) -> Vec<Insn> alias Fork),
-		CharForkAwait(u16 as CharId, u8 alias ForkId, u8),
-		Yield(), // Used in tight loops, probably wait until next frame
-		Event(func_ref() -> FuncRef), // Not sure how this differs from Call
+		ForkFunc(u16 as CharId, u8 alias ForkId, func_ref() -> FuncRef), // [execute]
+		ForkQuit(u16 as CharId, u8 alias ForkId), // [terminate]
+		Fork(u16 as CharId, u8 alias ForkId, u8, fork(arc) -> Vec<Insn> alias Fork), // [preset]? In t0311, only used with a single instruction inside
+		ForkLoop(u16 as CharId, u8 alias ForkId, u8, fork_loop(arc) -> Vec<Insn> alias Fork),
+		ForkAwait(u16 as CharId, u8 alias ForkId, u8), // [wait_terminate]
+		NextFrame(), // [next_frame]
+		Event(func_ref() -> FuncRef), // [event] Not sure how this differs from Call
 		_Char4A(u16 as CharId, u8), // Argument is almost always 255, but sometimes 0, and in a single case 1
 		_Char4B(u16 as CharId, u8),
 		skip!(1),
 		Var(u16 as Var, expr(arc) -> Expr),
 		skip!(1),
-		Attr(u8 as Attr, expr(arc) -> Expr),
+		Attr(u8 as Attr, expr(arc) -> Expr), // [system[n]]
 		skip!(1),
 		CharAttr(char_attr() -> CharAttr, expr(arc) -> Expr),
-		TextStart(u16 as CharId),
-		TextEnd(u16 as CharId),
-		TextMessage(text() -> Text),
+		TextStart(u16 as CharId), // [talk_start]
+		TextEnd(u16 as CharId), // [talk_end]
+		TextMessage(text() -> Text), // [mes]
 		skip!(1),
-		TextReset(u8),
+		TextClose(u8), // [mes_close]
 		skip!(1),
-		TextWait(),
+		TextWait(), // [wait_prompt]
 		_59(), // Always directly after a TextReset 1, and exists in all but one such case. I suspect that one is a bug.
-		TextSetPos(i16, i16, i16, i16),
-		TextTalk(u16 as CharId, text() -> Text),
-		TextTalkNamed(u16 as CharId, String alias TextTitle, text() -> Text),
-		Menu(u16 alias MenuId, i16, i16, u8, menu() -> Vec<String> alias Menu),
-		MenuWait(u16 as Var),
-		MenuClose(u16 alias MenuId),
-		TextSetName(String alias TextTitle),
-		_61(u16 as CharId),
-		Emote(u16 as CharId, i32, u32 alias Time, emote() -> Emote, u8),
-		EmoteStop(u16 as CharId),
-		_64(u8, u16), // I suspect these two are ObjectId, but ObjectId is u16?
-		_65(u8, u16),
-		CamFollow(u16), // A bool
-		CamOffset(i32, i32, i32, u32 alias Time),
+		TextSetPos(i16, i16, i16, i16), // [mes_pos]
+		TextTalk(u16 as CharId, text() -> Text), // [popup]
+		TextTalkNamed(u16 as CharId, String alias TextTitle, text() -> Text), // [popup2]
+		Menu(u16 alias MenuId, i16, i16, u8, menu() -> Vec<String> alias Menu), // [menu] (the u8 is a bool)
+		MenuWait(u16 as Var), // [wait_menu]
+		MenuClose(u16 alias MenuId), // [menu_close]
+		TextSetName(String alias TextTitle), // [name]
+		CharName2(u16 as CharId), // [name2]
+		Emote(u16 as CharId, i32, u32 alias Time, emote() -> Emote, u8), // [emotion] mostly used through macros such as EMO_BIKKURI3()
+		EmoteStop(u16 as CharId), // [emotion_close]
+		_64(u8 as u16 alias ObjectId, u16),
+		_65(u8 as u16 alias ObjectId, u16),
+		CamChangeAxis(u16), // [camera_change_axis] 0 CAMERA_ABSOLUTE_MODE, 1 CAMERA_RELATIVE_MODE
+		CamMove(i32, i32, i32, u32 alias Time), // [camera_move]
 		skip!(1),
-		CamLookAt(u16 as CharId, u32 alias Time),
+		CamLookChar(u16 as CharId, u32 alias Time), // [camera_look_chr]
 		_Char6A(u16 as CharId),
-		CamDistance(i32, u32 alias Time),
-		CamAngle(i32 alias Angle32, u32 alias Time),
-		CamPos(Pos3, u32 alias Time),
-		_Cam6E(u8, u8, u8, u8, u32 alias Time),
-		_Obj6F(u16 alias ObjectId, u32),
-		_Obj70(u16 alias ObjectId, u32),
-		_Obj71(u16 alias ObjectId, u16),
-		_Obj72(u16 alias ObjectId, u16),
+		CamZoom(i32, u32 alias Time), // [camera_zoom]
+		CamRotate(i32 alias Angle32, u32 alias Time), // [camera_rotate]
+		CamLookPos(Pos3, u32 alias Time), // [camera_look_at]
+		CamPers(u32, u32 alias Time), // [camera_pers]
+		ObjFrame(u16 alias ObjectId, u32), // [mapobj_frame]
+		ObjPlay(u16 alias ObjectId, u32), // [mapobj_play]
+		ObjFlagsSet(u16 alias ObjectId, u16 as ObjectFlags), // [mapobj_set_flag]
+		ObjFlagsUnset(u16 alias ObjectId, u16 as ObjectFlags), // [mapobj_reset_flag]
 		_Obj73(u16 alias ObjectId),
 		_74(u16, u32, u16),
 		_75(u8, u32, u8),
 		_76(u16, u32, u16, Pos3, u8, u8),
-		_77(u32 as Color, u32 alias Time),
+		MapColor(u32 as Color /*24*/, u32 alias Time), // [map_color]
 		_78(u8, u16),
 		_79(u8, u16),
 		_7A(u8, u16),
 		_7B(),
-		Shake(u32, u32, u32, u32 alias Time),
+		Shake(u32, u32, u32, u32 alias Time), // [quake]
 		skip!(1),
 		_7E(i16, i16, u16, u8, u32),
 		EffLoad(u8, String alias EffFileRef),
@@ -147,52 +147,52 @@ ed6_macros::bytecode! {
 		Achievement(u8, u8),
 		_84(u8),
 		_85(u16),
-		CharSetChcp   (u16 as CharId, u16 alias ChcpId),
-		CharSetFrame  (u16 as CharId, u16),
-		CharSetPos    (u16 as CharId, Pos3, u16 alias Angle),
-		CharSetPos2   (u16 as CharId, Pos3, u16 alias Angle),
-		CharLookAt    (u16 as CharId, u16 as CharId, u16 alias Time16),
-		CharLookAtPos (u16 as CharId, Pos2, u16 alias Time16),
-		CharSetAngle  (u16 as CharId, u16 alias Angle, u16 alias Time16),
-		CharIdle      (u16 as CharId, Pos2, Pos2, u32 alias Speed),
-		CharWalkTo    (u16 as CharId, Pos3, u32 alias Speed, u8),
-		CharWalkTo2   (u16 as CharId, Pos3, u32 alias Speed, u8), // how are these two different?
-		DontGoThere   (u16 as CharId, i32, i32, i32, u32, u8),
-		_Char91       (u16 as CharId, i32, i32, i32, i32, u8),
-		_Char92       (u16 as CharId, u16 as CharId, u32, u32 alias Speed, u8),
-		_Char93       (u16 as CharId, u16 as CharId, u32, u32 alias Speed, u8),
-		_94       (u8, u16 as CharId, u16 alias Angle, u32, u32 alias Speed, u8),
-		CharJump      (u16 as CharId, i32, i32, i32, u32, u32),
-		_Char96       (u16 as CharId, Pos3, i32, i32),
-		_Char97       (u16 as CharId, Pos2, i32 alias Angle32, u32, u16), // used with pigeons
+		CharSetBase    (u16 as CharId, u16), // [set_chr_base]
+		CharSetPattern (u16 as CharId, u16), // [set_chr_ptn]
+		CharSetPos     (u16 as CharId, Pos3, i16 alias Angle), // [set_pos]
+		CharSetPos2    (u16 as CharId, Pos3, i16 alias Angle),
+		CharLookAtChar (u16 as CharId, u16 as CharId, u16 alias Time16), // [look_to]
+		CharLookAtPos  (u16 as CharId, Pos2, u16 alias Time16),
+		CharTurn       (u16 as CharId, i16 alias Angle, u16 alias Time16), // [turn_to]
+		CharIdle       (u16 as CharId, Pos2, Pos2, u32 alias Speed),
+		CharWalkToPos  (u16 as CharId, Pos3, u32 alias Speed, u8), // [walk_to]
+		CharWalkToPos2 (u16 as CharId, Pos3, u32 alias Speed, u8),
+		_Char90        (u16 as CharId, i32, i32, i32, u32, u8),
+		_Char91        (u16 as CharId, i32, i32, i32, i32, u8),
+		CharWalkToChar (u16 as CharId, u16 as CharId, u32, u32 alias Speed, u8), // [walk_to_chr]
+		CharWalkToChar2(u16 as CharId, u16 as CharId, u32, u32 alias Speed, u8),
+		_94        (u8, u16 as CharId, i16 alias Angle, u32, u32 alias Speed, u8),
+		CharJump       (u16 as CharId, i32, i32, i32, u32, u32 alias Speed), // [jump]
+		_Char96        (u16 as CharId, Pos3, i32, i32),
+		_Char97        (u16 as CharId, Pos2, i32 alias Angle32, u32, u16), // used with pigeons
 		skip!(1),
-		CharAnimation (u16 as CharId, u8, u8, u32 alias Time),
-		CharFlagsSet  (u16 as CharId, u16 as CharFlags),
-		CharFlagsUnset(u16 as CharId, u16 as CharFlags),
-		_Char9C       (u16 as CharId, u16), // always 32
-		_Char9D       (u16 as CharId, u16),
-		CharShake     (u16 as CharId, u32, u32, u32, u32),
-		CharColor     (u16 as CharId, u32 as Color, u32 alias Time),
+		CharAnimation  (u16 as CharId, u8, u8, u32 alias Time), // [chr_anime]
+		CharFlagsSet   (u16 as CharId, u16 as CharFlags), // [set_state]
+		CharFlagsUnset (u16 as CharId, u16 as CharFlags), // [reset_state]
+		_Char9C        (u16 as CharId, u16), // always 32
+		_Char9D        (u16 as CharId, u16),
+		CharShake      (u16 as CharId, u32, u32, u32, u32),
+		CharColor      (u16 as CharId, u32 as Color, u32 alias Time),
 		skip!(1),
-		_CharA1(u16 as CharId, u16),
-		FlagSet(u16 as Flag),
-		FlagUnset(u16 as Flag),
+		CharAttachObj  (u16 as CharId, u16 alias ObjectId),
+		FlagSet(u16 as Flag), // [set_flag]
+		FlagUnset(u16 as Flag), // [reset_flag]
 		skip!(1),
-		FlagAwaitUnset(u16 as Flag),
-		FlagAwaitSet(u16 as Flag),
+		FlagAwaitUnset(u16 as Flag), // [wait_flag_false]
+		FlagAwaitSet(u16 as Flag), // [wait_flag_true]
 		skip!(2),
 		ShopOpen(u8 as ShopId),
 		skip!(2),
 		RecipeLearn(u16), // TODO check type
-		ImageShow(file_ref(arc) -> String alias VisFileRef, u16, u16, u32 alias Time),
-		ImageHide(u32 alias Time),
+		ImageShow(file_ref(arc) -> String alias VisFileRef, u16, u16, u32 alias Time), // [portrait_open]
+		ImageHide(u32 alias Time), // [portrait_close]
 		QuestSubmit(u8 as ShopId, u16 as QuestId),
 		_ObjB0(u16 alias ObjectId, u8), // Used along with 6F, 70, and 73 during T0700#11
 		OpLoad(String alias OpFileRef),
 		_B2(u8, u8, u16),
 		Video(match {
-			0x00 => _00(String alias AviFileRef),
-			0x01 => _01(u8),
+			0x00 => Play(String alias AviFileRef), // [movie(MOVIE_START)]
+			0x01 => End(u8), // [movie(MOVIE_END)]
 		}),
 		ReturnToTitle(u8),
 
@@ -208,18 +208,18 @@ ed6_macros::bytecode! {
 		#[game(Fc)] skip!(33),
 
 		#[game(FcEvo)] skip!(10),
-		#[game(FcEvo)] VisLoad(u8 alias VisId, u16, u16, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u32 as Color, u8, u8, String),
-		#[game(FcEvo)] EvoC7(u8 alias VisId, u8, u32 as Color, u32, u32, u32),
-		#[game(FcEvo)] EvoC8(u8, u8 alias VisId, u8),
+		#[game(FcEvo)] EvoVisC6(u8 alias VisId, u16, u16, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u32 as Color, u8, u8, String),
+		#[game(FcEvo)] EvoVisC7(u8 alias VisId, u8, u32 as Color, u32, u32, u32),
+		#[game(FcEvo)] EvoVisC8(u8, u8 alias VisId, u8),
 		#[game(FcEvo)] skip!(19),
 		#[game(FcEvo)] EvoDC(),
 		#[game(FcEvo)] EvoDD(),
 		#[game(FcEvo)] EvoDE(),
 		#[game(FcEvo)] skip!(2),
-		#[game(FcEvo)] EvoE1(u8, Pos3),
+		#[game(FcEvo)] EvoE1(u8 as u16 alias ObjectId, Pos3),
 		#[game(FcEvo)] skip!(2),
 		#[game(FcEvo)] EvoCtp(String), // Refers to /data/map2/{}.ctp
-		#[game(FcEvo)] EvoVoiceLine(u16),
+		#[game(FcEvo)] EvoVoiceLine(u16), // [pop_msg]
 		#[game(FcEvo)] EvoE8(text() -> Text),
 		#[game(FcEvo)] EvoE7(u8, u8),
 		#[game(FcEvo)] skip!(24),
@@ -286,7 +286,7 @@ mod fork_loop {
 			insns.push(Insn::read(f, arc)?);
 		}
 		ensure!(f.pos() == pos+len, "overshot while reading fork loop");
-		ensure!(read_raw_insn(f, arc)? == RawIInsn::Insn(Insn::Yield()), "invalid loop");
+		ensure!(read_raw_insn(f, arc)? == RawIInsn::Insn(Insn::NextFrame()), "invalid loop");
 		ensure!(read_raw_insn(f, arc)? == RawIInsn::Goto(pos), "invalid loop");
 		Ok(insns)
 	}
@@ -301,7 +301,7 @@ mod fork_loop {
 			Insn::write(f, arc, i)?;
 		}
 		f.label(l2_);
-		write_raw_insn(f, arc, RawOInsn::Insn(&Insn::Yield()))?;
+		write_raw_insn(f, arc, RawOInsn::Insn(&Insn::NextFrame()))?;
 		write_raw_insn(f, arc, RawOInsn::Goto(l1c))?;
 		Ok(())
 	}

@@ -16,8 +16,8 @@ use crate::util::*;
 use crate::text::Text;
 
 use super::{
-	Attr, CharAttr, CharFlags, CharId, Color, Emote, Flag, Flags, FuncRef, InExt2, MagicId, Member,
-	MemberAttr, OutExt2, Pos2, Pos3, QuestFlags, ShopId, Var,
+	Attr, CharAttr, CharFlags, CharId, Color, Emote, Flag, SystemFlags, FuncRef, InExt2, MagicId,
+	Member, MemberAttr, OutExt2, Pos2, Pos3, QuestFlags, ShopId, Var, ObjectFlags,
 };
 
 mod insn;

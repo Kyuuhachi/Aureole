@@ -1,4 +1,4 @@
-use super::{Scena, Npc, Monster, Trigger, Object, FuncRef, CharId, Pos2, Pos3};
+use super::{Scena, Npc, Monster, Trigger, Object, Entry, FuncRef, CharId, Pos2, Pos3};
 use super::code::{InsnArg as I, FlatInsn, Label, Insn, Expr, ExprBinop, ExprUnop};
 use super::code::decompile::{decompile, TreeInsn};
 use crate::text::{Text, TextSegment};
@@ -71,11 +71,11 @@ impl Context {
 
 pub fn dump(f: &mut Context, scena: &Scena) {
 	let Scena {
-		dir,
-		fname,
+		path,
+		map,
 		town,
 		bgm,
-		entry_func,
+		item,
 		includes,
 		ch,
 		cp,
@@ -83,17 +83,17 @@ pub fn dump(f: &mut Context, scena: &Scena) {
 		monsters,
 		triggers,
 		objects,
-		camera_angles,
+		entries,
 		functions,
 	} = scena;
 
 	f.write("scena");
 	object(f, &[
-		("dir", I::String(dir)),
-		("fname", I::String(fname)),
+		("path", I::String(path)),
+		("map", I::String(map)),
 		("town", I::TownId(town)),
 		("bgm", I::BgmId(bgm)),
-		("entry_func", I::FuncRef(entry_func)),
+		("item", I::FuncRef(item)),
 	]);
 	f.line();
 
@@ -106,17 +106,35 @@ pub fn dump(f: &mut Context, scena: &Scena) {
 		f.line();
 	}
 
-	for (i, a) in ch.iter().enumerate() {
-		f.write("ch ");
-		val(f, I::String(a));
-		f.writeln(&format!(" // {i}"));
-	}
-	if !ch.is_empty() {
+	for Entry {
+		pos, chr, angle,
+		cam_from, cam_at, cam_zoom, cam_pers, cam_deg, cam_limit1, cam_limit2, north,
+		flags, town, init, reinit,
+	} in entries {
+		f.write("entry");
+		object(f, &[
+			("pos", I::Pos3(pos)),
+			("chr", I::u16(chr)),
+			("angle", I::Angle(angle)),
+			("cam_from", I::Pos3(cam_from)),
+			("cam_at", I::Pos3(cam_at)),
+			("cam_zoom", I::i32(cam_zoom)),
+			("cam_pers", I::i32(cam_pers)),
+			("cam_deg", I::Angle(cam_deg)),
+			("cam_limit1", I::Angle(cam_limit1)),
+			("cam_limit2", I::Angle(cam_limit2)),
+			("north", I::Angle(north)),
+			("flags", I::u16(flags)),
+			("town", I::TownId(town)),
+			("init", I::FuncRef(init)),
+			("reinit", I::FuncRef(reinit)),
+		]);
 		f.line();
 	}
+	f.line();
 
 	for (i, a) in cp.iter().enumerate() {
-		f.write("cp ");
+		f.write("char_pattern ");
 		val(f, I::String(a));
 		f.writeln(&format!(" // {i}"));
 	}
@@ -124,19 +142,29 @@ pub fn dump(f: &mut Context, scena: &Scena) {
 		f.line();
 	}
 
+
+	for (i, a) in ch.iter().enumerate() {
+		f.write("char_data ");
+		val(f, I::String(a));
+		f.writeln(&format!(" // {i}"));
+	}
+	if !ch.is_empty() {
+		f.line();
+	}
+
 	let mut n = 8;
 
-	for Npc { name, pos, angle, ch, cp, flags, init, talk } in npcs {
+	for Npc { name, pos, angle, x, cp, frame, ch, flags, init, talk } in npcs {
 		f.write("npc ");
 		val(f, I::CharId(&CharId(n)));
 		object(f, &[
 			("name", I::TextTitle(name)),
 			("pos", I::Pos3(pos)),
 			("angle", I::Angle(angle)),
-			("ch0", I::u16(&ch.0)),
-			("ch1", I::u16(&ch.1)),
-			("cp0", I::u16(&cp.0)),
-			("cp1", I::u16(&cp.1)),
+			("x", I::u16(x)),
+			("pt", I::u16(cp)),
+			("no", I::u16(frame)),
+			("bs", I::u16(ch)),
 			("flags", I::CharFlags(flags)),
 			("init", I::FuncRef(init)),
 			("talk", I::FuncRef(talk)),
@@ -182,17 +210,12 @@ pub fn dump(f: &mut Context, scena: &Scena) {
 			("pos", I::Pos3(pos)),
 			("radius", I::u32(radius)),
 			("bubble_pos", I::Pos3(bubble_pos)),
-			("flags", I::u16(flags)),
+			("flags", I::ObjectFlags(flags)),
 			("func", I::FuncRef(func)),
 			("_1", I::u16(_1)),
 		]);
 		f.line();
 	}
-
-	for ca in camera_angles {
-		f.writeln(&format!("{:?}", ca)); // cheap cop-out, but whatever
-	}
-	f.line();
 
 	for (i, func) in functions.iter().enumerate() {
 		f.write("fn ");
@@ -359,31 +382,32 @@ fn val(f: &mut Context, a: I) {
 		I::u32(v) => f.write(&format!("{v}")),
 		I::String(v) => f.write(&format!("{v:?}")),
 
-		I::Flag(v) => f.write(&format!("F{}", v.0)),
-		I::Attr(v) => f.write(&format!("A{}", v.0)),
-		I::Var(v) => f.write(&format!("V{}", v.0)),
+		I::Flag(v) => f.write(&format!("flag[{}]", v.0)),
+		I::Attr(v) => f.write(&format!("system[{}]", v.0)),
+		I::Var(v) => f.write(&format!("var[{}]", v.0)),
 		I::CharAttr(v) => { val(f, I::CharId(&v.0)); f.write(&format!(":{}", v.1)) },
 
-		I::Flags(v)      => f.write(&format!("0x{:08X}", v.0)),
-		I::CharFlags(v)  => f.write(&format!("0x{:04X}", v.0)),
-		I::QuestFlags(v) => f.write(&format!("0x{:02X}", v.0)),
-		I::Color(v)      => f.write(&format!("#{:08X}", v.0)),
+		I::SystemFlags(v) => f.write(&format!("0x{:08X}", v.0)),
+		I::CharFlags(v)   => f.write(&format!("0x{:04X}", v.0)),
+		I::QuestFlags(v)  => f.write(&format!("0x{:02X}", v.0)),
+		I::ObjectFlags(v) => f.write(&format!("0x{:04X}", v.0)),
+		I::Color(v)       => f.write(&format!("#{:08X}", v.0)),
 
 		I::CharId(v)   => f.write(&format!("{v:?}")),
 		I::BattleId(v) => f.write(&format!("{v:?}")),
 		I::BgmId(v)    => f.write(&format!("{v:?}")),
-		I::ChcpId(v)   => f.write(&format!("{v:?}")),
-		I::ExitId(v)   => f.write(&format!("{v:?}")),
-		I::ForkId(v)   => f.write(&format!("{v:?}")),
 		I::ItemId(v)   => f.write(&format!("{v:?}")),
 		I::MagicId(v)  => f.write(&format!("{v:?}")),
-		I::MenuId(v)   => f.write(&format!("{v:?}")),
-		I::ObjectId(v) => f.write(&format!("{v:?}")),
 		I::QuestId(v)  => f.write(&format!("{v:?}")),
 		I::ShopId(v)   => f.write(&format!("{v:?}")),
 		I::SoundId(v)  => f.write(&format!("{v:?}")),
 		I::TownId(v)   => f.write(&format!("{v:?}")),
-		I::VisId(v)    => f.write(&format!("{v:?}")),
+
+		I::ExitId(v)   => f.write(&format!("ExitId({v})")),
+		I::ForkId(v)   => f.write(&format!("ForkId({v})")),
+		I::MenuId(v)   => f.write(&format!("MenuId({v})")),
+		I::ObjectId(v) => f.write(&format!("ObjectId({v})")),
+		I::VisId(v)    => f.write(&format!("VisId({v})")),
 
 		I::Expr(v) => expr(f, v),
 		I::Fork(v) => {

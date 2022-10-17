@@ -9,7 +9,6 @@ use mapr::Mmap;
 use hamu::read::coverage::*;
 use hamu::read::le::*;
 
-use crate::gamedata::{GameDataImpl, LookupError};
 use crate::decompress;
 use crate::util;
 
@@ -194,15 +193,14 @@ impl Archives {
 		})
 	}
 
-	pub fn get(&self, name: &str) -> Result<&[u8], LookupError> {
-		let arch = *self.names.get(name).ok_or(name)?;
-		let data = self.archive(arch).ok_or(name)?
-			.get(name).ok_or(name)?;
-		Ok(data)
+	pub fn get(&self, name: &str) -> Option<&[u8]> {
+		let arch = *self.names.get(name)?;
+		let data = self.archive(arch)?.get(name)?;
+		Some(data)
 	}
 
-	pub fn get_decomp(&self, name: &str) -> Result<Vec<u8>, LookupError> {
-		self.get(name).and_then(|a| decompress::decompress(a).map_err(|_| name.into()))
+	pub fn get_decomp(&self, name: &str) -> Option<Vec<u8>> {
+		self.get(name).and_then(|a| decompress::decompress(a).ok())
 	}
 
 	pub fn list(&self) -> Box<dyn Iterator<Item=&str> + '_> {
@@ -215,6 +213,25 @@ impl Archives {
 		)
 	}
 
+	pub fn name(&self, a: u32) -> Option<&str> {
+		let index = (a & 0xFFFF) as u16;
+		let mut arch  = (a >> 16) as u16;
+		if arch == 0x1A && !self.archives.contains_key(&0x1A) {
+			arch = 0x1B;
+		}
+		let name = self.archive(arch)?.name(index as usize)?;
+		Some(name)
+	}
+
+	pub fn index(&self, name: &str) -> Option<u32> {
+		let mut arch = *self.names.get(name)?;
+		let index = self.archive(arch)?.index(name)?;
+		if arch == 0x1B {
+			arch = 0x1A;
+		}
+		Some((index as u32) | (arch as u32) << 16)
+	}
+
 	pub fn archive(&self, n: u16) -> Option<&Archive> {
 		self.archives.get(&n)
 	}
@@ -222,27 +239,5 @@ impl Archives {
 	pub fn archives(&self) -> impl Iterator<Item=(u8, &Archive)> {
 		self.archives.iter().map(|(a, b)| (*a as u8, b))
 	}
-}
 
-impl GameDataImpl for Archives {
-	fn name(&self, a: u32) -> Result<&str, LookupError> {
-		let index = (a & 0xFFFF) as u16;
-		let mut arch  = (a >> 16) as u16;
-		if arch == 0x1A && !self.archives.contains_key(&0x1A) {
-			arch = 0x1B;
-		}
-		let name = self.archive(arch).ok_or(a)?
-			.name(index as usize).ok_or(a)?;
-		Ok(name)
-	}
-
-	fn index(&self, name: &str) -> Result<u32, LookupError> {
-		let mut arch = *self.names.get(name).ok_or(name)?;
-		let index = self.archive(arch).ok_or(name)?
-			.index(name).ok_or(name)?;
-		if arch == 0x1B {
-			arch = 0x1A;
-		}
-		Ok((index as u32) | (arch as u32) << 16)
-	}
 }

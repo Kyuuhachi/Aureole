@@ -97,3 +97,13 @@ impl<T: GameDataImpl> GameDataImpl for SkyGameData<T> {
 		Ok(self.1.index(name)? | ((self.0 as u32) << 16))
 	}
 }
+
+impl GameDataImpl for crate::archive::Archives {
+	fn name(&self, a: u32) -> Result<&str, LookupError> {
+		self.name(a).ok_or_else(|| a.into())
+	}
+
+	fn index(&self, name: &str) -> Result<u32, LookupError> {
+		self.index(name).ok_or_else(|| name.into())
+	}
+}

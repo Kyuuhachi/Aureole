@@ -478,28 +478,69 @@ pub fn write(arc: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 
 #[cfg(test)]
 mod test {
-use crate::gamedata::GameData;
+	use crate::gamedata::GameData;
+	use crate::gamedata::InstructionSet;
+	use crate::archive::Archives;
 	use crate::util::test::*;
 
-	#[test_case::test_case(&FC, "", "._sn"; "fc")]
-	fn roundtrip(arc: &GameData, prefix: &str, suffix: &str) -> Result<(), Error> {
+	macro_rules! tests {
+		($a:item) => {
+			#[test_case::test_case(InstructionSet::Fc, "../data/fc", "../data/fc.extract/01/", "._sn"; "fc")]
+			$a
+		}
+	}
+
+	tests! {
+	fn roundtrip(iset: InstructionSet, datapath: &str, scenapath: &str, suffix: &str) -> Result<(), Error> {
+		let arc = GameData::new(Archives::new(datapath).unwrap(), iset);
 		let mut failed = false;
 
-		for name in arc.list().filter(|&a| a.starts_with(prefix) && a.ends_with(suffix)) {
-			if let Err(err) = check_roundtrip_strict(arc, name, super::read, super::write) {
+		let mut paths = std::fs::read_dir(scenapath)?
+			.map(|r| r.unwrap())
+			.collect::<Vec<_>>();
+		paths.sort_by_key(|dir| dir.path());
+
+		for file in paths {
+			let path = file.path();
+			let name = path.file_name().unwrap().to_str().unwrap();
+			if !name.ends_with(suffix) {
+				continue
+			}
+
+			let data = std::fs::read(&path)?;
+
+			if let Err(err) = check_roundtrip_strict_data(&arc, &data, super::read, super::write) {
 				println!("{name}: {err}");
 				failed = true;
 			};
 		}
 
+
 		assert!(!failed);
 		Ok(())
 	}
+	}
 
-	#[test_case::test_case(&FC, "", "._sn"; "fc")]
-	fn decompile(arc: &GameData, prefix: &str, suffix: &str) -> Result<(), Error> {
-		for name in arc.list().filter(|&a| a.starts_with(prefix) && a.ends_with(suffix)) {
-			let scena = super::read(arc, &arc.get_decomp(name)?)?;
+	tests! {
+	fn decompile(iset: InstructionSet, datapath: &str, scenapath: &str, suffix: &str) -> Result<(), Error> {
+		let arc = GameData::new(Archives::new(datapath).unwrap(), iset);
+		let mut failed = false;
+
+		let mut paths = std::fs::read_dir(scenapath)?
+			.map(|r| r.unwrap())
+			.collect::<Vec<_>>();
+		paths.sort_by_key(|dir| dir.path());
+
+		for file in paths {
+			let path = file.path();
+			let name = path.file_name().unwrap().to_str().unwrap();
+			if !name.ends_with(suffix) {
+				continue
+			}
+
+			let data = std::fs::read(&path)?;
+
+			let scena = super::read(&arc, &data)?;
 			for (i, func) in scena.functions.iter().enumerate() {
 				let decomp = super::code::decompile::decompile(func).map_err(|e| format!("{name}:{i}: {e}"))?;
 				let recomp = super::code::decompile::recompile(&decomp).map_err(|e| format!("{name}:{i}: {e}"))?;
@@ -523,11 +564,14 @@ use crate::gamedata::GameData;
 					super::text::flat_func(&mut ctx, &recomp);
 					println!("{}", ctx.output);
 
-					panic!()
+					failed = true;
 				}
 			}
 		}
 
+		assert!(!failed);
+
 		Ok(())
+	}
 	}
 }

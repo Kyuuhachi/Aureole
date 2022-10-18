@@ -78,6 +78,7 @@ pub fn check_roundtrip_strict<T>(
 	let val = read(data)?;
 	let data2 = write(&val)?;
 	if data != data2 {
+		println!("differs! rereading");
 		let val2 = read(&data2)?;
 		check_equal(&val, &val2)?;
 

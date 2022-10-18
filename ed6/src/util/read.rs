@@ -102,6 +102,25 @@ pub trait InExt<'a>: In<'a> {
 		Ok(out)
 	}
 
+	fn multiple_loose<const N: usize, A: PartialEq + std::fmt::Debug>(
+		&mut self,
+		nil: &[u8],
+		mut f: impl FnMut(&mut Self) -> Result<A, ReadError>,
+	) -> Result<[Option<A>; N], ReadError> {
+		super::array(|| {
+			let i = self.pos();
+			if self.slice(nil.len())? == nil {
+				Ok(None)
+			} else {
+				let j = self.pos();
+				self.seek(i)?;
+				let v = f(self)?;
+				ensure!(self.pos() == j, "inconsistent position: {i} != {j}");
+				Ok(Some(v))
+			}
+		})
+	}
+
 	fn sized_string<const N: usize>(&mut self) -> Result<String, ReadError> {
 		let buf = self.multiple::<N, _>(&[0], |a| Ok(a.u8()?))?;
 		Ok(decode(&buf)?)

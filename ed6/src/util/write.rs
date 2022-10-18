@@ -82,6 +82,22 @@ pub trait OutExt: Out {
 		Ok(())
 	}
 
+	fn multiple_loose<const N: usize, A: PartialEq + std::fmt::Debug>(
+		&mut self,
+		nil: &[u8],
+		items: &[Option<A>; N],
+		mut f: impl FnMut(&mut Self, &A) -> Result<(), WriteError>,
+	) -> Result<(), WriteError> {
+		for i in items {
+			if let Some(i) = i {
+				f(self, i)?;
+			} else {
+				self.slice(nil);
+			}
+		}
+		Ok(())
+	}
+
 	fn sized_string<const N: usize>(&mut self, s: &str) -> Result<(), WriteError> {
 		let s = encode(s)?;
 		// Not using multiple() here to include the string in the error

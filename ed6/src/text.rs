@@ -27,6 +27,7 @@ pub enum TextSegment {
 	Color(u8),
 	_09,
 	Item(ItemId),
+	_18,
 	Hash(HashSegment),
 
 	// Invalid sjis, or hash sequence that did not parse correctly.
@@ -56,6 +57,7 @@ impl Text {
 				0x00 => break,
 				0x01 | 0x02 | 0x03 | 0x05 | 0x06 | 0x09 => {}
 				0x07 => { f.u8()?; }
+				0x18 => {}
 				0x1F => { f.u16()?; }
 				ch@(0x00..=0x1F) => bail!("b{:?}", char::from(ch)),
 				0x20.. => {}
@@ -173,12 +175,13 @@ impl Iterator for Iter<'_> {
 				TextSegment::Color(n)
 			}
 			0x09 => { self.pos += 1; TextSegment::_09 }
+			0x18 => { self.pos += 1; TextSegment::_18 }
 			0x1F => {
 				let n = u16::from_le_bytes([self.data[self.pos+1], self.data[self.pos+2]]);
-				self.pos += 2;
+				self.pos += 3;
 				TextSegment::Item(ItemId(n))
 			}
-			0x00..=0x1F => unreachable!(),
+			a@(0x00..=0x1F) => unreachable!("{a:02X} {:02X?}", &self.data),
 			b'#' => {
 				self.pos += 1;
 				if let Some(seg) = self.parse_hash() {
@@ -219,6 +222,7 @@ impl TextSegment {
 				f.u8(*n);
 			}
 			TextSegment::_09 => f.u8(0x09),
+			TextSegment::_18 => f.u8(0x18),
 			TextSegment::Item(n) => {
 				f.u8(0x1F);
 				f.u16(n.0);

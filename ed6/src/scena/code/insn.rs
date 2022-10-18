@@ -2,7 +2,7 @@ use super::*;
 
 ed6_macros::bytecode! {
 	(iset: InstructionSet, lookup: &dyn Lookup)
-	#[games(iset => InstructionSet::{Fc, FcEvo})]
+	#[games(iset => InstructionSet::{Fc, FcEvo, Sc})]
 	[
 		skip!(1), // null
 		Return(), // [return]
@@ -22,15 +22,16 @@ ed6_macros::bytecode! {
 		Fog(u8, u8, u8, u32, u32, u32), // First three are color; TODO parse it as one. Last is always 0.
 		_12(i32, i32, u32),
 		PlaceSetName(u16 as TownId),
-		skip!(2),
+		Sc_14(u32, u32, u32, u32, u8),
+		Sc_15(u32),
 		Map(match {
 			0x00 => Hide(),
 			0x01 => Show(),
 			0x02 => Set(i32, Pos2, file_ref(lookup) -> String alias MapFileRef),
 		}),
-		#[game(Fc)] Save(),
+		#[game(Fc, Sc)] Save(),
 		#[game(FcEvo)] SaveEvo(u8),
-		skip!(1),
+		Sc_18(u8, u8, u8),
 		EventBegin(u8), // [event_begin]
 		EventEnd(u8), // [event_end]
 		_1B(u16, u16),
@@ -59,16 +60,16 @@ ed6_macros::bytecode! {
 		QuestList(quest_list() -> Vec<QuestId> alias QuestList),
 		QuestBonusBp(u16 as QuestId, u16),
 		QuestBonusMira(u16 as QuestId, u16),
-		PartyAdd(u8 as Member, u8), // [join_party]
+		PartyAdd(u8 as Member, u8, u8_not_in_fc(iset) -> u8), // [join_party]
 		PartyRemove(u8 as Member, u8), // [separate_party]
-		skip!(1),
+		ScPartyClear(),
 		_Party30(u8 as Member),
 		PartySetAttr(u8 as Member, u8 as MemberAttr, u16), // [set_status]
 		skip!(2),
 		PartyAddArt(u8 as Member, u16 as MagicId),
 		PartyAddCraft(u8 as Member, u16 as MagicId),
 		PartyAddSCraft(u8 as Member, u16 as MagicId),
-		PartySet(u8 as Member, u8, u8),
+		PartySetSlot(u8 as Member, u8, party_set_slot(_1) -> i8),
 		SepithAdd(u8 as Element alias SepithElement, u16),
 		SepithRemove(u8 as Element alias SepithElement, u16),
 		MiraAdd(u16), // [get_gold]
@@ -77,8 +78,8 @@ ed6_macros::bytecode! {
 		skip!(1), // I have a guess what this is, but it doesn't exist in any scripts
 		ItemAdd(u16 as ItemId, u16),
 		ItemRemove(u16 as ItemId, u16), // [release_item]
-		ItemHas(u16 as ItemId), // or is it ItemGetCount?
-		PartyEquip(u8 as Member, u16 as ItemId, party_equip_slot(_1) -> i8),
+		ItemHas(u16 as ItemId, u8_not_in_fc(iset) -> u8), // or is it ItemGetCount?
+		PartyEquip(u8 as Member, u16 as ItemId, party_equip_slot(iset, _1) -> i8),
 		PartyPosition(u8 as Member),
 		ForkFunc(u16 as CharId, u8 alias ForkId, func_ref() -> FuncRef), // [execute]
 		ForkQuit(u16 as CharId, u8 alias ForkId), // [terminate]
@@ -100,7 +101,7 @@ ed6_macros::bytecode! {
 		TextMessage(text() -> Text), // [mes]
 		skip!(1),
 		TextClose(u8), // [mes_close]
-		skip!(1),
+		Sc_57(u32, u16, text() -> Text),
 		TextWait(), // [wait_prompt]
 		_59(), // Always directly after a TextReset 1, and exists in all but one such case. I suspect that one is a bug.
 		TextSetPos(i16, i16, i16, i16), // [mes_pos]
@@ -138,7 +139,7 @@ ed6_macros::bytecode! {
 		_7A(u8, u16),
 		_7B(),
 		Shake(u32, u32, u32, u32 alias Time), // [quake]
-		skip!(1),
+		Sc_7D(u8, u8, u8, u8, u8, u16),
 		_7E(i16, i16, u16, u8, u32),
 		EffLoad(u8, String alias EffFileRef),
 		EffPlay(u8, u8, i16, Pos3, u16, u16, u16, u32, u32, u32, u16, u32, u32, u32, u32),
@@ -165,7 +166,11 @@ ed6_macros::bytecode! {
 		CharJump       (u16 as CharId, i32, i32, i32, u32, u32 alias Speed), // [jump]
 		_Char96        (u16 as CharId, Pos3, i32, i32),
 		_Char97        (u16 as CharId, Pos2, i32 alias Angle32, u32, u16), // used with pigeons
-		skip!(1),
+		Sc_Char98(match {
+			0 => _0(u16 as CharId),
+			1 => _1(Pos3),
+			2 => _2(u16 as CharId, u32, u8),
+		}),
 		CharAnimation  (u16 as CharId, u8, u8, u32 alias Time), // [chr_anime]
 		CharFlagsSet   (u16 as CharId, u16 as CharFlags), // [set_state]
 		CharFlagsUnset (u16 as CharId, u16 as CharFlags), // [reset_state]
@@ -173,7 +178,7 @@ ed6_macros::bytecode! {
 		_Char9D        (u16 as CharId, u16),
 		CharShake      (u16 as CharId, u32, u32, u32, u32),
 		CharColor      (u16 as CharId, u32 as Color, u32 alias Time),
-		skip!(1),
+		Sc_A0(u8,u8,u8,u8,u8,u8,u8,u8,u8),
 		CharAttachObj  (u16 as CharId, u16 alias ObjectId),
 		FlagSet(u16 as Flag), // [set_flag]
 		FlagUnset(u16 as Flag), // [reset_flag]
@@ -191,15 +196,15 @@ ed6_macros::bytecode! {
 		OpLoad(String alias OpFileRef),
 		_B2(u8, u8, u16),
 		Video(match {
-			0x00 => Play(String alias AviFileRef), // [movie(MOVIE_START)]
-			0x01 => End(u8), // [movie(MOVIE_END)]
+			0x00 => Play(String alias AviFileRef, u32_not_in_fc(iset) -> u32), // [movie(MOVIE_START)]
+			0x01 => End(u8, u32_not_in_fc(iset) -> u32), // [movie(MOVIE_END)]
 		}),
 		ReturnToTitle(u8),
 
 		#[game(Fc,FcEvo)] PartySlot(u8 as Member, u8, u8),
-		#[game(Fc,FcEvo)] _FcB6(u8),
-		#[game(Fc,FcEvo)] _FcB7(u8 as Member, u8, u8), // Related to PartyAdd
-		#[game(Fc,FcEvo)] _FcB8(u8 as Member), // Related to PartyRemove
+		#[game(Fc,FcEvo)] Fc_B6(u8),
+		#[game(Fc,FcEvo)] Fc_B7(u8 as Member, u8, u8), // Related to PartyAdd
+		#[game(Fc,FcEvo)] Fc_B8(u8 as Member), // Related to PartyRemove
 		#[game(Fc,FcEvo)] ReadBook(u16 as ItemId, u16),
 		#[game(Fc,FcEvo)] PartyHasSpell(u8 as Member, u16 as MagicId),
 		#[game(Fc,FcEvo)] PartyHasSlot(u8 as Member, u8),
@@ -209,23 +214,84 @@ ed6_macros::bytecode! {
 
 		#[game(FcEvo)] skip!(10),
 		#[game(FcEvo)] EvoVisLoad(u8 alias VisId, u16, u16, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u32 as Color, u8, u8, String),
-		#[game(FcEvo)] EvoVisC7(u8 alias VisId, u8, u32 as Color, u32, u32, u32),
-		#[game(FcEvo)] EvoVis(match {
-			0 => C8(u8 alias VisId, u8),
-			1 => Close(u8 alias VisId, u8),
-		}),
+		#[game(FcEvo)] EvoVisColor(u8 alias VisId, u8, u32 as Color, u32, u32, u32),
+		#[game(FcEvo)] EvoVisDispose(u8, u8 alias VisId, u8),
 		#[game(FcEvo)] skip!(19),
-		#[game(FcEvo)] EvoDC(),
-		#[game(FcEvo)] EvoDD(),
-		#[game(FcEvo)] EvoDE(),
+		#[game(FcEvo)] Evo_DC(),
+		#[game(FcEvo)] Evo_DD(),
+		#[game(FcEvo)] EvoClearSaveData(),
 		#[game(FcEvo)] skip!(2),
-		#[game(FcEvo)] EvoE1(u8 as u16 alias ObjectId, Pos3),
+		#[game(FcEvo)] Evo_E1(u8 as u16 alias ObjectId, Pos3),
 		#[game(FcEvo)] skip!(2),
 		#[game(FcEvo)] EvoCtp(String), // Refers to /data/map2/{}.ctp
 		#[game(FcEvo)] EvoVoiceLine(u16), // [pop_msg]
-		#[game(FcEvo)] EvoE8(text() -> Text),
-		#[game(FcEvo)] EvoE7(u8, u8),
+		#[game(FcEvo)] Evo_E6(text() -> Text),
+		#[game(FcEvo)] Evo_E7(u8, u8),
 		#[game(FcEvo)] skip!(24),
+
+		#[game(Sc)] Sc_B5(u8),
+		#[game(Sc)] Sc_B6(u8, u8, u8),
+		#[game(Sc)] Sc_B7(u8),
+		#[game(Sc)] Sc_B8(u32),
+		#[game(Sc)] ScPartyHasSpell(u8 as Member, u16 as MagicId),
+		#[game(Sc)] skip!(1),
+		#[game(Sc)] ScSetPortrait(u8 as Member, u8, u32),
+		#[game(Sc)] skip!(1),
+		#[game(Sc)] Sc_BD(),
+		#[game(Sc)] Sc_BE(u8,u8,u8,u8, u16, u16, u8, i32,i32,i32,i32,i32,i32),
+		#[game(Sc)] Sc_BF(u32, u16),
+		#[game(Sc)] ScMinigame(u8, i32,i32,i32,i32,i32,i32,i32,i32), // 11 roulette, 12 slots, 13 blackjack, 15 poker, 17 broken shooting minigame , 19 menu with st/eq/orb
+		#[game(Sc)] Sc_C1(u16, u32),
+		#[game(Sc)] Sc_C2(),
+		#[game(Sc)] skip!(1),
+		#[game(Sc)] ScScreenInvert(u8, u32),
+		#[game(Sc)] ScVisLoad(u8 alias VisId, u16,u16,u16,u16, u16,u16,u16,u16, u16,u16,u16,u16, u32 as Color, u8, String),
+		#[game(Sc)] ScVisColor(u8 alias VisId, u8, u32 as Color, i32, u32),
+		#[game(Sc)] ScVisDispose(u8, u8 alias VisId, u8),
+		#[game(Sc)] Sc_C8(u32, String, u8, u16),
+		#[game(Sc)] ScPartySelect(u16, sc_party_select_mandatory() -> [Option<Member>; 4] alias MandatoryMembers, sc_party_select_optional() -> Vec<Member> alias OptionalMembers),
+		#[game(Sc)] Sc_CA(u16, u32),
+		#[game(Sc)] Sc_CharInSlot(u8),
+		#[game(Sc)] Sc_Select(match {
+			0 => New(u8,u8,u8,u8,u8,u8),
+			1 => Add(u8, String),
+			2 => Show(u8),
+			3 => _3(u8, u8),
+		}),
+		#[game(Sc)] Sc_CD(u16 as CharId),
+		#[game(Sc)] Sc_ExprUnk(u8, expr(iset, lookup) -> Expr),
+		#[game(Sc)] Sc_CF(u16 as CharId, u8, String),
+		#[game(Sc)] Sc_D0(u32, u32),
+		#[game(Sc)] Sc_D1(u16 as CharId, i32, i32, i32, i32),
+		#[game(Sc)] Sc_D2(file_ref(lookup) -> String, file_ref(lookup) -> String, u8),
+		#[game(Sc)] Sc_D3(u8),
+		#[game(Sc)] skip!(1),
+		#[game(Sc)] ScPartyIsEquipped(u8 as Member, u16, u16 as ItemId, u8,u8,u8),
+		#[game(Sc)] Sc_D6(u8),
+		#[game(Sc)] Sc_D7(u8,u8,u8,u8,u8,u8,u8),
+		#[game(Sc)] Sc_D8(u8, u16),
+		#[game(Sc)] Sc_D9(match {
+			0 => _0(String),
+			1 => _1(),
+		}),
+		#[game(Sc)] Sc_DA(),
+		#[game(Sc)] Sc_DB(),
+		#[game(Sc)] Sc_DC(),
+		#[game(Sc)] Sc_DD(),
+		#[game(Sc)] Sc_DE(String),
+		#[game(Sc)] skip!(1),
+		#[game(Sc)] Sc_E0(u8, Pos3),
+		#[game(Sc)] skip!(2),
+		#[game(Sc)] Sc_E3(u32),
+		#[game(Sc)] skip!(1),
+		#[game(Sc)] Sc_E5(u16 as CharId, u8),
+		#[game(Sc)] Sc_E6(u8), // related to RAM saving, according to debug script
+		#[game(Sc)] Sc_E7(u8, String, u8,u8,u8,u8,u8),
+		#[game(Sc)] Sc_E8(u32),
+		#[game(Sc)] Sc_E9(u8), // related to RAM saving
+		#[game(Sc)] Sc_EA(u32),
+		#[game(Sc)] Sc_EB(u16),
+		#[game(Sc)] skip!(20),
 	]
 }
 
@@ -261,7 +327,9 @@ mod fork {
 			insns.push(Insn::read(f, iset, lookup)?);
 		}
 		ensure!(f.pos() == pos+len, "overshot while reading fork");
-		f.check_u8(0)?;
+		if len > 0 {
+			f.check_u8(0)?;
+		}
 		Ok(insns)
 	}
 
@@ -274,7 +342,9 @@ mod fork {
 			Insn::write(f, iset, lookup, i)?;
 		}
 		f.label(l2_);
-		f.u8(0);
+		if !v.is_empty() {
+			f.u8(0);
+		}
 		Ok(())
 	}
 }
@@ -312,19 +382,40 @@ mod fork_loop {
 
 mod party_equip_slot {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>, arg1: &ItemId) -> Result<i8, ReadError> {
-		if (600..800).contains(&arg1.0) {
-			Ok(f.i8()?)
-		} else {
+	pub(super) fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet, arg1: &ItemId) -> Result<i8, ReadError> {
+		if !(600..800).contains(&arg1.0) && matches!(iset, InstructionSet::Fc|InstructionSet::FcEvo) {
 			Ok(-1)
+		} else {
+			Ok(f.i8()?)
 		}
 	}
 
-	pub(super) fn write(f: &mut impl Out, arg1: &ItemId, v: &i8) -> Result<(), WriteError> {
-		if (600..800).contains(&arg1.0) {
-			f.i8(*v);
-		} else {
+	pub(super) fn write(f: &mut impl Out, iset: InstructionSet, arg1: &ItemId, v: &i8) -> Result<(), WriteError> {
+		if !(600..800).contains(&arg1.0) && matches!(iset, InstructionSet::Fc|InstructionSet::FcEvo) {
 			ensure!(*v == -1, "invalid PartyEquipSlot");
+		} else {
+			f.i8(*v);
+		}
+		Ok(())
+	}
+}
+
+// I'm fairly sure this logic is wrong; check t4403:17 for an example
+mod party_set_slot {
+	use super::*;
+	pub(super) fn read<'a>(f: &mut impl In<'a>, arg1: &u8) -> Result<i8, ReadError> {
+		if *arg1 == 0xFF {
+			Ok(-1)
+		} else {
+			Ok(f.i8()?)
+		}
+	}
+
+	pub(super) fn write(f: &mut impl Out, arg1: &u8, v: &i8) -> Result<(), WriteError> {
+		if *arg1 == 0xFF {
+			ensure!(*v == -1, "invalid PartySetSlot");
+		} else {
+			f.i8(*v);
 		}
 		Ok(())
 	}
@@ -414,5 +505,74 @@ mod text {
 
 	pub(super) fn write(f: &mut impl Out, v: &Text) -> Result<(), WriteError> {
 		crate::text::Text::write(f, v)
+	}
+}
+
+mod u8_not_in_fc {
+	use super::*;
+	pub(super) fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet) -> Result<u8, ReadError> {
+		match iset {
+			InstructionSet::Fc | InstructionSet::FcEvo => Ok(0),
+			_ => Ok(f.u8()?)
+		}
+	}
+
+	pub(super) fn write(f: &mut impl Out, iset: InstructionSet, v: &u8) -> Result<(), WriteError> {
+		match iset {
+			InstructionSet::Fc | InstructionSet::FcEvo => ensure!(*v == 0, "{v} must be 0"),
+			_ => f.u8(*v)
+		}
+		Ok(())
+	}
+}
+
+mod u32_not_in_fc {
+	use super::*;
+	pub(super) fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet) -> Result<u32, ReadError> {
+		match iset {
+			InstructionSet::Fc | InstructionSet::FcEvo => Ok(0),
+			_ => Ok(f.u32()?)
+		}
+	}
+
+	pub(super) fn write(f: &mut impl Out, iset: InstructionSet, v: &u32) -> Result<(), WriteError> {
+		match iset {
+			InstructionSet::Fc | InstructionSet::FcEvo => ensure!(*v == 0, "{v} must be 0"),
+			_ => f.u32(*v)
+		}
+		Ok(())
+	}
+}
+
+mod sc_party_select_mandatory {
+	use super::*;
+	pub(super) fn read<'a>(f: &mut impl In<'a>) -> Result<[Option<Member>; 4], ReadError> {
+		f.multiple_loose::<4, _>(&[0xFF,0], |g| Ok(Member(cast(g.u16()?)?)))
+	}
+
+	pub(super) fn write(f: &mut impl Out, v: &[Option<Member>; 4]) -> Result<(), WriteError> {
+		f.multiple_loose::<4, _>(&[0xFF,0], v, |g, a| { g.u16(a.0.into()); Ok(()) })
+	}
+}
+
+mod sc_party_select_optional {
+	use super::*;
+	pub(super) fn read<'a>(f: &mut impl In<'a>) -> Result<Vec<Member>, ReadError> {
+		let mut quests = Vec::new();
+		loop {
+			match f.u16()? {
+				0xFFFF => break,
+				q => quests.push(Member(cast(q)?))
+			}
+		}
+		Ok(quests)
+	}
+
+	pub(super) fn write(f: &mut impl Out, v: &Vec<Member>) -> Result<(), WriteError> {
+		for &i in v {
+			f.u16(i.0.into());
+		}
+		f.u16(0xFFFF);
+		Ok(())
 	}
 }

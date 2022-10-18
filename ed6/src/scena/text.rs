@@ -98,11 +98,13 @@ pub fn dump(f: &mut Context, scena: &Scena) {
 	f.line();
 
 	for (i, a) in includes.iter().enumerate() {
-		f.write("include ");
-		val(f, I::String(a));
-		f.writeln(&format!(" // {i}"));
+		if let Some(a) = a {
+			f.write(&format!("scp {i} "));
+			val(f, I::String(a));
+			f.line();
+		}
 	}
-	if !includes.is_empty() {
+	if includes.iter().any(|a| a.is_some()) {
 		f.line();
 	}
 
@@ -131,7 +133,6 @@ pub fn dump(f: &mut Context, scena: &Scena) {
 		]);
 		f.line();
 	}
-	f.line();
 
 	for (i, a) in cp.iter().enumerate() {
 		f.write("char_pattern ");
@@ -393,6 +394,7 @@ fn val(f: &mut Context, a: I) {
 		I::ObjectFlags(v) => f.write(&format!("0x{:04X}", v.0)),
 		I::Color(v)       => f.write(&format!("#{:08X}", v.0)),
 
+		I::Member(v) => f.write(&format!("{v:?}")),
 		I::CharId(v)   => f.write(&format!("{v:?}")),
 		I::BattleId(v) => f.write(&format!("{v:?}")),
 		I::BgmId(v)    => f.write(&format!("{v:?}")),
@@ -444,11 +446,13 @@ fn val(f: &mut Context, a: I) {
 		// I::RelPos3(Pos3(x,y,z)) => f.write(&format!("({x:+}, {y:+}, {z:+})")),
 
 		I::Emote(v) => f.write(&format!("{v:?}")),
-		I::Member(v) => f.write(&format!("{v:?}")),
 		I::MemberAttr(v) => f.write(&format!("{v:?}")),
-		I::QuestList(v) => f.write(&format!("{v:?}")),
 		I::QuestTask(v) => f.write(&format!("{v:?}")),
 		I::SepithElement(v) => f.write(&format!("{v:?}")),
+
+		I::QuestList(v)    => f.write(&format!("{v:?}")),
+		I::MandatoryMembers(v) => f.write(&format!("{v:?}")),
+		I::OptionalMembers(v) => f.write(&format!("{v:?}")),
 
 		I::AviFileRef(v)   => f.write(&format!("{v:?}")),
 		I::EffFileRef(v)   => f.write(&format!("{v:?}")),
@@ -471,6 +475,7 @@ fn expr_prio(f: &mut Context, e: &Expr, prio: u8) {
 		Expr::Attr(v)     => val(f, I::Attr(v)),
 		Expr::CharAttr(v) => val(f, I::CharAttr(v)),
 		Expr::Rand        => f.write("Rand"),
+		Expr::ExprUnk(v)     => { f.write("ExprUnk "); val(f, I::u8(v)); },
 
 		Expr::Binop(op, a, b) => {
 			let (text, prio2) = binop(*op);
@@ -566,6 +571,9 @@ fn text(f: &mut Context, v: &Text) {
 				f.write(&format!("{{color {n}}}"));
 			},
 			TextSegment::_09 => {
+				f.write("{09}")
+			},
+			TextSegment::_18 => {
 				f.write("{09}")
 			},
 			TextSegment::Item(n) => {

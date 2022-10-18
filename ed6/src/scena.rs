@@ -82,7 +82,7 @@ pub struct Scena {
 	pub town: TownId, // [Town; 町名]
 	pub bgm: BgmId, // [BGM; BGM 番号]
 	pub item: FuncRef, // [Item; アイテム使用時イベント]
-	pub includes: Vec<String>, // [Scp0..7; スクリプト(１つだけは必須), これ以降は必要な場合のみ定義する]
+	pub includes: [Option<String>; 8], // [Scp0..7; スクリプト(１つだけは必須), これ以降は必要な場合のみ定義する]
 
 	// The script puts cp before ch.
 	pub ch: Vec<String>, // [Char_Data; キャラデータファイル]
@@ -200,7 +200,7 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 	let bgm = BgmId(f.u8()?);
 	f.check_u8(0)?;
 	let item = FuncRef(f.u16()?, f.u16()?);
-	let includes = f.multiple::<8, _>(&[0xFF;4], |g| Ok(lookup.name(g.u32()?)?.to_owned()))?;
+	let includes = f.multiple_loose::<8, _>(&[0xFF;4], |g| Ok(lookup.name(g.u32()?)?.to_owned()))?;
 	f.check_u16(0)?;
 
 	let head_end = f.clone().u16()? as usize;
@@ -353,7 +353,7 @@ pub fn write(iset: code::InstructionSet, lookup: &dyn Lookup, scena: &Scena) -> 
 	f.u8(bgm.0);
 	f.u8(0);
 	f.u16(item.0); f.u16(item.1);
-	f.multiple::<8, _>(&[0xFF; 4], includes, |g, a| { g.u32(lookup.index(a)?); Ok(()) }).strict()?;
+	f.multiple_loose::<8, _>(&[0xFF; 4], includes, |g, a| { g.u32(lookup.index(a)?); Ok(()) }).strict()?;
 	f.u16(0);
 
 	let (l_ch, l_ch_) = Label::new();
@@ -486,6 +486,7 @@ mod test {
 		($a:item) => {
 			#[test_case::test_case(InstructionSet::Fc, "../data/fc", "../data/fc.extract/01/", "._sn"; "fc")]
 			#[test_case::test_case(InstructionSet::FcEvo, "../data/fc", "../data/vita/extract/fc/gamedata/data/data/scenario/0/", ".bin"; "fc_evo")]
+			#[test_case::test_case(InstructionSet::Sc, "../data/sc", "../data/sc.extract/21/", "._sn"; "sc")]
 			$a
 		}
 	}

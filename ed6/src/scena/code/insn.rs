@@ -69,7 +69,7 @@ ed6_macros::bytecode! {
 		PartyAddArt(u8 as Member, u16 as MagicId),
 		PartyAddCraft(u8 as Member, u16 as MagicId),
 		PartyAddSCraft(u8 as Member, u16 as MagicId),
-		PartySetSlot(u8 as Member, u8, party_set_slot(_1) -> i8),
+		PartySetSlot(u8 as Member, u8, party_set_slot(iset, _1) -> i8),
 		SepithAdd(u8 as Element alias SepithElement, u16),
 		SepithRemove(u8 as Element alias SepithElement, u16),
 		MiraAdd(u16), // [get_gold]
@@ -400,19 +400,18 @@ mod party_equip_slot {
 	}
 }
 
-// I'm fairly sure this logic is wrong; check t4403:17 for an example
 mod party_set_slot {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>, arg1: &u8) -> Result<i8, ReadError> {
-		if *arg1 == 0xFF {
+	pub(super) fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet, arg1: &u8) -> Result<i8, ReadError> {
+		if !(0x7F..0xFF).contains(arg1) && !matches!(iset, InstructionSet::Fc|InstructionSet::FcEvo) {
 			Ok(-1)
 		} else {
 			Ok(f.i8()?)
 		}
 	}
 
-	pub(super) fn write(f: &mut impl Out, arg1: &u8, v: &i8) -> Result<(), WriteError> {
-		if *arg1 == 0xFF {
+	pub(super) fn write(f: &mut impl Out, iset: InstructionSet, arg1: &u8, v: &i8) -> Result<(), WriteError> {
+		if !(0x7F..0xFF).contains(arg1) && !matches!(iset, InstructionSet::Fc|InstructionSet::FcEvo) {
 			ensure!(*v == -1, "invalid PartySetSlot");
 		} else {
 			f.i8(*v);

@@ -20,8 +20,6 @@ pub enum Error<'a> {
 	MissingLabel { label: &'a Label, range: Range },
 	#[error("unexpected jump to {label:?}")]
 	UnexpectedJump { label: &'a Label },
-	#[error("switch is not yet supported, please wait")]
-	SwitchNotSupported,
 	#[error("{range:?}{} » {next}", brk.map_or(String::new(), |l| format!(":{l:?}")))]
 	Block { range: Range, brk: Option<&'a Label>, next: Box<Error<'a>>},
 }
@@ -113,6 +111,7 @@ fn block0<'a>(ctx: &Context<'a>, pos: &mut usize, end: usize, cont: Option<&'a L
 			}
 
 			FlatInsn::Switch(e, cs, l) => {
+				let brk_ = brk;
 				let mut cases = cs.iter()
 					.map(|(a, b)| (Some(*a), b))
 					.chain(std::iter::once((None, l)))
@@ -148,14 +147,19 @@ fn block0<'a>(ctx: &Context<'a>, pos: &mut usize, end: usize, cont: Option<&'a L
 					}
 					None => {
 						let (mut body, jump) = block_partial(ctx, pos, end, cont, None)?;
-						if jump.is_some() && *pos < ctx.len() && ctx[*pos] == FlatInsn::Label(*jump.unwrap()) {
+						if jump.is_some() && jump != brk_ && *pos < ctx.len() && ctx[*pos] == FlatInsn::Label(*jump.unwrap()) {
 							body.push(TreeInsn::Break);
 							arms.push((last_case.0, body));
 							out.push(TreeInsn::Switch(e.clone(), arms));
 						} else {
 							out.push(TreeInsn::Switch(e.clone(), arms));
 							out.extend(body);
-							return Ok((out, jump));
+							if jump.is_some() && jump == brk_ {
+								out.push(TreeInsn::Break);
+								return Ok((out, None));
+							} else {
+								return Ok((out, jump));
+							}
 						}
 					}
 				}

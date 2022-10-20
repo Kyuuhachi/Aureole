@@ -592,17 +592,7 @@ fn text(f: &mut Context, v: &Text) {
 			},
 			TextSegment::Item(n) => {
 				f.write("{item ");
-				val(f, I::ItemId(&n));
-				f.write("}");
-			},
-			TextSegment::Hash(h) => {
-				f.write(&h.to_hash());
-			},
-			TextSegment::Error(s) => {
-				f.write("{error");
-				for b in s {
-					f.write(&format!(" {b:02X}"));
-				}
+				val(f, I::ItemId(n));
 				f.write("}");
 			},
 		}

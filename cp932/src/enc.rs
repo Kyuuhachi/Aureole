@@ -1,3 +1,4 @@
+#[allow(clippy::identity_op)]
 pub(crate) fn cp932ext(ch: u16) -> Option<[u8; 2]> {
 	let [c1, c2] = ch.to_be_bytes();
 	let ch: u16 = match (c1, c2) {
@@ -615,6 +616,7 @@ pub(crate) fn cp932ext(ch: u16) -> Option<[u8; 2]> {
 	}
 }
 
+#[allow(clippy::identity_op)]
 pub(crate) fn jisxcommon(ch: u16) -> Option<[u8; 2]> {
 	let [c1, c2] = ch.to_be_bytes();
 	let ch: u16 = match (c1, c2) {

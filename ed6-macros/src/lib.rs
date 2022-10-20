@@ -42,10 +42,12 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 			hex2.entry(*hex).or_insert_with(Vec::new).push(game.to_string());
 		}
 		let mut doc = String::new();
+		doc.push_str("```text\n");
 		for (hex, games) in hex2 {
 			doc.push_str(&format!("{} => {hex:02X}", games.join(", ")));
 			doc.push('\n');
 		}
+		doc.push_str("```\n");
 		q!{span=>
 			#(#attrs)*
 			#[doc = #doc]

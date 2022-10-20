@@ -17,7 +17,7 @@ ed6_macros::bytecode! {
 		FadeIn(u32 alias Time, u32 as Color), // [fade_in]
 		FadeWait(), // [fade_wait]
 		CrossFade(u32 alias Time), // [cross_fade]
-		Battle(u16 as BattleId, u16, u16, u16, u8, u16, i8),
+		Battle(u16 as BattleId, u16, u16, u16, u8, u16, i8), // is this last one a CharId? Used a few times in FC's prologue where it clearly refers to npc/monsters, and 0xFF everywhere else
 		ExitSetEnabled(u8 alias ExitId, u8),
 		Fog(u8, u8, u8, u32, u32, u32), // First three are color; TODO parse it as one. Last is always 0.
 		_12(i32, i32, u32),
@@ -52,8 +52,8 @@ ed6_macros::bytecode! {
 		Quest(u16 as QuestId, match {
 			0x01 => TaskSet(u16 alias QuestTask),
 			0x02 => TaskUnset(u16 alias QuestTask),
-			0x03 => FlagsSet(u8 as QuestFlags),
-			0x04 => FlagsUnset(u8 as QuestFlags),
+			0x03 => FlagsUnset(u8 as QuestFlags),
+			0x04 => FlagsSet(u8 as QuestFlags),
 		}),
 		Quest(u16 as QuestId, match {
 			0x00 => FlagsGet(u8 as QuestFlags),
@@ -114,7 +114,7 @@ ed6_macros::bytecode! {
 		MenuClose(u16 alias MenuId), // [menu_close]
 		TextSetName(String alias TextTitle), // [name]
 		CharName2(u16 as CharId), // [name2]
-		Emote(u16 as CharId, i32, u32 alias Time, emote() -> Emote, u8), // [emotion] mostly used through macros such as EMO_BIKKURI3()
+		Emote(u16 as CharId, i32, i32, emote() -> Emote, u8), // [emotion] mostly used through macros such as EMO_BIKKURI3(). Third argument is height.
 		EmoteStop(u16 as CharId), // [emotion_close]
 		_64(u8 as u16 alias ObjectId, u16),
 		_65(u8 as u16 alias ObjectId, u16),
@@ -142,11 +142,27 @@ ed6_macros::bytecode! {
 		_7B(),
 		Shake(u32, u32, u32, u32 alias Time), // [quake]
 		#[game(Fc,FcEvo)] skip!(1), // {asm} two-byte nop
-		#[game(Sc)] Sc_7D(u8, u8, u8, u8, u8, u16),
+		#[game(Sc)] Sc_7D(match {
+			0 => _0(u16 as CharId, u16, u16),
+			1 => _1(u16 as CharId, u16, u16), // args always zero; always paired with a _0 except when the char is 254
+		}),
 		_7E(i16, i16, u16, u8, u32),
 		EffLoad(u8, String alias EffFileRef),
-		EffPlay(u8, u8, i16, Pos3, u16, u16, u16, u32, u32, u32, u16, u32, u32, u32, u32),
-		EffPlay2(u16, u8, String alias EffFileRef, Pos3, u16, u16, u16, u32, u32, u32, u32),
+		EffPlay(
+			u8, u8,
+			u16 as CharId, Pos3, // source
+			u16, u16, u16, // always zero
+			u32, u32, u32, // scale?
+			u16 as CharId, Pos3, // target
+			u32 alias Time, // period (0 if one-shot)
+		),
+		EffPlay2(
+			u8, u8,
+			u8 as u16 alias ObjectId, String, Pos3, // source
+			u16, u16, u16, // always zero
+			u32, u32, u32, // scale
+			u32 alias Time, // period (0 if one-shot)
+		),
 		_82(u16),
 		#[game(Fc)] Achievement(u8, u8),
 		#[game(FcEvo)] skip!(1),
@@ -167,7 +183,7 @@ ed6_macros::bytecode! {
 		_Char91        (u16 as CharId, i32, i32, i32, i32, u8),
 		CharWalkToChar (u16 as CharId, u16 as CharId, u32, u32 alias Speed, u8), // [walk_to_chr]
 		CharWalkToChar2(u16 as CharId, u16 as CharId, u32, u32 alias Speed, u8),
-		_94        (u8, u16 as CharId, i16 alias Angle, u32, u32 alias Speed, u8),
+		_94        (u8, u16 as CharId, i16 alias Angle, i32, u32 alias Speed, u8),
 		CharJump       (u16 as CharId, i32, i32, i32, u32, u32 alias Speed), // [jump]
 		_Char96        (u16 as CharId, Pos3, i32, i32),
 		_Char97        (u16 as CharId, Pos2, i32 alias Angle32, u32, u16), // used with pigeons
@@ -243,6 +259,8 @@ ed6_macros::bytecode! {
 		PartyLoad(),
 
 		/// Learns a cooking recipe.
+		///
+		/// Returns whether the recipe was already known, i.e. if it was *not* successfully learned.
 		RecipeLearn(u16),
 
 		ImageShow(file_ref(lookup) -> String alias VisFileRef, u16, u16, u32 alias Time), // [portrait_open]
@@ -265,11 +283,11 @@ ed6_macros::bytecode! {
 		_B2(match {
 			0 => Set(u8, u16),
 			1 => Unset(u8, u16),
-		},
+		}),
 
 		Video(match {
-			0 => Play(String alias AviFileRef, u32_not_in_fc(iset) -> u32), // [movie(MOVIE_START)]
-			1 => End(u8, u32_not_in_fc(iset) -> u32), // [movie(MOVIE_END)]
+			0 => Play(String alias AviFileRef, u16_not_in_fc(iset) -> u16, u16_not_in_fc(iset) -> u16), // [movie(MOVIE_START)]
+			1 => End(u8, u16_not_in_fc(iset) -> u16, u16_not_in_fc(iset) -> u16), // [movie(MOVIE_END)], probably the 0 is the null terminator of an empty string
 		}),
 
 		ReturnToTitle(u8),
@@ -314,7 +332,23 @@ ed6_macros::bytecode! {
 		#[game(Sc)] Sc_BD(),
 		#[game(Sc)] Sc_BE(u8,u8,u8,u8, u16, u16, u8, i32,i32,i32,i32,i32,i32),
 		#[game(Sc)] Sc_BF(u8,u8,u8,u8, u16),
-		#[game(Sc)] ScMinigame(u8, i32,i32,i32,i32,i32,i32,i32,i32), // 11 roulette, 12 slots, 13 blackjack, 15 poker, 17 broken shooting minigame , 19 menu with st/eq/orb
+		/// ```text
+		///  1 ⇒ something about using items on the field
+		/// 11 ⇒ roulette
+		/// 12 ⇒ slots
+		/// 13 ⇒ blackjack
+		/// 14 ... ⇒ fishing
+		/// 15 ⇒ poker
+		/// 16 ... ⇒ used in Axis Pillar
+		/// 17 ⇒ broken shooting minigame
+		/// 18 n ⇒ check if have fish n
+		/// 19 ⇒ menu with st/eq/orb
+		/// 20 5000 ⇒ after beating Luciola
+		/// 21 ⇒ used after a few battles
+		/// 22 ⇒ after Weissman sets up a barrier
+		/// 23 ⇒ used after sequences of ScLoadChcp
+		/// ```
+		#[game(Sc)] ScMinigame(u8, i32,i32,i32,i32,i32,i32,i32,i32),
 		#[game(Sc)] Sc_C1(u16 as ItemId, u32),
 		#[game(Sc)] Sc_C2(),
 		#[game(Sc)] skip!(1),
@@ -616,19 +650,19 @@ mod u8_not_in_fc {
 	}
 }
 
-mod u32_not_in_fc {
+mod u16_not_in_fc {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet) -> Result<u32, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet) -> Result<u16, ReadError> {
 		match iset {
 			InstructionSet::Fc | InstructionSet::FcEvo => Ok(0),
-			_ => Ok(f.u32()?)
+			_ => Ok(f.u16()?)
 		}
 	}
 
-	pub(super) fn write(f: &mut impl Out, iset: InstructionSet, v: &u32) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Out, iset: InstructionSet, v: &u16) -> Result<(), WriteError> {
 		match iset {
 			InstructionSet::Fc | InstructionSet::FcEvo => ensure!(*v == 0, "{v} must be 0"),
-			_ => f.u32(*v)
+			_ => f.u16(*v)
 		}
 		Ok(())
 	}

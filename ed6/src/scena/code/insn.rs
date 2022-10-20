@@ -8,8 +8,8 @@ ed6_macros::bytecode! {
 		Return(), // [return]
 		skip!(3), // control flow
 		Call(func_ref() -> FuncRef), // [call]
-		NewScene(file_ref(lookup) -> String alias ScenaFileRef, u8, u8, u8, u8), // [new_scene] (last two args are unaccounted for)
-		skip!(1),
+		NewScene(file_ref(lookup) -> String alias ScenaFileRef, u8, u8, u8, u8), // [new_scene]
+		skip!(1), // I think this is what the 7 after NewScene actually is. It seems to freeze the script, never proceeding.
 		Sleep(u32 alias Time), // [delay]
 		SystemFlagsSet(u32 as SystemFlags), // [set_system_flag]
 		SystemFlagsUnset(u32 as SystemFlags), // [reset_system_flag]
@@ -23,15 +23,17 @@ ed6_macros::bytecode! {
 		_12(i32, i32, u32),
 		PlaceSetName(u16 as TownId),
 		Sc_14(u32, u32, u32, u32, u8),
-		Sc_15(u32),
+		#[game(Fc, FcEvo)] skip!(1), // ptr += 1
+		#[game(Sc)] Sc_15(u32),
 		Map(match {
 			0x00 => Hide(),
 			0x01 => Show(),
 			0x02 => Set(i32, Pos2, file_ref(lookup) -> String alias MapFileRef),
 		}),
 		#[game(Fc, Sc)] Save(),
-		#[game(FcEvo)] SaveEvo(u8),
-		Sc_18(u8, u8, u8),
+		#[game(FcEvo)] EvoSave(u8),
+		#[game(Fc, FcEvo)] skip!(1), // two-byte nop
+		#[game(Sc)] Sc_18(u8, u8, u8),
 		EventBegin(u8), // [event_begin]
 		EventEnd(u8), // [event_end]
 		_1B(u16, u16),
@@ -69,7 +71,7 @@ ed6_macros::bytecode! {
 		PartyAddArt(u8 as Member, u16 as MagicId),
 		PartyAddCraft(u8 as Member, u16 as MagicId),
 		PartyAddSCraft(u8 as Member, u16 as MagicId),
-		PartySetSlot(u8 as Member, u8, party_set_slot(iset, _1) -> i8),
+		PartySetSlot(u8 as Member, u8, party_set_slot(iset, _1) -> i8), // merged with FC's PartyUnlockSlot
 		SepithAdd(u8 as Element alias SepithElement, u16),
 		SepithRemove(u8 as Element alias SepithElement, u16),
 		MiraAdd(u16), // [get_gold]
@@ -85,21 +87,21 @@ ed6_macros::bytecode! {
 		ForkQuit(u16 as CharId, u8 alias ForkId), // [terminate]
 		Fork(u16 as CharId, u8 alias ForkId, u8, fork(iset, lookup) -> Vec<Insn> alias Fork), // [preset]? In t0311, only used with a single instruction inside
 		ForkLoop(u16 as CharId, u8 alias ForkId, u8, fork_loop(iset, lookup) -> Vec<Insn> alias Fork),
-		ForkAwait(u16 as CharId, u8 alias ForkId, u8), // [wait_terminate]
+		ForkWait(u16 as CharId, u8 alias ForkId, u8), // [wait_terminate]
 		NextFrame(), // [next_frame]
 		Event(func_ref() -> FuncRef), // [event] Not sure how this differs from Call
 		_Char4A(u16 as CharId, u8), // Argument is almost always 255, but sometimes 0, and in a single case 1
 		_Char4B(u16 as CharId, u8),
-		skip!(1),
+		skip!(1), // {asm} one-byte nop
 		Var(u16 as Var, expr(iset, lookup) -> Expr),
-		skip!(1),
+		skip!(1), // {asm} one-byte nop
 		Attr(u8 as Attr, expr(iset, lookup) -> Expr), // [system[n]]
-		skip!(1),
+		skip!(1), // {asm} one-byte nop
 		CharAttr(char_attr() -> CharAttr, expr(iset, lookup) -> Expr),
 		TextStart(u16 as CharId), // [talk_start]
 		TextEnd(u16 as CharId), // [talk_end]
 		TextMessage(text() -> Text), // [mes]
-		skip!(1),
+		skip!(1), // {asm} same as NextFrame
 		TextClose(u8), // [mes_close]
 		Sc_57(u32, u16, text() -> Text),
 		TextWait(), // [wait_prompt]
@@ -133,19 +135,22 @@ ed6_macros::bytecode! {
 		_74(u16, u32, u16),
 		_75(u8, u32, u8),
 		_76(u16, u32, u16, Pos3, u8, u8),
-		MapColor(u32 as Color /*24*/, u32 alias Time), // [map_color]
+		MapColor(u32 as Color, u32 alias Time), // [map_color]
 		_78(u8, u16),
-		_79(u8, u16),
+		_79(u8 as u16 alias ObjectId, u16),
 		_7A(u8, u16),
 		_7B(),
 		Shake(u32, u32, u32, u32 alias Time), // [quake]
-		Sc_7D(u8, u8, u8, u8, u8, u16),
+		#[game(Fc,FcEvo)] skip!(1), // {asm} two-byte nop
+		#[game(Sc)] Sc_7D(u8, u8, u8, u8, u8, u16),
 		_7E(i16, i16, u16, u8, u32),
 		EffLoad(u8, String alias EffFileRef),
 		EffPlay(u8, u8, i16, Pos3, u16, u16, u16, u32, u32, u32, u16, u32, u32, u32, u32),
 		EffPlay2(u16, u8, String alias EffFileRef, Pos3, u16, u16, u16, u32, u32, u32, u32),
 		_82(u16),
-		Achievement(u8, u8),
+		#[game(Fc)] Achievement(u8, u8),
+		#[game(FcEvo)] skip!(1),
+		#[game(Sc)] _83(u8, u8),
 		_84(u8),
 		_85(u16),
 		CharSetBase    (u16 as CharId, u16), // [set_chr_base]
@@ -182,116 +187,202 @@ ed6_macros::bytecode! {
 		CharAttachObj  (u16 as CharId, u16 alias ObjectId),
 		FlagSet(u16 as Flag), // [set_flag]
 		FlagUnset(u16 as Flag), // [reset_flag]
+		// Checked from here
+
+		// {asm} 3-byte nop
 		skip!(1),
-		FlagAwaitUnset(u16 as Flag), // [wait_flag_false]
-		FlagAwaitSet(u16 as Flag), // [wait_flag_true]
-		skip!(2),
+
+		/// Waits until the flag is true.
+		///
+		/// Equivalent to
+		/// ```text
+		/// while !flag[n]:
+		/// 	NextFrame
+		/// ```
+		///
+		/// Official name is `flag_wait_false`.
+		FlagWaitSet(u16 as Flag),
+
+		/// Waits until the flag is true.
+		///
+		/// Equivalent to
+		/// ```text
+		/// while flag[n]:
+		/// 	NextFrame
+		/// ```
+		///
+		/// Official name is `flag_wait_true`.
+		FlagWaitUnset(u16 as Flag),
+
+		/// Waits until the variable has the given value.
+		///
+		/// Equivalent to
+		/// ```text
+		/// while var[n] != val:
+		/// 	NextFrame
+		/// ```
+		///
+		/// Never used.
+		VarWait(u16 as Var, u16),
+
+		// {asm} 6-byte nop
+		skip!(1),
+
 		ShopOpen(u8 as ShopId),
-		skip!(2),
-		RecipeLearn(u16), // TODO check type
+
+		/// Saves the order of the party, to be loaded by [`PartyLoad`](Self::PartyLoad).
+		///
+		/// It saves eight variables, I don't know what's up with that.
+		///
+		/// Never used.
+		PartySave(),
+
+		/// Loads the order of the party, as saved by [`PartySave`](Self::PartySave).
+		///
+		/// Never used.
+		PartyLoad(),
+
+		/// Learns a cooking recipe.
+		RecipeLearn(u16),
+
 		ImageShow(file_ref(lookup) -> String alias VisFileRef, u16, u16, u32 alias Time), // [portrait_open]
+
 		ImageHide(u32 alias Time), // [portrait_close]
+
+		/// Attempts to submit a quest.
+		///
+		/// Returns a boolean value, probably whether the quest was successfully reported.
+		/// What exactly this entails is unknown; the return value is never used.
 		QuestSubmit(u8 as ShopId, u16 as QuestId),
+
 		_ObjB0(u16 alias ObjectId, u8), // Used along with 6F, 70, and 73 during T0700#11
+
 		OpLoad(String alias OpFileRef),
-		_B2(u8, u8, u16),
+
+		/// Sets or unsets flags on *something*.
+		///
+		/// I don't know what kind of object it is about, but it's at `u16[u32[this._0x30]+0x20*n+0x18]
+		_B2(match {
+			0 => Set(u8, u16),
+			1 => Unset(u8, u16),
+		},
+
 		Video(match {
-			0x00 => Play(String alias AviFileRef, u32_not_in_fc(iset) -> u32), // [movie(MOVIE_START)]
-			0x01 => End(u8, u32_not_in_fc(iset) -> u32), // [movie(MOVIE_END)]
+			0 => Play(String alias AviFileRef, u32_not_in_fc(iset) -> u32), // [movie(MOVIE_START)]
+			1 => End(u8, u32_not_in_fc(iset) -> u32), // [movie(MOVIE_END)]
 		}),
+
 		ReturnToTitle(u8),
 
-		#[game(Fc,FcEvo)] PartySlot(u8 as Member, u8, u8),
-		#[game(Fc,FcEvo)] Fc_B6(u8),
-		#[game(Fc,FcEvo)] Fc_B7(u8 as Member, u8, u8), // Related to PartyAdd
-		#[game(Fc,FcEvo)] Fc_B8(u8 as Member), // Related to PartyRemove
-		#[game(Fc,FcEvo)] ReadBook(u16 as ItemId, u16),
-		#[game(Fc,FcEvo)] PartyHasSpell(u8 as Member, u16 as MagicId),
-		#[game(Fc,FcEvo)] PartyHasSlot(u8 as Member, u8),
+		/// Unlocks a character's orbment slot.
+		///
+		/// In SC onward, this is merged into PartySetSlot.
+		///
+		/// The first two values are really a u16, but my system currently does not allow multiple casts.
+		#[game(Fc,FcEvo)] PartyUnlockSlot(u8 /*u16*/ as Member, u8, u8),
+
+		/// The argument is always zero in the scripts. According to the scripts something else happens if it is nonzero, but it is unknown what.
+		_B6(u8),
+
+		/// This is related to [`PartyAdd`](Self::PartyAdd), but what it actually does is unknown.
+		///
+		/// As with PartyUnlockSlot, this is really a u16.
+		_B7(u8 as Member, u8, u8),
+
+		/// This is related to [`PartyRemove`](Self::PartyRemove) and [`_B7`](Self::_B7), but as with that one, the details are unknown.
+		_B8(u8 as Member),
+
+		/// Opens the book reading interface, as if using it from the inventory.
+		///
+		/// It is unknown what the second argument means; all known uses have zero.
+		/// The assembly hints that it might be a character, in which case the instruction might be a more general-purpose use-item instruction.
+		ReadBook(u16 as ItemId, u16),
+
+		/// Returns whether the given member has a particular orbal art.
+		///
+		/// Does not work on crafts.
+		PartyHasSpell(u8 as Member, u16 as MagicId),
+
+		/// Checks whether the given member has this orbment slot unlocked.
+		PartyHasSlot(u8 as Member, u8),
+
 		#[game(Fc)] skip!(34),
-		#[game(Fc)] SaveClearData(),
-		#[game(Fc)] skip!(33),
-
 		#[game(FcEvo)] skip!(10),
-		#[game(FcEvo)] EvoVisLoad(u8 alias VisId, u16, u16, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u8, u32 as Color, u8, u8, String),
-		#[game(FcEvo)] EvoVisColor(u8 alias VisId, u8, u32 as Color, u32, u32, u32),
-		#[game(FcEvo)] EvoVisDispose(u8, u8 alias VisId, u8),
-		#[game(FcEvo)] skip!(19),
-		#[game(FcEvo)] Evo_DC(),
-		#[game(FcEvo)] Evo_DD(),
-		#[game(FcEvo)] EvoClearSaveData(),
-		#[game(FcEvo)] skip!(2),
-		#[game(FcEvo)] Evo_E1(u8 as u16 alias ObjectId, Pos3),
-		#[game(FcEvo)] skip!(2),
-		#[game(FcEvo)] EvoCtp(String), // Refers to /data/map2/{}.ctp
-		#[game(FcEvo)] EvoVoiceLine(u16), // [pop_msg]
-		#[game(FcEvo)] Evo_E6(text() -> Text),
-		#[game(FcEvo)] Evo_E7(u8, u8),
-		#[game(FcEvo)] skip!(24),
 
-		#[game(Sc)] Sc_B5(u8),
-		#[game(Sc)] Sc_B6(u8, u8, u8),
-		#[game(Sc)] Sc_B7(u8),
-		#[game(Sc)] Sc_B8(u32),
-		#[game(Sc)] ScPartyHasSpell(u8 as Member, u16 as MagicId),
-		#[game(Sc)] skip!(1),
-		#[game(Sc)] ScSetPortrait(u8 as Member, u8, u32),
+		#[game(Sc)] ScSetPortrait(u8 as Member, u8, u8, u8, u8, u8),
 		#[game(Sc)] skip!(1),
 		#[game(Sc)] Sc_BD(),
 		#[game(Sc)] Sc_BE(u8,u8,u8,u8, u16, u16, u8, i32,i32,i32,i32,i32,i32),
-		#[game(Sc)] Sc_BF(u32, u16),
+		#[game(Sc)] Sc_BF(u8,u8,u8,u8, u16),
 		#[game(Sc)] ScMinigame(u8, i32,i32,i32,i32,i32,i32,i32,i32), // 11 roulette, 12 slots, 13 blackjack, 15 poker, 17 broken shooting minigame , 19 menu with st/eq/orb
-		#[game(Sc)] Sc_C1(u16, u32),
+		#[game(Sc)] Sc_C1(u16 as ItemId, u32),
 		#[game(Sc)] Sc_C2(),
 		#[game(Sc)] skip!(1),
 		#[game(Sc)] ScScreenInvert(u8, u32),
-		#[game(Sc)] ScVisLoad(u8 alias VisId, u16,u16,u16,u16, u16,u16,u16,u16, u16,u16,u16,u16, u32 as Color, u8, String),
-		#[game(Sc)] ScVisColor(u8 alias VisId, u8, u32 as Color, i32, u32),
-		#[game(Sc)] ScVisDispose(u8, u8 alias VisId, u8),
-		#[game(Sc)] Sc_C8(u32, String, u8, u16),
+		#[game(FcEvo,Sc)] VisLoad(u8 alias VisId, u16,u16,u16,u16, u16,u16,u16,u16, u16,u16,u16,u16, u32 as Color, u8, String),
+		#[game(FcEvo)] VisColor(u8 alias VisId, u8, u32 as Color, u32, u32, u32),
+		#[game(Sc)]  ScVisColor(u8 alias VisId, u8, u32 as Color, i32, u32),
+		#[game(FcEvo,Sc)] VisDispose(u8, u8 alias VisId, u8),
+
+		#[game(FcEvo)] skip!(19),
+
+		#[game(Sc)] Sc_C8(u16, u16, String, u8, u16), // Something with C_PLATnn._CH
 		#[game(Sc)] ScPartySelect(u16, sc_party_select_mandatory() -> [Option<Member>; 4] alias MandatoryMembers, sc_party_select_optional() -> Vec<Member> alias OptionalMembers),
-		#[game(Sc)] Sc_CA(u16, u32),
-		#[game(Sc)] Sc_CharInSlot(u8),
+		#[game(Sc)] Sc_CA(u16 as ItemId, u32),
+		#[game(Sc)] Sc_CharInSlot(u8), // clearly related to CharId, but not the same
 		#[game(Sc)] Sc_Select(match {
-			0 => New(u8,u8,u8,u8,u8,u8),
-			1 => Add(u8, String),
-			2 => Show(u8),
-			3 => _3(u8, u8),
+			0 => New(u8 alias SelectId, u16, u16, u8),
+			1 => Add(u8 alias SelectId, String alias MenuItem),
+			2 => Show(u8 alias SelectId),
+			3 => _3(u8 alias SelectId, u8),
 		}),
-		#[game(Sc)] Sc_CD(u16 as CharId),
-		#[game(Sc)] Sc_ExprUnk(u8, expr(iset, lookup) -> Expr),
-		#[game(Sc)] Sc_CF(u16 as CharId, u8, String),
-		#[game(Sc)] Sc_D0(u32, u32),
-		#[game(Sc)] Sc_D1(u16 as CharId, i32, i32, i32, i32),
-		#[game(Sc)] Sc_D2(file_ref(lookup) -> String, file_ref(lookup) -> String, u8),
+		#[game(Sc)] Sc_CD(u16 as CharId), // related to showing photographs
+		#[game(Sc)] Sc_ExprUnk(u8, expr(iset, lookup) -> Expr), // I think this is integer variables that are not local
+		#[game(Sc)] Sc_CF(u16 as CharId, u8, String), // something with skeleton animation
+		#[game(Sc)] Sc_D0(i32 alias Angle32, u32 alias Time),
+		#[game(Sc)] Sc_D1(u16 as CharId, i32, i32, i32, u32 alias Time), // something with camera?
+		#[game(Sc)] ScLoadChcp(file_ref(lookup) -> String, file_ref(lookup) -> String, u8),
 		#[game(Sc)] Sc_D3(u8),
 		#[game(Sc)] skip!(1),
-		#[game(Sc)] ScPartyIsEquipped(u8 as Member, u16, u16 as ItemId, u8,u8,u8),
-		#[game(Sc)] Sc_D6(u8),
+		#[game(Sc)] ScPartyIsEquipped(u8 as Member, u16, u16 as ItemId, u8, u8, u8),
+		#[game(Sc)] Sc_D6(u8), // bool
 		#[game(Sc)] Sc_D7(u8,u8,u8,u8,u8,u8,u8),
-		#[game(Sc)] Sc_D8(u8, u16),
-		#[game(Sc)] Sc_D9(match {
-			0 => _0(String),
-			1 => _1(),
+		#[game(Sc)] Sc_D8(u8 as u16 alias ObjectId, u16),
+		#[game(Sc)] ScCutIn(match {
+			0 => Show(String), // CTInnnnn
+			1 => Hide(),
 		}),
-		#[game(Sc)] Sc_DA(),
-		#[game(Sc)] Sc_DB(),
-		#[game(Sc)] Sc_DC(),
-		#[game(Sc)] Sc_DD(),
-		#[game(Sc)] Sc_DE(String),
+		#[game(Sc)] Sc_DA(), // Something to do with menus
+		#[game(FcEvo,Sc)] Sc_DB(), // brackets with the below
+		#[game(FcEvo,Sc)] Sc_DC(), // ↑
+
+		/// Opens the save menu in order to save clear data.
+		SaveClearData(),
+
+		#[game(Fc)] skip!(33),
+		#[game(FcEvo)] skip!(2),
+
+		#[game(Sc)] Sc_DE(String), // a place name. Not a t_town, strangely
 		#[game(Sc)] skip!(1),
-		#[game(Sc)] Sc_E0(u8, Pos3),
-		#[game(Sc)] skip!(2),
-		#[game(Sc)] Sc_E3(u32),
+		#[game(FcEvo,Sc)] Sc_E0(u8 as u16 alias ObjectId, Pos3),
+		#[game(FcEvo,Sc)] skip!(2),
+
+		#[game(Sc)] Sc_E3(u8, u16 as CharId, u8),
 		#[game(Sc)] skip!(1),
 		#[game(Sc)] Sc_E5(u16 as CharId, u8),
 		#[game(Sc)] Sc_E6(u8), // related to RAM saving, according to debug script
-		#[game(Sc)] Sc_E7(u8, String, u8,u8,u8,u8,u8),
+		#[game(Sc)] Sc_E7(u8 as u16 alias ObjectId, String, u8,u8,u8,u8,u8),
 		#[game(Sc)] Sc_E8(u32),
 		#[game(Sc)] Sc_E9(u8), // related to RAM saving
-		#[game(Sc)] Sc_EA(u32),
-		#[game(Sc)] Sc_EB(u16),
+		#[game(Sc)] ScAchievement(u8, u16, u8),
+		#[game(Sc)] Sc_EB(u8, u8),
 		#[game(Sc)] skip!(20),
+
+		#[game(FcEvo)] EvoCtp(String), // Refers to /data/map2/{}.ctp
+		#[game(FcEvo)] EvoVoiceLine(u16), // [pop_msg]
+		#[game(FcEvo)] Evo_E6(text() -> Text),
+		#[game(FcEvo)] Evo_E7(u8 alias VisId, u8),
+		#[game(FcEvo)] skip!(24),
 	]
 }
 

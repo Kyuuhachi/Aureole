@@ -394,7 +394,7 @@ fn val(f: &mut Context, a: I) {
 		I::ObjectFlags(v) => f.write(&format!("0x{:04X}", v.0)),
 		I::Color(v)       => f.write(&format!("#{:08X}", v.0)),
 
-		I::Member(v) => f.write(&format!("{v:?}")),
+		I::Member(v)   => f.write(&format!("{v:?}")),
 		I::CharId(v)   => f.write(&format!("{v:?}")),
 		I::BattleId(v) => f.write(&format!("{v:?}")),
 		I::BgmId(v)    => f.write(&format!("{v:?}")),
@@ -408,6 +408,7 @@ fn val(f: &mut Context, a: I) {
 		I::ExitId(v)   => f.write(&format!("ExitId({v})")),
 		I::ForkId(v)   => f.write(&format!("ForkId({v})")),
 		I::MenuId(v)   => f.write(&format!("MenuId({v})")),
+		I::SelectId(v) => f.write(&format!("SelectId({v})")),
 		I::ObjectId(v) => f.write(&format!("ObjectId({v})")),
 		I::VisId(v)    => f.write(&format!("VisId({v})")),
 
@@ -432,8 +433,21 @@ fn val(f: &mut Context, a: I) {
 		I::TextTitle(v) => f.write(&format!("{v:?}")),
 		I::Text(_) if f.blind => f.write("{…}"),
 		I::Text(v) => text(f, v),
-		I::Menu(v) if f.blind => f.write("{…}"),
-		I::Menu(v) => f.write(&format!("{v:?}")),
+		I::MenuItem(_) if f.blind => f.write("\"…\""),
+		I::MenuItem(v) => f.write(&format!("{v:?}")),
+
+		I::Menu(v) => {
+			f.writeln("[");
+			f.indent(|f| {
+				for (i, line) in v.iter().enumerate() {
+					val(f, I::u32(&(i as u32)));
+					f.write(" => ");
+					val(f, I::MenuItem(line));
+					f.line();
+				}
+			});
+			f.write("]");
+		},
 
 		I::Angle(v)   => f.write(&format!("{v}°")),
 		I::Angle32(v) => f.write(&format!("{v}°₃₂")),
@@ -450,9 +464,9 @@ fn val(f: &mut Context, a: I) {
 		I::QuestTask(v) => f.write(&format!("{v:?}")),
 		I::SepithElement(v) => f.write(&format!("{v:?}")),
 
-		I::QuestList(v)    => f.write(&format!("{v:?}")),
+		I::QuestList(v)        => f.write(&format!("{v:?}")),
 		I::MandatoryMembers(v) => f.write(&format!("{v:?}")),
-		I::OptionalMembers(v) => f.write(&format!("{v:?}")),
+		I::OptionalMembers(v)  => f.write(&format!("{v:?}")),
 
 		I::AviFileRef(v)   => f.write(&format!("{v:?}")),
 		I::EffFileRef(v)   => f.write(&format!("{v:?}")),

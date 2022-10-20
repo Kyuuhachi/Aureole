@@ -1,4 +1,3 @@
-use encoding_rs::SHIFT_JIS;
 use hamu::read::le::*;
 use std::ops::*;
 
@@ -51,14 +50,7 @@ impl std::convert::From<std::convert::Infallible> for ReadError {
 pub struct DecodeError { text: String }
 
 pub fn decode(bytes: &[u8]) -> Result<String, DecodeError> {
-	let (text, _, error) = SHIFT_JIS.decode(bytes);
-	if error {
-		return Err(DecodeError { text: text.into_owned() });
-	}
-	if text.contains('\0') {
-		return Err(DecodeError { text: text.into_owned() });
-	}
-	Ok(text.into_owned())
+	cp932::decode(bytes).map_err(|_| DecodeError { text: cp932::decode_lossy(bytes) })
 }
 
 pub trait InExt<'a>: In<'a> {

@@ -4,6 +4,7 @@ members = [
 	"beryl-cli",
 	"hamu",
 	"choubun",
+	"cp932",
 
 	"ed6-macros",
 	"ed6",
@@ -23,3 +24,5 @@ package.png.opt-level = 3
 package.crc32fast.opt-level = 3
 package.deflate.opt-level = 3
 package.adler32.opt-level = 3
+
+package.cp932.opt-level = 3

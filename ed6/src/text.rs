@@ -1,4 +1,3 @@
-use encoding_rs::SHIFT_JIS;
 use hamu::read::le::*;
 use hamu::write::le::*;
 use crate::util::*;
@@ -151,8 +150,7 @@ impl Iter<'_> {
 			self.pos += 1;
 		}
 		let bytes = &self.data[start..self.pos];
-		let (text, _, error) = SHIFT_JIS.decode(bytes);
-		(!error).then(|| text.into_owned())
+		cp932::decode(bytes).ok()
 	}
 }
 
@@ -208,9 +206,7 @@ impl TextSegment {
 	fn write_to(&self, f: &mut OutBytes) {
 		match self {
 			TextSegment::String(ref s) => {
-				let (text, _, error) = SHIFT_JIS.encode(s);
-				assert!(!error); // Panics, but whatever.
-				f.slice(&text);
+				f.slice(&cp932::encode(s).unwrap());
 			}
 			TextSegment::Line => f.u8(0x01),
 			TextSegment::Wait => f.u8(0x02),
@@ -230,9 +226,7 @@ impl TextSegment {
 
 			TextSegment::Hash(a) => {
 				let s = a.to_hash();
-				let (text, _, error) = SHIFT_JIS.encode(&s);
-				assert!(!error);
-				f.slice(&text);
+				f.slice(&cp932::encode(&s).unwrap());
 			}
 
 			TextSegment::Error(ref s) => f.slice(s),

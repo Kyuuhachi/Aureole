@@ -6,11 +6,11 @@ edition = "2021"
 [dependencies]
 hamu = { path = "../hamu" }
 ed6-macros = { path = "../ed6-macros" }
+cp932 = { path = "../cp932" }
 mapr = "0.8.0"
 
 thiserror = "1.0.0"
 bitmatch = "0.1.1" # for decompress algorithm 2
-encoding_rs = "0.8.31"
 num_enum = "0.5.7"
 enumflags2 = { version = "0.7.5", features = ["std"] }
 extend = "1.1.2"

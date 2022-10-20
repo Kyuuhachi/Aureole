@@ -1,4 +1,3 @@
-use encoding_rs::SHIFT_JIS;
 use hamu::write::le::*;
 use std::ops::*;
 
@@ -48,14 +47,7 @@ impl std::convert::From<std::convert::Infallible> for WriteError {
 pub struct EncodeError { text: String }
 
 pub fn encode(text: &str) -> Result<Vec<u8>, EncodeError> {
-	if text.contains('\0') {
-		return Err(EncodeError { text: text.to_owned() });
-	}
-	let (bytes, _, error) = SHIFT_JIS.encode(text);
-	if error {
-		return Err(EncodeError { text: text.to_owned() });
-	}
-	Ok(bytes.into_owned())
+	cp932::encode(text).map_err(|_| EncodeError { text: text.to_owned() })
 }
 
 pub trait OutExt: Out {

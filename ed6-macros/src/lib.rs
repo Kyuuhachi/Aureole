@@ -283,7 +283,7 @@ impl ToTokens for InsnArm {
 #[derive(Clone, Debug)]
 struct Arg {
 	source: Source,
-	ty: Option<(Token![as], Box<Type>)>,
+	ty: Vec<(Token![as], Box<Type>)>,
 	alias: Option<(kw::alias, Ident)>,
 }
 
@@ -291,10 +291,12 @@ impl Parse for Arg {
 	fn parse(input: ParseStream) -> Result<Self> {
 		Ok(Self {
 			source: input.parse()?,
-			ty: if input.peek(Token![as]) {
-				Some((input.parse()?, input.parse()?))
-			} else {
-				None
+			ty: {
+				let mut xs = Vec::new();
+				while input.peek(Token![as]) {
+					xs.push((input.parse()?, input.parse()?))
+				}
+				xs
 			},
 			alias: if input.peek(kw::alias) {
 				Some((input.parse()?, input.parse()?))
@@ -308,7 +310,7 @@ impl Parse for Arg {
 impl ToTokens for Arg {
 	fn to_tokens(&self, ts: &mut TokenStream) {
 		self.source.to_tokens(ts);
-		if let Some((a, b)) = &self.ty {
+		for (a, b) in &self.ty {
 			a.to_tokens(ts);
 			b.to_tokens(ts);
 		}
@@ -323,7 +325,7 @@ impl Arg {
 	fn alias(&self) -> Ident {
 		let ty = if let Some((_, alias)) = &self.alias {
 			return alias.clone();
-		} else if let Some((_, ty)) = &self.ty {
+		} else if let Some((_, ty)) = &self.ty.last() {
 			ty
 		} else {
 			match &self.source {
@@ -574,10 +576,11 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 				def: TokenStream::new(),
 				write: TokenStream::new(),
 			};
+			let name = &item.name;
 			item.write.extend(q!{arm=>
 				__f.u8(match {#game_expr} { // the braces give better span information
 					#(#game_ty::#games => #hex,)*
-					_g => return Err(format!("`{}` is not supported on `{:?}`", stringify!(&item.name), _g).into())
+					_g => return Err(format!("`{}` is not supported on `{:?}`", stringify!(#name), _g).into())
 				});
 			});
 			let read = gather_arm(&mut items, &mut arg_types, &arm, item);
@@ -618,13 +621,18 @@ fn gather_arm(items: &mut Vec<(Span, Item)>, arg_types: &mut BTreeMap<Ident, Tok
 	for arg in &arm.args {
 		let varname = format_ident!("_{}", item.vars.len(), span=arg.span());
 
+		let mut types = Vec::new();
 		{
 			let mut val = match &arg.source {
 				Source::Simple(name) => {
+					types.push(q!{name=> #name });
 					let name = to_snake(name);
 					q!{name=> __f.#name()? }
 				},
 				Source::Call(a) => {
+					let ty = &a.ty;
+					types.push(q!{ty=> #ty });
+
 					let name = &a.name;
 					let mut args = vec![q!{a=> __f }];
 					for e in &a.args {
@@ -638,9 +646,11 @@ fn gather_arm(items: &mut Vec<(Span, Item)>, arg_types: &mut BTreeMap<Ident, Tok
 					q!{a=> #name::read(#(#args),*)? }
 				},
 			};
-			if let Some((a, ty)) = &arg.ty {
-				let span = a.span().join(ty.span()).unwrap();
-				val = q!{span=> cast(#val)? };
+			for (a, ty) in &arg.ty {
+				types.push(q!{ty=> #ty});
+			}
+			for ty in types.iter().skip(1) {
+				val = q!{ty=> cast::<_, #ty>(#val)? };
 			}
 			read.extend(q!{arg=> let #varname = #val; });
 		}
@@ -652,9 +662,8 @@ fn gather_arm(items: &mut Vec<(Span, Item)>, arg_types: &mut BTreeMap<Ident, Tok
 					val = q!{arg=> *#val };
 				}
 			}
-			if let Some((a, ty)) = &arg.ty {
-				let span = a.span().join(ty.span()).unwrap();
-				val = q!{span=> cast(#val)? };
+			for ty in types.iter().rev().skip(1) {
+				val = q!{ty=> cast::<_, #ty>(#val)? };
 			}
 			val = match &arg.source {
 				Source::Simple(name) => {
@@ -679,7 +688,7 @@ fn gather_arm(items: &mut Vec<(Span, Item)>, arg_types: &mut BTreeMap<Ident, Tok
 			item.write.extend(q!{arg=> #val; });
 		}
 
-		let ty = if let Some((_, ty)) = &arg.ty {
+		let ty = if let Some((_, ty)) = &arg.ty.last() {
 			ty.to_token_stream()
 		} else {
 			match &arg.source {

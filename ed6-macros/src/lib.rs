@@ -627,17 +627,26 @@ fn gather_arm(items: &mut Vec<(Span, Item)>, arg_types: &mut BTreeMap<Ident, Tok
 		let varname = format_ident!("_{}", item.vars.len(), span=arg.span());
 
 		let mut types = Vec::new();
+		types.push(match &arg.source {
+			Source::Simple(name) => {
+				q!{name=> #name }
+			}
+			Source::Call(a) => {
+				let ty = &a.ty;
+				q!{ty=> #ty }
+			}
+		});
+		for (_, ty) in &arg.ty {
+			types.push(q!{ty=> #ty});
+		}
+
 		{
 			let mut val = match &arg.source {
 				Source::Simple(name) => {
-					types.push(q!{name=> #name });
 					let name = to_snake(name);
 					q!{name=> __f.#name()? }
 				},
 				Source::Call(a) => {
-					let ty = &a.ty;
-					types.push(q!{ty=> #ty });
-
 					let name = &a.name;
 					let mut args = vec![q!{a=> __f }];
 					for e in &a.args {
@@ -651,9 +660,6 @@ fn gather_arm(items: &mut Vec<(Span, Item)>, arg_types: &mut BTreeMap<Ident, Tok
 					q!{a=> #name::read(#(#args),*)? }
 				},
 			};
-			for (a, ty) in &arg.ty {
-				types.push(q!{ty=> #ty});
-			}
 			for ty in types.iter().skip(1) {
 				val = q!{ty=> cast::<_, #ty>(#val)? };
 			}

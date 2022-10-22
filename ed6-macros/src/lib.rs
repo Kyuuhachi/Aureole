@@ -650,12 +650,21 @@ fn gather_arm(items: &mut Vec<(Span, Item)>, arg_types: &mut BTreeMap<Ident, Tok
 					let name = &a.name;
 					let mut args = vec![q!{a=> __f }];
 					for e in &a.args {
-						if item.vars.is_empty() {
-							args.push(q!{e=> #e })
-						} else {
+						args.push(#[allow(clippy::never_loop)] loop {
+							if let Expr::Path(ExprPath { attrs, qself: None, path }) = &**e {
+								if attrs.is_empty() {
+									if let Some(ident) = path.get_ident() {
+										if item.vars.iter().any(|a| a == ident) {
+											break q!{ident=> &#ident }
+										} else {
+											break q!{ident=> #ident }
+										}
+									}
+								}
+							}
 							let v = item.vars.iter();
-							args.push(q!{e=> #[allow(clippy::let_and_return)] { #(let #v = &#v;)* #e } })
-						}
+							break q!{e=> #[allow(clippy::let_and_return)] { #(let #v = &#v;)* #e } }
+						});
 					}
 					q!{a=> #name::read(#(#args),*)? }
 				},

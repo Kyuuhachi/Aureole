@@ -29,10 +29,12 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 	let read_body = &ctx.read_body;
 	let attrs = &ctx.attrs;
 	let game_expr = &ctx.game_expr;
+	let game_ty = &ctx.game_ty;
 
-	let write_body = ctx.items.iter().map(|(span, Item { name, vars, write, .. })| {
+	let write_body = ctx.items.iter().map(|(span, Item { name, hex, vars, write, .. })| {
+		let games = hex.iter().map(|a| &a.0);
 		q!{span=>
-			Self::#name(#vars) => { #write }
+			(__iset@(#(IS::#games)|*), Self::#name(#vars)) => { #write }
 		}
 	}).collect::<TokenStream>();
 
@@ -65,6 +67,7 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 
 		impl Insn {
 			pub fn read<'a>(__f: &mut impl In<'a>, #func_args) -> Result<Self, ReadError> {
+				type IS = #game_ty;
 				match (#game_expr, __f.u8()?) {
 					#read_body
 					(_g, _v) => Err(format!("invalid Insn on {:?}: 0x{:02X}", _g, _v).into())
@@ -72,8 +75,11 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 			}
 
 			pub fn write(__f: &mut impl OutDelay, #func_args, __insn: &Insn) -> Result<(), WriteError> {
-				match __insn {
+				type IS = #game_ty;
+				#[allow(unused_parens)]
+				match (#game_expr, __insn) {
 					#write_body
+					(_is, _i) => return Err(format!("`{}` is not supported on `{:?}`", _i.name(), _is).into())
 				}
 				Ok(())
 			}
@@ -576,15 +582,14 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 				def: TokenStream::new(),
 				write: TokenStream::new(),
 			};
-			let name = &item.name;
 			item.write.extend(q!{arm=>
-				__f.u8(match {#game_expr} { // the braces give better span information
-					#(#game_ty::#games => #hex,)*
-					_g => return Err(format!("`{}` is not supported on `{:?}`", stringify!(#name), _g).into())
+				__f.u8(match __iset {
+					#(IS::#games => #hex,)*
+					_g => unsafe { std::hint::unreachable_unchecked() }
 				});
 			});
 			let read = gather_arm(&mut items, &mut arg_types, &arm, item);
-			read_body.extend(q!{arm=> #((#game_ty::#games, #hex))|* => { #read } });
+			read_body.extend(q!{arm=> #((IS::#games, #hex))|* => { #read } });
 
 			for idx in &game_idx {
 				n[*idx] += 1;

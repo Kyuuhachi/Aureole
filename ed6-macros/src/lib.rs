@@ -20,6 +20,10 @@ macro_rules! q {
 	}
 }
 
+fn varnames(n: usize) -> Vec<Ident> {
+	(0..n).map(|a| format_ident!("_{a}")).collect()
+}
+
 // {{{1 Main
 #[proc_macro]
 #[allow(non_snake_case)]
@@ -27,34 +31,93 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 	let ctx = parse_macro_input!(tokens with gather_top);
 
 	let func_args = &ctx.func_args;
-	let read_body = &ctx.read_body;
 	let attrs = &ctx.attrs;
 	let game_expr = &ctx.game_expr;
 	let game_ty = &ctx.game_ty;
 
-	let write_body = ctx.items.iter().map(|(span, Item { name, hex, vars, write, .. })| {
-		let games = hex.iter().map(|a| &a.0);
+	let read = ctx.reads.iter().map(|ReadArm { span, games, body }| {
+		let games_name = games.iter().map(|a| &a.0).collect::<Vec<_>>();
+		let games_hex  = games.iter().map(|a| &a.1).collect::<Vec<_>>();
 		q!{span=>
-			(__iset@(#(IS::#games)|*), Self::#name(#vars)) => { #write }
+			#((IS::#games_name, #games_hex))|* => {
+				run(__f, #body)
+			}
 		}
 	}).collect::<TokenStream>();
+	let read = quote! {
+		pub fn read<'a>(__f: &mut impl In<'a>, #func_args) -> Result<Self, ReadError> {
+			fn run<'a, I: In<'a>, A>(__f: &mut I, fun: impl FnOnce(&mut I) -> Result<A, ReadError>) -> Result<A, ReadError> {
+				fun(__f)
+			}
+			type IS = #game_ty;
+			match (#game_expr, __f.u8()?) {
+				#read
+				(_g, _v) => Err(format!("invalid Insn on {:?}: 0x{:02X}", _g, _v).into())
+			}
+		}
+	};
 
-	let Insn_body = ctx.items.iter().map(|(span, Item { hex, attrs, name, def, .. })| {
-		let mut hex2 = BTreeMap::<u8, Vec<String>>::new();
-		for (game, hex) in hex {
-			hex2.entry(*hex).or_insert_with(Vec::new).push(game.to_string());
-		}
-		let mut doc = String::new();
-		doc.push_str("```text\n");
-		for (hex, games) in hex2 {
-			doc.push_str(&format!("{} => {hex:02X}", games.join(", ")));
-			doc.push('\n');
-		}
-		doc.push_str("```\n");
+	let write = ctx.writes.iter().map(|WriteArm { span, games, ident, args, body }| {
+		let games_name = games.iter().map(|a| &a.0).collect::<Vec<_>>();
+		let games_hex  = games.iter().map(|a| &a.1).collect::<Vec<_>>();
 		q!{span=>
+			(__iset@(#(IS::#games_name)|*), Self::#ident(#args)) => {
+				__f.u8(match __iset {
+					#(IS::#games_name => #games_hex,)*
+					_g => unsafe { std::hint::unreachable_unchecked() }
+				});
+				run(__f, #body)?;
+			}
+		}
+	}).collect::<TokenStream>();
+	let write = quote! {
+		pub fn write(__f: &mut impl OutDelay, #func_args, __insn: &Insn) -> Result<(), WriteError> {
+			fn run<O: OutDelay>(__f: &mut O, fun: impl FnOnce(&mut O) -> Result<(), WriteError>) -> Result<(), WriteError> {
+				fun(__f)
+			}
+			type IS = #game_ty;
+			#[allow(unused_parens)]
+			match (#game_expr, __insn) {
+				#write
+				(_is, _i) => return Err(format!("`{}` is not supported on `{:?}`", _i.name(), _is).into())
+			}
+			Ok(())
+		}
+	};
+
+	let mut hex: BTreeMap<Ident, BTreeMap<u8, Vec<String>>> = BTreeMap::new();
+	for WriteArm { games, ident, .. } in &ctx.writes {
+		let entry = hex.entry(ident.clone()).or_default();
+		for (game, hex) in games {
+			entry.entry(*hex).or_default().push(game.to_string())
+		}
+	}
+
+	let Insn_body = ctx.defs.iter().map(|Def { span, attrs, ident, types, aliases, .. }| {
+
+		let mut predoc = String::new();
+		predoc.push_str("**`");
+		predoc.push_str(&ident.to_string());
+		predoc.push_str("`**");
+		for alias in aliases {
+			predoc.push(' ');
+			predoc.push_str(&format!("[`{alias}`](InsnArg::{alias})"));
+		}
+		predoc.push_str("\n\n");
+
+		let mut postdoc = String::new();
+		postdoc.push_str("# Encoding\n```text\n");
+		for (hex, games) in hex.get(ident).iter().flat_map(|a| a.iter()) {
+			postdoc.push_str(&format!("{} => {hex:02X}", games.join(", ")));
+			postdoc.push('\n');
+		}
+		postdoc.push_str("```\n");
+
+		q!{span=>
+			#[doc = #predoc]
 			#(#attrs)*
-			#[doc = #doc]
-			#name(#def),
+			#[doc = #postdoc]
+			#ident(#(#types),*),
 		}
 	}).collect::<TokenStream>();
 
@@ -67,54 +130,39 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		}
 
 		impl Insn {
-			pub fn read<'a>(__f: &mut impl In<'a>, #func_args) -> Result<Self, ReadError> {
-				type IS = #game_ty;
-				match (#game_expr, __f.u8()?) {
-					#read_body
-					(_g, _v) => Err(format!("invalid Insn on {:?}: 0x{:02X}", _g, _v).into())
-				}
-			}
-
-			pub fn write(__f: &mut impl OutDelay, #func_args, __insn: &Insn) -> Result<(), WriteError> {
-				type IS = #game_ty;
-				#[allow(unused_parens)]
-				match (#game_expr, __insn) {
-					#write_body
-					(_is, _i) => return Err(format!("`{}` is not supported on `{:?}`", _i.name(), _is).into())
-				}
-				Ok(())
-			}
+			#read
+			#write
 		}
 	};
 
 	let InsnArg_names = ctx.arg_types.keys().collect::<Vec<_>>();
 	let InsnArg_types = ctx.arg_types.values().collect::<Vec<_>>();
 
-	let name_body = ctx.items.iter().map(|(span, Item { name, .. })| {
+	let name_body = ctx.defs.iter().map(|Def { span, ident, .. }| {
 		q!{span=>
-			Self::#name(..) => stringify!(#name),
+			Self::#ident(..) => stringify!(#ident),
 		}
 	}).collect::<TokenStream>();
 
-	let args_body = ctx.items.iter().map(|(span, Item { name, vars, aliases, .. })| {
-		let varnames = vars.into_iter();
+	let args_body = ctx.defs.iter().map(|Def { span, ident, aliases, .. }| {
+		let vars = varnames(aliases.len());
 		q!{span=>
-			Self::#name(#vars) => Box::new([#(Arg::#aliases(#varnames)),*]),
+			Self::#ident(#(#vars),*) => Box::new([#(Arg::#aliases(#vars)),*]),
 		}
 	}).collect::<TokenStream>();
 
-	let arg_types_body = ctx.items.iter().map(|(span, Item { name, aliases, .. })| {
+	let arg_types_body = ctx.defs.iter().map(|Def { span, ident, aliases, .. }| {
 		q!{span=>
-			stringify!(#name) => Box::new([#(Arg::#aliases),*]),
+			stringify!(#ident) => Box::new([#(Arg::#aliases),*]),
 		}
 	}).collect::<TokenStream>();
 
-	let from_args_body = ctx.items.iter().map(|(span, Item { name, vars, aliases, .. })| {
-		let varnames = vars.into_iter();
+	let from_args_body = ctx.defs.iter().map(|Def { span, ident, aliases, .. }| {
+		let vars = varnames(aliases.len());
 		q!{span=>
-			stringify!(#name) => {
-				#(let #varnames = if let Some(Arg::#aliases(v)) = it.next() { v } else { return None; };)*
-				Self::#name(#vars)
+			stringify!(#ident) => {
+				#(let #vars = if let Some(Arg::#aliases(v)) = it.next() { v } else { return None; };)*
+				Self::#ident(#(#vars),*)
 			},
 		}
 	}).collect::<TokenStream>();
@@ -464,24 +512,49 @@ impl ToTokens for TableArm {
 // }}}1
 
 struct Ctx {
-	arg_types: BTreeMap<Ident, TokenStream>,
+	arg_types: BTreeMap<Ident, Box<Type>>,
 	func_args: Punctuated<PatType, Token![,]>,
 	attrs: Vec<Attribute>,
-	items: Vec<(Span, Item)>,
-	read_body: TokenStream,
+	defs: Vec<Def>,
+	reads: Vec<ReadArm>,
+	writes: Vec<WriteArm>,
 	game_expr: Expr,
 	game_ty: TokenStream,
 }
 
-#[derive(Debug, Clone)]
-struct Item {
-	hex: Vec<(Ident, u8)>,
+#[derive(Clone)]
+struct InwardContext {
+	ident: Ident,
 	attrs: Vec<Attribute>,
-	name: Ident,
-	vars: Punctuated<Ident, Token![,]>,
+	args: Punctuated<Ident, Token![,]>,
 	aliases: Vec<Ident>,
-	def: TokenStream,
+	types: Vec<Box<Type>>,
+	games: GameSpec,
 	write: TokenStream,
+}
+
+type GameSpec = Vec<(Ident, u8)>;
+
+struct Def {
+	span: Span,
+	ident: Ident,
+	attrs: Vec<Attribute>,
+	aliases: Vec<Ident>,
+	types: Vec<Box<Type>>,
+}
+
+struct ReadArm {
+	span: Span,
+	games: GameSpec,
+	body: TokenStream,
+}
+
+struct WriteArm {
+	span: Span,
+	games: GameSpec,
+	ident: Ident,
+	args: Punctuated<Ident, Token![,]>,
+	body: TokenStream,
 }
 
 fn gather_top(input: ParseStream) -> Result<Ctx> {
@@ -495,13 +568,6 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 			ty: input.parse()?,
 		})
 	})?;
-
-	let mut items = Vec::new();
-	let mut arg_types = BTreeMap::new();
-	let mut read_body = TokenStream::new();
-
-	// Used in the dump
-	arg_types.insert(Ident::new("String", Span::call_site()), quote! { String });
 
 	let mut attrs = Attribute::parse_outer(input)?;
 	let games_attr = attrs.iter().position(|a| a.path.is_ident("games"))
@@ -522,6 +588,20 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 			.iter().cloned().collect::<Vec<_>>();
 		Ok((expr, ty, all_games))
 	})?;
+
+	let mut ctx = Ctx {
+		arg_types: BTreeMap::new(),
+		func_args,
+		attrs,
+		defs: Vec::new(),
+		reads: Vec::new(),
+		writes: Vec::new(),
+		game_expr,
+		game_ty,
+	};
+
+	// Used in the dump
+	ctx.arg_types.insert(Ident::new("String", Span::call_site()), parse_quote! { String });
 
 	let content;
 	bracketed!(content in input);
@@ -574,24 +654,22 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 		} else {
 			let arm = InsnArm::parse(input)?;
 			let hex = game_idx.iter().map(|idx| n[*idx] as u8).collect::<Vec<_>>();
-			let mut item = Item {
-				hex: games.iter().cloned().zip(hex.iter().copied()).collect(),
+			let games = games.iter().cloned().zip(hex.iter().copied()).collect::<GameSpec>();
+			let ictx = InwardContext {
+				ident: arm.name.clone(),
 				attrs,
-				name: arm.name.clone(),
-				vars: Punctuated::new(),
+				args: Punctuated::new(),
 				aliases: Vec::new(),
-				def: TokenStream::new(),
+				types: Vec::new(),
+				games: games.clone(),
 				write: TokenStream::new(),
 			};
-			item.write.extend(q!{arm=>
-				__f.u8(match __iset {
-					#(IS::#games => #hex,)*
-					_g => unsafe { std::hint::unreachable_unchecked() }
-				});
+			let read = gather_arm(&mut ctx, ictx, &arm);
+			ctx.reads.push(ReadArm {
+				span: arm.span(),
+				games: games.clone(),
+				body: q!{arm=> |__f| { #read } },
 			});
-			let read = gather_arm(&mut items, &mut arg_types, &arm, item);
-			read_body.extend(q!{arm=> #((IS::#games, #hex))|* => { #read } });
-
 			for idx in &game_idx {
 				n[*idx] += 1;
 			}
@@ -610,22 +688,14 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 		}
 	}
 
-	Ok(Ctx {
-		arg_types,
-		func_args,
-		attrs,
-		items,
-		read_body,
-		game_expr,
-		game_ty,
-	})
+	Ok(ctx)
 }
 
-fn gather_arm(items: &mut Vec<(Span, Item)>, arg_types: &mut BTreeMap<Ident, TokenStream>, arm: &InsnArm, mut item: Item) -> TokenStream {
+fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: &InsnArm) -> TokenStream {
 	let mut read = TokenStream::new();
 
 	for arg in &arm.args {
-		let varname = format_ident!("_{}", item.vars.len(), span=arg.span());
+		let varname = format_ident!("_{}", ictx.args.len(), span=arg.span());
 
 		let mut types = Vec::new();
 		types.push(match &arg.source {
@@ -656,13 +726,13 @@ fn gather_arm(items: &mut Vec<(Span, Item)>, arg_types: &mut BTreeMap<Ident, Tok
 								&& attrs.is_empty()
 								&& let Some(ident) = path.get_ident()
 							{
-								if item.vars.iter().any(|a| a == ident) {
+								if ictx.args.iter().any(|a| a == ident) {
 									q!{ident=> &#ident }
 								} else {
 									q!{ident=> #ident }
 								}
 							} else {
-								let v = item.vars.iter();
+								let v = ictx.args.iter();
 								q!{e=> #[allow(clippy::let_and_return)] { #(let #v = &#v;)* #e } }
 							}
 						);
@@ -706,40 +776,40 @@ fn gather_arm(items: &mut Vec<(Span, Item)>, arg_types: &mut BTreeMap<Ident, Tok
 					val = q!{arg=> #val? };
 				}
 			}
-			item.write.extend(q!{arg=> #val; });
+			ictx.write.extend(q!{arg=> #val; });
 		}
 
 		let ty = if let Some((_, ty)) = &arg.ty.last() {
-			ty.to_token_stream()
+			ty.clone()
 		} else {
 			match &arg.source {
-				Source::Simple(ident) => ident.to_token_stream(),
-				Source::Call(s) => s.ty.to_token_stream(),
+				Source::Simple(ident) => parse_quote! { #ident },
+				Source::Call(s) => s.ty.clone(),
 			}
 		};
-		item.vars.push(varname.clone());
-		item.def.extend(q!{ty=> #ty, });
-
 		let alias = arg.alias();
-		// collisions will be errored about at type checking
-		if !arg_types.contains_key(&alias) {
-			arg_types.insert(alias.clone(), ty);
+
+		ictx.args.push(varname.clone());
+		ictx.aliases.push(alias.clone());
+		ictx.types.push(ty.clone());
+		if !ctx.arg_types.contains_key(&alias) {
+			// collisions will be errored about at type checking
+			ctx.arg_types.insert(alias.clone(), ty);
 		}
-		item.aliases.push(alias.clone());
 	}
 
 	if let Some(tail) = &arm.tail {
 		let mut arms = Vec::new();
 		for arm in &tail.arms {
-			let mut item = item.clone();
-			item.name = format_ident!("{}{}", &item.name, &arm.value.insn.name, span=arm.value.insn.name.span());
-			item.attrs.extend(arm.attrs.clone());
+			let mut ictx = ictx.clone();
+			ictx.ident = format_ident!("{}{}", &ictx.ident, &arm.value.insn.name, span=arm.value.insn.name.span());
+			ictx.attrs.extend(arm.attrs.clone());
 			let key = &arm.value.key;
-			item.write.extend(q!{arm=> __f.u8(#key); });
-			let body = gather_arm(items, arg_types, &arm.value.insn, item);
+			ictx.write.extend(q!{arm=> __f.u8(#key); });
+			let body = gather_arm(ctx, ictx, &arm.value.insn);
 			arms.push(q!{arm=> #key => { #body } });
 		}
-		let name = &item.name;
+		let name = &ictx.ident;
 		read.extend(q!{tail=>
 			match __f.u8()? {
 				#(#arms)*
@@ -747,10 +817,26 @@ fn gather_arm(items: &mut Vec<(Span, Item)>, arg_types: &mut BTreeMap<Ident, Tok
 			}
 		})
 	} else {
-		items.push((arm.span(), item.clone()));
-		let name = &item.name;
-		let vars = &item.vars;
-		read.extend(q!{arm=> Ok(Self::#name(#vars)) })
+		let ident = &ictx.ident;
+		let args = &ictx.args;
+		read.extend(q!{arm=> Ok(Self::#ident(#args)) });
+
+		ctx.defs.push(Def {
+			span: arm.span(),
+			ident: ictx.ident.clone(),
+			attrs: ictx.attrs,
+			aliases: ictx.aliases,
+			types: ictx.types,
+		});
+
+		let write = ictx.write;
+		ctx.writes.push(WriteArm {
+			span: arm.span(),
+			games: ictx.games,
+			ident: ictx.ident,
+			args: ictx.args,
+			body: q!{arm=> |__f| { #write Ok(()) } },
+		});
 	};
 
 	read

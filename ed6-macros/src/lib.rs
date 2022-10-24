@@ -198,6 +198,9 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 
 		// doc shims
 		#[cfg(doc)]
+		#[doc(alias="InsnArgOwned")]
+		#[doc(alias="InsnArgMut")]
+		#[doc(alias="InsnArgType")]
 		#[allow(non_camel_case_types)]
 		#[derive(Debug)]
 		pub enum InsnArg {
@@ -205,13 +208,15 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		}
 
 		#[cfg(doc)]
-		#[doc(inline)]
+		#[doc(inline, hidden)]
 		pub use InsnArg as InsnArgOwned;
 
 		#[cfg(doc)]
+		#[doc(inline, hidden)]
 		pub use InsnArg as InsnArgMut;
 
 		#[cfg(doc)]
+		#[doc(inline, hidden)]
 		pub use InsnArg as InsnArgType;
 
 		impl Insn {

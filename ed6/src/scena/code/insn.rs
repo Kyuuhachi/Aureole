@@ -8,16 +8,26 @@ ed6_macros::bytecode! {
 		Return(), // [return]
 		skip!(3), // control flow
 		Call(func_ref() -> FuncRef), // [call]
-		NewScene(file_ref(lookup) -> String alias ScenaFileRef, u8, u8, u8, u8), // [new_scene]
-		skip!(1), // I think this is what the 7 after NewScene actually is. It seems to freeze the script, never proceeding.
+
+		/// Technically the last argument, which is always 7, is a separate hcf instruction.
+		/// But they are never used separately, so since treating it separately would just bloat the output, it's treated as a constant for now.
+		///
+		/// Official name is `new_scene`.
+		NewScene(file_ref(lookup) -> String alias ScenaFileRef, u8, u8, u8, u8),
+
+		// This is some kind of hcf instruction: like [`NextFrame`](Self::NextFrame), but does not advance the instruction pointer.
+		skip!(1),
+
 		Sleep(u32 alias Time), // [delay]
 		SystemFlagsSet(u32 as SystemFlags), // [set_system_flag]
 		SystemFlagsUnset(u32 as SystemFlags), // [reset_system_flag]
+
 		FadeOut(u32 alias Time, u32 as Color, u8), // [fade_out]
 		FadeIn(u32 alias Time, u32 as Color), // [fade_in]
 		FadeWait(), // [fade_wait]
 		CrossFade(u32 alias Time), // [cross_fade]
-		Battle(u16 as BattleId, u16, u16, u16, u8, u16, i8), // is this last one a CharId? Used a few times in FC's prologue where it clearly refers to npc/monsters, and 0xFF everywhere else
+
+		Battle(u32 as u16 as BattleId, u32, u8, u16, i8), // is this last one a CharId? Used a few times in FC's prologue where it clearly refers to npc/monsters, and 0xFF everywhere else
 		ExitSetEnabled(u8 alias ExitId, u8),
 		Fog(u8, u8, u8, u32, u32, u32), // First three are color; TODO parse it as one. Last is always 0.
 		_12(i32, i32, u32),
@@ -132,13 +142,13 @@ ed6_macros::bytecode! {
 		ObjFlagsSet(u16 alias ObjectId, u16 as ObjectFlags), // [mapobj_set_flag]
 		ObjFlagsUnset(u16 alias ObjectId, u16 as ObjectFlags), // [mapobj_reset_flag]
 		_Obj73(u16 alias ObjectId),
-		_74(u16, u32, u16),
-		_75(u8, u32, u8),
-		_76(u16, u32, u16, Pos3, u8, u8),
+		_74(u16 alias ObjectId, u32, u16),
+		_75(u8 as u16 alias ObjectId, u32, u8),
+		_76(u16, u32, u16, i32, i32, i32, u8, u8),
 		MapColor(u32 as Color, u32 alias Time), // [map_color]
-		_78(u8, u16),
+		_78(u8, u8, u8),
 		_79(u8 as u16 alias ObjectId, u16),
-		_7A(u8, u16),
+		_7A(u8 as u16 alias ObjectId, u16),
 		_7B(),
 		Shake(u32, u32, u32, u32 alias Time), // [quake]
 		#[game(Fc,FcEvo)] skip!(1), // {asm} two-byte nop
@@ -163,12 +173,12 @@ ed6_macros::bytecode! {
 			u32, u32, u32, // scale
 			u32 alias Time, // period (0 if one-shot)
 		),
-		_82(u16),
+		_82(u8, u8),
 		#[game(Fc)] Achievement(u8, u8),
 		#[game(FcEvo)] skip!(1),
-		#[game(Sc)] _83(u8, u8),
+		#[game(Sc)] _83(u8, u8), // might have to do with EffPlay
 		_84(u8),
-		_85(u16),
+		_85(u8, u8),
 		CharSetBase    (u16 as CharId, u16), // [set_chr_base]
 		CharSetPattern (u16 as CharId, u16), // [set_chr_ptn]
 		CharSetPos     (u16 as CharId, Pos3, i16 alias Angle), // [set_pos]
@@ -199,7 +209,7 @@ ed6_macros::bytecode! {
 		_Char9D        (u16 as CharId, u16),
 		CharShake      (u16 as CharId, u32, u32, u32, u32),
 		CharColor      (u16 as CharId, u32 as Color, u32 alias Time),
-		Sc_A0(u8,u8,u8,u8,u8,u8,u8,u8,u8),
+		Sc_A0          (u16 as CharId, u32 as Color, u8,u8,u8),
 		CharAttachObj  (u16 as CharId, u16 alias ObjectId),
 		FlagSet(u16 as Flag), // [set_flag]
 		FlagUnset(u16 as Flag), // [reset_flag]

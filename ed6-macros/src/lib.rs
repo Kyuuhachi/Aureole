@@ -168,29 +168,51 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 	}).collect::<TokenStream>();
 
 	let introspection = quote! {
+		#[cfg(not(doc))]
 		#[allow(non_camel_case_types)]
 		#[derive(Debug, Clone)]
 		pub enum InsnArgOwned {
 			#(#InsnArg_names(#InsnArg_types),)*
 		}
 
+		#[cfg(not(doc))]
 		#[allow(non_camel_case_types)]
 		#[derive(Debug, Clone, Copy)]
 		pub enum InsnArg<'a> {
 			#(#InsnArg_names(&'a #InsnArg_types),)*
 		}
 
+		#[cfg(not(doc))]
 		#[allow(non_camel_case_types)]
 		#[derive(Debug)]
 		pub enum InsnArgMut<'a> {
 			#(#InsnArg_names(&'a mut #InsnArg_types),)*
 		}
 
+		#[cfg(not(doc))]
 		#[allow(non_camel_case_types)]
 		#[derive(Debug, Clone, Copy)]
 		pub enum InsnArgType {
 			#(#InsnArg_names,)*
 		}
+
+		// doc shims
+		#[cfg(doc)]
+		#[allow(non_camel_case_types)]
+		#[derive(Debug)]
+		pub enum InsnArg {
+			#(#InsnArg_names(#InsnArg_types),)*
+		}
+
+		#[cfg(doc)]
+		#[doc(inline)]
+		pub use InsnArg as InsnArgOwned;
+
+		#[cfg(doc)]
+		pub use InsnArg as InsnArgMut;
+
+		#[cfg(doc)]
+		pub use InsnArg as InsnArgType;
 
 		impl Insn {
 			pub fn name(&self) -> &'static str {

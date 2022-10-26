@@ -67,8 +67,7 @@ fn main() -> io::Result<()> {
 	} else if let Some(encoding) = encoding_rs::Encoding::for_label_no_replacement(cli.encoding.as_bytes()) {
 		Some(Box::new(beryl::preview::encoding(encoding)))
 	} else {
-		eprintln!("Invalid encoding");
-		None
+		panic!("Invalid encoding");
 	};
 
 	let files = if cli.files.is_empty() {
@@ -100,7 +99,7 @@ fn main() -> io::Result<()> {
 		if let Some(v) = cli.num_width { dump = dump.num_width(v); }
 		if cli.no_blank { dump = dump.newline(false); }
 		if cli.one_line { dump = dump.oneline(); }
-		if cli.gray { dump = dump.color(&beryl::color::gray); }
+		if cli.gray { dump = dump.color(beryl::color::gray); }
 
 		if cli.print_name {
 			println!("{}", path.display());

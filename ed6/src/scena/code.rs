@@ -78,7 +78,7 @@ pub fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet, lookup: &dyn Lookup, 
 			Err(err) => {
 				let start = pos.saturating_sub(48*2);
 				f.seek(start)?;
-				let mut d = f.dump().lines(4).mark(pos, 9);
+				let mut d = f.dump().lines(4).mark(pos, 9).preview_encoding("sjis");
 				for (i, insn) in &insns {
 					if *i >= start {
 						d = d.mark(*i, 3);

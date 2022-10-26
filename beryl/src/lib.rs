@@ -84,8 +84,9 @@ pub struct Dump<'a> {
 	start: usize,
 	length: DumpLength,
 	width: usize,
-	color: &'a ColorFn,
-	preview: Option<&'a PreviewFn>,
+	color: Box<dyn Fn(u8, Option<u8>) -> Style + 'a>,
+	#[allow(clippy::type_complexity)]
+	preview: Option<Box<dyn Fn(&mut Vec<Ansi>, &[u8]) + 'a>>,
 	num_width: usize,
 	newline: bool,
 	marks: RangeMap<usize, u8>,
@@ -98,8 +99,8 @@ impl<'a> Dump<'a> {
 			start,
 			width: 0,
 			length: DumpLength::None,
-			color: &color::ascii,
-			preview: Some(&preview::ascii),
+			color: Box::new(color::ascii),
+			preview: Some(Box::new(preview::ascii)),
 			num_width: 1,
 			newline: true,
 			marks: RangeMap::new(),
@@ -127,22 +128,33 @@ impl<'a> Dump<'a> {
 		Dump { width, ..self }
 	}
 
-	pub fn color(self, color: &'a ColorFn) -> Self {
-		Dump { color, ..self }
+	pub fn color(self, color: impl Fn(u8, Option<u8>) -> Style + 'a) -> Self {
+		Dump { color: Box::new(color), ..self }
 	}
 
-	pub fn preview(self, preview: &'a PreviewFn) -> Self {
+	pub fn preview(self, preview: impl Fn(&mut Vec<Ansi>, &[u8]) + 'a) -> Self {
 		self.preview_option(Some(preview))
 	}
 
 	// This is different from a no-op preview function, since it affects the
 	// default width and trailing space on the last line.
 	pub fn no_preview(self) -> Self {
-		self.preview_option(None)
+		Dump { preview: None, ..self }
 	}
 
-	pub fn preview_option(self, preview: Option<&'a PreviewFn>) -> Self {
-		Dump { preview, ..self }
+	#[cfg(feature = "encoding_rs")]
+	pub fn preview_encoding(self, enc: &str) -> Self {
+		let encoding = encoding_rs::Encoding::for_label_no_replacement(enc.as_bytes())
+			.expect("invalid encoding");
+		self.preview(preview::encoding(encoding))
+	}
+
+	pub fn preview_option(self, preview: Option<impl Fn(&mut Vec<Ansi>, &[u8]) + 'a>) -> Self {
+		if let Some(a) = preview {
+			Dump { preview: Some(Box::new(a)), ..self }
+		} else {
+			Dump { preview: None, ..self }
+		}
 	}
 
 	pub fn num_width(self, num_width: usize) -> Self {
@@ -232,7 +244,7 @@ impl<'a> Dump<'a> {
 
 			line.push(" ".into());
 
-			if let Some(preview) = self.preview {
+			if let Some(preview) = &self.preview {
 				if buf.len() < width {
 					line.push("   ".repeat(width - buf.len()).into());
 				}

@@ -2,7 +2,7 @@ use super::*;
 
 ed6_macros::bytecode! {
 	(iset: InstructionSet, lookup: &dyn Lookup)
-	#[games(iset => InstructionSet::{Fc, FcEvo, Sc})]
+	#[games(iset => InstructionSet::{Fc, FcEvo, Sc, ScEvo})]
 	[
 		skip!(1), // null
 		Return(), // [return]
@@ -27,38 +27,73 @@ ed6_macros::bytecode! {
 		FadeWait(), // [fade_wait]
 		CrossFade(u32 alias Time), // [cross_fade]
 
-		Battle(u32 as u16 as BattleId, u32, u8, u16, i8), // is this last one a CharId? Used a few times in FC's prologue where it clearly refers to npc/monsters, and 0xFF everywhere else
-		ExitSetEnabled(u8 alias ExitId, u8),
-		Fog(u8, u8, u8, u32, u32, u32), // First three are color; TODO parse it as one. Last is always 0.
+		Battle(u32 as u16 as BattleId, u16, u16, u8, u16, i8), // is this last one a CharId? Used a few times in FC's prologue where it clearly refers to npc/monsters, and 0xFF everywhere else
+
+		/// Sets whether an entrance (or rather exit), defined in the accompanying `._en` file, is enabled.
+		/// Specifically, it sets the 0x0001 flag.
+		/// I think `1` sets the exit as enabled, `0` as disabled. But I could be misreading it.
+		EntranceSetDisabled(u8 alias EntranceId, u8),
+
+		/// I have not been able to verify this one, the asm is complex.
+		///
+		/// Arguments are `D3DRS_FOGCOLOR` (24 bit, so color ignored), `D3DRS_FOGSTART`, `D3DRS_FOGEND`, `D3DRS_RANGEFOGENABLE`, `D3DRS_FOGDENSITY`.
+		/// But since `D3DRS_FOGVERTEXMODE` is hardcoded to `D3DFOG_LINEAR` (at least in FC), the third parameter is never used.
+		Fog(color24() -> Color, i32, i32, i32),
+
+		/// Something related to fog.
+		/// If I'm reading the assembly correctly, if arg1 is `0f`, then it is set to `32f`. arg2 is similarly defaulted to `130f`.
+		///
+		/// The third arg is an index to something, but it is unclear what.
 		_12(i32, i32, u32),
+
 		PlaceSetName(u16 as TownId),
-		Sc_14(u32, u32, u32, u32, u8),
-		#[game(Fc, FcEvo)] skip!(1), // ptr += 1
-		#[game(Sc)] Sc_15(u32),
+
+		#[game(Fc, FcEvo)] skip!(1), // Unused one-byte instruction that calls an unknown function
+		#[game(Fc, FcEvo)] skip!(1), // One-byte nop
+		#[game(Sc, ScEvo)] Sc_14(u32, u32 as Color, u32, u32, u8),
+		#[game(Sc, ScEvo)] Sc_15(u32),
+
 		Map(match {
 			0x00 => Hide(),
 			0x01 => Show(),
 			0x02 => Set(i32, Pos2, file_ref(lookup) -> String alias MapFileRef),
 		}),
 		#[game(Fc, Sc)] Save(),
-		#[game(FcEvo)] EvoSave(u8),
+		#[game(FcEvo, ScEvo)] EvoSave(u8),
 		#[game(Fc, FcEvo)] skip!(1), // two-byte nop
-		#[game(Sc)] Sc_18(u8, u8, u8),
-		EventBegin(u8), // [event_begin]
-		EventEnd(u8), // [event_end]
-		_1B(u16, u16),
-		_1C(u16, u16),
+		#[game(Sc, ScEvo)] Sc_18(u8, u8, u8),
+
+		/// Performs a variety of setup when initializing a talk or cutscene.
+		///
+		/// The argument is a bitmask, but the meanings are unknown.
+		///
+		/// Official name is `event_begin`.
+		EventBegin(u8),
+
+		/// Undoes the setup performed by [`EventBegin`](Self::EventBegin).
+		///
+		/// At least that's what it intuitively should do, but it has at least one flag not supported by `EventBegin`, and the assembly code is very long.
+		///
+		/// Official name is `event_end`.
+		EventEnd(u8),
+
+		// Can't tell what these two are doing
+		_1B(u8, u8, u16),
+		_1C(u8, u8, u16),
+
 		BgmPlay(u8 as BgmId), // [play_bgm]
 		BgmResume(), // [resume_bgm]
 		BgmVolume(u8, u32 alias Time), // [volume_bgm]
 		BgmStop(u32 alias Time), // [stop_bgm]
 		BgmWait(), // [wait_bgm]
+
 		SoundPlay(u16 as SoundId, u8, u8), // [sound]
 		SoundStop(u16 as SoundId),
 		SoundLoop(u16 as SoundId, u8),
 		_Sound25(u16 as SoundId, Pos3, u32, u32, u8, u32),
 		SoundLoad(u16 as SoundId), // [sound_load]
 		skip!(1),
+
 		Quest(u16 as QuestId, match {
 			0x01 => TaskSet(u16 alias QuestTask),
 			0x02 => TaskUnset(u16 alias QuestTask),
@@ -72,6 +107,7 @@ ed6_macros::bytecode! {
 		QuestList(quest_list() -> Vec<QuestId> alias QuestList),
 		QuestBonusBp(u16 as QuestId, u16),
 		QuestBonusMira(u16 as QuestId, u16),
+
 		PartyAdd(u8 as Member, u8, u8_not_in_fc(iset) -> u8), // [join_party]
 		PartyRemove(u8 as Member, u8), // [separate_party]
 		ScPartyClear(),
@@ -82,37 +118,45 @@ ed6_macros::bytecode! {
 		PartyAddCraft(u8 as Member, u16 as MagicId),
 		PartyAddSCraft(u8 as Member, u16 as MagicId),
 		PartySetSlot(u8 as Member, u8, party_set_slot(iset, _1) -> i8), // merged with FC's PartyUnlockSlot
+
 		SepithAdd(u8 as Element alias SepithElement, u16),
 		SepithRemove(u8 as Element alias SepithElement, u16),
 		MiraAdd(u16), // [get_gold]
 		MiraSub(u16),
 		BpAdd(u16),
-		skip!(1), // I have a guess what this is, but it doesn't exist in any scripts
+		BpSub(u16),
 		ItemAdd(u16 as ItemId, u16),
 		ItemRemove(u16 as ItemId, u16), // [release_item]
 		ItemHas(u16 as ItemId, u8_not_in_fc(iset) -> u8), // or is it ItemGetCount?
+
 		PartyEquip(u8 as Member, u16 as ItemId, party_equip_slot(iset, _1) -> i8),
 		PartyPosition(u8 as Member),
+
 		ForkFunc(u16 as CharId, u8 alias ForkId, func_ref() -> FuncRef), // [execute]
 		ForkQuit(u16 as CharId, u8 alias ForkId), // [terminate]
 		Fork(u16 as CharId, u8 alias ForkId, u8, fork(iset, lookup) -> Vec<Insn> alias Fork), // [preset]? In t0311, only used with a single instruction inside
 		ForkLoop(u16 as CharId, u8 alias ForkId, u8, fork_loop(iset, lookup) -> Vec<Insn> alias Fork),
 		ForkWait(u16 as CharId, u8 alias ForkId, u8), // [wait_terminate]
 		NextFrame(), // [next_frame]
+
 		Event(func_ref() -> FuncRef), // [event] Not sure how this differs from Call
+
 		_Char4A(u16 as CharId, u8), // Argument is almost always 255, but sometimes 0, and in a single case 1
 		_Char4B(u16 as CharId, u8),
+
 		skip!(1), // {asm} one-byte nop
 		Var(u16 as Var, expr(iset, lookup) -> Expr),
 		skip!(1), // {asm} one-byte nop
 		Attr(u8 as Attr, expr(iset, lookup) -> Expr), // [system[n]]
 		skip!(1), // {asm} one-byte nop
 		CharAttr(char_attr() -> CharAttr, expr(iset, lookup) -> Expr),
+
 		TextStart(u16 as CharId), // [talk_start]
 		TextEnd(u16 as CharId), // [talk_end]
 		TextMessage(text() -> Text), // [mes]
 		skip!(1), // {asm} same as NextFrame
 		TextClose(u8), // [mes_close]
+		/// Exists in FC too, but does not appear to do anything.
 		Sc_57(u32, u16, text() -> Text),
 		TextWait(), // [wait_prompt]
 		_59(), // Always directly after a TextReset 1, and exists in all but one such case. I suspect that one is a bug.
@@ -124,25 +168,30 @@ ed6_macros::bytecode! {
 		MenuClose(u16 alias MenuId), // [menu_close]
 		TextSetName(String alias TextTitle), // [name]
 		CharName2(u16 as CharId), // [name2]
+
 		Emote(u16 as CharId, i32, i32, emote() -> Emote, u8), // [emotion] mostly used through macros such as EMO_BIKKURI3(). Third argument is height.
 		EmoteStop(u16 as CharId), // [emotion_close]
-		_64(u8 as u16 alias ObjectId, u16),
+
+		/// These two seem to use the scp idx for something?
+		_64(u8 as u16 alias ObjectId, u16), // What's the difference between this and ObjFlagsSet?
 		_65(u8 as u16 alias ObjectId, u16),
+
 		CamChangeAxis(u16), // [camera_change_axis] 0 CAMERA_ABSOLUTE_MODE, 1 CAMERA_RELATIVE_MODE
 		CamMove(i32, i32, i32, u32 alias Time), // [camera_move]
-		skip!(1),
+		_Cam68(u8),
 		CamLookChar(u16 as CharId, u32 alias Time), // [camera_look_chr]
 		_Char6A(u16 as CharId),
 		CamZoom(i32, u32 alias Time), // [camera_zoom]
 		CamRotate(i32 alias Angle32, u32 alias Time), // [camera_rotate]
 		CamLookPos(Pos3, u32 alias Time), // [camera_look_at]
 		CamPers(u32, u32 alias Time), // [camera_pers]
+
 		ObjFrame(u16 alias ObjectId, u32), // [mapobj_frame]
 		ObjPlay(u16 alias ObjectId, u32), // [mapobj_play]
 		ObjFlagsSet(u16 alias ObjectId, u16 as ObjectFlags), // [mapobj_set_flag]
 		ObjFlagsUnset(u16 alias ObjectId, u16 as ObjectFlags), // [mapobj_reset_flag]
 		_Obj73(u16 alias ObjectId),
-		_74(u16 alias ObjectId, u32, u16),
+		_74(u16, u32, u16),
 		_75(u8 as u16 alias ObjectId, u32, u8),
 		_76(u16, u32, u16, i32, i32, i32, u8, u8),
 		MapColor(u32 as Color, u32 alias Time), // [map_color]
@@ -151,8 +200,8 @@ ed6_macros::bytecode! {
 		_7A(u8 as u16 alias ObjectId, u16),
 		_7B(),
 		Shake(u32, u32, u32, u32 alias Time), // [quake]
-		#[game(Fc,FcEvo)] skip!(1), // {asm} two-byte nop
-		#[game(Sc)] Sc_7D(match {
+		#[game(Fc, FcEvo)] skip!(1), // {asm} two-byte nop
+		#[game(Sc, ScEvo)] Sc_7D(match {
 			0 => _0(u16 as CharId, u16, u16),
 			1 => _1(u16 as CharId, u16, u16), // args always zero; always paired with a _0 except when the char is 254
 		}),
@@ -161,7 +210,7 @@ ed6_macros::bytecode! {
 		EffPlay(
 			u8, u8,
 			u16 as CharId, Pos3, // source
-			u16, u16, u16, // always zero
+			i16, i16, i16,
 			u32, u32, u32, // scale?
 			u16 as CharId, Pos3, // target
 			u32 alias Time, // period (0 if one-shot)
@@ -169,14 +218,13 @@ ed6_macros::bytecode! {
 		EffPlay2(
 			u8, u8,
 			u8 as u16 alias ObjectId, String, Pos3, // source
-			u16, u16, u16, // always zero
+			i16, i16, i16,
 			u32, u32, u32, // scale
 			u32 alias Time, // period (0 if one-shot)
 		),
 		_82(u8, u8),
-		#[game(Fc)] Achievement(u8, u8),
-		#[game(FcEvo)] skip!(1),
-		#[game(Sc)] _83(u8, u8), // might have to do with EffPlay
+		#[game(Fc, FcEvo)] Achievement(u8, u8),
+		#[game(Sc, ScEvo)] _83(u8, u8), // might have to do with EffPlay
 		_84(u8),
 		_85(u8, u8),
 		CharSetBase    (u16 as CharId, u16), // [set_chr_base]
@@ -213,17 +261,15 @@ ed6_macros::bytecode! {
 		CharAttachObj  (u16 as CharId, u16 alias ObjectId),
 		FlagSet(u16 as Flag), // [set_flag]
 		FlagUnset(u16 as Flag), // [reset_flag]
-		// Checked from here
 
-		// {asm} 3-byte nop
-		skip!(1),
+		skip!(1), // {asm} 3-byte nop
 
 		/// Waits until the flag is true.
 		///
 		/// Equivalent to
 		/// ```text
 		/// while !flag[n]:
-		/// 	NextFrame
+		///   NextFrame
 		/// ```
 		///
 		/// Official name is `flag_wait_false`.
@@ -234,7 +280,7 @@ ed6_macros::bytecode! {
 		/// Equivalent to
 		/// ```text
 		/// while flag[n]:
-		/// 	NextFrame
+		///   NextFrame
 		/// ```
 		///
 		/// Official name is `flag_wait_true`.
@@ -245,7 +291,7 @@ ed6_macros::bytecode! {
 		/// Equivalent to
 		/// ```text
 		/// while var[n] != val:
-		/// 	NextFrame
+		///   NextFrame
 		/// ```
 		///
 		/// Never used.
@@ -334,14 +380,13 @@ ed6_macros::bytecode! {
 		/// Checks whether the given member has this orbment slot unlocked.
 		PartyHasSlot(u8 as Member, u8),
 
-		#[game(Fc)] skip!(34),
-		#[game(FcEvo)] skip!(10),
+		#[game(Fc,FcEvo)] skip!(10),
 
-		#[game(Sc)] ScSetPortrait(u8 as Member, u8, u8, u8, u8, u8),
-		#[game(Sc)] skip!(1),
-		#[game(Sc)] Sc_BD(),
-		#[game(Sc)] Sc_BE(u8,u8,u8,u8, u16, u16, u8, i32,i32,i32,i32,i32,i32),
-		#[game(Sc)] Sc_BF(u8,u8,u8,u8, u16),
+		#[game(Sc,ScEvo)] ScSetPortrait(u8 as Member, u8, u8, u8, u8, u8),
+		#[game(Sc,ScEvo)] skip!(1),
+		#[game(Sc,ScEvo)] Sc_BD(),
+		#[game(Sc,ScEvo)] Sc_BE(u8,u8,u8,u8, u16, u16, u8, i32,i32,i32,i32,i32,i32),
+		#[game(Sc,ScEvo)] Sc_BF(u8,u8,u8,u8, u16),
 		/// ```text
 		///  1 ⇒ something about using items on the field
 		/// 11 ⇒ roulette
@@ -358,76 +403,112 @@ ed6_macros::bytecode! {
 		/// 22 ⇒ after Weissman sets up a barrier
 		/// 23 ⇒ used after sequences of ScLoadChcp
 		/// ```
-		#[game(Sc)] ScMinigame(u8, i32,i32,i32,i32,i32,i32,i32,i32),
-		#[game(Sc)] Sc_C1(u16 as ItemId, u32),
-		#[game(Sc)] Sc_C2(),
-		#[game(Sc)] skip!(1),
-		#[game(Sc)] ScScreenInvert(u8, u32),
-		#[game(FcEvo,Sc)] VisLoad(u8 alias VisId, u16,u16,u16,u16, u16,u16,u16,u16, u16,u16,u16,u16, u32 as Color, u8, String),
-		#[game(FcEvo)] VisColor(u8 alias VisId, u8, u32 as Color, u32, u32, u32),
-		#[game(Sc)]  ScVisColor(u8 alias VisId, u8, u32 as Color, i32, u32),
-		#[game(FcEvo,Sc)] VisDispose(u8, u8 alias VisId, u8),
+		#[game(Sc,ScEvo)] ScMinigame(u8, i32,i32,i32,i32,i32,i32,i32,i32),
+		#[game(Sc,ScEvo)] Sc_C1(u16 as ItemId, u32),
+		#[game(Sc,ScEvo)] Sc_C2(),
 
-		#[game(FcEvo)] skip!(19),
+		/// Unused.
+		#[game(Sc,ScEvo)] Sc_C3(u16),
 
-		#[game(Sc)] Sc_C8(u16, u16, String, u8, u16), // Something with C_PLATnn._CH
-		#[game(Sc)] ScPartySelect(u16, sc_party_select_mandatory() -> [Option<Member>; 4] alias MandatoryMembers, sc_party_select_optional() -> Vec<Member> alias OptionalMembers),
-		#[game(Sc)] Sc_CA(u16 as ItemId, u32),
-		#[game(Sc)] Sc_CharInSlot(u8), // clearly related to CharId, but not the same
-		#[game(Sc)] Sc_Select(match {
+		#[game(Sc,ScEvo)] Sc_C4(u8, u32),
+
+		#[game(Fc)] skip!(3),
+		#[game(FcEvo,Sc,ScEvo)] VisLoad(u8 alias VisId, i16,i16,u16,u16, i16,i16,u16,u16, i16,i16,u16,u16, u32 as Color, u8, String),
+		#[game(FcEvo,Sc,ScEvo)] VisColor(u8 alias VisId, u8, u32 as Color, u32, u32, u32_only_fc_evo(iset) -> u32),
+		#[game(FcEvo,Sc,ScEvo)] VisDispose(u8, u8 alias VisId, u8),
+
+		#[game(Fc,FcEvo)] skip!(19),
+
+		#[game(Sc,ScEvo)] Sc_C8(u16, u16, String, u8, u16), // Something with C_PLATnn._CH
+		#[game(Sc,ScEvo)] ScPartySelect(u16, sc_party_select_mandatory() -> [Option<Member>; 4] alias MandatoryMembers, sc_party_select_optional() -> Vec<Member> alias OptionalMembers),
+		#[game(Sc,ScEvo)] Sc_CA(u16 as ItemId, u32),
+		#[game(Sc,ScEvo)] Sc_CharInSlot(u8), // clearly related to CharId, but not the same
+		#[game(Sc,ScEvo)] Sc_Select(match {
 			0 => New(u8 alias SelectId, u16, u16, u8),
 			1 => Add(u8 alias SelectId, String alias MenuItem),
 			2 => Show(u8 alias SelectId),
 			3 => _3(u8 alias SelectId, u8),
 		}),
-		#[game(Sc)] Sc_CD(u16 as CharId), // related to showing photographs
-		#[game(Sc)] Sc_ExprUnk(u8, expr(iset, lookup) -> Expr), // I think this is integer variables that are not local
-		#[game(Sc)] Sc_CF(u16 as CharId, u8, String), // something with skeleton animation
-		#[game(Sc)] Sc_D0(i32 alias Angle32, u32 alias Time),
-		#[game(Sc)] Sc_D1(u16 as CharId, i32, i32, i32, u32 alias Time), // something with camera?
-		#[game(Sc)] ScLoadChcp(file_ref(lookup) -> String, file_ref(lookup) -> String, u8),
-		#[game(Sc)] Sc_D3(u8),
-		#[game(Sc)] skip!(1),
-		#[game(Sc)] ScPartyIsEquipped(u8 as Member, u16, u16 as ItemId, u8, u8, u8),
-		#[game(Sc)] Sc_D6(u8), // bool
-		#[game(Sc)] Sc_D7(u8,u8,u8,u8,u8,u8,u8),
-		#[game(Sc)] Sc_D8(u8 as u16 alias ObjectId, u16),
-		#[game(Sc)] ScCutIn(match {
+		#[game(Sc,ScEvo)] Sc_CD(u16 as CharId), // related to showing photographs
+		#[game(Sc,ScEvo)] Sc_ExprUnk(u8, expr(iset, lookup) -> Expr), // I think this is integer variables that are not local
+		#[game(Sc,ScEvo)] Sc_CF(u16 as CharId, u8, String), // something with skeleton animation
+		#[game(Sc,ScEvo)] Sc_D0(i32 alias Angle32, u32 alias Time),
+		#[game(Sc,ScEvo)] Sc_D1(u16 as CharId, i32, i32, i32, u32 alias Time), // something with camera?
+		#[game(Sc,ScEvo)] ScLoadChcp(file_ref(lookup) -> String, file_ref(lookup) -> String, u8),
+		#[game(Sc,ScEvo)] Sc_D3(u8),
+
+		/// Unused.
+		///
+		/// First arg is an index into some array; second is a field selector, which can be `[0, 1, 2, 5, 6]`.
+		/// Returns whatever that value is.
+		#[game(Sc,ScEvo)] Sc_D4(u8, u8),
+
+		#[game(Sc,ScEvo)] ScPartyIsEquipped(u8 as Member, u16, u16 as ItemId, u8, u8, u8),
+		#[game(Sc,ScEvo)] Sc_D6(u8), // bool
+		#[game(Sc,ScEvo)] Sc_D7(u8,u8,u8,u8,u8,u8,u8),
+		#[game(Sc,ScEvo)] Sc_D8(u8 as u16 alias ObjectId, u16),
+		#[game(Sc,ScEvo)] ScCutIn(match {
 			0 => Show(String), // CTInnnnn
 			1 => Hide(),
 		}),
-		#[game(Sc)] Sc_DA(), // Something to do with menus
-		#[game(FcEvo,Sc)] Sc_DB(), // brackets with the below
-		#[game(FcEvo,Sc)] Sc_DC(), // ↑
+		#[game(Sc,ScEvo)] Sc_DA(), // Something to do with menus
+
+		#[game(Fc)] skip!(2),
+		/// A no-op. Always paired with [`Sc_DC`](Self::SC_DC).
+		#[game(FcEvo,Sc,ScEvo)] Sc_DB(),
+		/// A no-op. Always paired with [`Sc_DB`](Self::SC_DB).
+		#[game(FcEvo,Sc,ScEvo)] Sc_DC(),
 
 		/// Opens the save menu in order to save clear data.
 		SaveClearData(),
 
-		#[game(Fc)] skip!(33),
-		#[game(FcEvo)] skip!(2),
+		#[game(FcEvo)] skip!(1),
+		#[game(Sc,ScEvo)] Sc_DE(String), // a place name. Not a t_town, strangely
+		#[game(FcEvo,Sc,ScEvo)] skip!(1),
+		#[game(FcEvo,Sc,ScEvo)] Sc_E0(u8 as u16 alias ObjectId, Pos3),
+		#[game(FcEvo,Sc,ScEvo)] skip!(2),
 
-		#[game(Sc)] Sc_DE(String), // a place name. Not a t_town, strangely
-		#[game(Sc)] skip!(1),
-		#[game(FcEvo,Sc)] Sc_E0(u8 as u16 alias ObjectId, Pos3),
-		#[game(FcEvo,Sc)] skip!(2),
-
-		#[game(Sc)] Sc_E3(u8, u16 as CharId, u8),
-		#[game(Sc)] skip!(1),
-		#[game(Sc)] Sc_E5(u16 as CharId, u8),
-		#[game(Sc)] Sc_E6(u8), // related to RAM saving, according to debug script
-		#[game(Sc)] Sc_E7(u8 as u16 alias ObjectId, String, u8,u8,u8,u8,u8),
-		#[game(Sc)] Sc_E8(u32),
-		#[game(Sc)] Sc_E9(u8), // related to RAM saving
-		#[game(Sc)] ScAchievement(u8, u16, u8),
-		#[game(Sc)] Sc_EB(u8, u8),
-		#[game(Sc)] skip!(20),
+		#[game(Sc,ScEvo)] Sc_E3(u8, u16 as CharId, u8),
+		/// A no-op.
+		#[game(Sc,ScEvo)] Sc_E4(u8, u16),
+		#[game(Sc,ScEvo)] Sc_E5(u16 as CharId, u8),
+		#[game(Sc,ScEvo)] Sc_E6(u8), // related to RAM saving, according to debug script
+		#[game(Sc,ScEvo)] Sc_E7(u8 as u16 alias ObjectId, String, u8,u8,u8,u8,u8),
+		#[game(Sc,ScEvo)] Sc_E8(u32),
+		#[game(Sc,ScEvo)] Sc_E9(u8), // related to RAM saving
+		/// Probably nonexistent on ScEvo.
+		#[game(Sc,ScEvo)] ScAchievement(u8, u16, u8),
+		/// A no-op.
+		#[game(Sc,ScEvo)] Sc_EB(u16),
 
 		#[game(FcEvo)] EvoCtp(String), // Refers to /data/map2/{}.ctp
-		#[game(FcEvo)] EvoVoiceLine(u16), // [pop_msg]
-		#[game(FcEvo)] Evo_E6(text() -> Text),
-		#[game(FcEvo)] Evo_E7(u8 alias VisId, u8),
+		#[game(FcEvo,ScEvo)] EvoVoiceLine(u16), // [pop_msg]
+		#[game(FcEvo,ScEvo)] Evo_E6(text() -> Text),
+		#[game(FcEvo,ScEvo)] Evo_E7(u8 alias VisId, u8),
+
+		#[game(Fc)] skip!(33),
 		#[game(FcEvo)] skip!(24),
+		#[game(Sc)] skip!(20),
+		#[game(ScEvo)] skip!(17),
 	]
+}
+
+mod color24 {
+	use super::*;
+	pub(super) fn read<'a>(f: &mut impl In<'a>) -> Result<Color, ReadError> {
+		let a = f.u8()?;
+		let b = f.u8()?;
+		let c = f.u8()?;
+		Ok(Color(u32::from_le_bytes([a, b, c, 0])))
+	}
+
+	pub(super) fn write(f: &mut impl Out, v: &Color) -> Result<(), WriteError> {
+		let [a, b, c, _] = u32::to_le_bytes(v.0);
+		f.u8(a);
+		f.u8(b);
+		f.u8(c);
+		Ok(())
+	}
 }
 
 mod quest_list {
@@ -673,6 +754,24 @@ mod u16_not_in_fc {
 		match iset {
 			InstructionSet::Fc | InstructionSet::FcEvo => ensure!(*v == 0, "{v} must be 0"),
 			_ => f.u16(*v)
+		}
+		Ok(())
+	}
+}
+
+mod u32_only_fc_evo {
+	use super::*;
+	pub(super) fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet) -> Result<u32, ReadError> {
+		match iset {
+			InstructionSet::FcEvo => Ok(f.u32()?),
+			_ => Ok(0)
+		}
+	}
+
+	pub(super) fn write(f: &mut impl Out, iset: InstructionSet, v: &u32) -> Result<(), WriteError> {
+		match iset {
+			InstructionSet::FcEvo => f.u32(*v),
+			_ => ensure!(*v == 0, "{v} must be 0"),
 		}
 		Ok(())
 	}

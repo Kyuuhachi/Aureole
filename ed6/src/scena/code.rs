@@ -288,7 +288,11 @@ pub enum Expr {
 	Var(Var),
 	Attr(Attr),
 	CharAttr(CharAttr),
+	/// Returns a 15-bit pseudorandom number
 	Rand,
+	/// I think this is global integer variables.
+	///
+	/// Only available on SC onward.
 	ExprUnk(u8),
 }
 

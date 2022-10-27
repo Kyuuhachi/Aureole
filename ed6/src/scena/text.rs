@@ -405,7 +405,7 @@ fn val(f: &mut Context, a: I) {
 		I::SoundId(v)  => f.write(&format!("{v:?}")),
 		I::TownId(v)   => f.write(&format!("{v:?}")),
 
-		I::ExitId(v)   => f.write(&format!("ExitId({v})")),
+		I::EntranceId(v) => f.write(&format!("EntranceId({v})")),
 		I::ForkId(v)   => f.write(&format!("ForkId({v})")),
 		I::MenuId(v)   => f.write(&format!("MenuId({v})")),
 		I::SelectId(v) => f.write(&format!("SelectId({v})")),

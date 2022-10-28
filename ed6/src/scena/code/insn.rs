@@ -2,7 +2,7 @@ use super::*;
 
 ed6_macros::bytecode! {
 	(iset: InstructionSet, lookup: &dyn Lookup)
-	#[games(iset => InstructionSet::{Fc, FcEvo, Sc, ScEvo})]
+	#[games(iset => InstructionSet::{Fc, FcEvo, Sc, ScEvo, Tc})]
 	[
 		skip!(1), // null
 		Return(), // [return]
@@ -50,18 +50,18 @@ ed6_macros::bytecode! {
 
 		#[game(Fc, FcEvo)] skip!(1), // Unused one-byte instruction that calls an unknown function
 		#[game(Fc, FcEvo)] skip!(1), // One-byte nop
-		#[game(Sc, ScEvo)] Sc_14(u32, u32 as Color, u32, u32, u8),
-		#[game(Sc, ScEvo)] Sc_15(u32),
+		#[game(Sc, ScEvo, Tc)] Sc_14(u32, u32 as Color, u32, u32, u8),
+		#[game(Sc, ScEvo, Tc)] Sc_15(u32),
 
 		Map(match {
 			0x00 => Hide(),
 			0x01 => Show(),
 			0x02 => Set(i32, Pos2, file_ref(lookup) -> String alias MapFileRef),
 		}),
-		#[game(Fc, Sc)] Save(),
+		#[game(Fc, Sc, Tc)] Save(),
 		#[game(FcEvo, ScEvo)] EvoSave(u8),
 		#[game(Fc, FcEvo)] skip!(1), // two-byte nop
-		#[game(Sc, ScEvo)] Sc_18(u8, u8, u8),
+		#[game(Sc, ScEvo, Tc)] Sc_18(u8, u8, u8),
 
 		/// Performs a variety of setup when initializing a talk or cutscene.
 		///
@@ -188,8 +188,8 @@ ed6_macros::bytecode! {
 
 		ObjFrame(u16 alias ObjectId, u32), // [mapobj_frame]
 		ObjPlay(u16 alias ObjectId, u32), // [mapobj_play]
-		ObjFlagsSet(u16 alias ObjectId, u16 as ObjectFlags), // [mapobj_set_flag]
-		ObjFlagsUnset(u16 alias ObjectId, u16 as ObjectFlags), // [mapobj_reset_flag]
+		ObjFlagsSet(u16 alias ObjectId, u16 as ObjectFlags, u8_if_tc(iset) -> u8), // [mapobj_set_flag]
+		ObjFlagsUnset(u16 alias ObjectId, u16 as ObjectFlags, u8_if_tc(iset) -> u8), // [mapobj_reset_flag]
 		_Obj73(u16 alias ObjectId),
 		_74(u16, u32, u16),
 		_75(u8 as u16 alias ObjectId, u32, u8),
@@ -201,14 +201,14 @@ ed6_macros::bytecode! {
 		_7B(),
 		Shake(u32, u32, u32, u32 alias Time), // [quake]
 		#[game(Fc, FcEvo)] skip!(1), // {asm} two-byte nop
-		#[game(Sc, ScEvo)] Sc_7D(match {
+		#[game(Sc, ScEvo, Tc)] Sc_7D(match {
 			0 => _0(u16 as CharId, u16, u16),
 			1 => _1(u16 as CharId, u16, u16), // args always zero; always paired with a _0 except when the char is 254
 		}),
 		_7E(i16, i16, u16, u8, u32),
 		EffLoad(u8, String alias EffFileRef),
 		EffPlay(
-			u8, u8,
+			u8 alias EffId, u8,
 			u16 as CharId, Pos3, // source
 			i16, i16, i16,
 			u32, u32, u32, // scale?
@@ -216,15 +216,15 @@ ed6_macros::bytecode! {
 			u32 alias Time, // period (0 if one-shot)
 		),
 		EffPlay2(
-			u8, u8,
+			u8 alias EffId, u8,
 			u8 as u16 alias ObjectId, String, Pos3, // source
 			i16, i16, i16,
 			u32, u32, u32, // scale
 			u32 alias Time, // period (0 if one-shot)
 		),
-		_82(u8, u8),
-		#[game(Fc, FcEvo)] Achievement(u8, u8),
-		#[game(Sc, ScEvo)] _83(u8, u8), // might have to do with EffPlay
+		_82(u8 alias EffId, u8),
+		#[game(Fc, FcEvo)] FcAchievement(u8, u8),
+		#[game(Sc, ScEvo, Tc)] _83(u8, u8), // might have to do with EffPlay
 		_84(u8),
 		_85(u8, u8),
 		CharSetBase    (u16 as CharId, u16), // [set_chr_base]
@@ -307,7 +307,12 @@ ed6_macros::bytecode! {
 		/// It saves eight variables, I don't know what's up with that.
 		///
 		/// Never used.
-		PartySave(),
+		#[game(Fc, FcEvo, Sc, ScEvo)] PartySave(),
+		#[game(Tc)] TcMonument(match {
+			0 => Open(u8, u8, u8),
+			1 => Disable(u8, u8, u8),
+			2 => Enable(u8, u8, u8),
+		}),
 
 		/// Loads the order of the party, as saved by [`PartySave`](Self::PartySave).
 		///
@@ -351,9 +356,7 @@ ed6_macros::bytecode! {
 		/// Unlocks a character's orbment slot.
 		///
 		/// In SC onward, this is merged into PartySetSlot.
-		///
-		/// The first two values are really a u16, but my system currently does not allow multiple casts.
-		#[game(Fc,FcEvo)] PartyUnlockSlot(u8 /*u16*/ as Member, u8, u8),
+		#[game(Fc, FcEvo)] PartyUnlockSlot(u16 as u8 as Member, u8),
 
 		/// The argument is always zero in the scripts. According to the scripts something else happens if it is nonzero, but it is unknown what.
 		_B6(u8),
@@ -380,13 +383,17 @@ ed6_macros::bytecode! {
 		/// Checks whether the given member has this orbment slot unlocked.
 		PartyHasSlot(u8 as Member, u8),
 
-		#[game(Fc,FcEvo)] skip!(10),
+		#[game(Fc, FcEvo)] skip!(10),
 
-		#[game(Sc,ScEvo)] ScSetPortrait(u8 as Member, u8, u8, u8, u8, u8),
-		#[game(Sc,ScEvo)] skip!(1),
-		#[game(Sc,ScEvo)] Sc_BD(),
-		#[game(Sc,ScEvo)] Sc_BE(u8,u8,u8,u8, u16, u16, u8, i32,i32,i32,i32,i32,i32),
-		#[game(Sc,ScEvo)] Sc_BF(u8,u8,u8,u8, u16),
+		#[game(Sc, ScEvo, Tc)] ScSetPortrait(u8 as Member, u8, u8, u8, u8, u8),
+		// This instruction is only used a single time throughout FC..=3rd, but this is its signature according to the asm
+		#[game(Sc, ScEvo, Tc)] Sc_BC(u8, match {
+			0 => _0(u16),
+			1 => _1(u16),
+		}),
+		#[game(Sc, ScEvo, Tc)] Sc_BD(),
+		#[game(Sc, ScEvo, Tc)] Sc_BE(u8,u8,u8,u8, u16, u16, u8, i32,i32,i32,i32,i32,i32),
+		#[game(Sc, ScEvo, Tc)] Sc_BF(u8,u8,u8,u8, u16),
 		/// ```text
 		///  1 ⇒ something about using items on the field
 		/// 11 ⇒ roulette
@@ -403,93 +410,141 @@ ed6_macros::bytecode! {
 		/// 22 ⇒ after Weissman sets up a barrier
 		/// 23 ⇒ used after sequences of ScLoadChcp
 		/// ```
-		#[game(Sc,ScEvo)] ScMinigame(u8, i32,i32,i32,i32,i32,i32,i32,i32),
-		#[game(Sc,ScEvo)] Sc_C1(u16 as ItemId, u32),
-		#[game(Sc,ScEvo)] Sc_C2(),
+		#[game(Sc, ScEvo, Tc)] ScMinigame(u8, i32,i32,i32,i32,i32,i32,i32,i32),
+		#[game(Sc, ScEvo, Tc)] Sc_C1(u16 as ItemId, u32),
+		#[game(Sc, ScEvo)] Sc_C2(),
+		#[game(Tc)] Tc_C2(u8, u8),
 
 		/// Unused.
-		#[game(Sc,ScEvo)] Sc_C3(u16),
+		#[game(Sc, ScEvo, Tc)] Sc_C3(u16),
 
-		#[game(Sc,ScEvo)] Sc_C4(u8, u32),
+		#[game(Sc, ScEvo, Tc)] Sc_C4(u8, u32),
 
 		#[game(Fc)] skip!(3),
-		#[game(FcEvo,Sc,ScEvo)] VisLoad(u8 alias VisId, i16,i16,u16,u16, i16,i16,u16,u16, i16,i16,u16,u16, u32 as Color, u8, String),
-		#[game(FcEvo,Sc,ScEvo)] VisColor(u8 alias VisId, u8, u32 as Color, u32, u32, u32_only_fc_evo(iset) -> u32),
-		#[game(FcEvo,Sc,ScEvo)] VisDispose(u8, u8 alias VisId, u8),
+		#[game(FcEvo, Sc, ScEvo, Tc)] VisLoad(u8 alias VisId, i16,i16,u16,u16, i16,i16,u16,u16, i16,i16,u16,u16, u32 as Color, u8, String),
+		#[game(FcEvo, Sc, ScEvo, Tc)] VisColor(u8 alias VisId, u8, u32 as Color, u32, u32, u32_only_fc_evo(iset) -> u32),
+		#[game(FcEvo, Sc, ScEvo, Tc)] VisDispose(u8, u8 alias VisId, u8),
 
 		#[game(Fc,FcEvo)] skip!(19),
 
-		#[game(Sc,ScEvo)] Sc_C8(u16, u16, String, u8, u16), // Something with C_PLATnn._CH
-		#[game(Sc,ScEvo)] ScPartySelect(u16, sc_party_select_mandatory() -> [Option<Member>; 4] alias MandatoryMembers, sc_party_select_optional() -> Vec<Member> alias OptionalMembers),
-		#[game(Sc,ScEvo)] Sc_CA(u16 as ItemId, u32),
-		#[game(Sc,ScEvo)] Sc_CharInSlot(u8), // clearly related to CharId, but not the same
-		#[game(Sc,ScEvo)] Sc_Select(match {
+		#[game(Sc, ScEvo, Tc)] Sc_C8(u16, u16, String, u8, u16), // Something with C_PLATnn._CH
+		#[game(Sc, ScEvo, Tc)] ScPartySelect(u16, sc_party_select_mandatory() -> [Option<Member>; 4] alias MandatoryMembers, sc_party_select_optional() -> Vec<Member> alias OptionalMembers),
+		#[game(Sc, ScEvo, Tc)] Sc_CA(u16 as ItemId, u32),
+		#[game(Sc, ScEvo)] Sc_CharInSlot(u8), // clearly related to CharId, but not the same
+		#[game(Tc)] Tc_CB(u8, u8),
+		#[game(Sc, ScEvo, Tc)] Sc_Select(match {
 			0 => New(u8 alias SelectId, u16, u16, u8),
 			1 => Add(u8 alias SelectId, String alias MenuItem),
 			2 => Show(u8 alias SelectId),
-			3 => _3(u8 alias SelectId, u8),
+			3 => SetDisabled(u8 alias SelectId, u8),
 		}),
-		#[game(Sc,ScEvo)] Sc_CD(u16 as CharId), // related to showing photographs
-		#[game(Sc,ScEvo)] Sc_ExprUnk(u8, expr(iset, lookup) -> Expr), // I think this is integer variables that are not local
-		#[game(Sc,ScEvo)] Sc_CF(u16 as CharId, u8, String), // something with skeleton animation
-		#[game(Sc,ScEvo)] Sc_D0(i32 alias Angle32, u32 alias Time),
-		#[game(Sc,ScEvo)] Sc_D1(u16 as CharId, i32, i32, i32, u32 alias Time), // something with camera?
-		#[game(Sc,ScEvo)] ScLoadChcp(file_ref(lookup) -> String, file_ref(lookup) -> String, u8),
-		#[game(Sc,ScEvo)] Sc_D3(u8),
+		#[game(Sc, ScEvo, Tc)] Sc_CD(u16 as CharId), // related to showing photographs
+		#[game(Sc, ScEvo, Tc)] Sc_ExprUnk(u8, expr(iset, lookup) -> Expr), // I think this is integer variables that are not local
+		#[game(Sc, ScEvo, Tc)] Sc_CF(u16 as CharId, u8, String), // something with skeleton animation
+		#[game(Sc, ScEvo, Tc)] Sc_D0(i32 alias Angle32, u32 alias Time),
+		#[game(Sc, ScEvo, Tc)] Sc_D1(u16 as CharId, i32, i32, i32, u32 alias Time), // something with camera?
+		#[game(Sc, ScEvo, Tc)] ScLoadChcp(file_ref(lookup) -> String, file_ref(lookup) -> String, u8),
+		#[game(Sc, ScEvo, Tc)] Sc_D3(u8),
 
 		/// Unused.
 		///
 		/// First arg is an index into some array; second is a field selector, which can be `[0, 1, 2, 5, 6]`.
 		/// Returns whatever that value is.
-		#[game(Sc,ScEvo)] Sc_D4(u8, u8),
+		#[game(Sc, ScEvo, Tc)] Sc_D4(u8, u8),
 
-		#[game(Sc,ScEvo)] ScPartyIsEquipped(u8 as Member, u16, u16 as ItemId, u8, u8, u8),
-		#[game(Sc,ScEvo)] Sc_D6(u8), // bool
-		#[game(Sc,ScEvo)] Sc_D7(u8,u8,u8,u8,u8,u8,u8),
-		#[game(Sc,ScEvo)] Sc_D8(u8 as u16 alias ObjectId, u16),
-		#[game(Sc,ScEvo)] ScCutIn(match {
+		#[game(Sc, ScEvo, Tc)] ScPartyIsEquipped(u8 as Member, u16, u16 as ItemId, u8, u8, u8),
+		#[game(Sc, ScEvo, Tc)] Sc_D6(u8), // bool
+		#[game(Sc, ScEvo, Tc)] Sc_D7(u8,u8,u8,u8,u8,u8,u8),
+		#[game(Sc, ScEvo, Tc)] Sc_D8(u8 as u16 alias ObjectId, u16),
+		#[game(Sc, ScEvo, Tc)] ScCutIn(match {
 			0 => Show(String), // CTInnnnn
 			1 => Hide(),
 		}),
-		#[game(Sc,ScEvo)] Sc_DA(), // Something to do with menus
+		#[game(Sc, ScEvo, Tc)] Sc_DA(), // Something to do with menus
+
+		#[game(Tc)] Tc_DB(u8, u8 as Member),
+		#[game(Tc)] TcTeam(match {
+			0 => Use(u8),
+			1 => AddMember(u8, u8 as Member),
+			2 => Clear(u8),
+		}),
+		#[game(Tc)] TcOrganizeTeams(u8, u8, u8, u32 alias TcMembers, u32 alias TcMembers, u32 alias TcMembers, u32 alias TcMembers),
+		#[game(Tc)] Tc_DE(u8, u32),
+		#[game(Tc)] Tc_DF(u8, u16),
+		#[game(Tc)] Tc_E0(u16 as CharId, u8, u8),
+		#[game(Tc)] TcIndexInTeam(u8 as Member, u8),
+		#[game(Tc)] Tc_E2(match {
+			0 => _0(u8),
+			1 => _1(),
+			3 => _3(u8),
+			4 => _4(u8),
+			5 => _5(u16, u16, u16),
+			7 => _7(),
+			8 => _8(),
+			9 => _9(u8),
+			10 => _10(), // A getter
+			11 => _11(u8),
+		}),
+		#[game(Tc)] TcEpisode(match {
+			0 => Start(u16, u32),
+			1 => End(u8),
+			4 => _4(u8),
+		}),
+		#[game(Tc)] skip!(1),
+		#[game(Tc)] Tc_E5(match {
+			0 => _0(u8, u8, u16, u16),
+			1 => _1(u8, u8, u16, u16),
+			2 => _2(u8, u8, u16, u16),
+		}),
+		#[game(Tc)] Tc_E6(match {
+			0 => _0(u8),
+			1 => _1(u8),
+			2 => _2(),
+		}),
+		#[game(Tc)] Tc_E7(u8, u8, u8, u8, u8, u8, u32),
 
 		#[game(Fc)] skip!(2),
-		/// A no-op. Always paired with [`Sc_DC`](Self::SC_DC).
-		#[game(FcEvo,Sc,ScEvo)] Sc_DB(),
-		/// A no-op. Always paired with [`Sc_DB`](Self::SC_DB).
-		#[game(FcEvo,Sc,ScEvo)] Sc_DC(),
+		/// A no-op. Always paired with [`Sc_DC`](Self::Sc_DC).
+		#[game(FcEvo, Sc, ScEvo)] Sc_DB(),
+		/// A no-op. Always paired with [`Sc_DB`](Self::Sc_DB).
+		#[game(FcEvo, Sc, ScEvo)] Sc_DC(),
+		#[game(Tc)] skip!(2),
 
 		/// Opens the save menu in order to save clear data.
 		SaveClearData(),
 
-		#[game(FcEvo)] skip!(1),
-		#[game(Sc,ScEvo)] Sc_DE(String), // a place name. Not a t_town, strangely
-		#[game(FcEvo,Sc,ScEvo)] skip!(1),
-		#[game(FcEvo,Sc,ScEvo)] Sc_E0(u8 as u16 alias ObjectId, Pos3),
-		#[game(FcEvo,Sc,ScEvo)] skip!(2),
-
-		#[game(Sc,ScEvo)] Sc_E3(u8, u16 as CharId, u8),
-		/// A no-op.
-		#[game(Sc,ScEvo)] Sc_E4(u8, u16),
-		#[game(Sc,ScEvo)] Sc_E5(u16 as CharId, u8),
-		#[game(Sc,ScEvo)] Sc_E6(u8), // related to RAM saving, according to debug script
-		#[game(Sc,ScEvo)] Sc_E7(u8 as u16 alias ObjectId, String, u8,u8,u8,u8,u8),
-		#[game(Sc,ScEvo)] Sc_E8(u32),
-		#[game(Sc,ScEvo)] Sc_E9(u8), // related to RAM saving
-		/// Probably nonexistent on ScEvo.
-		#[game(Sc,ScEvo)] ScAchievement(u8, u16, u8),
-		/// A no-op.
-		#[game(Sc,ScEvo)] Sc_EB(u16),
+		#[game(FcEvo, Sc, ScEvo)] Sc_DE(String), // a place name. Not a t_town, strangely
+		#[game(FcEvo, Sc, ScEvo)] skip!(1),
+		#[game(FcEvo, Sc, ScEvo)] Sc_E0(u8 as u16 alias ObjectId, Pos3),
+		#[game(FcEvo, Sc, ScEvo)] skip!(2),
 
 		#[game(FcEvo)] EvoCtp(String), // Refers to /data/map2/{}.ctp
-		#[game(FcEvo,ScEvo)] EvoVoiceLine(u16), // [pop_msg]
-		#[game(FcEvo,ScEvo)] Evo_E6(text() -> Text),
-		#[game(FcEvo,ScEvo)] Evo_E7(u8 alias VisId, u8),
+
+		#[game(Sc, ScEvo)] Sc_E3(u8, u16 as CharId, u8),
+		/// A no-op.
+		#[game(Sc, ScEvo)] Sc_E4(u8, u16),
+		#[game(Sc, ScEvo)] Sc_E5(u16 as CharId, u8),
+		#[game(Sc, ScEvo)] Sc_E6(u8), // related to RAM saving, according to debug script
+		#[game(Sc, ScEvo)] Sc_E7(u8 as u16 alias ObjectId, String, u8,u8,u8,u8,u8),
+		#[game(Sc, ScEvo)] Sc_E8(u32),
+		#[game(Sc, ScEvo)] Sc_E9(u8), // related to RAM saving
+
+		#[game(Tc)] skip!(12),
+
+		/// Probably nonexistent on ScEvo.
+		#[game(Sc, ScEvo, Tc)] ScAchievement(u8, u16, u8),
+		/// A no-op.
+		#[game(Sc, ScEvo)] Sc_EB(u16),
+
+		#[game(FcEvo, ScEvo)] EvoVoiceLine(u16), // [pop_msg]
+		#[game(FcEvo, ScEvo)] Evo_E6(text() -> Text),
+		#[game(FcEvo, ScEvo)] Evo_E7(u8 alias VisId, u8),
 
 		#[game(Fc)] skip!(33),
 		#[game(FcEvo)] skip!(24),
 		#[game(Sc)] skip!(20),
 		#[game(ScEvo)] skip!(17),
+		#[game(Tc)] skip!(8),
 	]
 }
 
@@ -736,6 +791,24 @@ mod u8_not_in_fc {
 		match iset {
 			InstructionSet::Fc | InstructionSet::FcEvo => ensure!(*v == 0, "{v} must be 0"),
 			_ => f.u8(*v)
+		}
+		Ok(())
+	}
+}
+
+mod u8_if_tc {
+	use super::*;
+	pub(super) fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet) -> Result<u8, ReadError> {
+		match iset {
+			InstructionSet::Tc => Ok(f.u8()?),
+			_ => Ok(0),
+		}
+	}
+
+	pub(super) fn write(f: &mut impl Out, iset: InstructionSet, v: &u8) -> Result<(), WriteError> {
+		match iset {
+			InstructionSet::Tc => f.u8(*v),
+			_ => ensure!(*v == 0, "{v} must be 0"),
 		}
 		Ok(())
 	}

@@ -510,6 +510,7 @@ mod test {
 			#[test_case::test_case(InstructionSet::FcEvo, "../data/fc", "../data/vita/extract/fc/gamedata/data/data/scenario/0/", ".bin"; "fc_evo")]
 			#[test_case::test_case(InstructionSet::Sc, "../data/sc", "../data/sc.extract/21/", "._sn"; "sc")]
 			#[test_case::test_case(InstructionSet::ScEvo, "../data/sc", "../data/vita/extract/sc/gamedata/data/data_sc/scenario/1/", ".bin"; "sc_evo")]
+			#[test_case::test_case(InstructionSet::Tc, "../data/3rd", "../data/3rd.extract/21/", "._sn"; "tc")]
 			$a
 		}
 	}

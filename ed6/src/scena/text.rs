@@ -411,6 +411,7 @@ fn val(f: &mut Context, a: I) {
 		I::SelectId(v) => f.write(&format!("SelectId({v})")),
 		I::ObjectId(v) => f.write(&format!("ObjectId({v})")),
 		I::VisId(v)    => f.write(&format!("VisId({v})")),
+		I::EffId(v)    => f.write(&format!("EffId({v})")),
 
 		I::Expr(v) => expr(f, v),
 		I::Fork(v) => {
@@ -467,6 +468,7 @@ fn val(f: &mut Context, a: I) {
 		I::QuestList(v)        => f.write(&format!("{v:?}")),
 		I::MandatoryMembers(v) => f.write(&format!("{v:?}")),
 		I::OptionalMembers(v)  => f.write(&format!("{v:?}")),
+		I::TcMembers(v)        => f.write(&format!("{v:016b}")),
 
 		I::AviFileRef(v)   => f.write(&format!("{v:?}")),
 		I::EffFileRef(v)   => f.write(&format!("{v:?}")),

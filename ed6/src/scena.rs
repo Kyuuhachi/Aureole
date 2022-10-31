@@ -511,6 +511,7 @@ mod test {
 			#[test_case::test_case(InstructionSet::Sc, "../data/sc", "../data/sc.extract/21/", "._sn"; "sc")]
 			#[test_case::test_case(InstructionSet::ScEvo, "../data/sc", "../data/vita/extract/sc/gamedata/data/data_sc/scenario/1/", ".bin"; "sc_evo")]
 			#[test_case::test_case(InstructionSet::Tc, "../data/3rd", "../data/3rd.extract/21/", "._sn"; "tc")]
+			#[test_case::test_case(InstructionSet::TcEvo, "../data/3rd", "../data/vita/extract/3rd/gamedata/data/data_3rd/scenario/2/", ".bin"; "tc_evo")]
 			$a
 		}
 	}

@@ -188,9 +188,14 @@ ed6_macros::bytecode! {
 
 		ObjFrame(u16 alias ObjectId, u32), // [mapobj_frame]
 		ObjPlay(u16 alias ObjectId, u32), // [mapobj_play]
-		ObjFlagsSet(u16 alias ObjectId, u16 as ObjectFlags, u8_if_tc(iset) -> u8), // [mapobj_set_flag]
-		ObjFlagsUnset(u16 alias ObjectId, u16 as ObjectFlags, u8_if_tc(iset) -> u8), // [mapobj_reset_flag]
-		_Obj73(u16 alias ObjectId),
+		#[game(Fc, FcEvo, Sc, ScEvo)] ObjFlagsSet(u16 alias ObjectId, u16 as ObjectFlags), // [mapobj_set_flag]
+		#[game(Fc, FcEvo, Sc, ScEvo)] ObjFlagsUnset(u16 alias ObjectId, u16 as ObjectFlags), // [mapobj_reset_flag]
+		#[deprecated]
+		#[game(Tc)] TcObjFlagsSet(u8 as u16 alias ObjectId, u16 as ObjectFlags, u16), // [mapobj_set_flag]
+		#[deprecated]
+		#[game(Tc)] TcObjFlagsUnset(u8 as u16 alias ObjectId, u16 as ObjectFlags, u16), // [mapobj_reset_flag]
+		ObjWait(u16 alias ObjectId),
+
 		_74(u16, u32, u16),
 		_75(u8 as u16 alias ObjectId, u32, u8),
 		_76(u16, u32, u16, i32, i32, i32, u8, u8),
@@ -422,7 +427,7 @@ ed6_macros::bytecode! {
 
 		#[game(Fc)] skip!(3),
 		#[game(FcEvo, Sc, ScEvo, Tc)] VisLoad(u8 alias VisId, i16,i16,u16,u16, i16,i16,u16,u16, i16,i16,u16,u16, u32 as Color, u8, String),
-		#[game(FcEvo, Sc, ScEvo, Tc)] VisColor(u8 alias VisId, u8, u32 as Color, u32, u32, u32_only_fc_evo(iset) -> u32),
+		#[game(FcEvo, Sc, ScEvo, Tc)] VisColor(u8 alias VisId, u8, u32 as Color, u32 alias Time, u32, u32_only_fc_evo(iset) -> u32),
 		#[game(FcEvo, Sc, ScEvo, Tc)] VisDispose(u8, u8 alias VisId, u8),
 
 		#[game(Fc,FcEvo)] skip!(19),
@@ -454,7 +459,8 @@ ed6_macros::bytecode! {
 
 		#[game(Sc, ScEvo, Tc)] ScPartyIsEquipped(u8 as Member, u16, u16 as ItemId, u8, u8, u8),
 		#[game(Sc, ScEvo, Tc)] Sc_D6(u8), // bool
-		#[game(Sc, ScEvo, Tc)] Sc_D7(u8,u8,u8,u8,u8,u8,u8),
+		#[game(Sc, ScEvo, Tc)] Sc_D7(u8, u32, u16 as CharId),
+		/// Always occurs before ObjSetFrame and ObjPlay. Probably animation speed?
 		#[game(Sc, ScEvo, Tc)] Sc_D8(u8 as u16 alias ObjectId, u16),
 		#[game(Sc, ScEvo, Tc)] ScCutIn(match {
 			0 => Show(String), // CTInnnnn
@@ -501,7 +507,7 @@ ed6_macros::bytecode! {
 			1 => _1(u8),
 			2 => _2(),
 		}),
-		#[game(Tc)] Tc_E7(u8, u8, u8, u8, u8, u8, u32),
+		#[game(Tc)] Tc_E7(u8 alias VisId, u8, u32 as Color, u32 alias Time),
 
 		#[game(Fc)] skip!(2),
 		/// A no-op. Always paired with [`Sc_DC`](Self::Sc_DC).
@@ -791,24 +797,6 @@ mod u8_not_in_fc {
 		match iset {
 			InstructionSet::Fc | InstructionSet::FcEvo => ensure!(*v == 0, "{v} must be 0"),
 			_ => f.u8(*v)
-		}
-		Ok(())
-	}
-}
-
-mod u8_if_tc {
-	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet) -> Result<u8, ReadError> {
-		match iset {
-			InstructionSet::Tc => Ok(f.u8()?),
-			_ => Ok(0),
-		}
-	}
-
-	pub(super) fn write(f: &mut impl Out, iset: InstructionSet, v: &u8) -> Result<(), WriteError> {
-		match iset {
-			InstructionSet::Tc => f.u8(*v),
-			_ => ensure!(*v == 0, "{v} must be 0"),
 		}
 		Ok(())
 	}

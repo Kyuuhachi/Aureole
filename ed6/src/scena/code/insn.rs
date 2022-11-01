@@ -704,7 +704,6 @@ mod party_equip_slot {
 	}
 }
 
-#[deprecated]
 mod party_set_slot {
 	use super::*;
 	pub(super) fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet, arg1: &u8) -> Result<i8, ReadError> {

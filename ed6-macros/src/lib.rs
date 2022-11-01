@@ -734,7 +734,7 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 					input.parse::<kw::alias>()?;
 					input.parse::<Ident>()?
 				} else {
-					parse_quote! { #ty }
+					reparse(&ty)?
 				};
 
 				let varname = format_ident!("_{}", args.len(), span=ty.span().join(alias.span()).unwrap());
@@ -916,7 +916,7 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: &InsnArm) -> TokenStr
 			ty.clone()
 		} else {
 			match &arg.source {
-				Source::Simple(ident) => parse_quote! { #ident },
+				Source::Simple(ident) => reparse(ident).unwrap(),
 				Source::Call(s) => s.ty.clone(),
 			}
 		};
@@ -981,4 +981,8 @@ fn to_snake(ident: &Ident) -> Ident {
 		&ident.to_string().with_boundaries(&[Boundary::LowerUpper]).to_case(Case::Snake),
 		ident.span(),
 	)
+}
+
+fn reparse<A: ToTokens, B: Parse>(a: &A) -> Result<B> {
+	Ok(parse_quote! { #a })
 }

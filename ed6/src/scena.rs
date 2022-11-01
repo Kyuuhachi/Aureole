@@ -222,7 +222,7 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 	let bgm = BgmId(f.u8()?);
 	f.check_u8(0)?;
 	let item = FuncRef(f.u16()?, f.u16()?);
-	let includes = f.multiple_loose::<8, _>(&[0xFF;4], |g| Ok(lookup.name(g.u32()?)?.to_owned()))?;
+	let includes = f.multiple_loose::<8, _>(&[0xFF;4], |g| Ok(lookup.name(g.u32()?)?))?;
 	f.check_u16(0)?;
 
 	let head_end = f.clone().u16()? as usize;
@@ -244,11 +244,11 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 	ensure!(strings.string()? == "@FileName", "expected @FileName");
 
 	let (mut g, n) = ch;
-	let ch = list(n as usize, || Ok(lookup.name(g.u32()?)?.to_owned())).strict()?;
+	let ch = list(n as usize, || Ok(lookup.name(g.u32()?)?)).strict()?;
 	g.check_u8(0xFF)?;
 
 	let (mut g, n) = cp;
-	let cp = list(n as usize, || Ok(lookup.name(g.u32()?)?.to_owned())).strict()?;
+	let cp = list(n as usize, || Ok(lookup.name(g.u32()?)?)).strict()?;
 	g.check_u8(0xFF)?;
 
 	let (mut g, n) = npcs;

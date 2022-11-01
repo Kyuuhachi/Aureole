@@ -28,12 +28,12 @@ impl std::convert::From<u32> for LookupError {
 }
 
 pub trait Lookup {
-	fn name(&self, index: u32) -> Result<&str, LookupError>;
+	fn name(&self, index: u32) -> Result<String, LookupError>;
 	fn index(&self, name: &str) -> Result<u32, LookupError>;
 }
 
 impl Lookup for Vec<Box<dyn Lookup>> {
-	fn name(&self, index: u32) -> Result<&str, LookupError> {
+	fn name(&self, index: u32) -> Result<String, LookupError> {
 		self.iter()
 			.find_map(|a| a.name(index).ok())
 			.ok_or_else(|| index.into())
@@ -47,7 +47,7 @@ impl Lookup for Vec<Box<dyn Lookup>> {
 }
 
 impl<A, B> Lookup for (A, B) where A: Lookup, B: Lookup {
-	fn name(&self, index: u32) -> Result<&str, LookupError> {
+	fn name(&self, index: u32) -> Result<String, LookupError> {
 		self.0.name(index).or_else(|_| self.1.name(index))
 	}
 
@@ -59,7 +59,7 @@ impl<A, B> Lookup for (A, B) where A: Lookup, B: Lookup {
 pub struct SkyGameData<T: Lookup>(pub u16, pub T);
 
 impl<T: Lookup> Lookup for SkyGameData<T> {
-	fn name(&self, index: u32) -> Result<&str, LookupError> {
+	fn name(&self, index: u32) -> Result<String, LookupError> {
 		if index >> 16 == self.0 as u32 {
 			self.1.name(index & 0xFFFF)
 		} else {
@@ -73,8 +73,8 @@ impl<T: Lookup> Lookup for SkyGameData<T> {
 }
 
 impl Lookup for crate::archive::Archives {
-	fn name(&self, a: u32) -> Result<&str, LookupError> {
-		self.name(a).ok_or_else(|| a.into())
+	fn name(&self, a: u32) -> Result<String, LookupError> {
+		self.name(a).map(str::to_owned).ok_or_else(|| a.into())
 	}
 
 	fn index(&self, name: &str) -> Result<u32, LookupError> {

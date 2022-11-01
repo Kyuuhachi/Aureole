@@ -23,7 +23,7 @@ pub fn read(lookup: &dyn Lookup, data: &[u8]) -> Result<BTreeMap<NameId, Name>, 
 	let mut f = Coverage::new(Bytes::new(data));
 	let n = f.clone().u16()? / 2;
 	let mut table = BTreeMap::new();
-	let fileref = |a| if a == 0 { Ok(None) } else { lookup.name(a).map(|a| Some(a.to_owned())) };
+	let fileref = |a| if a == 0 { Ok(None) } else { lookup.name(a).map(Some) };
 
 	for _ in 0..n-1 {
 		let mut g = f.ptr()?;

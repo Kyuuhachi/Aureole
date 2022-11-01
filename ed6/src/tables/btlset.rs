@@ -124,7 +124,7 @@ fn read_battles<'a>(
 	let mut battlefields = BTreeMap::new();
 	let mut at_rolls = BTreeMap::new();
 
-	let fileref = |a| if a == 0 { Ok(None) } else { lookup.name(a).map(|a| Some(a.to_owned())) };
+	let fileref = |a| if a == 0 { Ok(None) } else { lookup.name(a).map(Some) };
 
 	let mut table = BTreeMap::new();
 
@@ -200,7 +200,7 @@ fn read_auto_battles<'a>(
 ) -> Result<BTreeMap<BattleId, AutoBattle>, ReadError> {
 	let mut battlefields = BTreeMap::new();
 
-	let fileref = |a| if a == 0 { Ok(None) } else { lookup.name(a).map(|a| Some(a.to_owned())) };
+	let fileref = |a| if a == 0 { Ok(None) } else { lookup.name(a).map(Some) };
 
 	let mut table = BTreeMap::new();
 

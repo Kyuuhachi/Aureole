@@ -714,6 +714,47 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 			} else {
 				Diagnostic::spanned(input.span().unwrap(), Level::Error, "invalid definition").emit();
 			}
+		} else if let Some(def_attr) = pop_attr(&mut attrs, "def") {
+			if !def_attr.tokens.is_empty() {
+				Diagnostic::spanned(def_attr.span().unwrap(), Level::Error, "#[def] does not take arguments").emit();
+			}
+			let ident = input.parse::<Ident>()?;
+			let content;
+			let paren = parenthesized!(content in input);
+
+			let input = content;
+			let mut args = Vec::new();
+			let mut aliases = Vec::new();
+			let mut types = Vec::new();
+
+			while !input.is_empty() {
+				let ty = input.parse::<Box<Type>>()?;
+
+				let alias = if input.peek(kw::alias) {
+					input.parse::<kw::alias>()?;
+					input.parse::<Ident>()?
+				} else {
+					parse_quote! { #ty }
+				};
+
+				let varname = format_ident!("_{}", args.len(), span=ty.span().join(alias.span()).unwrap());
+				types.push(ty);
+				aliases.push(alias);
+				args.push(varname);
+
+				if !input.is_empty() {
+					input.parse::<Token![,]>()?;
+				}
+			}
+
+			ctx.defs.push(Def {
+				span: ident.span().join(paren.span).unwrap(),
+				ident,
+				attrs,
+				args,
+				aliases,
+				types,
+			});
 		} else {
 			let games = get_games(&mut attrs, &all_games, &mut n, 1)?;
 
@@ -751,11 +792,12 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 	Ok(ctx)
 }
 
-fn get_games(attrs: &mut Vec<Attribute>, all_games: &[Ident], n: &mut [usize], num: usize) -> Result<GameSpec> {
-	let game_attr = attrs.iter().position(|a| a.path.is_ident("game"))
-		.map(|i| attrs.remove(i));
+fn pop_attr(attrs: &mut Vec<Attribute>, name: &str) -> Option<Attribute> {
+	attrs.iter().position(|a| a.path.is_ident(name)).map(|i| attrs.remove(i))
+}
 
-	let games = if let Some(game_attr) = game_attr {
+fn get_games(attrs: &mut Vec<Attribute>, all_games: &[Ident], n: &mut [usize], num: usize) -> Result<GameSpec> {
+	let games = if let Some(game_attr) = pop_attr(attrs, "game") {
 		game_attr.parse_args_with(Punctuated::<Ident, Token![,]>::parse_terminated)?
 			.iter().cloned().collect()
 	} else {

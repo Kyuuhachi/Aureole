@@ -117,7 +117,29 @@ ed6_macros::bytecode! {
 		PartyAddArt(u8 as Member, u16 as MagicId),
 		PartyAddCraft(u8 as Member, u16 as MagicId),
 		PartyAddSCraft(u8 as Member, u16 as MagicId),
-		PartySetSlot(u8 as Member, u8, party_set_slot(iset, _1) -> i8), // merged with FC's PartyUnlockSlot
+		#[def] PartySetSlot(Member, u8, i8),
+		custom! {
+			read => |f| {
+				let a = cast::<_, Member>(f.u8()?)?;
+				let b = f.u8()?;
+				let c = if !(0x7F..0xFF).contains(&b) && !matches!(iset, InstructionSet::Fc|InstructionSet::FcEvo) {
+					-1
+				} else {
+					f.i8()?
+				};
+				Ok(Self::PartySetSlot(a, b, c))
+			},
+			write PartySetSlot(a, b, c) => |f| {
+				f.u8(cast::<_, u8>(*a)?);
+				f.u8(*b);
+				if !(0x7F..0xFF).contains(b) && !matches!(iset, InstructionSet::Fc|InstructionSet::FcEvo) {
+					ensure!(*c == -1, "invalid PartySetSlot");
+				} else {
+					f.i8(*c);
+				}
+				Ok(())
+			},
+		},
 
 		SepithAdd(u8 as Element alias SepithElement, u16),
 		SepithRemove(u8 as Element alias SepithElement, u16),
@@ -697,26 +719,6 @@ mod party_equip_slot {
 	pub(super) fn write(f: &mut impl Out, iset: InstructionSet, arg1: &ItemId, v: &i8) -> Result<(), WriteError> {
 		if !(600..800).contains(&arg1.0) && matches!(iset, InstructionSet::Fc|InstructionSet::FcEvo) {
 			ensure!(*v == -1, "invalid PartyEquipSlot");
-		} else {
-			f.i8(*v);
-		}
-		Ok(())
-	}
-}
-
-mod party_set_slot {
-	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet, arg1: &u8) -> Result<i8, ReadError> {
-		if !(0x7F..0xFF).contains(arg1) && !matches!(iset, InstructionSet::Fc|InstructionSet::FcEvo) {
-			Ok(-1)
-		} else {
-			Ok(f.i8()?)
-		}
-	}
-
-	pub(super) fn write(f: &mut impl Out, iset: InstructionSet, arg1: &u8, v: &i8) -> Result<(), WriteError> {
-		if !(0x7F..0xFF).contains(arg1) && !matches!(iset, InstructionSet::Fc|InstructionSet::FcEvo) {
-			ensure!(*v == -1, "invalid PartySetSlot");
 		} else {
 			f.i8(*v);
 		}

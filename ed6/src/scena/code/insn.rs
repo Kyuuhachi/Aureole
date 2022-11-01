@@ -543,7 +543,7 @@ ed6_macros::bytecode! {
 				f.u8(*a);
 				f.u8(*b);
 				Ok(())
-			}
+			},
 		},
 		#[game(Sc, ScEvo)] Sc_E7(u8 as u16 alias ObjectId, String, u8,u8,u8,u8,u8),
 		#[game(TcEvo)] skip!(1),

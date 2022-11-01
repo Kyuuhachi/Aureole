@@ -640,27 +640,6 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 		}
 
 		let mut attrs = Attribute::parse_outer(input)?;
-		let game_attr = attrs.iter().position(|a| a.path.is_ident("game"))
-			.map(|i| attrs.remove(i));
-
-		let games = if let Some(game_attr) = game_attr {
-			game_attr.parse_args_with(Punctuated::<Ident, Token![,]>::parse_terminated)?
-				.iter().cloned().collect()
-		} else {
-			all_games.clone()
-		};
-
-		let game_idx: Vec<usize> = games.iter().filter_map(|game| {
-			if let Some(n) = all_games.iter().position(|a| a == game) {
-				Some(n)
-			} else {
-				Diagnostic::spanned(game.span().unwrap(), Level::Error, format!("unknown game `{game}`")).emit();
-				None
-			}
-		}).collect();
-
-		let hex = game_idx.iter().map(|idx| n[*idx] as u8).collect::<Vec<_>>();
-		let games = games.iter().cloned().zip(hex.iter().copied()).collect::<GameSpec>();
 
 		if input.peek2(Token![!]) {
 			if input.peek(kw::skip) {
@@ -671,12 +650,9 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 				let lit = content.parse::<LitInt>()?;
 				let val = lit.base10_parse::<u8>()?;
 
-				for idx in &game_idx {
-					n[*idx] += val as usize;
-				}
+				get_games(&mut attrs, &all_games, &mut n, val as usize)?;
 
 				for attr in &attrs {
-					// Doesn't work so great for non-ident paths, but whatever
 					Diagnostic::spanned(attr.path.span().unwrap(), Level::Error, format!("cannot find attribute `{}` in this scope", attr.path.to_token_stream())).emit();
 				}
 			} else if input.peek(kw::custom) {
@@ -686,17 +662,25 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 				braced!(content in input);
 				let input = content;
 
+				let games = get_games(&mut attrs, &all_games, &mut n, 1)?;
+
+				for attr in &attrs {
+					Diagnostic::spanned(attr.path.span().unwrap(), Level::Error, format!("cannot find attribute `{}` in this scope", attr.path.to_token_stream())).emit();
+				}
+
 				let mut has_read = false;
 				while !input.is_empty() {
 					if input.peek(kw::read) {
 						let token = input.parse::<kw::read>()?;
-						if has_read {
-							Diagnostic::spanned(input.span().unwrap(), Level::Error, "only one `read` allowed").emit();
-						}
-						has_read = true;
 
 						input.parse::<Token![=>]>()?;
 						let body = input.parse::<ExprClosure>()?;
+
+						if has_read {
+							Diagnostic::spanned(token.span().unwrap(), Level::Error, "only one `read` allowed").emit();
+						}
+						has_read = true;
+
 						ctx.reads.push(ReadArm {
 							span: token.span().join(body.span()).unwrap(),
 							games: games.clone(),
@@ -727,19 +711,12 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 						input.parse::<Token![,]>()?;
 					}
 				}
-
-				for idx in &game_idx {
-					n[*idx] += 1;
-				}
-
-				for attr in &attrs {
-					// Doesn't work so great for non-ident paths, but whatever
-					Diagnostic::spanned(attr.path.span().unwrap(), Level::Error, format!("cannot find attribute `{}` in this scope", attr.path.to_token_stream())).emit();
-				}
 			} else {
 				Diagnostic::spanned(input.span().unwrap(), Level::Error, "invalid definition").emit();
 			}
 		} else {
+			let games = get_games(&mut attrs, &all_games, &mut n, 1)?;
+
 			let arm = InsnArm::parse(input)?;
 			let ictx = InwardContext {
 				ident: arm.name.clone(),
@@ -756,9 +733,6 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 				games: games.clone(),
 				body: q!{arm=> |__f| { #read } },
 			});
-			for idx in &game_idx {
-				n[*idx] += 1;
-			}
 		}
 
 		last_span = input.span();
@@ -775,6 +749,37 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 	}
 
 	Ok(ctx)
+}
+
+fn get_games(attrs: &mut Vec<Attribute>, all_games: &[Ident], n: &mut [usize], num: usize) -> Result<GameSpec> {
+	let game_attr = attrs.iter().position(|a| a.path.is_ident("game"))
+		.map(|i| attrs.remove(i));
+
+	let games = if let Some(game_attr) = game_attr {
+		game_attr.parse_args_with(Punctuated::<Ident, Token![,]>::parse_terminated)?
+			.iter().cloned().collect()
+	} else {
+		all_games.to_owned()
+	};
+
+	let game_idx: Vec<usize> = games.iter().filter_map(|game| {
+		if let Some(n) = all_games.iter().position(|a| a == game) {
+			Some(n)
+		} else {
+			Diagnostic::spanned(game.span().unwrap(), Level::Error, format!("unknown game `{game}`")).emit();
+			None
+		}
+	}).collect();
+
+	let games = games.iter().cloned()
+		.zip(game_idx.iter().map(|idx| n[*idx] as u8))
+		.collect::<GameSpec>();
+
+	for idx in &game_idx {
+		n[*idx] += num;
+	}
+
+	Ok(games)
 }
 
 fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: &InsnArm) -> TokenStream {

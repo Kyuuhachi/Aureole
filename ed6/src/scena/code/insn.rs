@@ -534,8 +534,17 @@ ed6_macros::bytecode! {
 		#[game(Sc, ScEvo)] Sc_E5(u16 as CharId, u8),
 		#[game(TcEvo)] TcEvo_F2(u16 as CharId, u8, u16, u16),
 		#[game(Sc, ScEvo)] Sc_E6(u8), // related to RAM saving, according to debug script
-		#[deprecated]
-		#[game(TcEvo)] Evo_E7_(u8 alias VisId, u8), // What's Evo_E7 doing up here? Maybe they wanted FF to stay clear.
+		#[game(TcEvo)] custom! {
+			// What's Evo_E7 doing up here? Maybe they wanted FF to stay clear.
+			read => |f| {
+				Ok(Self::Evo_E7(f.u8()?, f.u8()?))
+			},
+			write Evo_E7(a, b) => |f| {
+				f.u8(*a);
+				f.u8(*b);
+				Ok(())
+			}
+		},
 		#[game(Sc, ScEvo)] Sc_E7(u8 as u16 alias ObjectId, String, u8,u8,u8,u8,u8),
 		#[game(TcEvo)] skip!(1),
 		#[game(Sc, ScEvo, TcEvo)] Sc_E8(u32 alias Time),

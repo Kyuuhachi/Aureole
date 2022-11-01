@@ -273,6 +273,9 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 mod kw {
 	syn::custom_keyword!(alias);
 	syn::custom_keyword!(skip);
+	syn::custom_keyword!(custom);
+	syn::custom_keyword!(read);
+	syn::custom_keyword!(write);
 }
 
 // {{{1 AST and parse
@@ -559,6 +562,7 @@ struct Def {
 	span: Span,
 	ident: Ident,
 	attrs: Vec<Attribute>,
+	args: Vec<Ident>,
 	aliases: Vec<Ident>,
 	types: Vec<Box<Type>>,
 }
@@ -655,26 +659,88 @@ fn gather_top(input: ParseStream) -> Result<Ctx> {
 			}
 		}).collect();
 
-		if input.peek(kw::skip) {
-			input.parse::<kw::skip>()?;
-			input.parse::<Token![!]>()?;
-			let content;
-			parenthesized!(content in input);
-			let lit = content.parse::<LitInt>()?;
-			let val = lit.base10_parse::<u8>()?;
+		let hex = game_idx.iter().map(|idx| n[*idx] as u8).collect::<Vec<_>>();
+		let games = games.iter().cloned().zip(hex.iter().copied()).collect::<GameSpec>();
 
-			for idx in &game_idx {
-				n[*idx] += val as usize;
-			}
+		if input.peek2(Token![!]) {
+			if input.peek(kw::skip) {
+				input.parse::<kw::skip>()?;
+				input.parse::<Token![!]>()?;
+				let content;
+				parenthesized!(content in input);
+				let lit = content.parse::<LitInt>()?;
+				let val = lit.base10_parse::<u8>()?;
 
-			for attr in &attrs {
-				// Doesn't work so great for non-ident paths, but whatever
-				Diagnostic::spanned(attr.path.span().unwrap(), Level::Error, format!("cannot find attribute `{}` in this scope", attr.path.to_token_stream())).emit();
+				for idx in &game_idx {
+					n[*idx] += val as usize;
+				}
+
+				for attr in &attrs {
+					// Doesn't work so great for non-ident paths, but whatever
+					Diagnostic::spanned(attr.path.span().unwrap(), Level::Error, format!("cannot find attribute `{}` in this scope", attr.path.to_token_stream())).emit();
+				}
+			} else if input.peek(kw::custom) {
+				input.parse::<kw::custom>()?;
+				input.parse::<Token![!]>()?;
+				let content;
+				braced!(content in input);
+				let input = content;
+
+				let mut has_read = false;
+				while !input.is_empty() {
+					if input.peek(kw::read) {
+						let token = input.parse::<kw::read>()?;
+						if has_read {
+							Diagnostic::spanned(input.span().unwrap(), Level::Error, "only one `read` allowed").emit();
+						}
+						has_read = true;
+
+						input.parse::<Token![=>]>()?;
+						let body = input.parse::<ExprClosure>()?;
+						ctx.reads.push(ReadArm {
+							span: token.span().join(body.span()).unwrap(),
+							games: games.clone(),
+							body: quote! { #body },
+						});
+					} else if input.peek(kw::write) {
+						let token = input.parse::<kw::write>()?;
+
+						let ident = input.parse::<Ident>()?;
+						let content;
+						parenthesized!(content in input);
+						let args = Punctuated::parse_terminated(&content)?;
+
+						input.parse::<Token![=>]>()?;
+						let body = input.parse::<ExprClosure>()?;
+						ctx.writes.push(WriteArm {
+							span: token.span().join(body.span()).unwrap(),
+							games: games.clone(),
+							ident,
+							args,
+							body: quote! { #body },
+						});
+					} else {
+						Diagnostic::spanned(input.span().unwrap(), Level::Error, "invalid definition").emit();
+						break
+					}
+					if !input.is_empty() {
+						input.parse::<Token![,]>()?;
+					}
+				}
+
+				for idx in &game_idx {
+					n[*idx] += 1;
+				}
+
+				for attr in &attrs {
+					// Doesn't work so great for non-ident paths, but whatever
+					Diagnostic::spanned(attr.path.span().unwrap(), Level::Error, format!("cannot find attribute `{}` in this scope", attr.path.to_token_stream())).emit();
+				}
+			} else {
+				Diagnostic::spanned(input.span().unwrap(), Level::Error, "invalid definition").emit();
 			}
 		} else {
 			let arm = InsnArm::parse(input)?;
-			let hex = game_idx.iter().map(|idx| n[*idx] as u8).collect::<Vec<_>>();
-			let games = games.iter().cloned().zip(hex.iter().copied()).collect::<GameSpec>();
 			let ictx = InwardContext {
 				ident: arm.name.clone(),
 				attrs,

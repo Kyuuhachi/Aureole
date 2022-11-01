@@ -20,10 +20,6 @@ macro_rules! q {
 	}
 }
 
-fn varnames(n: usize) -> Vec<Ident> {
-	(0..n).map(|a| format_ident!("_{a}")).collect()
-}
-
 // {{{1 Main
 #[proc_macro]
 #[allow(non_snake_case)]
@@ -94,7 +90,6 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 	}
 
 	let Insn_body = ctx.defs.iter().map(|Def { span, attrs, ident, types, aliases, .. }| {
-
 		let mut predoc = String::new();
 		predoc.push_str("**`");
 		predoc.push_str(&ident.to_string());
@@ -144,10 +139,9 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		}
 	}).collect::<TokenStream>();
 
-	let args_body = ctx.defs.iter().map(|Def { span, ident, aliases, .. }| {
-		let vars = varnames(aliases.len());
+	let args_body = ctx.defs.iter().map(|Def { span, ident, args, aliases, .. }| {
 		q!{span=>
-			Self::#ident(#(#vars),*) => Box::new([#(Arg::#aliases(#vars)),*]),
+			Self::#ident(#(#args),*) => Box::new([#(Arg::#aliases(#args)),*]),
 		}
 	}).collect::<TokenStream>();
 
@@ -157,12 +151,11 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		}
 	}).collect::<TokenStream>();
 
-	let from_args_body = ctx.defs.iter().map(|Def { span, ident, aliases, .. }| {
-		let vars = varnames(aliases.len());
+	let from_args_body = ctx.defs.iter().map(|Def { span, ident, args, aliases, .. }| {
 		q!{span=>
 			stringify!(#ident) => {
-				#(let #vars = if let Some(Arg::#aliases(v)) = it.next() { v } else { return None; };)*
-				Self::#ident(#(#vars),*)
+				#(let #args = if let Some(Arg::#aliases(v)) = it.next() { v } else { return None; };)*
+				Self::#ident(#(#args),*)
 			},
 		}
 	}).collect::<TokenStream>();
@@ -852,6 +845,7 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: &InsnArm) -> TokenStr
 			span: arm.span(),
 			ident: ictx.ident.clone(),
 			attrs: ictx.attrs,
+			args: ictx.args.iter().cloned().collect(),
 			aliases: ictx.aliases,
 			types: ictx.types,
 		});

@@ -538,7 +538,7 @@ ed6_macros::bytecode! {
 		#[game(TcEvo)] Evo_E7_(u8 alias VisId, u8), // What's Evo_E7 doing up here? Maybe they wanted FF to stay clear.
 		#[game(Sc, ScEvo)] Sc_E7(u8 as u16 alias ObjectId, String, u8,u8,u8,u8,u8),
 		#[game(TcEvo)] skip!(1),
-		#[game(Sc, ScEvom TcEvo)] Sc_E8(u32 alias Time),
+		#[game(Sc, ScEvo, TcEvo)] Sc_E8(u32 alias Time),
 		#[game(Sc, ScEvo)] Sc_E9(u8), // related to RAM saving
 		#[game(TcEvo)] skip!(1),
 

@@ -501,24 +501,23 @@ pub fn write(iset: code::InstructionSet, lookup: &dyn Lookup, scena: &Scena) -> 
 #[cfg(test)]
 mod test {
 	use super::code::InstructionSet;
-	use crate::archive::Archives;
 	use crate::util::test::*;
+	use crate::gamedata::Lookup;
 
 	macro_rules! tests {
 		($a:item) => {
-			#[test_case::test_case(InstructionSet::Fc, "../data/fc", "../data/fc.extract/01/", "._sn"; "fc")]
-			#[test_case::test_case(InstructionSet::FcEvo, "../data/fc", "../data/vita/extract/fc/gamedata/data/data/scenario/0/", ".bin"; "fc_evo")]
-			#[test_case::test_case(InstructionSet::Sc, "../data/sc", "../data/sc.extract/21/", "._sn"; "sc")]
-			#[test_case::test_case(InstructionSet::ScEvo, "../data/sc", "../data/vita/extract/sc/gamedata/data/data_sc/scenario/1/", ".bin"; "sc_evo")]
-			#[test_case::test_case(InstructionSet::Tc, "../data/3rd", "../data/3rd.extract/21/", "._sn"; "tc")]
-			#[test_case::test_case(InstructionSet::TcEvo, "../data/3rd", "../data/vita/extract/3rd/gamedata/data/data_3rd/scenario/2/", ".bin"; "tc_evo")]
+			#[test_case::test_case(InstructionSet::Fc,    &*FC, "../data/fc.extract/01/", "._sn"; "fc")]
+			#[test_case::test_case(InstructionSet::FcEvo, &*FC, "../data/vita/extract/fc/gamedata/data/data/scenario/0/", ".bin"; "fc_evo")]
+			#[test_case::test_case(InstructionSet::Sc,    &*SC, "../data/sc.extract/21/", "._sn"; "sc")]
+			#[test_case::test_case(InstructionSet::ScEvo, &*SC, "../data/vita/extract/sc/gamedata/data/data_sc/scenario/1/", ".bin"; "sc_evo")]
+			#[test_case::test_case(InstructionSet::Tc,    &*TC, "../data/3rd.extract/21/", "._sn"; "tc")]
+			#[test_case::test_case(InstructionSet::TcEvo, &*TC, "../data/vita/extract/3rd/gamedata/data/data_3rd/scenario/2/", ".bin"; "tc_evo")]
 			$a
 		}
 	}
 
 	tests! {
-	fn roundtrip(iset: InstructionSet, datapath: &str, scenapath: &str, suffix: &str) -> Result<(), Error> {
-		let arc = Archives::new(datapath).unwrap();
+	fn roundtrip(iset: InstructionSet, arc: &dyn Lookup, scenapath: &str, suffix: &str) -> Result<(), Error> {
 		let mut failed = false;
 
 		let mut paths = std::fs::read_dir(scenapath)?
@@ -537,8 +536,8 @@ mod test {
 
 			if let Err(err) = check_roundtrip_strict(
 				&data,
-				|a| super::read(iset, &arc, a),
-				|a| super::write(iset, &arc, a),
+				|a| super::read(iset, arc, a),
+				|a| super::write(iset, arc, a),
 			) {
 				println!("{name}: {err:?}");
 				failed = true;
@@ -552,8 +551,7 @@ mod test {
 	}
 
 	tests! {
-	fn decompile(iset: InstructionSet, datapath: &str, scenapath: &str, suffix: &str) -> Result<(), Error> {
-		let arc = Archives::new(datapath).unwrap();
+	fn decompile(iset: InstructionSet, arc: &dyn Lookup, scenapath: &str, suffix: &str) -> Result<(), Error> {
 		let mut failed = false;
 
 		let mut paths = std::fs::read_dir(scenapath)?
@@ -570,7 +568,7 @@ mod test {
 
 			let data = std::fs::read(&path)?;
 
-			let scena = super::read(iset, &arc, &data)?;
+			let scena = super::read(iset, arc, &data)?;
 			for (i, func) in scena.functions.iter().enumerate() {
 				let decomp = super::code::decompile::decompile(func).map_err(|e| format!("{name}:{i}: {e}"))?;
 				let recomp = super::code::decompile::recompile(&decomp).map_err(|e| format!("{name}:{i}: {e}"))?;

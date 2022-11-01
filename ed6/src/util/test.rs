@@ -29,6 +29,8 @@ impl std::convert::From<String> for Error {
 
 lazy_static::lazy_static! {
 	pub static ref FC: Archives = Archives::new("../data/fc").unwrap();
+	pub static ref SC: Archives = Archives::new("../data/sc").unwrap();
+	pub static ref TC: Archives = Archives::new("../data/3rd").unwrap();
 }
 
 pub fn check_equal<T: PartialEq + std::fmt::Debug>(a: &T, b: &T) -> Result<(), Error> {

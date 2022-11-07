@@ -273,6 +273,7 @@ dependencies = [
 name = "ed6-macros"
 version = "0.1.0"
 dependencies = [
+ "choubun",
  "convert_case",
  "proc-macro2",
  "quote",

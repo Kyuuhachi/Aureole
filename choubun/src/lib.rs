@@ -3,11 +3,29 @@ use std::fmt;
 use linked_hash_map::LinkedHashMap;
 
 #[derive(Clone)]
-enum Item {
+pub enum Item {
 	Node(Node),
 	Leaf(Leaf),
 	Text(String),
 	Raw(String),
+}
+
+impl From<Node> for Item {
+	fn from(a: Node) -> Self {
+		Item::Node(a)
+	}
+}
+
+impl From<Leaf> for Item {
+	fn from(a: Leaf) -> Self {
+		Item::Leaf(a)
+	}
+}
+
+impl From<String> for Item {
+	fn from(a: String) -> Self {
+		Item::Text(a)
+	}
 }
 
 impl fmt::Debug for Item {
@@ -58,12 +76,21 @@ impl Leaf {
 		self.attrs.insert(name.to_owned(), value.to_string());
 	}
 
+	pub fn attrs(&self) -> &LinkedHashMap<String, String> {
+		&self.attrs
+	}
+
+	pub fn attrs_mut(&mut self) -> &mut LinkedHashMap<String, String> {
+		&mut self.attrs
+	}
+
 	pub fn class(&mut self, class: &str) {
-		if let Some(v) = self.attrs.get_mut("class") {
-			v.push(' ');
-			v.push_str(class);
+		let attrs = self.attrs_mut();
+		if let Some(e) = attrs.get_mut("class") {
+			e.push(' ');
+			e.push_str(class)
 		} else {
-			self.attr("class", class);
+			attrs.insert("class".to_owned(), class.to_owned());
 		}
 	}
 }
@@ -85,32 +112,36 @@ impl Node {
 		self.leaf.attr(name, value);
 	}
 
+	pub fn attrs(&self) -> &LinkedHashMap<String, String> {
+		self.leaf.attrs()
+	}
+
+	pub fn attrs_mut(&mut self) -> &mut LinkedHashMap<String, String> {
+		self.leaf.attrs_mut()
+	}
+
 	pub fn class(&mut self, class: &str) {
 		self.leaf.class(class);
 	}
 
 	pub fn node(&mut self, name: &str, body: impl FnOnce(&mut Node)) {
-		self.add_node(node(name, body));
+		self.add(node(name, body));
 	}
 
 	pub fn leaf(&mut self, name: &str, body: impl FnOnce(&mut Leaf)) {
-		self.add_leaf(leaf(name, body));
+		self.add(leaf(name, body));
 	}
 
-	pub fn add_node(&mut self, node: Node) {
-		self.body.push(Item::Node(node));
-	}
-
-	pub fn add_leaf(&mut self, node: Leaf) {
-		self.body.push(Item::Leaf(node));
+	pub fn add(&mut self, node: impl Into<Item>) {
+		self.body.push(node.into());
 	}
 
 	pub fn text(&mut self, text: impl ToString) {
-		self.body.push(Item::Text(text.to_string()));
+		self.add(text.to_string());
 	}
 
 	pub fn raw(&mut self, text: &str) {
-		self.body.push(Item::Raw(text.to_owned()));
+		self.add(Item::Raw(text.to_owned()));
 	}
 }
 
@@ -167,7 +198,9 @@ pub fn document(body: impl FnOnce(&mut Document)) -> Node {
 
 impl Node {
 	pub fn render(&self, out: &mut impl fmt::Write) -> fmt::Result {
-		writeln!(out, "<!DOCTYPE html>")?;
+		if self.leaf.name == "html" {
+			writeln!(out, "<!DOCTYPE html>")?;
+		}
 		self.render_fragment(out, 0)
 	}
 

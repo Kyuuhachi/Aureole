@@ -89,85 +89,7 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		}
 	}
 
-	let doc_insn_table = choubun::node("table", |n| {
-		let mut hex: BTreeMap<Ident, BTreeMap<Ident, u8>> = BTreeMap::new();
-		for WriteArm { games, ident, .. } in &ctx.writes {
-			let entry = hex.entry(ident.clone()).or_default();
-			for (game, hex) in games {
-				entry.insert(game.clone(), *hex);
-			}
-		}
-
-		n.attr("style", "text-align: center; width: min-content; overflow-x: unset");
-		n.node("thead", |n| {
-			n.attr("style", "position: sticky; top: 0");
-			n.node("tr", |n| {
-				n.node("th", |_| {});
-				for game in &ctx.games {
-					n.node("th", |n| {
-						n.attr("style", "writing-mode: vertical-lr");
-						n.text(format_args!("[`{game}`]({ty}::{game})", ty=&ctx.game_ty))
-					});
-				}
-			});
-		});
-
-		n.node("tbody", |n| {
-			let mut insns = ctx.defs.iter().peekable();
-			while let Some(def) = insns.next() {
-				let games = hex.get(&def.ident).unwrap();
-				let mut defs = vec![def];
-				while let Some(next) = insns.peek() && hex.get(&next.ident).unwrap() == games {
-					defs.push(insns.next().unwrap());
-				}
-
-				n.node("tr", |n| {
-					n.node("td", |n| {
-						n.attr("style", "text-align: left");
-						for Def { ident, aliases, ..} in defs {
-							let mut title = String::new();
-							title.push_str(&ident.to_string());
-							for alias in aliases {
-								title.push_str(&format!(" {alias}"));
-							}
-							n.node("span", |n| {
-								n.attr("title", title);
-								n.text(format_args!("[`{ident}`](Self::{ident})"));
-							});
-							n.text(" ");
-						}
-					});
-
-					let mut columns = Vec::<choubun::Node>::new();
-					let mut prev = None;
-					for game in &ctx.games {
-						let node = choubun::node("td", |n| {
-							n.attr("style", "vertical-align: middle");
-							let hex = games.get(game);
-							if let Some(hex) = hex {
-								n.text(format_args!("{hex:02X}"));
-							}
-							if prev == Some(hex) {
-								let prev = columns.last_mut().unwrap();
-								n.attrs_mut().get_mut("style").unwrap().push_str("; border-left: none");
-								prev.attrs_mut().get_mut("style").unwrap().push_str("; border-right: none");
-							}
-							prev = Some(hex);
-						});
-						columns.push(node);
-					}
-					for item in columns {
-						n.add(item);
-					}
-				});
-			}
-		});
-	});
-	let doc_insn_table = choubun::node("div", |n| {
-		n.class("example-wrap");
-		n.add(doc_insn_table)
-	});
-	let doc_insn_table = format!("\n\n<span></span>{}\n\n", doc_insn_table.render_to_string());
+	let doc_insn_table = make_table(&ctx);
 
 	let Insn_body = ctx.defs.iter().map(|Def { span, attrs, ident, types, aliases, .. }| {
 		let mut predoc = String::new();
@@ -345,6 +267,88 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		#main
 		#introspection
 	}.into()
+}
+
+fn make_table(ctx: &Ctx) -> String {
+	let doc = choubun::node("table", |n| {
+		let mut hex: BTreeMap<Ident, BTreeMap<Ident, u8>> = BTreeMap::new();
+		for WriteArm { games, ident, .. } in &ctx.writes {
+			let entry = hex.entry(ident.clone()).or_default();
+			for (game, hex) in games {
+				entry.insert(game.clone(), *hex);
+			}
+		}
+
+		n.attr("style", "text-align: center; width: min-content; overflow-x: unset");
+		n.node("thead", |n| {
+			n.attr("style", "position: sticky; top: 0");
+			n.node("tr", |n| {
+				n.node("th", |_| {});
+				for game in &ctx.games {
+					n.node("th", |n| {
+						n.attr("style", "writing-mode: vertical-lr");
+						n.text(format_args!("[`{game}`]({ty}::{game})", ty=&ctx.game_ty))
+					});
+				}
+			});
+		});
+
+		n.node("tbody", |n| {
+			let mut insns = ctx.defs.iter().peekable();
+			while let Some(def) = insns.next() {
+				let games = hex.get(&def.ident).unwrap();
+				let mut defs = vec![def];
+				while let Some(next) = insns.peek() && hex.get(&next.ident).unwrap() == games {
+					defs.push(insns.next().unwrap());
+				}
+
+				n.node("tr", |n| {
+					n.node("td", |n| {
+						n.attr("style", "text-align: left");
+						for Def { ident, aliases, ..} in defs {
+							let mut title = String::new();
+							title.push_str(&ident.to_string());
+							for alias in aliases {
+								title.push_str(&format!(" {alias}"));
+							}
+							n.node("span", |n| {
+								n.attr("title", title);
+								n.text(format_args!("[`{ident}`](Self::{ident})"));
+							});
+							n.text(" ");
+						}
+					});
+
+					let mut columns = Vec::<choubun::Node>::new();
+					let mut prev = None;
+					for game in &ctx.games {
+						let node = choubun::node("td", |n| {
+							n.attr("style", "vertical-align: middle");
+							let hex = games.get(game);
+							if let Some(hex) = hex {
+								n.text(format_args!("{hex:02X}"));
+							}
+							if prev == Some(hex) {
+								let prev = columns.last_mut().unwrap();
+								n.attrs_mut().get_mut("style").unwrap().push_str("; border-left: none");
+								prev.attrs_mut().get_mut("style").unwrap().push_str("; border-right: none");
+							}
+							prev = Some(hex);
+						});
+						columns.push(node);
+					}
+					for item in columns {
+						n.add(item);
+					}
+				});
+			}
+		});
+	});
+	let doc = choubun::node("div", |n| {
+		n.class("example-wrap");
+		n.add(doc)
+	});
+	format!("\n\n<span></span>{}\n\n", doc.render_to_string())
 }
 
 mod kw {

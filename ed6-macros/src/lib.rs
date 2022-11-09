@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use convert_case::{Case, Casing, Boundary};
 use proc_macro::{TokenStream as TokenStream0, Diagnostic, Level};
 use proc_macro2::{TokenStream, Span};
-use quote::{quote, format_ident, ToTokens};
+use quote::{quote, format_ident, ToTokens, TokenStreamExt};
 use syn::{
 	*,
 	spanned::Spanned,
@@ -356,35 +356,14 @@ mod kw {
 }
 
 // {{{1 AST and parse
-#[derive(Clone, Debug)]
-struct WithAttrs<T> {
-	attrs: Vec<Attribute>,
-	value: T,
-}
-
-impl<T: Parse> Parse for WithAttrs<T> {
-	fn parse(input: ParseStream) -> Result<Self> {
-		Ok(Self {
-			attrs: Attribute::parse_outer(input)?,
-			value: input.parse()?,
-		})
-	}
-}
-
-impl<T: ToTokens> ToTokens for WithAttrs<T> {
-	fn to_tokens(&self, ts: &mut TokenStream) {
-		for a in &self.attrs {
-			a.to_tokens(ts);
-		}
-		self.value.to_tokens(ts);
-	}
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, syn_derive::ToTokens)]
 struct InsnArm {
 	name: Ident,
+	#[syn(parenthesized)]
 	paren_token: token::Paren,
+	#[syn(in = paren_token)]
 	args: Punctuated<Arg, Token![,]>,
+	#[syn(in = paren_token)]
 	tail: Option<Table>,
 }
 
@@ -414,201 +393,73 @@ impl Parse for InsnArm {
 
 				punctuated
 			},
-			tail: if content.peek(Token![match]) {
-				Some(content.parse()?)
-			} else {
-				None
-			},
+			tail: parse_if(&content, |content| content.peek(Token![match]))?,
 		})
 	}
 }
 
-impl ToTokens for InsnArm {
-	fn to_tokens(&self, ts: &mut TokenStream) {
-		self.name.to_tokens(ts);
-		self.paren_token.surround(ts, |ts| {
-			self.args.to_tokens(ts);
-			if let Some(t) = &self.tail {
-				t.to_tokens(ts);
-			}
-		});
-	}
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
 struct Arg {
 	source: Source,
-	ty: Vec<(Token![as], Box<Type>)>,
-	alias: Option<(kw::alias, Ident)>,
+	#[parse(|input| parse_while(input, |input| input.peek(Token![as])))]
+	#[to_tokens(|tokens, val| tokens.append_all(val))]
+	ty: Vec<ArgTy>,
+	#[parse(|input| parse_if(input, |input| input.peek(kw::alias)))]
+	#[to_tokens(|tokens, val| tokens.append_all(val))]
+	alias: Option<ArgAlias>,
 }
 
-impl Parse for Arg {
-	fn parse(input: ParseStream) -> Result<Self> {
-		Ok(Self {
-			source: input.parse()?,
-			ty: {
-				let mut xs = Vec::new();
-				while input.peek(Token![as]) {
-					xs.push((input.parse()?, input.parse()?))
-				}
-				xs
-			},
-			alias: if input.peek(kw::alias) {
-				Some((input.parse()?, input.parse()?))
-			} else {
-				None
-			},
-		})
-	}
+#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+struct ArgTy {
+	as_token: Token![as],
+	ty: Box<Type>,
 }
 
-impl ToTokens for Arg {
-	fn to_tokens(&self, ts: &mut TokenStream) {
-		self.source.to_tokens(ts);
-		for (a, b) in &self.ty {
-			a.to_tokens(ts);
-			b.to_tokens(ts);
-		}
-		if let Some((a, b)) = &self.alias {
-			a.to_tokens(ts);
-			b.to_tokens(ts);
-		}
-	}
+#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+struct ArgAlias {
+	alias_token: kw::alias,
+	ident: Ident,
 }
 
-impl Arg {
-	fn alias(&self) -> Ident {
-		let ty = if let Some((_, alias)) = &self.alias {
-			return alias.clone();
-		} else if let Some((_, ty)) = &self.ty.last() {
-			ty
-		} else {
-			match &self.source {
-				Source::Simple(ident) => return ident.clone(),
-				Source::Call(s) => &s.ty,
-			}
-		};
-
-		if let Type::Path(ty) = Box::as_ref(ty) {
-			if let Some(ident) = ty.path.get_ident() {
-				return ident.clone()
-			}
-		}
-
-		Diagnostic::spanned(ty.span().unwrap(), Level::Error, "invalid identifier").emit();
-		Ident::new("__error", Span::call_site())
-	}
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
 enum Source {
-	Simple(Ident),
+	#[parse(peek_func = |i| i.peek2(token::Paren))]
 	Call(SourceCall),
+	Simple(Ident),
 }
 
-impl Parse for Source {
-	fn parse(input: ParseStream) -> Result<Self> {
-		if input.peek2(token::Paren) {
-			Ok(Source::Call(input.parse()?))
-		} else {
-			Ok(Source::Simple(input.parse()?))
-		}
-	}
-}
-
-impl ToTokens for Source {
-	fn to_tokens(&self, ts: &mut TokenStream) {
-		match self {
-			Source::Simple(a) => a.to_tokens(ts),
-			Source::Call(a) => a.to_tokens(ts),
-		}
-	}
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
 struct SourceCall {
 	name: Ident,
+	#[syn(parenthesized)]
 	paren_token: token::Paren,
+	#[syn(in = paren_token)]
+	#[parse(Punctuated::parse_terminated)]
 	args: Punctuated<Box<Expr>, Token![,]>,
 	arrow_token: Token![->],
 	ty: Box<Type>,
 }
 
-impl Parse for SourceCall {
-	fn parse(input: ParseStream) -> Result<Self> {
-		let content;
-		Ok(SourceCall {
-			name: input.parse()?,
-			paren_token: parenthesized!(content in input),
-			args: Punctuated::parse_terminated(&content)?,
-			arrow_token: input.parse()?,
-			ty: input.parse()?,
-		})
-	}
-}
-
-impl ToTokens for SourceCall {
-	fn to_tokens(&self, ts: &mut TokenStream) {
-		self.name.to_tokens(ts);
-		self.paren_token.surround(ts, |ts| {
-			self.args.to_tokens(ts);
-		});
-		self.arrow_token.to_tokens(ts);
-		self.ty.to_tokens(ts);
-	}
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
 struct Table {
 	match_token: Token![match],
+	#[syn(braced)]
 	brace_token: token::Brace,
-	arms: Punctuated<WithAttrs<TableArm>, Token![,]>,
+	#[syn(in = brace_token)]
+	#[parse(Punctuated::parse_terminated)]
+	arms: Punctuated<TableArm, Token![,]>,
 }
 
-impl Parse for Table {
-	fn parse(input: ParseStream) -> Result<Self> {
-		let content;
-		Ok(Self {
-			match_token: input.parse()?,
-			brace_token: braced!(content in input),
-			arms: Punctuated::parse_terminated(&content)?,
-		})
-	}
-}
-
-impl ToTokens for Table {
-	fn to_tokens(&self, ts: &mut TokenStream) {
-		self.match_token.to_tokens(ts);
-		self.brace_token.surround(ts, |ts| {
-			self.arms.to_tokens(ts);
-		});
-	}
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
 struct TableArm {
+	#[parse(Attribute::parse_outer)]
+	#[to_tokens(|tokens, val| tokens.append_all(val))]
+	attrs: Vec<Attribute>,
 	key: LitInt,
 	arrow_token: Token![=>],
 	insn: InsnArm,
 }
 
-impl Parse for TableArm {
-	fn parse(input: ParseStream) -> Result<Self> {
-		Ok(Self {
-			key: input.parse()?,
-			arrow_token: input.parse()?,
-			insn: input.parse()?,
-		})
-	}
-}
-
-impl ToTokens for TableArm {
-	fn to_tokens(&self, ts: &mut TokenStream) {
-		self.key.to_tokens(ts);
-		self.arrow_token.to_tokens(ts);
-		self.insn.to_tokens(ts);
-	}
-}
 // }}}1
 
 struct Ctx {
@@ -919,8 +770,9 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: &InsnArm) -> TokenStr
 				q!{ty=> #ty }
 			}
 		});
-		for (_, ty) in &arg.ty {
-			types.push(q!{ty=> #ty});
+		for ty in &arg.ty {
+			let ty_ = &ty.ty;
+			types.push(q!{ty=> #ty_});
 		}
 
 		{
@@ -991,15 +843,35 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: &InsnArm) -> TokenStr
 			ictx.write.extend(q!{arg=> #val; });
 		}
 
-		let ty = if let Some((_, ty)) = &arg.ty.last() {
-			ty.clone()
+		let ty = if let Some(ty) = &arg.ty.last() {
+			ty.ty.clone()
 		} else {
 			match &arg.source {
 				Source::Simple(ident) => reparse(ident).unwrap(),
 				Source::Call(s) => s.ty.clone(),
 			}
 		};
-		let alias = arg.alias();
+		let alias = 'a: {
+			let ty = if let Some(alias) = &arg.alias {
+				break 'a alias.ident.clone();
+			} else if let Some(ty) = &arg.ty.last() {
+				&ty.ty
+			} else {
+				match &arg.source {
+					Source::Simple(ident) => break 'a ident.clone(),
+					Source::Call(s) => &s.ty,
+				}
+			};
+
+			if let Type::Path(ty) = Box::as_ref(ty) {
+				if let Some(ident) = ty.path.get_ident() {
+					break 'a ident.clone()
+				}
+			}
+
+			Diagnostic::spanned(ty.span().unwrap(), Level::Error, "invalid identifier").emit();
+			Ident::new("__error", Span::call_site())
+		};
 
 		ictx.args.push(varname.clone());
 		ictx.aliases.push(alias.clone());
@@ -1014,11 +886,11 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: &InsnArm) -> TokenStr
 		let mut arms = Vec::new();
 		for arm in &tail.arms {
 			let mut ictx = ictx.clone();
-			ictx.ident = format_ident!("{}{}", &ictx.ident, &arm.value.insn.name, span=arm.value.insn.name.span());
+			ictx.ident = format_ident!("{}{}", &ictx.ident, &arm.insn.name, span=arm.insn.name.span());
 			ictx.attrs.extend(arm.attrs.clone());
-			let key = &arm.value.key;
+			let key = &arm.key;
 			ictx.write.extend(q!{arm=> __f.u8(#key); });
-			let body = gather_arm(ctx, ictx, &arm.value.insn);
+			let body = gather_arm(ctx, ictx, &arm.insn);
 			arms.push(q!{arm=> #key => { #body } });
 		}
 		let name = &ictx.ident;
@@ -1064,4 +936,20 @@ fn to_snake(ident: &Ident) -> Ident {
 
 fn reparse<A: ToTokens, B: Parse>(a: &A) -> Result<B> {
 	Ok(parse_quote! { #a })
+}
+
+fn parse_while<T: Parse>(input: ParseStream, cond: fn(ParseStream) -> bool) -> Result<Vec<T>> {
+	let mut xs = Vec::new();
+	while cond(input) {
+		xs.push(input.parse()?)
+	}
+	Ok(xs)
+}
+
+fn parse_if<T: Parse>(input: ParseStream, cond: fn(ParseStream) -> bool) -> Result<Option<T>> {
+	if cond(input) {
+		Ok(Some(input.parse()?))
+	} else {
+		Ok(None)
+	}
 }

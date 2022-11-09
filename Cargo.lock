@@ -278,6 +278,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+ "syn_derive",
 ]
 
 [[package]]
@@ -688,6 +689,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-xid",
+]
+
+[[package]]
+name = "syn_derive"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f58dd5ed206a8206ae6f97bc880f13994b066daa85199c1359aa0fbf4eb5db0d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

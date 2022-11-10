@@ -6,13 +6,16 @@ use std::collections::BTreeMap;
 use convert_case::{Case, Casing, Boundary};
 use proc_macro::{TokenStream as TokenStream0, Diagnostic, Level};
 use proc_macro2::{TokenStream, Span};
-use quote::{quote, format_ident, ToTokens, TokenStreamExt};
+use quote::{quote, format_ident, ToTokens};
 use syn::{
 	*,
 	spanned::Spanned,
 	parse::{ParseStream, Parse},
 	punctuated::*,
 };
+
+mod parse;
+use parse::*;
 
 macro_rules! q {
 	($a:expr=> $($b:tt)*) => {
@@ -269,6 +272,54 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 	}.into()
 }
 
+struct Ctx {
+	arg_types: BTreeMap<Ident, Box<Type>>,
+	func_args: Punctuated<PatType, Token![,]>,
+	games: Vec<Ident>,
+	attrs: Vec<Attribute>,
+	defs: Vec<Def>,
+	reads: Vec<ReadArm>,
+	writes: Vec<WriteArm>,
+	game_expr: Expr,
+	game_ty: TokenStream,
+}
+
+#[derive(Clone)]
+struct InwardContext {
+	ident: Ident,
+	attrs: Vec<Attribute>,
+	args: Punctuated<Ident, Token![,]>,
+	aliases: Vec<Ident>,
+	types: Vec<Box<Type>>,
+	games: GameSpec,
+	write: TokenStream,
+}
+
+type GameSpec = Vec<(Ident, u8)>;
+
+struct Def {
+	span: Span,
+	ident: Ident,
+	attrs: Vec<Attribute>,
+	args: Vec<Ident>,
+	aliases: Vec<Ident>,
+	types: Vec<Box<Type>>,
+}
+
+struct ReadArm {
+	span: Span,
+	games: GameSpec,
+	body: TokenStream,
+}
+
+struct WriteArm {
+	span: Span,
+	games: GameSpec,
+	ident: Ident,
+	args: Punctuated<Ident, Token![,]>,
+	body: TokenStream,
+}
+
 fn make_table(ctx: &Ctx) -> String {
 	let doc = choubun::node("table", |n| {
 		let mut hex: BTreeMap<Ident, BTreeMap<Ident, u8>> = BTreeMap::new();
@@ -349,169 +400,6 @@ fn make_table(ctx: &Ctx) -> String {
 		n.add(doc)
 	});
 	format!("\n\n<span></span>{}\n\n", doc.render_to_string())
-}
-
-mod kw {
-	syn::custom_keyword!(alias);
-	syn::custom_keyword!(skip);
-	syn::custom_keyword!(custom);
-	syn::custom_keyword!(read);
-	syn::custom_keyword!(write);
-}
-
-// {{{1 AST and parse
-#[derive(Clone, Debug, syn_derive::ToTokens)]
-struct InsnArm {
-	name: Ident,
-	#[syn(parenthesized)]
-	paren_token: token::Paren,
-	#[syn(in = paren_token)]
-	args: Punctuated<Arg, Token![,]>,
-	#[syn(in = paren_token)]
-	tail: Option<Table>,
-}
-
-impl Parse for InsnArm {
-	fn parse(input: ParseStream) -> Result<Self> {
-		let content;
-		Ok(Self {
-			name: input.parse()?,
-			paren_token: parenthesized!(content in input),
-			args: {
-				let mut punctuated = Punctuated::new();
-				loop {
-					if content.is_empty() {
-						break;
-					}
-					if content.peek(Token![match]) {
-						break;
-					}
-					let value = content.parse()?;
-					punctuated.push_value(value);
-					if content.is_empty() {
-						break;
-					}
-					let punct = content.parse()?;
-					punctuated.push_punct(punct);
-				}
-
-				punctuated
-			},
-			tail: parse_if(&content, |content| content.peek(Token![match]))?,
-		})
-	}
-}
-
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
-struct Arg {
-	source: Source,
-	#[parse(|input| parse_while(input, |input| input.peek(Token![as])))]
-	#[to_tokens(|tokens, val| tokens.append_all(val))]
-	ty: Vec<ArgTy>,
-	#[parse(|input| parse_if(input, |input| input.peek(kw::alias)))]
-	#[to_tokens(|tokens, val| tokens.append_all(val))]
-	alias: Option<ArgAlias>,
-}
-
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
-struct ArgTy {
-	as_token: Token![as],
-	ty: Box<Type>,
-}
-
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
-struct ArgAlias {
-	alias_token: kw::alias,
-	ident: Ident,
-}
-
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
-enum Source {
-	#[parse(peek_func = |i| i.peek2(token::Paren))]
-	Call(SourceCall),
-	Simple(Ident),
-}
-
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
-struct SourceCall {
-	name: Ident,
-	#[syn(parenthesized)]
-	paren_token: token::Paren,
-	#[syn(in = paren_token)]
-	#[parse(Punctuated::parse_terminated)]
-	args: Punctuated<Box<Expr>, Token![,]>,
-	arrow_token: Token![->],
-	ty: Box<Type>,
-}
-
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
-struct Table {
-	match_token: Token![match],
-	#[syn(braced)]
-	brace_token: token::Brace,
-	#[syn(in = brace_token)]
-	#[parse(Punctuated::parse_terminated)]
-	arms: Punctuated<TableArm, Token![,]>,
-}
-
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
-struct TableArm {
-	#[parse(Attribute::parse_outer)]
-	#[to_tokens(|tokens, val| tokens.append_all(val))]
-	attrs: Vec<Attribute>,
-	key: LitInt,
-	arrow_token: Token![=>],
-	insn: InsnArm,
-}
-
-// }}}1
-
-struct Ctx {
-	arg_types: BTreeMap<Ident, Box<Type>>,
-	func_args: Punctuated<PatType, Token![,]>,
-	games: Vec<Ident>,
-	attrs: Vec<Attribute>,
-	defs: Vec<Def>,
-	reads: Vec<ReadArm>,
-	writes: Vec<WriteArm>,
-	game_expr: Expr,
-	game_ty: TokenStream,
-}
-
-#[derive(Clone)]
-struct InwardContext {
-	ident: Ident,
-	attrs: Vec<Attribute>,
-	args: Punctuated<Ident, Token![,]>,
-	aliases: Vec<Ident>,
-	types: Vec<Box<Type>>,
-	games: GameSpec,
-	write: TokenStream,
-}
-
-type GameSpec = Vec<(Ident, u8)>;
-
-struct Def {
-	span: Span,
-	ident: Ident,
-	attrs: Vec<Attribute>,
-	args: Vec<Ident>,
-	aliases: Vec<Ident>,
-	types: Vec<Box<Type>>,
-}
-
-struct ReadArm {
-	span: Span,
-	games: GameSpec,
-	body: TokenStream,
-}
-
-struct WriteArm {
-	span: Span,
-	games: GameSpec,
-	ident: Ident,
-	args: Punctuated<Ident, Token![,]>,
-	body: TokenStream,
 }
 
 fn gather_top(input: ParseStream) -> Result<Ctx> {
@@ -940,20 +828,4 @@ fn to_snake(ident: &Ident) -> Ident {
 
 fn reparse<A: ToTokens, B: Parse>(a: &A) -> Result<B> {
 	Ok(parse_quote! { #a })
-}
-
-fn parse_while<T: Parse>(input: ParseStream, cond: fn(ParseStream) -> bool) -> Result<Vec<T>> {
-	let mut xs = Vec::new();
-	while cond(input) {
-		xs.push(input.parse()?)
-	}
-	Ok(xs)
-}
-
-fn parse_if<T: Parse>(input: ParseStream, cond: fn(ParseStream) -> bool) -> Result<Option<T>> {
-	if cond(input) {
-		Ok(Some(input.parse()?))
-	} else {
-		Ok(None)
-	}
 }

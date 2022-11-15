@@ -91,14 +91,6 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		}
 	};
 
-	let mut hex: BTreeMap<Ident, BTreeMap<u8, Vec<String>>> = BTreeMap::new();
-	for WriteArm { games, ident, .. } in &ctx.writes {
-		let entry = hex.entry(ident.clone()).or_default();
-		for (game, hex) in games {
-			entry.entry(*hex).or_default().push(game.to_string())
-		}
-	}
-
 	let doc_insn_table = make_table(&ctx);
 
 	let Insn_body = ctx.defs.iter().map(|Insn { span, attrs, ident, types, aliases, .. }| {

@@ -113,7 +113,7 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 
 		q!{span=>
 			#[doc = #predoc]
-			#(#attrs)*
+			#attrs
 			#ident(#(#types),*),
 		}
 	}).collect::<TokenStream>();
@@ -121,7 +121,7 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 	let main = quote! {
 		#[allow(non_camel_case_types)]
 		#[derive(Debug, Clone, PartialEq, Eq)]
-		#(#attrs)*
+		#attrs
 		/// # Encoding
 		/// Below is a table listing the hex codes for each instruction.
 		/// This can for example be used to see which instructions are available in each game.
@@ -283,7 +283,7 @@ struct Ctx {
 	arg_types: BTreeMap<Ident, Box<Type>>,
 	func_args: Punctuated<PatType, Token![,]>,
 	games: Vec<Ident>,
-	attrs: Vec<Attribute>,
+	attrs: Attributes,
 	defs: Vec<Insn>,
 	reads: Vec<ReadArm>,
 	writes: Vec<WriteArm>,
@@ -294,7 +294,7 @@ struct Ctx {
 #[derive(Clone)]
 struct InwardContext {
 	ident: Ident,
-	attrs: Vec<Attribute>,
+	attrs: Attributes,
 	args: Punctuated<Ident, Token![,]>,
 	aliases: Vec<Ident>,
 	types: Vec<Box<Type>>,
@@ -307,7 +307,7 @@ type GameSpec = Vec<(Ident, u8)>;
 struct Insn {
 	span: Span,
 	ident: Ident,
-	attrs: Vec<Attribute>,
+	attrs: Attributes,
 	args: Vec<Ident>,
 	aliases: Vec<Ident>,
 	types: Vec<Box<Type>>,
@@ -410,16 +410,14 @@ fn make_table(ctx: &Ctx) -> String {
 	format!("\n\n<span></span>{}\n\n", doc.render_to_string())
 }
 
-fn gather_top(mut input: Top) -> Result<Ctx> {
-	let games: GamesAttr = pop_attr(&mut input.attrs, "games")
-		.ok_or_else(|| Error::new(input.attrs.span(), "no #[games]"))?
-		.parse_args()?;
+fn gather_top(input: Top) -> Result<Ctx> {
+	let games = input.attrs.games;
 	let all_games: Box<[Ident]> = games.idents.iter().cloned().collect();
 
 	let mut ctx = Ctx {
 		arg_types: BTreeMap::new(),
 		func_args: input.args,
-		attrs: (*input.attrs).clone(),
+		attrs: input.attrs.other,
 		games: games.idents.iter().cloned().collect(),
 		defs: Vec::new(),
 		reads: Vec::new(),
@@ -439,14 +437,14 @@ fn gather_top(mut input: Top) -> Result<Ctx> {
 
 				get_games(&mut def.attrs, &all_games, &mut n, val as usize)?;
 
-				for attr in def.attrs.iter() {
+				for attr in def.attrs.other.iter() {
 					Diagnostic::spanned(attr.path.span().unwrap(), Level::Error, format!("cannot find attribute `{}` in this scope", attr.path.to_token_stream())).emit();
 				}
 			}
 			Def::Custom(mut def) => {
 				let games = get_games(&mut def.attrs, &all_games, &mut n, 1)?;
 
-				for attr in def.attrs.iter() {
+				for attr in def.attrs.other.iter() {
 					Diagnostic::spanned(attr.path.span().unwrap(), Level::Error, format!("cannot find attribute `{}` in this scope", attr.path.to_token_stream())).emit();
 				}
 
@@ -478,18 +476,18 @@ fn gather_top(mut input: Top) -> Result<Ctx> {
 				}
 			}
 			Def::Standard(mut def) => {
+				let span = def.span();
 				let games = get_games(&mut def.attrs, &all_games, &mut n, 1)?;
 
 				let ictx = InwardContext {
 					ident: def.ident.clone(),
-					attrs: (*def.attrs).clone(),
+					attrs: def.attrs.other.clone(),
 					args: Punctuated::new(),
 					aliases: Vec::new(),
 					types: Vec::new(),
 					games: games.clone(),
 					write: TokenStream::new(),
 				};
-				let span = def.span();
 				let read = gather_arm(&mut ctx, ictx, def);
 				ctx.reads.push(ReadArm {
 					span,
@@ -509,13 +507,9 @@ fn gather_top(mut input: Top) -> Result<Ctx> {
 	Ok(ctx)
 }
 
-fn pop_attr(attrs: &mut Vec<Attribute>, name: &str) -> Option<Attribute> {
-	attrs.iter().position(|a| a.path.is_ident(name)).map(|i| attrs.remove(i))
-}
-
-fn get_games(attrs: &mut Vec<Attribute>, all_games: &[Ident], n: &mut [usize], num: usize) -> Result<GameSpec> {
-	let games = if let Some(game_attr) = pop_attr(attrs, "game") {
-		game_attr.parse_args::<GameAttr>()?.idents.into_iter().collect()
+fn get_games(attrs: &mut DefAttributes, all_games: &[Ident], n: &mut [usize], num: usize) -> Result<GameSpec> {
+	let games = if let Some(attr) = &attrs.game {
+		attr.idents.iter().cloned().collect()
 	} else {
 		all_games.to_owned()
 	};

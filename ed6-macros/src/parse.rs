@@ -30,7 +30,7 @@ pub struct Top {
 		})
 	}))]
 	pub args: Punctuated<PatType, Token![,]>,
-	pub attrs: Attributes,
+	pub attrs: TopAttributes,
 	#[syn(bracketed)]
 	pub bracket_token: syn::token::Bracket,
 	#[syn(in = bracket_token)]
@@ -41,32 +41,6 @@ pub struct Top {
 	#[parse(|input| Ok(input.span()))]
 	#[to_tokens(|_, _| {})]
 	pub end_span: proc_macro2::Span,
-}
-
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
-pub struct GamesAttr {
-	pub expr: Box<Expr>,
-	pub arrow_token: Token![=>],
-	#[parse(|input| {
-		let mut ty = TokenStream::new();
-		while !input.is_empty() && !(input.peek(Token![::]) && input.peek3(token::Brace)) {
-			ty.extend(input.parse::<proc_macro2::TokenTree>())
-		}
-		Ok(parse_quote! { #ty })
-	})]
-	pub ty: Box<Type>,
-	pub colon2_token: Token![::],
-	#[syn(braced)]
-	pub brace_token: syn::token::Brace,
-	#[syn(in = brace_token)]
-	#[parse(Punctuated::parse_terminated)]
-	pub idents: Punctuated<Ident, Token![,]>,
-}
-
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
-pub struct GameAttr {
-	#[parse(Punctuated::parse_terminated)]
-	pub idents: Punctuated<Ident, Token![,]>,
 }
 
 #[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
@@ -81,7 +55,7 @@ pub enum Def {
 
 #[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct DefStandard {
-	pub attrs: Attributes,
+	pub attrs: DefAttributes,
 	pub ident: Ident,
 	#[syn(parenthesized)]
 	pub paren_token: token::Paren,
@@ -181,7 +155,7 @@ pub struct SplitArm {
 
 #[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct DefSkip {
-	pub attrs: Attributes,
+	pub attrs: DefAttributes,
 	pub skip_token: kw::skip,
 	pub bang_token: Token![!],
 	#[syn(parenthesized)]
@@ -192,7 +166,7 @@ pub struct DefSkip {
 
 #[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct DefCustom {
-	pub attrs: Attributes,
+	pub attrs: DefAttributes,
 	pub custom_token: kw::custom,
 	pub bang_token: Token![!],
 	#[syn(braced)]
@@ -230,6 +204,69 @@ pub struct ClauseWrite {
 	pub expr: Box<Expr>,
 }
 
+#[derive(Clone, Debug, syn_derive::ToTokens)]
+pub struct TopAttributes {
+	pub games: GamesAttr,
+	pub other: Attributes,
+}
+
+impl Parse for TopAttributes {
+	fn parse(input: ParseStream) -> Result<Self> {
+		let mut attrs = input.parse::<Attributes>()?;
+		Ok(TopAttributes {
+			games: pop_attr(&mut attrs, "games")
+				.ok_or_else(|| Error::new(input.span(), "no #[games]"))?
+				.parse_args()?,
+			other: attrs,
+		})
+	}
+}
+
+#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+pub struct GamesAttr {
+	pub expr: Box<Expr>,
+	pub arrow_token: Token![=>],
+	#[parse(|input| {
+		let mut ty = TokenStream::new();
+		#[allow(clippy::nonminimal_bool)] // it's more readable thisw ay
+		while !input.is_empty() && !(input.peek(Token![::]) && input.peek3(token::Brace)) {
+			ty.extend(input.parse::<proc_macro2::TokenTree>())
+		}
+		Ok(parse_quote! { #ty })
+	})]
+	pub ty: Box<Type>,
+	pub colon2_token: Token![::],
+	#[syn(braced)]
+	pub brace_token: syn::token::Brace,
+	#[syn(in = brace_token)]
+	#[parse(Punctuated::parse_terminated)]
+	pub idents: Punctuated<Ident, Token![,]>,
+}
+
+#[derive(Clone, Debug, syn_derive::ToTokens)]
+pub struct DefAttributes {
+	pub game: Option<GameAttr>,
+	pub other: Attributes,
+}
+
+impl Parse for DefAttributes {
+	fn parse(input: ParseStream) -> Result<Self> {
+		let mut attrs = input.parse::<Attributes>()?;
+		Ok(DefAttributes {
+			game: pop_attr(&mut attrs, "game")
+				.map(|a| a.parse_args())
+				.transpose()?,
+			other: attrs,
+		})
+	}
+}
+
+#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+pub struct GameAttr {
+	#[parse(Punctuated::parse_terminated)]
+	pub idents: Punctuated<Ident, Token![,]>,
+}
+
 // Utils
 
 #[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
@@ -262,4 +299,8 @@ fn parse_if<T: Parse>(input: ParseStream, cond: fn(ParseStream) -> bool) -> Resu
 	} else {
 		Ok(None)
 	}
+}
+
+fn pop_attr(attrs: &mut Vec<Attribute>, name: &str) -> Option<Attribute> {
+	attrs.iter().position(|a| a.path.is_ident(name)).map(|i| attrs.remove(i))
 }

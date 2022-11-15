@@ -693,9 +693,9 @@ dependencies = [
 
 [[package]]
 name = "syn_derive"
-version = "0.1.0"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f58dd5ed206a8206ae6f97bc880f13994b066daa85199c1359aa0fbf4eb5db0d"
+checksum = "42c92309b20be5f1c9582f694e7fbf8cf3291df83583bfe6fc603b0117132cf9"
 dependencies = [
  "proc-macro2",
  "quote",

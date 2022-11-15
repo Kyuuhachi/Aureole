@@ -479,7 +479,7 @@ fn gather_top(input: Top) -> Result<Ctx> {
 				ctx.reads.push(ReadArm {
 					span,
 					games: games.clone(),
-					body: pq!{span=> |__f| { #(#read)* } },
+					body: pq!{span=> |__f| #read },
 				});
 			}
 		}
@@ -521,7 +521,7 @@ fn get_games(attrs: &mut DefAttributes, all_games: &[Ident], n: &mut [usize], nu
 	Ok(games)
 }
 
-fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Vec<Stmt> {
+fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block {
 	let mut read = Vec::<Stmt>::new();
 	let span = arm.span();
 
@@ -657,6 +657,12 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Vec<S
 				todo!()
 			}
 			(Arg::Tail(arg), comma) => {
+				let span = arg.span();
+
+				if let Some(comma) = comma {
+					Diagnostic::spanned(comma.span().unwrap(), Level::Error, "tail must be last").emit();
+				}
+
 				let mut arms = Vec::<Arm>::new();
 				for arm in arg.arms {
 					let mut ictx = ictx.clone();
@@ -666,10 +672,7 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Vec<S
 					ictx.write.push(pq!{arm=> __f.u8(#key); });
 					let span = arm.span();
 					let body = gather_arm(ctx, ictx, arm.def);
-					arms.push(pq!{span=> #key => { #(#body)* } });
-				}
-				if let Some(comma) = comma {
-					Diagnostic::spanned(comma.span().unwrap(), Level::Error, "..match {} must be last").emit();
+					arms.push(pq!{span=> #key => #body });
 				}
 
 				let name = &ictx.ident;
@@ -679,7 +682,10 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Vec<S
 						_v => Err(format!("invalid Insn::{}*: 0x{:02X}", stringify!(#name), _v).into())
 					}
 				}));
-				return read
+				return Block {
+					brace_token: token::Brace { span },
+					stmts: read
+				}
 			}
 		};
 	}
@@ -705,7 +711,10 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Vec<S
 	let ident = &ictx.ident;
 	let args = &ictx.args;
 	read.push(Stmt::Expr(pq!{span=> Ok(Self::#ident(#args)) }));
-	read
+	Block {
+		brace_token: token::Brace { span },
+		stmts: read
+	}
 }
 
 fn to_snake(ident: &Ident) -> Ident {

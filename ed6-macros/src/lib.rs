@@ -41,32 +41,32 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 	let game_expr = &ctx.game_expr;
 	let game_ty = &ctx.game_ty;
 
-	let read = ctx.reads.iter().map(|ReadArm { span, games, body }| {
+	let read: Vec<Arm> = ctx.reads.iter().map(|ReadArm { span, games, body }| {
 		let games_name = games.iter().map(|a| &a.0).collect::<Vec<_>>();
 		let games_hex  = games.iter().map(|a| &a.1).collect::<Vec<_>>();
-		q!{span=>
+		pq!{span=>
 			#((IS::#games_name, #games_hex))|* => {
 				run(__f, #body)
 			}
 		}
-	}).collect::<TokenStream>();
-	let read = quote! {
+	}).collect();
+	let read: ItemFn = pq!{_=>
 		pub fn read<'a>(__f: &mut impl In<'a>, #func_args) -> Result<Self, ReadError> {
 			fn run<'a, I: In<'a>, A>(__f: &mut I, fun: impl FnOnce(&mut I) -> Result<A, ReadError>) -> Result<A, ReadError> {
 				fun(__f)
 			}
 			type IS = #game_ty;
 			match (#game_expr, __f.u8()?) {
-				#read
+				#(#read)*
 				(_g, _v) => Err(format!("invalid Insn on {:?}: 0x{:02X}", _g, _v).into())
 			}
 		}
 	};
 
-	let write = ctx.writes.iter().map(|WriteArm { span, games, ident, args, body }| {
+	let write: Vec<Arm> = ctx.writes.iter().map(|WriteArm { span, games, ident, args, body }| {
 		let games_name = games.iter().map(|a| &a.0).collect::<Vec<_>>();
 		let games_hex  = games.iter().map(|a| &a.1).collect::<Vec<_>>();
-		q!{span=>
+		pq!{span=>
 			(__iset@(#(IS::#games_name)|*), Self::#ident(#args)) => {
 				__f.u8(match __iset {
 					#(IS::#games_name => #games_hex,)*
@@ -75,8 +75,8 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 				run(__f, #body)?;
 			}
 		}
-	}).collect::<TokenStream>();
-	let write = quote! {
+	}).collect();
+	let write: ItemFn = pq! {_=>
 		pub fn write(__f: &mut impl OutDelay, #func_args, __insn: &Insn) -> Result<(), WriteError> {
 			fn run<O: OutDelay>(__f: &mut O, fun: impl FnOnce(&mut O) -> Result<(), WriteError>) -> Result<(), WriteError> {
 				fun(__f)
@@ -84,7 +84,7 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 			type IS = #game_ty;
 			#[allow(unused_parens)]
 			match (#game_expr, __insn) {
-				#write
+				#(#write)*
 				(_is, _i) => return Err(format!("`{}` is not supported on `{:?}`", _i.name(), _is).into())
 			}
 			Ok(())
@@ -93,7 +93,7 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 
 	let doc_insn_table = make_table(&ctx);
 
-	let Insn_body = ctx.defs.iter().map(|Insn { span, attrs, ident, types, aliases, .. }| {
+	let Insn_body: Punctuated<Variant, Token![,]> = ctx.defs.iter().map(|Insn { span, attrs, ident, types, aliases, .. }| -> Variant {
 		let mut predoc = String::new();
 		predoc.push_str("**`");
 		predoc.push_str(&ident.to_string());
@@ -103,12 +103,12 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		}
 		predoc.push_str("\n\n");
 
-		q!{span=>
+		pq!{span=>
 			#[doc = #predoc]
 			#attrs
-			#ident(#(#types),*),
+			#ident(#(#types),*)
 		}
-	}).collect::<TokenStream>();
+	}).collect();
 
 	let main = quote! {
 		#[allow(non_camel_case_types)]
@@ -134,32 +134,32 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 	let InsnArg_names = ctx.arg_types.keys().collect::<Vec<_>>();
 	let InsnArg_types = ctx.arg_types.values().collect::<Vec<_>>();
 
-	let name_body = ctx.defs.iter().map(|Insn { span, ident, .. }| {
-		q!{span=>
+	let name_body: Vec<Arm> = ctx.defs.iter().map(|Insn { span, ident, .. }| {
+		pq!{span=>
 			Self::#ident(..) => stringify!(#ident),
 		}
-	}).collect::<TokenStream>();
+	}).collect();
 
-	let args_body = ctx.defs.iter().map(|Insn { span, ident, args, aliases, .. }| {
-		q!{span=>
+	let args_body: Vec<Arm> = ctx.defs.iter().map(|Insn { span, ident, args, aliases, .. }| {
+		pq!{span=>
 			Self::#ident(#(#args),*) => Box::new([#(Arg::#aliases(#args)),*]),
 		}
-	}).collect::<TokenStream>();
+	}).collect();
 
-	let arg_types_body = ctx.defs.iter().map(|Insn { span, ident, aliases, .. }| {
-		q!{span=>
+	let arg_types_body: Vec<Arm> = ctx.defs.iter().map(|Insn { span, ident, aliases, .. }| {
+		pq!{span=>
 			stringify!(#ident) => Box::new([#(Arg::#aliases),*]),
 		}
-	}).collect::<TokenStream>();
+	}).collect();
 
-	let from_args_body = ctx.defs.iter().map(|Insn { span, ident, args, aliases, .. }| {
-		q!{span=>
+	let from_args_body: Vec<Arm> = ctx.defs.iter().map(|Insn { span, ident, args, aliases, .. }| {
+		pq!{span=>
 			stringify!(#ident) => {
 				#(let #args = if let Some(Arg::#aliases(v)) = it.next() { v } else { return None; };)*
 				Self::#ident(#(#args),*)
 			},
 		}
-	}).collect::<TokenStream>();
+	}).collect();
 
 	let introspection = quote! {
 		#[cfg(not(doc))]
@@ -216,21 +216,21 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		impl Insn {
 			pub fn name(&self) -> &'static str {
 				match self {
-					#name_body
+					#(#name_body)*
 				}
 			}
 
 			pub fn args(&self) -> Box<[InsnArg]> {
 				use InsnArg as Arg;
 				match self {
-					#args_body
+					#(#args_body)*
 				}
 			}
 
 			pub fn args_mut(&mut self) -> Box<[InsnArgMut]> {
 				use InsnArgMut as Arg;
 				match self {
-					#args_body
+					#(#args_body)*
 				}
 			}
 
@@ -238,7 +238,7 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 				use InsnArgOwned as Arg;
 				let name = self.name();
 				let args: Box<[Arg]> = match self {
-					#args_body
+					#(#args_body)*
 				};
 				(name, args)
 			}
@@ -246,7 +246,7 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 			pub fn arg_types(name: &str) -> Option<Box<[InsnArgType]>> {
 				use InsnArgType as Arg;
 				let types: Box<[Arg]> = match name {
-					#arg_types_body
+					#(#arg_types_body)*
 					_ => return None,
 				};
 				Some(types)
@@ -256,7 +256,7 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 				use InsnArgOwned as Arg;
 				let mut it = args.into_iter();
 				let v = match name {
-					#from_args_body
+					#(#from_args_body)*
 					_ => return None,
 				};
 				if let Some(_) = it.next() { return None; }

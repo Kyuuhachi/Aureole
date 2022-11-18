@@ -356,8 +356,8 @@ ed6_macros::bytecode! {
 		}),
 
 		Video(match {
-			0 => Play(String alias AviFileRef, u16_not_in_fc(iset) -> u16, u16_not_in_fc(iset) -> u16), // [movie(MOVIE_START)]
-			1 => End(u8, u16_not_in_fc(iset) -> u16, u16_not_in_fc(iset) -> u16), // [movie(MOVIE_END)], probably the 0 is the null terminator of an empty string
+			0 => Play(String alias AviFileRef, { IS::Fc|IS::FcEvo => const 0u16, _ => u16 }, { IS::Fc|IS::FcEvo => const 0u16, _ => u16 }), // [movie(MOVIE_START)]
+			1 => End(u8, { IS::Fc|IS::FcEvo => const 0u16, _ => u16 }, { IS::Fc|IS::FcEvo => const 0u16, _ => u16 }), // [movie(MOVIE_END)], probably the 0 is the null terminator of an empty string
 		}),
 
 		ReturnToTitle(u8),
@@ -435,7 +435,7 @@ ed6_macros::bytecode! {
 
 		#[game(Fc)] skip!(3),
 		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo)] VisLoad(u8 alias VisId, i16,i16,u16,u16, i16,i16,u16,u16, i16,i16,u16,u16, u32 as Color, u8, String),
-		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo)] VisColor(u8 alias VisId, u8, u32 as Color, u32 alias Time, u32, u32_only_fc_evo(iset) -> u32),
+		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo)] VisColor(u8 alias VisId, u8, u32 as Color, u32 alias Time, u32, { IS::FcEvo => u32, _ => const 0u32 }),
 		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo)] VisDispose(u8, u8 alias VisId, u8),
 
 		#[game(Fc,FcEvo)] skip!(19),
@@ -775,42 +775,6 @@ mod text {
 
 	pub(super) fn write(f: &mut impl Out, v: &Text) -> Result<(), WriteError> {
 		crate::text::Text::write(f, v)
-	}
-}
-
-mod u16_not_in_fc {
-	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet) -> Result<u16, ReadError> {
-		match iset {
-			InstructionSet::Fc | InstructionSet::FcEvo => Ok(0),
-			_ => Ok(f.u16()?)
-		}
-	}
-
-	pub(super) fn write(f: &mut impl Out, iset: InstructionSet, v: &u16) -> Result<(), WriteError> {
-		match iset {
-			InstructionSet::Fc | InstructionSet::FcEvo => ensure!(*v == 0, "{v} must be 0"),
-			_ => f.u16(*v)
-		}
-		Ok(())
-	}
-}
-
-mod u32_only_fc_evo {
-	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet) -> Result<u32, ReadError> {
-		match iset {
-			InstructionSet::FcEvo => Ok(f.u32()?),
-			_ => Ok(0)
-		}
-	}
-
-	pub(super) fn write(f: &mut impl Out, iset: InstructionSet, v: &u32) -> Result<(), WriteError> {
-		match iset {
-			InstructionSet::FcEvo => f.u32(*v),
-			_ => ensure!(*v == 0, "{v} must be 0"),
-		}
-		Ok(())
 	}
 }
 

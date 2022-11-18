@@ -745,7 +745,7 @@ pub(super) mod char_attr {
 mod file_ref {
 	use super::*;
 	pub(super) fn read<'a>(f: &mut impl In<'a>, lookup: &dyn Lookup) -> Result<String, ReadError> {
-		Ok(lookup.name(f.u32()?)?.to_owned())
+		Ok(lookup.name(f.u32()?)?)
 	}
 
 	pub(super) fn write(f: &mut impl Out, lookup: &dyn Lookup, v: &str) -> Result<(), WriteError> {

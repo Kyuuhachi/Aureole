@@ -76,17 +76,8 @@ pub enum Arg {
 #[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct ArgStandard {
 	pub source: Source,
-	#[parse(|input| parse_while(input, |input| input.peek(Token![as])))]
-	#[to_tokens(|tokens, val| tokens.append_all(val))]
-	pub ty: Vec<ArgTy>,
 	#[parse(|input| parse_if(input, |input| input.peek(kw::alias)))]
 	pub alias: Option<ArgAlias>,
-}
-
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
-pub struct ArgTy {
-	pub as_token: Token![as],
-	pub ty: Box<Type>,
 }
 
 #[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
@@ -95,22 +86,47 @@ pub struct ArgAlias {
 	pub ident: Ident,
 }
 
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+#[derive(Clone, Debug, syn_derive::ToTokens)]
 pub enum Source {
-	#[parse(peek_func = |i| i.peek2(token::Paren))]
 	Call(SourceCall),
 	Simple(Ident),
+	Cast(SourceCast),
+}
+
+impl Parse for Source {
+	fn parse(input: ParseStream) -> Result<Self> {
+		let mut source = if input.peek2(token::Paren) {
+			Source::Call(input.parse()?)
+		} else {
+			Source::Simple(input.parse()?)
+		};
+		while input.peek(Token![as]) {
+			source = Source::Cast(SourceCast {
+				source: Box::new(source),
+				as_token: input.parse()?,
+				ty: input.parse()?,
+			})
+		}
+		Ok(source)
+	}
 }
 
 #[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct SourceCall {
-	pub name: Ident,
+	pub ident: Ident,
 	#[syn(parenthesized)]
 	pub paren_token: token::Paren,
 	#[syn(in = paren_token)]
 	#[parse(Punctuated::parse_terminated)]
 	pub args: Punctuated<Box<Expr>, Token![,]>,
 	pub arrow_token: Token![->],
+	pub ty: Box<Type>,
+}
+
+#[derive(Clone, Debug, syn_derive::ToTokens)]
+pub struct SourceCast {
+	pub source: Box<Source>,
+	pub as_token: Token![as],
 	pub ty: Box<Type>,
 }
 
@@ -148,9 +164,6 @@ pub struct SplitArm {
 	pub pat: Pat,
 	pub arrow_token: Token![=>],
 	pub source: Source,
-	#[parse(|input| parse_while(input, |input| input.peek(Token![as])))]
-	#[to_tokens(|tokens, val| tokens.append_all(val))]
-	pub ty: Vec<ArgTy>,
 }
 
 #[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
@@ -283,14 +296,6 @@ impl std::ops::Deref for Attributes {
 
 impl std::ops::DerefMut for Attributes {
 	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
-}
-
-fn parse_while<T: Parse>(input: ParseStream, cond: fn(ParseStream) -> bool) -> Result<Vec<T>> {
-	let mut xs = Vec::new();
-	while cond(input) {
-		xs.push(input.parse()?)
-	}
-	Ok(xs)
 }
 
 fn parse_if<T: Parse>(input: ParseStream, cond: fn(ParseStream) -> bool) -> Result<Option<T>> {

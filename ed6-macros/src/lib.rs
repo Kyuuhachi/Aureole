@@ -530,120 +530,26 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 			(Arg::Standard(arg), _) => {
 				let varname = format_ident!("_{}", ictx.args.len(), span=arg.span());
 
-				let mut types = Vec::<Type>::new();
-				types.push(match &arg.source {
-					Source::Simple(name) => {
-						pq!{name=> #name }
-					}
-					Source::Call(a) => {
-						let ty = &a.ty;
-						pq!{ty=> #ty }
-					}
-				});
-				for ty in &arg.ty {
-					let ty_ = &ty.ty;
-					types.push(pq!{ty=> #ty_});
-				}
-
-				{
-					let mut val: Expr = match &arg.source {
-						Source::Simple(name) => {
-							let name = to_snake(name);
-							pq!{name=> __f.#name()? }
-						},
-						Source::Call(a) => {
-							let name = &a.name;
-							let mut args = Punctuated::<Expr, Token![,]>::new();
-							args.push(pq!{a=> __f });
-							for e in &a.args {
-								args.push(
-									if let Expr::Path(ExprPath { attrs, qself: None, path }) = &**e
-										&& attrs.is_empty()
-										&& let Some(ident) = path.get_ident()
-									{
-										if ictx.args.iter().any(|a| a == ident) {
-											pq!{ident=> &#ident }
-										} else {
-											pq!{ident=> #ident }
-										}
-									} else {
-										let v = ictx.args.iter();
-										pq!{e=> #[allow(clippy::let_and_return)] { #(let #v = &#v;)* #e } }
-									}
-								);
-							}
-							pq!{a=> #name::read(#args)? }
-						},
-					};
-					for ty in types.iter().skip(1) {
-						val = pq!{ty=> cast::<_, #ty>(#val)? };
-					}
-					read.push(pq!{arg=> let #varname = #val; });
-				}
-
-				{
-					let mut val: Expr = pq!{varname=> #varname };
-					if let Source::Simple(a) = &arg.source {
-						if a != "String" {
-							val = pq!{arg=> *#val };
-						}
-					}
-					for ty in types.iter().rev().skip(1) {
-						val = pq!{ty=> cast::<_, #ty>(#val)? };
-					}
-					val = match &arg.source {
-						Source::Simple(name) => {
-							let name = to_snake(name);
-							pq!{name=> __f.#name(#val) }
-						},
-						Source::Call(a) => {
-							let name = &a.name;
-							let mut args = Punctuated::<Expr, Token![,]>::new();
-							args.push(pq!{a=> __f });
-							for e in &a.args {
-								args.push(pq!{e=> #e })
-							}
-							args.push(val);
-							pq!{a=> #name::write(#args)? }
-						},
-					};
-					if let Source::Simple(a) = &arg.source {
-						if a == "String" {
-							val = pq!{arg=> #val? };
-						}
-					}
-					ictx.write.push(pq!{arg=> #val; });
-				}
-
-				let ty = if let Some(ty) = &arg.ty.last() {
-					ty.ty.clone()
-				} else {
-					match &arg.source {
-						Source::Simple(ident) => pq!{ _ => #ident },
-						Source::Call(s) => s.ty.clone(),
-					}
-				};
-				let alias = 'a: {
-					let ty = if let Some(alias) = &arg.alias {
-						break 'a alias.ident.clone();
-					} else if let Some(ty) = &arg.ty.last() {
-						&ty.ty
+				let ty = source_ty(&arg.source);
+				let alias = arg.alias.as_ref().map_or_else(|| {
+					if let Type::Path(ty) = &*ty && ty.qself.is_none() && let Some(ident) = ty.path.get_ident() {
+						ident.clone()
 					} else {
-						match &arg.source {
-							Source::Simple(ident) => break 'a ident.clone(),
-							Source::Call(s) => &s.ty,
-						}
-					};
-
-					if let Type::Path(ty) = Box::as_ref(ty) {
-						if let Some(ident) = ty.path.get_ident() {
-							break 'a ident.clone()
-						}
+						Diagnostic::spanned(arg.span().unwrap(), Level::Error, "cannot determine alias").emit();
+						pq!{arg=> _no_alias}
 					}
+				}, |a| a.ident.clone());
 
-					Diagnostic::spanned(ty.span().unwrap(), Level::Error, "invalid identifier").emit();
-					Ident::new("__error", Span::call_site())
+				let read_expr = read_source(&arg.source, &ictx.args.iter().collect::<Vec<_>>());
+				read.push(pq!{arg=> let #varname = #read_expr; });
+
+				let write_init = match &arg.source {
+					Source::Simple(a) if a != "String" => pq!{arg=> *#varname },
+					Source::Cast(_) => pq!{arg=> *#varname },
+					_ => pq!{arg=> #varname },
 				};
+				let write_expr = write_source(&arg.source, write_init);
+				ictx.write.push(pq!{arg=> #write_expr; });
 
 				ictx.args.push(varname.clone());
 				ictx.aliases.push(alias.clone());
@@ -714,6 +620,78 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 	Block {
 		brace_token: token::Brace { span },
 		stmts: read
+	}
+}
+
+fn source_ty(source: &Source) -> Box<Type> {
+	match source {
+		Source::Simple(source) => pq!{source=> #source },
+		Source::Call(source) => source.ty.clone(),
+		Source::Cast(source) => source.ty.clone(),
+	}
+}
+
+fn write_source(source: &Source, val: Expr) -> Expr {
+	match source {
+		Source::Simple(source) => {
+			let name = to_snake(source);
+			if source == "String" {
+				pq!{source=> __f.#name(#val)? }
+			} else {
+				pq!{source=> __f.#name(#val) }
+			}
+		}
+		Source::Call(source) => {
+			let mut args = Punctuated::<Expr, Token![,]>::new();
+			args.push(pq!{source=> __f });
+			for e in &source.args {
+				args.push(pq!{e=> #e })
+			}
+			args.push(val);
+			let ident = &source.ident;
+			pq!{source=> #ident::write(#args)? }
+		}
+		Source::Cast(source) => {
+			let ty = &source.ty;
+			write_source(&source.source, pq! {source=> cast::<#ty, _>(#val)? })
+		}
+	}
+}
+
+fn read_source(source: &Source, argnames: &[&Ident]) -> Expr {
+	match source {
+		Source::Simple(source) => {
+			let name = to_snake(source);
+			pq!{source=> __f.#name()? }
+		}
+		Source::Call(source) => {
+			let mut args = Punctuated::<Expr, Token![,]>::new();
+			args.push(pq!{source=> __f });
+			for e in &source.args {
+				args.push(
+					if let Expr::Path(ExprPath { attrs, qself: None, path }) = &**e
+						&& attrs.is_empty()
+						&& let Some(ident) = path.get_ident()
+					{
+						if argnames.iter().any(|a| &ident == a) {
+							pq!{ident=> &#ident }
+						} else {
+							pq!{ident=> #ident }
+						}
+					} else {
+						let v = argnames.iter();
+						pq!{e=> #[allow(clippy::let_and_return)] { #(let #v = &#v;)* #e } }
+					}
+				);
+			}
+			let ident = &source.ident;
+			pq!{source=> #ident::read(#args)? }
+		}
+		Source::Cast(source) => {
+			let ty = &source.ty;
+			let expr = read_source(&source.source, argnames);
+			pq! {source=> cast::<_, #ty>(#expr)? }
+		}
 	}
 }
 

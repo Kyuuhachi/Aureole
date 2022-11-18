@@ -283,6 +283,7 @@ struct InwardContext {
 	ident: Ident,
 	attrs: Attributes,
 	args: Punctuated<Ident, Token![,]>,
+	args2: Punctuated<Ident, Token![,]>,
 	aliases: Vec<Ident>,
 	types: Vec<Type>,
 	games: GameSpec,
@@ -470,6 +471,7 @@ fn gather_top(input: Top) -> Result<Ctx> {
 					ident: def.ident.clone(),
 					attrs: def.attrs.other.clone(),
 					args: Punctuated::new(),
+					args2: Punctuated::new(),
 					aliases: Vec::new(),
 					types: Vec::new(),
 					games: games.clone(),
@@ -529,9 +531,9 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 		match pair.into_tuple() {
 			(Arg::Standard(arg), _) => {
 				let varname = format_ident!("_{}", ictx.args.len(), span=arg.span());
+				let varname2 = format_ident!("__{}", ictx.args.len(), span=arg.span());
 
-				let argnames = ictx.args.iter().collect::<Vec<_>>();
-				let read_expr = read_source(&arg.source, &argnames);
+				let read_expr = read_source(&arg.source);
 
 				let write_init = match &arg.source {
 					Source::Simple(a) if a != "String" => pq!{arg=> *#varname },
@@ -541,7 +543,9 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 				let write_expr = write_source(&arg.source, write_init);
 
 				let ty = source_ty(&arg.source);
-				read.push(pq!{arg=> let #varname = #read_expr; });
+
+				read.push(pq!{arg=> let #varname2 = #read_expr; });
+				read.push(pq!{arg=> let #varname = &#varname2; });
 				ictx.write.push(pq!{arg=> #write_expr; });
 
 				let alias = arg.alias.as_ref().map_or_else(|| {
@@ -553,7 +557,8 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 					}
 				}, |a| a.ident.clone());
 
-				ictx.args.push(varname.clone());
+				ictx.args.push(varname);
+				ictx.args2.push(varname2);
 				ictx.aliases.push(alias.clone());
 				ictx.types.push((*ty).clone());
 				if !ctx.arg_types.contains_key(&alias) {
@@ -563,8 +568,8 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 			}
 			(Arg::Split(arg), _) => {
 				let varname = format_ident!("_{}", ictx.args.len(), span=arg.span());
+				let varname2 = format_ident!("__{}", ictx.args.len(), span=arg.span());
 
-				let argnames = ictx.args.iter().collect::<Vec<_>>();
 				let mut writes = Vec::<Arm>::new();
 				let mut reads = Vec::<Arm>::new();
 				let mut types = std::collections::HashSet::<Box<Type>>::new();
@@ -572,7 +577,7 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 					let pat = &arm.pat;
 					let guard = &arm.guard;
 
-					let read_expr = read_source(&arm.source, &argnames);
+					let read_expr = read_source(&arm.source);
 
 					let write_init = match &arm.source {
 						Source::Simple(a) if a != "String" => pq!{arm=> *#varname },
@@ -595,8 +600,12 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 				};
 
 				let game_expr = &ctx.game_expr;
-				read.push(pq!{arg=> let #varname = match #game_expr { #(#reads)* }; });
-				ictx.write.push(pq!{arg=> match #game_expr { #(#writes)* } });
+				let read_expr: Box<Expr> = pq!{arg=> match #game_expr { #(#reads)* } };
+				let write_expr: Box<Expr> = pq!{arg=> match #game_expr { #(#writes)* } };
+
+				read.push(pq!{arg=> let #varname2 = #read_expr; });
+				read.push(pq!{arg=> let #varname = &#varname2; });
+				ictx.write.push(pq!{arg=> #write_expr; });
 
 				let alias = arg.alias.as_ref().map_or_else(|| {
 					if let Type::Path(ty) = &*ty && ty.qself.is_none() && let Some(ident) = ty.path.get_ident() {
@@ -607,7 +616,8 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 					}
 				}, |a| a.ident.clone());
 
-				ictx.args.push(varname.clone());
+				ictx.args.push(varname);
+				ictx.args2.push(varname2);
 				ictx.aliases.push(alias.clone());
 				ictx.types.push((*ty).clone());
 				if !ctx.arg_types.contains_key(&alias) {
@@ -668,7 +678,7 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 	});
 
 	let ident = &ictx.ident;
-	let args = &ictx.args;
+	let args = &ictx.args2;
 	read.push(Stmt::Expr(pq!{span=> Ok(Self::#ident(#args)) }));
 	Block {
 		brace_token: token::Brace { span },
@@ -721,7 +731,7 @@ fn write_source(source: &Source, val: Expr) -> Expr {
 	}
 }
 
-fn read_source(source: &Source, argnames: &[&Ident]) -> Expr {
+fn read_source(source: &Source) -> Expr {
 	match source {
 		Source::Simple(source) => {
 			let name = to_snake(source);
@@ -731,21 +741,7 @@ fn read_source(source: &Source, argnames: &[&Ident]) -> Expr {
 			let mut args = Punctuated::<Expr, Token![,]>::new();
 			args.push(pq!{source=> __f });
 			for e in &source.args {
-				args.push(
-					if let Expr::Path(ExprPath { attrs, qself: None, path }) = &**e
-						&& attrs.is_empty()
-						&& let Some(ident) = path.get_ident()
-					{
-						if argnames.iter().any(|a| &ident == a) {
-							pq!{ident=> &#ident }
-						} else {
-							pq!{ident=> #ident }
-						}
-					} else {
-						let v = argnames.iter();
-						pq!{e=> #[allow(clippy::let_and_return)] { #(let #v = &#v;)* #e } }
-					}
-				);
+				args.push(pq!{e=> #e })
 			}
 			let ident = &source.ident;
 			pq!{source=> #ident::read(#args)? }
@@ -756,7 +752,7 @@ fn read_source(source: &Source, argnames: &[&Ident]) -> Expr {
 		}
 		Source::Cast(source) => {
 			let ty = &source.ty;
-			let expr = read_source(&source.source, argnames);
+			let expr = read_source(&source.source);
 			pq! {source=> cast::<_, #ty>(#expr)? }
 		}
 	}

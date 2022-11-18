@@ -117,7 +117,11 @@ ed6_macros::bytecode! {
 		PartyAddArt(u8 as Member, u16 as MagicId),
 		PartyAddCraft(u8 as Member, u16 as MagicId),
 		PartyAddSCraft(u8 as Member, u16 as MagicId),
-		PartySetSlot(u8 as Member, u8, party_set_slot(iset, _1) -> i8), // merged with FC's PartyUnlockSlot
+		PartySetSlot(u8 as Member, u8, {
+			IS::Fc|IS::FcEvo => u8,
+			_ if (0x7F..=0xFE).contains(_1) => u8,
+			_ => const 0u8
+		}), // merged with FC's PartyUnlockSlot
 
 		SepithAdd(u8 as Element alias SepithElement, u16),
 		SepithRemove(u8 as Element alias SepithElement, u16),
@@ -129,7 +133,10 @@ ed6_macros::bytecode! {
 		ItemRemove(u16 as ItemId, u16), // [release_item]
 		ItemHas(u16 as ItemId, { IS::Fc|IS::FcEvo => const 0u8, _ => u8 }), // or is it ItemGetCount?
 
-		PartyEquip(u8 as Member, u16 as ItemId, party_equip_slot(iset, _1) -> i8),
+		PartyEquip(u8 as Member, u16 as ItemId, {
+			IS::Fc|IS::FcEvo if !(600..=799).contains(&_1.0) => const 0u8,
+			_ => u8,
+		}),
 		PartyPosition(u8 as Member),
 
 		ForkFunc(u16 as CharId, u8 alias ForkId, func_ref() -> FuncRef), // [execute]
@@ -680,46 +687,6 @@ mod fork_loop {
 		f.label(l2_);
 		write_raw_insn(f, iset, lookup, RawOInsn::Insn(&Insn::NextFrame()))?;
 		write_raw_insn(f, iset, lookup, RawOInsn::Goto(l1c))?;
-		Ok(())
-	}
-}
-
-mod party_equip_slot {
-	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet, arg1: &ItemId) -> Result<i8, ReadError> {
-		if !(600..800).contains(&arg1.0) && matches!(iset, InstructionSet::Fc|InstructionSet::FcEvo) {
-			Ok(-1)
-		} else {
-			Ok(f.i8()?)
-		}
-	}
-
-	pub(super) fn write(f: &mut impl Out, iset: InstructionSet, arg1: &ItemId, v: &i8) -> Result<(), WriteError> {
-		if !(600..800).contains(&arg1.0) && matches!(iset, InstructionSet::Fc|InstructionSet::FcEvo) {
-			ensure!(*v == -1, "invalid PartyEquipSlot");
-		} else {
-			f.i8(*v);
-		}
-		Ok(())
-	}
-}
-
-mod party_set_slot {
-	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet, arg1: &u8) -> Result<i8, ReadError> {
-		if !(0x7F..0xFF).contains(arg1) && !matches!(iset, InstructionSet::Fc|InstructionSet::FcEvo) {
-			Ok(-1)
-		} else {
-			Ok(f.i8()?)
-		}
-	}
-
-	pub(super) fn write(f: &mut impl Out, iset: InstructionSet, arg1: &u8, v: &i8) -> Result<(), WriteError> {
-		if !(0x7F..0xFF).contains(arg1) && !matches!(iset, InstructionSet::Fc|InstructionSet::FcEvo) {
-			ensure!(*v == -1, "invalid PartySetSlot");
-		} else {
-			f.i8(*v);
-		}
 		Ok(())
 	}
 }

@@ -530,7 +530,20 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 			(Arg::Standard(arg), _) => {
 				let varname = format_ident!("_{}", ictx.args.len(), span=arg.span());
 
+				let argnames = ictx.args.iter().collect::<Vec<_>>();
+				let read_expr = read_source(&arg.source, &argnames);
+
+				let write_init = match &arg.source {
+					Source::Simple(a) if a != "String" => pq!{arg=> *#varname },
+					Source::Cast(_) => pq!{arg=> *#varname },
+					_ => pq!{arg=> #varname },
+				};
+				let write_expr = write_source(&arg.source, write_init);
+
 				let ty = source_ty(&arg.source);
+				read.push(pq!{arg=> let #varname = #read_expr; });
+				ictx.write.push(pq!{arg=> #write_expr; });
+
 				let alias = arg.alias.as_ref().map_or_else(|| {
 					if let Type::Path(ty) = &*ty && ty.qself.is_none() && let Some(ident) = ty.path.get_ident() {
 						ident.clone()
@@ -539,17 +552,6 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 						pq!{arg=> _no_alias}
 					}
 				}, |a| a.ident.clone());
-
-				let read_expr = read_source(&arg.source, &ictx.args.iter().collect::<Vec<_>>());
-				read.push(pq!{arg=> let #varname = #read_expr; });
-
-				let write_init = match &arg.source {
-					Source::Simple(a) if a != "String" => pq!{arg=> *#varname },
-					Source::Cast(_) => pq!{arg=> *#varname },
-					_ => pq!{arg=> #varname },
-				};
-				let write_expr = write_source(&arg.source, write_init);
-				ictx.write.push(pq!{arg=> #write_expr; });
 
 				ictx.args.push(varname.clone());
 				ictx.aliases.push(alias.clone());
@@ -560,7 +562,58 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 				}
 			}
 			(Arg::Split(arg), _) => {
-				todo!()
+				let varname = format_ident!("_{}", ictx.args.len(), span=arg.span());
+
+				let argnames = ictx.args.iter().collect::<Vec<_>>();
+				let mut writes = Vec::<Arm>::new();
+				let mut reads = Vec::<Arm>::new();
+				let mut types = std::collections::HashSet::<Box<Type>>::new();
+				for arm in &arg.arms {
+					let pat = &arm.pat;
+					let guard = &arm.guard;
+
+					let read_expr = read_source(&arm.source, &argnames);
+
+					let write_init = match &arm.source {
+						Source::Simple(a) if a != "String" => pq!{arm=> *#varname },
+						Source::Cast(_) => pq!{arm=> *#varname },
+						_ => pq!{arm=> #varname },
+					};
+					let write_expr = write_source(&arm.source, write_init);
+
+					let ty = source_ty(&arm.source);
+					reads.push(pq!{arm=> #pat #guard => #read_expr, });
+					writes.push(pq!{arm=> #pat #guard => #write_expr, });
+					types.insert(ty);
+				}
+
+				let ty = if types.len() == 1 {
+					types.iter().next().unwrap().clone()
+				} else {
+					Diagnostic::spanned(arg.span().unwrap(), Level::Error, "inconsistent types").emit();
+					pq!{arg => ()}
+				};
+
+				let game_expr = &ctx.game_expr;
+				read.push(pq!{arg=> let #varname = match #game_expr { #(#reads)* }; });
+				ictx.write.push(pq!{arg=> match #game_expr { #(#writes)* } });
+
+				let alias = arg.alias.as_ref().map_or_else(|| {
+					if let Type::Path(ty) = &*ty && ty.qself.is_none() && let Some(ident) = ty.path.get_ident() {
+						ident.clone()
+					} else {
+						Diagnostic::spanned(arg.span().unwrap(), Level::Error, "cannot determine alias").emit();
+						pq!{arg=> _no_alias}
+					}
+				}, |a| a.ident.clone());
+
+				ictx.args.push(varname.clone());
+				ictx.aliases.push(alias.clone());
+				ictx.types.push((*ty).clone());
+				if !ctx.arg_types.contains_key(&alias) {
+					// collisions will be errored about at type checking
+					ctx.arg_types.insert(alias.clone(), ty);
+				}
 			}
 			(Arg::Tail(arg), comma) => {
 				let span = arg.span();
@@ -627,6 +680,7 @@ fn source_ty(source: &Source) -> Box<Type> {
 	match source {
 		Source::Simple(source) => pq!{source=> #source },
 		Source::Call(source) => source.ty.clone(),
+		Source::Const(source) => if source.lit.suffix().is_empty() { pq!{_=> usize } } else { parse_str(source.lit.suffix()).unwrap() },
 		Source::Cast(source) => source.ty.clone(),
 	}
 }
@@ -650,6 +704,15 @@ fn write_source(source: &Source, val: Expr) -> Expr {
 			args.push(val);
 			let ident = &source.ident;
 			pq!{source=> #ident::write(#args)? }
+		}
+		Source::Const(source) => {
+			let lit = &source.lit;
+			pq!{source=> {
+				let v = #val;
+				if v != &#lit {
+					return Err(format!("{:?} must be {:?}", v, #lit).into());
+				}
+			} }
 		}
 		Source::Cast(source) => {
 			let ty = &source.ty;
@@ -686,6 +749,10 @@ fn read_source(source: &Source, argnames: &[&Ident]) -> Expr {
 			}
 			let ident = &source.ident;
 			pq!{source=> #ident::read(#args)? }
+		}
+		Source::Const(source) => {
+			let lit = &source.lit;
+			pq!{source => #lit }
 		}
 		Source::Cast(source) => {
 			let ty = &source.ty;

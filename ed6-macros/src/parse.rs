@@ -90,12 +90,15 @@ pub struct ArgAlias {
 pub enum Source {
 	Call(SourceCall),
 	Simple(Ident),
+	Const(SourceConst),
 	Cast(SourceCast),
 }
 
 impl Parse for Source {
 	fn parse(input: ParseStream) -> Result<Self> {
-		let mut source = if input.peek2(token::Paren) {
+		let mut source = if input.peek(Token![const]) {
+			Source::Const(input.parse()?)
+		} else if input.peek2(token::Paren) {
 			Source::Call(input.parse()?)
 		} else {
 			Source::Simple(input.parse()?)
@@ -131,6 +134,12 @@ pub struct SourceCast {
 }
 
 #[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+pub struct SourceConst {
+	pub const_token: Token![const],
+	pub lit: LitInt,
+}
+
+#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct ArgTail {
 	pub match_token: Token![match],
 	#[syn(braced)]
@@ -156,14 +165,52 @@ pub struct ArgSplit {
 	#[syn(in = brace_token)]
 	#[parse(Punctuated::parse_terminated)]
 	pub arms: Punctuated<SplitArm, Token![,]>,
-	pub alias: ArgAlias,
+	#[parse(|input| parse_if(input, |input| input.peek(kw::alias)))]
+	pub alias: Option<ArgAlias>,
 }
 
 #[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct SplitArm {
+	#[parse(multi_pat_with_leading_vert)]
 	pub pat: Pat,
-	pub arrow_token: Token![=>],
+	#[parse(|input| parse_if(input, |input| input.peek(Token![if])))]
+	pub guard: Option<Guard>,
+	pub fat_arrow_token: Token![=>],
 	pub source: Source,
+}
+
+// Copied from syn::pat::parsing
+pub fn multi_pat_with_leading_vert(input: ParseStream) -> Result<Pat> {
+	let leading_vert: Option<Token![|]> = input.parse()?;
+	multi_pat_impl(input, leading_vert)
+}
+
+fn multi_pat_impl(input: ParseStream, leading_vert: Option<Token![|]>) -> Result<Pat> {
+	let mut pat: Pat = input.parse()?;
+	if leading_vert.is_some()
+		|| input.peek(Token![|]) && !input.peek(Token![||]) && !input.peek(Token![|=])
+	{
+		let mut cases = Punctuated::new();
+		cases.push_value(pat);
+		while input.peek(Token![|]) && !input.peek(Token![||]) && !input.peek(Token![|=]) {
+			let punct = input.parse()?;
+			cases.push_punct(punct);
+			let pat: Pat = input.parse()?;
+			cases.push_value(pat);
+		}
+		pat = Pat::Or(PatOr {
+			attrs: Vec::new(),
+			leading_vert,
+			cases,
+		});
+	}
+	Ok(pat)
+}
+
+#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+pub struct Guard {
+	pub if_token: Token![if],
+	pub expr: Box<Expr>,
 }
 
 #[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]

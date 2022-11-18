@@ -108,7 +108,7 @@ ed6_macros::bytecode! {
 		QuestBonusBp(u16 as QuestId, u16),
 		QuestBonusMira(u16 as QuestId, u16),
 
-		PartyAdd(u8 as Member, u8, u8_not_in_fc(iset) -> u8), // [join_party]
+		PartyAdd(u8 as Member, u8, { IS::Fc|IS::FcEvo => const 0u8, _ => u8 }), // [join_party]
 		PartyRemove(u8 as Member, u8), // [separate_party]
 		ScPartyClear(),
 		_Party30(u8 as Member),
@@ -127,7 +127,7 @@ ed6_macros::bytecode! {
 		BpSub(u16),
 		ItemAdd(u16 as ItemId, u16),
 		ItemRemove(u16 as ItemId, u16), // [release_item]
-		ItemHas(u16 as ItemId, u8_not_in_fc(iset) -> u8), // or is it ItemGetCount?
+		ItemHas(u16 as ItemId, { IS::Fc|IS::FcEvo => const 0u8, _ => u8 }), // or is it ItemGetCount?
 
 		PartyEquip(u8 as Member, u16 as ItemId, party_equip_slot(iset, _1) -> i8),
 		PartyPosition(u8 as Member),
@@ -808,24 +808,6 @@ mod text {
 
 	pub(super) fn write(f: &mut impl Out, v: &Text) -> Result<(), WriteError> {
 		crate::text::Text::write(f, v)
-	}
-}
-
-mod u8_not_in_fc {
-	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet) -> Result<u8, ReadError> {
-		match iset {
-			InstructionSet::Fc | InstructionSet::FcEvo => Ok(0),
-			_ => Ok(f.u8()?)
-		}
-	}
-
-	pub(super) fn write(f: &mut impl Out, iset: InstructionSet, v: &u8) -> Result<(), WriteError> {
-		match iset {
-			InstructionSet::Fc | InstructionSet::FcEvo => ensure!(*v == 0, "{v} must be 0"),
-			_ => f.u8(*v)
-		}
-		Ok(())
 	}
 }
 

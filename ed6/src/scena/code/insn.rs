@@ -195,12 +195,14 @@ ed6_macros::bytecode! {
 
 		ObjFrame(u16 alias ObjectId, u32), // [mapobj_frame]
 		ObjPlay(u16 alias ObjectId, u32), // [mapobj_play]
-		#[game(Fc, FcEvo, Sc, ScEvo)] ObjFlagsSet(u16 alias ObjectId, u16 as ObjectFlags), // [mapobj_set_flag]
-		#[game(Fc, FcEvo, Sc, ScEvo)] ObjFlagsUnset(u16 alias ObjectId, u16 as ObjectFlags), // [mapobj_reset_flag]
-		#[deprecated]
-		#[game(Tc, TcEvo)] TcObjFlagsSet(u8 as u16 alias ObjectId, u16 as ObjectFlags, u16), // [mapobj_set_flag]
-		#[deprecated]
-		#[game(Tc, TcEvo)] TcObjFlagsUnset(u8 as u16 alias ObjectId, u16 as ObjectFlags, u16), // [mapobj_reset_flag]
+		ObjFlagsSet(
+			{ IS::Fc|IS::FcEvo|IS::Sc|IS::ScEvo => u16, _ => u8 as u16 } alias ObjectId,
+			{ IS::Fc|IS::FcEvo|IS::Sc|IS::ScEvo => u16 as u32, _ => u32 } as ObjectFlags,
+		), // [mapobj_set_flag]
+		ObjFlagsUnset(
+			{ IS::Fc|IS::FcEvo|IS::Sc|IS::ScEvo => u16, _ => u8 as u16 } alias ObjectId,
+			{ IS::Fc|IS::FcEvo|IS::Sc|IS::ScEvo => u16 as u32, _ => u32 } as ObjectFlags,
+		), // [mapobj_reset_flag]
 		ObjWait(u16 alias ObjectId),
 
 		_74(u16, u32, u16),

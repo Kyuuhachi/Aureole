@@ -54,7 +54,7 @@ newtype!(CharFlags, u16);
 
 // 0x0004 MOF_NODISP
 // 0x0020 MOF_LOOPPLAY
-newtype!(ObjectFlags, u16);
+newtype!(ObjectFlags, u32);
 
 newtype!(Var, u16); // called Work internally
 
@@ -292,7 +292,7 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 		pos: g.pos3()?,
 		radius: g.u32()?,
 		bubble_pos: g.pos3()?,
-		flags: ObjectFlags(g.u16()?),
+		flags: ObjectFlags(cast(g.u16()?)?),
 		func: FuncRef(g.u16()?, g.u16()?),
 		_1: g.u16()?,
 	})).strict()?;
@@ -461,7 +461,7 @@ pub fn write(iset: code::InstructionSet, lookup: &dyn Lookup, scena: &Scena) -> 
 		g.pos3(pos);
 		g.u32(radius);
 		g.pos3(bubble_pos);
-		g.u16(flags.0);
+		g.u16(cast(flags.0)?);
 		g.u16(func.0); g.u16(func.1);
 		g.u16(_1);
 	}

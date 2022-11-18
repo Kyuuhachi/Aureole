@@ -68,8 +68,6 @@ pub struct DefStandard {
 pub enum Arg {
 	#[parse(peek = Token![match])]
 	Tail(ArgTail),
-	#[parse(peek = token::Brace)]
-	Split(ArgSplit),
 	Standard(ArgStandard),
 }
 
@@ -92,11 +90,14 @@ pub enum Source {
 	Simple(Ident),
 	Const(SourceConst),
 	Cast(SourceCast),
+	Split(SourceSplit),
 }
 
 impl Parse for Source {
 	fn parse(input: ParseStream) -> Result<Self> {
-		let mut source = if input.peek(Token![const]) {
+		let mut source = if input.peek(token::Brace) {
+			Source::Split(input.parse()?)
+		} else if input.peek(Token![const]) {
 			Source::Const(input.parse()?)
 		} else if input.peek2(token::Paren) {
 			Source::Call(input.parse()?)
@@ -159,14 +160,12 @@ pub struct TailArm {
 }
 
 #[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
-pub struct ArgSplit {
+pub struct SourceSplit {
 	#[syn(braced)]
 	pub brace_token: token::Brace,
 	#[syn(in = brace_token)]
 	#[parse(Punctuated::parse_terminated)]
 	pub arms: Punctuated<SplitArm, Token![,]>,
-	#[parse(|input| parse_if(input, |input| input.peek(kw::alias)))]
-	pub alias: Option<ArgAlias>,
 }
 
 #[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]

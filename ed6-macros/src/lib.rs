@@ -71,7 +71,7 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 			}
 		}
 	}).collect();
-	let write: ItemFn = pq! {_=>
+	let write: ItemFn = pq!{_=>
 		pub fn write(__f: &mut impl OutDelay, #func_args, __insn: &Insn) -> Result<(), WriteError> {
 			fn run<O: OutDelay>(__f: &mut O, fun: impl FnOnce(&mut O) -> Result<(), WriteError>) -> Result<(), WriteError> {
 				fun(__f)
@@ -533,75 +533,17 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 				let varname = format_ident!("_{}", ictx.args.len(), span=arg.span());
 				let varname2 = format_ident!("__{}", ictx.args.len(), span=arg.span());
 
-				let read_expr = read_source(&arg.source);
+				let read_expr = read_source(ctx, &arg.source);
 
 				let write_init = match &arg.source {
 					Source::Simple(a) if a != "String" => pq!{arg=> *#varname },
 					Source::Cast(_) => pq!{arg=> *#varname },
+					Source::Split(_) => pq!{arg=> *#varname },
 					_ => pq!{arg=> #varname },
 				};
-				let write_expr = write_source(&arg.source, write_init);
+				let write_expr = write_source(ctx, &arg.source, write_init);
 
 				let ty = source_ty(&arg.source);
-
-				read.push(pq!{arg=> let #varname2 = #read_expr; });
-				read.push(pq!{arg=> let #varname = &#varname2; });
-				ictx.write.push(pq!{arg=> #write_expr; });
-
-				let alias = arg.alias.as_ref().map_or_else(|| {
-					if let Type::Path(ty) = &*ty && ty.qself.is_none() && let Some(ident) = ty.path.get_ident() {
-						ident.clone()
-					} else {
-						Diagnostic::spanned(arg.span().unwrap(), Level::Error, "cannot determine alias").emit();
-						pq!{arg=> _no_alias}
-					}
-				}, |a| a.ident.clone());
-
-				ictx.args.push(varname);
-				ictx.args2.push(varname2);
-				ictx.aliases.push(alias.clone());
-				ictx.types.push((*ty).clone());
-				if !ctx.arg_types.contains_key(&alias) {
-					// collisions will be errored about at type checking
-					ctx.arg_types.insert(alias.clone(), ty);
-				}
-			}
-			(Arg::Split(arg), _) => {
-				let varname = format_ident!("_{}", ictx.args.len(), span=arg.span());
-				let varname2 = format_ident!("__{}", ictx.args.len(), span=arg.span());
-
-				let mut writes = Vec::<Arm>::new();
-				let mut reads = Vec::<Arm>::new();
-				let mut types = std::collections::HashSet::<Box<Type>>::new();
-				for arm in &arg.arms {
-					let pat = &arm.pat;
-					let guard = &arm.guard;
-
-					let read_expr = read_source(&arm.source);
-
-					let write_init = match &arm.source {
-						Source::Simple(a) if a != "String" => pq!{arm=> *#varname },
-						Source::Cast(_) => pq!{arm=> *#varname },
-						_ => pq!{arm=> #varname },
-					};
-					let write_expr = write_source(&arm.source, write_init);
-
-					let ty = source_ty(&arm.source);
-					reads.push(pq!{arm=> #pat #guard => #read_expr, });
-					writes.push(pq!{arm=> #pat #guard => #write_expr, });
-					types.insert(ty);
-				}
-
-				let ty = if types.len() == 1 {
-					types.iter().next().unwrap().clone()
-				} else {
-					Diagnostic::spanned(arg.span().unwrap(), Level::Error, "inconsistent types").emit();
-					pq!{arg => ()}
-				};
-
-				let game_expr = &ctx.game_expr;
-				let read_expr: Box<Expr> = pq!{arg=> match #game_expr { #(#reads)* } };
-				let write_expr: Box<Expr> = pq!{arg=> match #game_expr { #(#writes)* } };
 
 				read.push(pq!{arg=> let #varname2 = #read_expr; });
 				read.push(pq!{arg=> let #varname = &#varname2; });
@@ -690,12 +632,32 @@ fn source_ty(source: &Source) -> Box<Type> {
 	match source {
 		Source::Simple(source) => pq!{source=> #source },
 		Source::Call(source) => source.ty.clone(),
-		Source::Const(source) => if source.lit.suffix().is_empty() { pq!{_=> usize } } else { parse_str(source.lit.suffix()).unwrap() },
+		Source::Const(source) => {
+			if source.lit.suffix().is_empty() {
+				Diagnostic::spanned(source.span().unwrap(), Level::Error, "constants must be suffixed").emit();
+				pq!{_=> usize }
+			} else {
+				parse_str(source.lit.suffix()).unwrap()
+			}
+		}
 		Source::Cast(source) => source.ty.clone(),
+		Source::Split(source) => {
+			let mut types = std::collections::HashSet::<Box<Type>>::new();
+			for arm in &source.arms {
+				types.insert(source_ty(&arm.source));
+			}
+
+			if types.len() == 1 {
+				types.iter().next().unwrap().clone()
+			} else {
+				Diagnostic::spanned(source.span().unwrap(), Level::Error, "inconsistent types").emit();
+				pq!{source => () }
+			}
+		},
 	}
 }
 
-fn write_source(source: &Source, val: Expr) -> Expr {
+fn write_source(ctx: &Ctx, source: &Source, val: Expr) -> Expr {
 	match source {
 		Source::Simple(source) => {
 			let name = to_snake(source);
@@ -719,19 +681,31 @@ fn write_source(source: &Source, val: Expr) -> Expr {
 			let lit = &source.lit;
 			pq!{source=> {
 				let v = #val;
-				if v != &#lit {
+				if v != #lit {
 					return Err(format!("{:?} must be {:?}", v, #lit).into());
 				}
 			} }
 		}
 		Source::Cast(source) => {
 			let ty = &source.ty;
-			write_source(&source.source, pq! {source=> cast::<#ty, _>(#val)? })
+			write_source(ctx, &source.source, pq!{source=> cast::<#ty, _>(#val)? })
+		}
+		Source::Split(source) => {
+			let mut writes = Vec::<Arm>::new();
+			for arm in &source.arms {
+				let pat = &arm.pat;
+				let guard = &arm.guard;
+				let write_expr = write_source(ctx, &arm.source, val.clone());
+				writes.push(pq!{arm=> #pat #guard => #write_expr, });
+			}
+
+			let game_expr = &ctx.game_expr;
+			pq!{source=> match #game_expr { #(#writes)* } }
 		}
 	}
 }
 
-fn read_source(source: &Source) -> Expr {
+fn read_source(ctx: &Ctx, source: &Source) -> Expr {
 	match source {
 		Source::Simple(source) => {
 			let name = to_snake(source);
@@ -752,8 +726,20 @@ fn read_source(source: &Source) -> Expr {
 		}
 		Source::Cast(source) => {
 			let ty = &source.ty;
-			let expr = read_source(&source.source);
-			pq! {source=> cast::<_, #ty>(#expr)? }
+			let expr = read_source(ctx, &source.source);
+			pq!{source=> cast::<_, #ty>(#expr)? }
+		}
+		Source::Split(source) => {
+			let mut reads = Vec::<Arm>::new();
+			for arm in &source.arms {
+				let pat = &arm.pat;
+				let guard = &arm.guard;
+				let read_expr = read_source(ctx, &arm.source);
+				reads.push(pq!{arm=> #pat #guard => #read_expr, });
+			}
+
+			let game_expr = &ctx.game_expr;
+			pq!{source=> match #game_expr { #(#reads)* } }
 		}
 	}
 }

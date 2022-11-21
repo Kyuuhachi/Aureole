@@ -369,7 +369,7 @@ ed6_macros::bytecode! {
 		/// In SC onward, this is merged into PartySetSlot.
 		#[game(Fc, FcEvo)] PartyUnlockSlot(u16 as u8 as Member, u8),
 
-		/// The argument is always zero in the scripts. According to the scripts something else happens if it is nonzero, but it is unknown what.
+		/// The argument is always zero in the scripts. According to the asm something else happens if it is nonzero, but it is unknown what.
 		_B6(u8),
 
 		/// This is related to [`PartyAdd`](Self::PartyAdd), but what it actually does is unknown.

@@ -1,12 +1,21 @@
 type Backtrace = Box<std::backtrace::Backtrace>;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(thiserror::Error)]
 pub enum LookupError {
 	#[error("failed to look up {name:?}")]
 	Name { name: String, backtrace: Backtrace },
 
-	#[error("failed to look up {index:08X}")]
+	#[error("failed to look up 0x{index:08X}")]
 	Index { index: u32, backtrace: Backtrace },
+}
+
+impl std::fmt::Debug for LookupError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Name { name, backtrace } => f.debug_struct("Name").field("name", name).field("backtrace", backtrace).finish(),
+            Self::Index { index, backtrace } => f.debug_struct("Index").field("index", &format_args!("0x{:08X}", index)).field("backtrace", backtrace).finish(),
+        }
+    }
 }
 
 impl std::convert::From<&str> for LookupError {
@@ -79,5 +88,108 @@ impl Lookup for crate::archive::Archives {
 
 	fn index(&self, name: &str) -> Result<u32, LookupError> {
 		self.index(name).ok_or_else(|| name.into())
+	}
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ED7Lookup;
+
+impl Lookup for ED7Lookup {
+	fn name(&self, index: u32) -> Result<String, LookupError> {
+		match (index & 0xFF000000) >> 24 {
+			0x00 => {
+				let a = (index & 0xF00000) >> 20;
+				let b = index & 0x0FFFFF;
+				let prefix = match a {
+					7 => "chr",
+					8 => "apl",
+					9 => "monster",
+					_ => return Err(index.into())
+				};
+				Ok(format!("{prefix}/ch{b:05x}.itc"))
+			}
+
+			0x21 => {
+				let a = (index & 0xF00000) >> 20;
+				let b = (index & 0x0FFFF0) >> 4;
+				let c = index & 0x00000F;
+				let prefix = "0atcrme".chars().nth(a as usize).ok_or(index)?;
+				if c == 0 {
+					Ok(format!("scena/{prefix}{b:04x}.bin"))
+				} else {
+					Ok(format!("scena/{prefix}{b:04x}_{c:01x}.bin"))
+				}
+			}
+
+			0x30 => {
+				let a = (index & 0xF00000) >> 20;
+				let b = index & 0x0FFFFF;
+				let prefix = match a {
+					0 => "battle/ms",
+					1 => "battle/as",
+					2 => "battle/bs",
+					_ => return Err(index.into())
+				};
+				Ok(format!("{prefix}/ch{b:05x}.dat"))
+			}
+
+			_ => Err(index.into())
+		}
+	}
+
+	fn index(&self, name: &str) -> Result<u32, LookupError> {
+		fn inner(name: &str) -> Option<u32> {
+			if let Some(name) = name.strip_prefix("chr/ch") {
+				let name = name.strip_suffix(".itc")?;
+				let b = u32::from_str_radix(name, 16).ok()?;
+				return Some(0x00700000 | b)
+			}
+			if let Some(name) = name.strip_prefix("apl/ch") {
+				let name = name.strip_suffix(".itc")?;
+				let b = u32::from_str_radix(name, 16).ok()?;
+				return Some(0x00800000 | b)
+			}
+			if let Some(name) = name.strip_prefix("monster/ch") {
+				let name = name.strip_suffix(".itc")?;
+				let b = u32::from_str_radix(name, 16).ok()?;
+				return Some(0x00900000 | b)
+			}
+
+			if let Some(name) = name.strip_prefix("scena/") {
+				let name = name.strip_suffix(".bin")?;
+				let mut iter = name.chars();
+				let a = iter.next()?;
+				let name = iter.as_str();
+				let a = "0atcrme".chars().position(|x| x == a)? as u32;
+				let (b, c) = if let Some((b, c)) = name.split_once('_') {
+					let b = u32::from_str_radix(b, 16).ok()?;
+					let c = u32::from_str_radix(c, 16).ok()?;
+					(b, c)
+				} else {
+					let b = u32::from_str_radix(name, 16).ok()?;
+					(b, 0)
+				};
+				return Some(0x21000000 | a << 20 | b << 4 | c)
+			}
+
+			if let Some(name) = name.strip_prefix("battle/ms") {
+				let name = name.strip_suffix(".dat")?;
+				let b = u32::from_str_radix(name, 16).ok()?;
+				return Some(0x30000000 | b)
+			}
+			if let Some(name) = name.strip_prefix("battle/as") {
+				let name = name.strip_suffix(".dat")?;
+				let b = u32::from_str_radix(name, 16).ok()?;
+				return Some(0x30100000 | b)
+			}
+			if let Some(name) = name.strip_prefix("battle/bs") {
+				let name = name.strip_suffix(".dat")?;
+				let b = u32::from_str_radix(name, 16).ok()?;
+				return Some(0x30200000 | b)
+			}
+
+			None
+		}
+		inner(name).ok_or_else(|| name.into())
 	}
 }

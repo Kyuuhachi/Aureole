@@ -691,16 +691,17 @@ fn write_source(ctx: &Ctx, source: &Source, val: Expr) -> Expr {
 			write_source(ctx, &source.source, pq!{source=> cast::<#ty, _>(#val)? })
 		}
 		Source::Split(source) => {
+			let def: Stmt = pq!{val=> let _v = #val; };
 			let mut writes = Vec::<Arm>::new();
 			for arm in &source.arms {
 				let pat = &arm.pat;
 				let guard = &arm.guard;
-				let write_expr = write_source(ctx, &arm.source, val.clone());
+				let write_expr = write_source(ctx, &arm.source, pq!{val=> _v});
 				writes.push(pq!{arm=> #pat #guard => #write_expr, });
 			}
 
 			let game_expr = &ctx.game_expr;
-			pq!{source=> match #game_expr { #(#writes)* } }
+			pq!{source=> { #def match #game_expr { #(#writes)* } } }
 		}
 	}
 }

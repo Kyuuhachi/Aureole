@@ -132,23 +132,33 @@ pub fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet, lookup: &dyn Lookup, 
 
 fn read_raw_insn<'a>(f: &mut impl In<'a>, iset: InstructionSet, lookup: &dyn Lookup) -> Result<RawIInsn, ReadError> {
 	let pos = f.pos();
+	fn addr<'a>(f: &mut impl In<'a>, iset: InstructionSet) -> Result<usize, ReadError> {
+		match iset {
+			InstructionSet::Zero => Ok(f.u32()? as usize),
+			_ => Ok(f.u16()? as usize),
+		}
+	}
 	let insn = match f.u8()? {
 		0x02 => {
 			let e = expr::read(f, iset, lookup)?;
-			let l = f.u16()? as usize;
+			let l = addr(f, iset)?;
 			RawIInsn::Unless(e, l)
 		}
 		0x03 => {
-			let l = f.u16()? as usize;
+			let l = addr(f, iset)?;
 			RawIInsn::Goto(l)
 		}
 		0x04 => {
 			let e = expr::read(f, iset, lookup)?;
-			let mut cs = Vec::new();
-			for _ in 0..f.u16()? {
-				cs.push((f.u16()?, f.u16()? as usize));
+			let count = match iset {
+				InstructionSet::Zero => f.u8()? as u16,
+				_ => f.u16()?,
+			};
+			let mut cs = Vec::with_capacity(count as usize);
+			for _ in 0..count {
+				cs.push((f.u16()?, addr(f, iset)?));
 			}
-			let l = f.u16()? as usize;
+			let l = addr(f, iset)?;
 			RawIInsn::Switch(e, cs, l)
 		}
 		_ => {

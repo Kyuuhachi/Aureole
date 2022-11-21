@@ -58,6 +58,10 @@ pub trait InExt<'a>: In<'a> {
 		Ok(self.clone().at(self.u16()? as usize)?)
 	}
 
+	fn ptr32(&mut self) -> Result<Self, ReadError> where Self: Clone {
+		Ok(self.clone().at(self.u32()? as usize)?)
+	}
+
 	fn string(&mut self) -> Result<String, ReadError> {
 		let mut buf = Vec::new();
 		loop {

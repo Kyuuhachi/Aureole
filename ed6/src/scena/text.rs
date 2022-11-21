@@ -1,4 +1,4 @@
-use super::{Scena, Npc, Monster, Trigger, Object, Entry, FuncRef, CharId, Pos2, Pos3};
+use super::{ed6::{Scena, Npc, Monster, Trigger, Object, Entry}, FuncRef, CharId, Pos2, Pos3};
 use super::code::{InsnArg as I, FlatInsn, Label, Insn, Expr, ExprBinop, ExprUnop};
 use super::code::decompile::{decompile, TreeInsn};
 use crate::text::{Text, TextSegment};
@@ -375,7 +375,7 @@ fn label(f: &mut Context, l: &Label) {
 
 fn val(f: &mut Context, a: I) {
 	match a {
-		I::i8(v)  => f.write(&format!("{v}")),
+		// I::i8(v)  => f.write(&format!("{v}")),
 		I::i16(v) => f.write(&format!("{v}")),
 		I::i32(v) => f.write(&format!("{v}")),
 		I::u8(v)  => f.write(&format!("{v}")),
@@ -463,7 +463,7 @@ fn val(f: &mut Context, a: I) {
 		I::Emote(v) => f.write(&format!("{v:?}")),
 		I::MemberAttr(v) => f.write(&format!("{v:?}")),
 		I::QuestTask(v) => f.write(&format!("{v:?}")),
-		I::SepithElement(v) => f.write(&format!("{v:?}")),
+		I::Animation(v) => f.write(&format!("{v:?}")),
 
 		I::QuestList(v)        => f.write(&format!("{v:?}")),
 		I::MandatoryMembers(v) => f.write(&format!("{v:?}")),

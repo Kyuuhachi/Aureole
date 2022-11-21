@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
@@ -10,7 +11,7 @@ use crate::util::*;
 use super::*;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Label { // [Monster]
+pub struct Label {
 	pub name: String,
 	pub pos: (f32, f32, f32),
 	pub flags: u32,
@@ -97,6 +98,33 @@ pub struct Animation {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Battle {
+	flags: u16,
+	level: u16,
+	unk1: u8,
+	vision_range: u8,
+	move_range: u8,
+	can_move: u8,
+	move_speed: u16,
+	unk2: u16,
+	battlefield: String,
+	sepith: Option<[u8; 7]>,
+	setups: Vec<BattleSetup>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BattleSetup {
+	weight: u8,
+	enemies: [Option<String>; 8],
+	placement: u16, // index
+	placement_ambush: u16,
+	bgm: BgmId,
+	bgm_ambush: BgmId, // not entirely sure if this is what it is
+	at_roll: u16, // index
+}
+
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Scena;
 
 pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Result<Scena, ReadError> {
@@ -165,6 +193,9 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 		stand_anim: g.u32()?,
 		walk_anim: g.u32()?,
 	})).strict()?;
+
+	let battle_start = g.pos();
+	let battle_end = anims.pos();
 
 	let (mut g, n) = (triggers, f.u8()? as usize);
 	let triggers = list(n, || Ok(Trigger {
@@ -235,6 +266,81 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 
 	let (mut g, n) = (func_table, func_count);
 	let func_table = list(n as usize, || Ok(g.u32()? as usize)).strict()?;
+
+	let mut at_rolls = Vec::new();
+	let mut at_roll_pos = HashMap::new();
+	let mut placements = Vec::new();
+	let mut placement_pos = HashMap::new();
+	let mut battles = Vec::new();
+	let mut battle_pos = HashMap::new();
+	if battle_start != battle_end {
+		// I can't use anything but heuristics here. That sucks.
+		let mut g = f.clone().at(battle_start)?;
+		while g.pos() < battle_end {
+			// Heuristic: first field of AT rolls is 100
+			if g.clone().u8()? != 100 {
+				break
+			}
+			at_roll_pos.insert(g.pos() as u32, at_rolls.len() as u16);
+			at_rolls.push(g.array::<16>()?);
+		}
+		while g.pos() < battle_end {
+			// if both alternatives and field sepith is zero, it's not a placement
+			if g.pos() + 16+8 <= battle_end && g.clone().at(g.pos()+16)?.u64()? == 0 {
+				break
+			}
+			// if there's a valid AT roll pointer for the first alternative, it's probably not a placement
+			if g.pos() + 64+4 <= battle_end && at_roll_pos.contains_key(&g.clone().at(g.pos()+64)?.u32()?) {
+				break
+			}
+			placement_pos.insert(g.pos() as u16, placements.len() as u16);
+			placements.push(array::<8, _>(|| Ok((g.u8()?, g.u8()?, g.u16()?))).strict()?);
+		}
+		while g.pos() < battle_end {
+			battle_pos.insert(g.pos() as u32, battles.len());
+			battles.push(Battle {
+				flags: g.u16()?,
+				level: g.u16()?,
+				unk1: g.u8()?,
+				vision_range: g.u8()?,
+				move_range: g.u8()?,
+				can_move: g.u8()?,
+				move_speed: g.u16()?,
+				unk2: g.u16()?,
+				battlefield: g.ptr32()?.string()?,
+				sepith: {
+					let mut h = g.ptr32()?;
+					if h.pos() == 0 {
+						None
+					} else {
+						code_end = code_end.min(h.pos());
+						Some(h.array()?)
+					}
+				},
+				setups: {
+					let mut setups = Vec::new();
+					for weight in g.array::<4>()? {
+						if weight == 0 {
+							continue
+						}
+						setups.push(BattleSetup {
+							weight,
+							enemies: array(|| match g.u32()? {
+								0 => Ok(None),
+								n => Ok(Some(lookup.name(n)?))
+							}).strict()?,
+							placement: *placement_pos.get(&g.u16()?).ok_or("invalid placement ref")?,
+							placement_ambush: *placement_pos.get(&g.u16()?).ok_or("invalid placement ref")?,
+							bgm: BgmId(g.u16()?),
+							bgm_ambush: BgmId(g.u16()?),
+							at_roll: *at_roll_pos.get(&g.u32()?).ok_or("invalid at roll ref")?,
+						});
+					}
+					setups
+				},
+			});
+		}
+	}
 
 	let mut functions = Vec::with_capacity(func_table.len());
 	let starts = func_table.iter().copied();

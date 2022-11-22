@@ -128,8 +128,19 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		}
 	};
 
-	let InsnArg_names = ctx.arg_types.keys().collect::<Vec<_>>();
-	let InsnArg_types = ctx.arg_types.values().collect::<Vec<_>>();
+	let mut arg_types = BTreeMap::new();
+	arg_types.insert(Ident::new("String", Span::call_site()), parse_quote! { String });
+	for insn in &ctx.defs {
+		for arg in &insn.args {
+			let alias = arg.alias();
+			if !arg_types.contains_key(&alias) {
+				// collisions will be errored about at type checking
+				arg_types.insert(alias.clone(), arg.ty.clone());
+			}
+		}
+	}
+	let InsnArg_names = arg_types.keys().collect::<Vec<_>>();
+	let InsnArg_types = arg_types.values().collect::<Vec<_>>();
 
 	let name_body: Vec<Arm> = ctx.defs.iter().map(|Insn { span, ident, .. }| {
 		pq!{span=>
@@ -274,7 +285,6 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 }
 
 struct Ctx {
-	arg_types: BTreeMap<Ident, Box<Type>>,
 	func_args: Punctuated<PatType, Token![,]>,
 	games: Vec<Ident>,
 	attrs: Attributes,
@@ -431,7 +441,6 @@ fn gather_top(input: Top) -> Result<Ctx> {
 	let all_games: Box<[Ident]> = games.idents.iter().cloned().collect();
 
 	let mut ctx = Ctx {
-		arg_types: BTreeMap::new(),
 		func_args: input.args,
 		attrs: input.attrs.other,
 		games: games.idents.iter().cloned().collect(),
@@ -441,9 +450,6 @@ fn gather_top(input: Top) -> Result<Ctx> {
 		game_expr: games.expr,
 		game_ty: games.ty,
 	};
-
-	// Used in the dump
-	ctx.arg_types.insert(Ident::new("String", Span::call_site()), parse_quote! { String });
 
 	let mut n = vec![0; games.idents.len()];
 	for item in input.defs {
@@ -570,26 +576,17 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 				};
 				let write_expr = write_source(ctx, &arg.source, write_init);
 
-				let ty = source_ty(&arg.source);
-				let arg_ = InsnArg {
-					span: arg.span(),
-					ty: ty.clone(),
-					alias: arg.alias.as_ref().map(|a| &a.ident).cloned(),
-				};
-
 				read.push(pq!{arg=> let #varname2 = #read_expr; });
 				read.push(pq!{arg=> let #varname = &#varname2; });
 				ictx.write.push(pq!{arg=> #write_expr; });
 
-				let alias = arg_.alias();
-
 				ictx.arg_names.push(varname);
 				ictx.arg_names2.push(varname2);
-				ictx.args.push(arg_);
-				if !ctx.arg_types.contains_key(&alias) {
-					// collisions will be errored about at type checking
-					ctx.arg_types.insert(alias.clone(), ty);
-				}
+				ictx.args.push(InsnArg {
+					span: arg.span(),
+					ty: source_ty(&arg.source),
+					alias: arg.alias.as_ref().map(|a| &a.ident).cloned(),
+				});
 			}
 			(Arg::Tail(arg), comma) => {
 				let span = arg.span();

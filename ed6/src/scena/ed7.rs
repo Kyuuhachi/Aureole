@@ -186,7 +186,7 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 		pos: g.pos3()?,
 		angle: g.i16()?,
 		unk1: g.u16()?,
-		battle: BattleId(g.u16()?),
+		battle: BattleId(cast(g.u16()?)?),
 		flag: Flag(g.u16()?),
 		chcp: g.u16()?,
 		unk2: g.u16()?,

@@ -469,6 +469,7 @@ fn val(f: &mut Context, a: I) {
 		I::MandatoryMembers(v) => f.write(&format!("{v:?}")),
 		I::OptionalMembers(v)  => f.write(&format!("{v:?}")),
 		I::TcMembers(v)        => f.write(&format!("{v:016b}")),
+		I::NpcBattleCombatants(v) => f.write(&format!("{v:?}")),
 
 		I::AviFileRef(v)   => f.write(&format!("{v:?}")),
 		I::EffFileRef(v)   => f.write(&format!("{v:?}")),

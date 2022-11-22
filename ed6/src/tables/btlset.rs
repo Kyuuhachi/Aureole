@@ -8,7 +8,7 @@ use crate::gamedata::Lookup;
 use crate::tables::bgmtbl::BgmId;
 use crate::util::*;
 
-newtype!(BattleId, u16);
+newtype!(BattleId, u32);
 
 #[bitflags]
 #[repr(u16)]
@@ -131,7 +131,7 @@ fn read_battles<'a>(
 	loop {
 		let mut g = f.ptr()?;
 
-		let id = BattleId(g.u16()?);
+		let id = BattleId(cast(g.u16()?)?);
 		let flags: BitFlags<BattleFlag> = cast(g.u16()?)?;
 
 		let unk1 = g.u16()?;
@@ -206,7 +206,7 @@ fn read_auto_battles<'a>(
 	loop {
 		let mut g = f.ptr()?;
 
-		let id = BattleId(g.u16()?);
+		let id = BattleId(cast(g.u16()?)?);
 
 		let unk1 = g.u16()?;
 		let battlefield = read_battlefield(&mut g, &mut battlefields)?;

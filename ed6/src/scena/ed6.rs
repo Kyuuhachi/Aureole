@@ -157,7 +157,7 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 		_1: g.u16()?,
 		flags: CharFlags(g.u16()?),
 		_2: g.i32()?,
-		battle: BattleId(g.u16()?),
+		battle: BattleId(cast(g.u16()?)?),
 		flag: Flag(g.u16()?),
 		_3: g.u16()?,
 	})).strict()?;
@@ -325,7 +325,7 @@ pub fn write(iset: code::InstructionSet, lookup: &dyn Lookup, scena: &Scena) -> 
 		g.u16(_1);
 		g.u16(flags.0);
 		g.i32(_2);
-		g.u16(battle.0);
+		g.u16(cast(battle.0)?);
 		g.u16(flag.0);
 		g.u16(_3);
 	}

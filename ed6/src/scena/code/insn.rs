@@ -28,9 +28,56 @@ ed6_macros::bytecode! {
 		CrossFade(u32 alias Time), // [cross_fade]
 
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)]
-		Battle(u32 as u16 as BattleId, u16, u16, u8, u16, u8 as u16 as CharId),
+		Battle(u32 as BattleId, u16, u16, u8, u16, u8 as u16 as CharId),
+
+		def! ED7Battle(BattleId, u16,u8,u8,u8, u16, u16, CharId),
+		def! ED7NpcBattle(u16,u8,u8,u8, [Option<String>; 8] alias NpcBattleCombatants, u16, u16),
+
 		#[game(Zero)]
-		skip!(1), // TODO ED7Battle is complicated
+		custom! {
+			read => |f| {
+				let ptr = f.u32()?;
+				if ptr != 0xFFFFFFFF {
+					Ok(Self::ED7Battle(
+						BattleId(ptr),
+						f.u16()?, f.u8()?, f.u8()?, f.u8()?,
+						f.u16()?,
+						f.u16()?,
+						CharId(f.u16()?),
+					))
+				} else {
+					Ok(Self::ED7NpcBattle(
+						f.u16()?, f.u8()?, f.u8()?, f.u8()?,
+						array::<8, _>(|| match f.u32()? {
+							0 => Ok(None),
+							n => Ok(Some(lookup.name(n)?))
+						}).strict()?,
+						{
+							f.check(&[0;16])?;
+							f.u16()?
+						},
+						f.u16()?,
+					))
+				}
+			},
+			write ED7Battle(ptr, s1,s2,s3,s4, a1, a2, ch) => |f| {
+				f.u32(ptr.0);
+				f.u16(*s1); f.u8(*s2); f.u8(*s3); f.u8(*s4);
+				f.u16(*a1); f.u16(*a2);
+				f.u16(ch.0);
+				Ok(())
+			},
+			write ED7NpcBattle(s1,s2,s3,s4, c, a1, a2) => |f| {
+				f.u32(0xFFFFFFFF);
+				f.u16(*s1); f.u8(*s2); f.u8(*s3); f.u8(*s4);
+				for c in c {
+					f.u32(c.as_ref().map_or(Ok(0), |a| lookup.index(a))?);
+				}
+				f.array([0;16]);
+				f.u16(*a1); f.u16(*a2);
+				Ok(())
+			},
+		},
 
 		/// Sets whether an entrance (or rather exit), defined in the accompanying `._en` file, is enabled.
 		/// Specifically, it sets the 0x0001 flag.

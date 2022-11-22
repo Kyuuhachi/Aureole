@@ -88,7 +88,9 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 
 	let doc_insn_table = make_table(&ctx);
 
-	let Insn_body: Punctuated<Variant, Token![,]> = ctx.defs.iter().map(|Insn { span, attrs, ident, types, aliases, .. }| -> Variant {
+	let Insn_body: Punctuated<Variant, Token![,]> = ctx.defs.iter().map(|Insn { span, attrs, ident, args, .. }| -> Variant {
+		let types = args.iter().map(|a| &a.ty);
+		let aliases = args.iter().map(|a| a.alias());
 		let mut predoc = String::new();
 		predoc.push_str("**`");
 		predoc.push_str(&ident.to_string());
@@ -135,23 +137,28 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		}
 	}).collect();
 
-	let args_body: Vec<Arm> = ctx.defs.iter().map(|Insn { span, ident, args, aliases, .. }| {
+	let args_body: Vec<Arm> = ctx.defs.iter().map(|Insn { span, ident, args, .. }| {
+		let arg_names = args.iter().enumerate().map(|(i, _)| format_ident!("_{i}")).collect::<Vec<_>>();
+		let aliases = args.iter().map(|a| a.alias());
 		pq!{span=>
-			Self::#ident(#(#args),*) => Box::new([#(Arg::#aliases(#args)),*]),
+			Self::#ident(#(#arg_names),*) => Box::new([#(Arg::#aliases(#arg_names)),*]),
 		}
 	}).collect();
 
-	let arg_types_body: Vec<Arm> = ctx.defs.iter().map(|Insn { span, ident, aliases, .. }| {
+	let arg_types_body: Vec<Arm> = ctx.defs.iter().map(|Insn { span, ident, args, .. }| {
+		let aliases = args.iter().map(|a| a.alias());
 		pq!{span=>
 			stringify!(#ident) => Box::new([#(Arg::#aliases),*]),
 		}
 	}).collect();
 
-	let from_args_body: Vec<Arm> = ctx.defs.iter().map(|Insn { span, ident, args, aliases, .. }| {
+	let from_args_body: Vec<Arm> = ctx.defs.iter().map(|Insn { span, ident, args, .. }| {
+		let arg_names = args.iter().enumerate().map(|(i, _)| format_ident!("_{i}")).collect::<Vec<_>>();
+		let aliases = args.iter().map(|a| a.alias());
 		pq!{span=>
 			stringify!(#ident) => {
-				#(let #args = if let Some(Arg::#aliases(v)) = it.next() { v } else { return None; };)*
-				Self::#ident(#(#args),*)
+				#(let #arg_names = if let Some(Arg::#aliases(v)) = it.next() { v } else { return None; };)*
+				Self::#ident(#(#arg_names),*)
 			},
 		}
 	}).collect();
@@ -282,10 +289,9 @@ struct Ctx {
 struct InwardContext {
 	ident: Ident,
 	attrs: Attributes,
-	args: Punctuated<Ident, Token![,]>,
-	args2: Punctuated<Ident, Token![,]>,
-	aliases: Vec<Ident>,
-	types: Vec<Type>,
+	arg_names: Punctuated<Ident, Token![,]>,
+	arg_names2: Punctuated<Ident, Token![,]>,
+	args: Vec<InsnArg>,
 	games: GameSpec,
 	write: Vec<Stmt>,
 }
@@ -296,9 +302,30 @@ struct Insn {
 	span: Span,
 	ident: Ident,
 	attrs: Attributes,
-	args: Vec<Ident>,
-	aliases: Vec<Ident>,
-	types: Vec<Type>,
+	args: Vec<InsnArg>,
+}
+
+#[derive(Clone)]
+struct InsnArg {
+	span: Span,
+	ty: Box<Type>,
+	alias: Option<Ident>
+}
+
+impl InsnArg {
+	fn alias(&self) -> Ident {
+		match &self.alias {
+			Some(a) => a.clone(),
+			None => {
+				if let Type::Path(ty) = &*self.ty && ty.qself.is_none() && let Some(ident) = ty.path.get_ident() {
+					ident.clone()
+				} else {
+					Diagnostic::spanned(self.span.unwrap(), Level::Error, "cannot determine alias").emit();
+					pq!{self.span=> _no_alias}
+				}
+			}
+		}
+	}
 }
 
 struct ReadArm {
@@ -352,7 +379,8 @@ fn make_table(ctx: &Ctx) -> String {
 				n.node("tr", |n| {
 					n.node("td", |n| {
 						n.attr("style", "text-align: left");
-						for Insn { ident, aliases, ..} in defs {
+						for Insn { ident, args, ..} in defs {
+							let aliases = args.iter().map(|a| a.alias());
 							let mut title = String::new();
 							title.push_str(&ident.to_string());
 							for alias in aliases {
@@ -470,10 +498,9 @@ fn gather_top(input: Top) -> Result<Ctx> {
 				let ictx = InwardContext {
 					ident: def.ident.clone(),
 					attrs: def.attrs.other.clone(),
-					args: Punctuated::new(),
-					args2: Punctuated::new(),
-					aliases: Vec::new(),
-					types: Vec::new(),
+					arg_names: Punctuated::new(),
+					arg_names2: Punctuated::new(),
+					args: Vec::new(),
 					games: games.clone(),
 					write: Vec::new(),
 				};
@@ -544,24 +571,21 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 				let write_expr = write_source(ctx, &arg.source, write_init);
 
 				let ty = source_ty(&arg.source);
+				let arg_ = InsnArg {
+					span: arg.span(),
+					ty: ty.clone(),
+					alias: arg.alias.as_ref().map(|a| &a.ident).cloned(),
+				};
 
 				read.push(pq!{arg=> let #varname2 = #read_expr; });
 				read.push(pq!{arg=> let #varname = &#varname2; });
 				ictx.write.push(pq!{arg=> #write_expr; });
 
-				let alias = arg.alias.as_ref().map_or_else(|| {
-					if let Type::Path(ty) = &*ty && ty.qself.is_none() && let Some(ident) = ty.path.get_ident() {
-						ident.clone()
-					} else {
-						Diagnostic::spanned(arg.span().unwrap(), Level::Error, "cannot determine alias").emit();
-						pq!{arg=> _no_alias}
-					}
-				}, |a| a.ident.clone());
+				let alias = arg_.alias();
 
-				ictx.args.push(varname);
-				ictx.args2.push(varname2);
-				ictx.aliases.push(alias.clone());
-				ictx.types.push((*ty).clone());
+				ictx.arg_names.push(varname);
+				ictx.arg_names2.push(varname2);
+				ictx.args.push(arg_);
 				if !ctx.arg_types.contains_key(&alias) {
 					// collisions will be errored about at type checking
 					ctx.arg_types.insert(alias.clone(), ty);
@@ -605,9 +629,7 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 		span,
 		ident: ictx.ident.clone(),
 		attrs: ictx.attrs,
-		args: ictx.args.iter().cloned().collect(),
-		aliases: ictx.aliases,
-		types: ictx.types,
+		args: ictx.args,
 	});
 
 	let write = ictx.write;
@@ -615,12 +637,12 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 		span,
 		games: ictx.games,
 		ident: ictx.ident.clone(),
-		args: ictx.args.clone(),
+		args: ictx.arg_names.clone(),
 		body: pq!{span=> |__f| { #(#write)* Ok(()) } },
 	});
 
 	let ident = &ictx.ident;
-	let args = &ictx.args2;
+	let args = &ictx.arg_names2;
 	read.push(Stmt::Expr(pq!{span=> Ok(Self::#ident(#args)) }));
 	Block {
 		brace_token: token::Brace { span },

@@ -10,6 +10,7 @@ pub mod kw {
 	syn::custom_keyword!(alias);
 	syn::custom_keyword!(skip);
 	syn::custom_keyword!(custom);
+	syn::custom_keyword!(def);
 	syn::custom_keyword!(read);
 	syn::custom_keyword!(write);
 }
@@ -50,6 +51,8 @@ pub enum Def {
 	Skip(DefSkip),
 	#[parse(peek_func = |i| i.peek(kw::custom) && i.peek2(Token![!]))]
 	Custom(DefCustom),
+	#[parse(peek_func = |i| i.peek(kw::def) && i.peek2(Token![!]))]
+	Def(DefDef),
 	Standard(DefStandard),
 }
 
@@ -261,6 +264,26 @@ pub struct ClauseWrite {
 	pub args: Punctuated<Ident, Token![,]>,
 	pub arrow_token: Token![=>],
 	pub expr: Box<Expr>,
+}
+
+#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+pub struct DefDef {
+	pub attrs: Attributes,
+	pub def_token: kw::def,
+	pub bang_token: Token![!],
+	pub ident: Ident,
+	#[syn(parenthesized)]
+	pub paren_token: token::Paren,
+	#[syn(in = paren_token)]
+	#[parse(Punctuated::parse_terminated)]
+	pub args: Punctuated<DefDefArg, Token![,]>,
+}
+
+#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+pub struct DefDefArg {
+	pub ty: Box<Type>,
+	#[parse(|input| parse_if(input, |input| input.peek(kw::alias)))]
+	pub alias: Option<ArgAlias>,
 }
 
 #[derive(Clone, Debug, syn_derive::ToTokens)]

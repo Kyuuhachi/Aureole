@@ -497,6 +497,19 @@ fn gather_top(input: Top) -> Result<Ctx> {
 					}
 				}
 			}
+			Def::Def(def) => {
+				println!("{:?}", def);
+				ctx.defs.push(Insn {
+					span: def.span(),
+					ident: def.ident,
+					attrs: def.attrs,
+					args: def.args.into_iter().map(|a| InsnArg {
+						span: a.span(),
+						ty: a.ty,
+						alias: a.alias.map(|a| a.ident),
+					}).collect(),
+				});
+			}
 			Def::Standard(mut def) => {
 				let span = def.span();
 				let games = get_games(&mut def.attrs, &all_games, &mut n, 1)?;

@@ -498,7 +498,6 @@ fn gather_top(input: Top) -> Result<Ctx> {
 				}
 			}
 			Def::Def(def) => {
-				println!("{:?}", def);
 				ctx.defs.push(Insn {
 					span: def.span(),
 					ident: def.ident,

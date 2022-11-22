@@ -147,19 +147,11 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 	let look_points = f.ptr()?;
 
 	let func_table = f.ptr()?;
-	let func_count = (f.u16()? / 4) as usize;
+	let func_count = f.u16()? / 4;
 	let anims = f.ptr()?;
 
 	let labels = f.ptr()?;
-
-	let (mut g, n) = (labels, f.u8()? as usize);
-	let labels = list(n, || Ok(Label {
-		pos: (g.f32()?, g.f32()?, g.f32()?),
-		flags: g.u32()?,
-		name: g.ptr32()?.string()?,
-	})).strict()?;
-
-	f.check_u8(0)?;
+	let n_labels = f.u16()?;
 
 	let (mut g, n) = (chcp, f.u8()? as usize);
 	let chcp = list(n, || Ok(match g.u32()? {
@@ -306,7 +298,10 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 				can_move: g.u8()?,
 				move_speed: g.u16()?,
 				unk2: g.u16()?,
-				battlefield: g.ptr32()?.string()?,
+				battlefield: {
+					ensure!(g.ptr32()?.pos() == strings.pos(), "unexpected battlefield ptr");
+					strings.string()?
+				},
 				sepith: {
 					let mut h = g.ptr32()?;
 					if h.pos() == 0 {
@@ -340,6 +335,16 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 		}
 	}
 
+	let (mut g, n) = (labels, n_labels as usize);
+	let labels = list(n, || Ok(Label {
+		pos: (g.f32()?, g.f32()?, g.f32()?),
+		flags: g.u32()?,
+		name: {
+			ensure!(g.ptr32()?.pos() == strings.pos(), "unexpected battlefield ptr");
+			strings.string()?
+		}
+	})).strict()?;
+
 	let mut functions = Vec::with_capacity(func_table.len());
 	let starts = func_table.iter().copied();
 	let ends = func_table.iter().copied().skip(1).map(Some).chain(Some(None));
@@ -347,36 +352,11 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 		functions.push(code::read(&mut f.clone().at(start)?, iset, lookup, end)?);
 	}
 
-	strings.dump().preview_encoding("sjis").to_stdout();
+	println!("{name1} {name2} {filename}");
 	f.dump_uncovered(|d| d.preview_encoding("sjis").to_stdout());
+	strings.dump().preview_encoding("sjis").to_stdout();
 
-	return Ok(Scena);
-
-	// _.code@k.later("functable", ref.func_start)@k.list(ref.func_count)@k.later("script", k.u4)@insn.script,
-	//
-	// _.anim@k.later("anim", ref.anim_start)@k.list(ref.anim_count)@k.struct(
-	// 	_.speed@k.u2,
-	// 	_._@k.u1,
-	// 	_.count@k.u1,
-	// 	_.frames@k.list(8)@k.u1,
-	// ),
-	//
-	// k.nowC("label"),
-	// k.nowC("trigger"),
-	// k.nowC("object"),
-	// k.nowC("chcp"),
-	// k.nowC("npc"),
-	// k.nowC("monster"),
-	//
-	// battle.now,
-	//
-	// k.now("anim"),
-	// k.now("functable"),
-	// k.now("script"),
-	// k.nowC("name"),
-	// k.now("string"),
-
-	todo!()
+	Ok(Scena)
 }
 
 #[cfg(test)]

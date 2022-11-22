@@ -213,7 +213,7 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 	let starts = func_table.iter().copied();
 	let ends = func_table.iter().copied().skip(1).chain(std::iter::once(code_end));
 	for (start, end) in starts.zip(ends) {
-		functions.push(code::read(&mut f.clone().at(start)?, iset, lookup, end)?);
+		functions.push(code::read(&mut f.clone().at(start)?, iset, lookup, Some(end))?);
 	}
 
 	f.assert_covered()?;

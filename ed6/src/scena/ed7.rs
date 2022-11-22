@@ -137,7 +137,6 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 	let flags = f.u32()?;
 	let includes = f.multiple_loose::<6, _>(&[0xFF;4], |g| Ok(lookup.name(g.u32()?)?))?;
 
-	let mut code_end = f.clone().u32()? as usize;
 	let mut strings = f.ptr32()?;
 	let filename = strings.string()?;
 
@@ -313,7 +312,6 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 					if h.pos() == 0 {
 						None
 					} else {
-						code_end = code_end.min(h.pos());
 						Some(h.array()?)
 					}
 				},
@@ -344,7 +342,7 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 
 	let mut functions = Vec::with_capacity(func_table.len());
 	let starts = func_table.iter().copied();
-	let ends = func_table.iter().copied().skip(1).chain(std::iter::once(code_end));
+	let ends = func_table.iter().copied().skip(1).map(Some).chain(Some(None));
 	for (start, end) in starts.zip(ends) {
 		functions.push(code::read(&mut f.clone().at(start)?, iset, lookup, end)?);
 	}

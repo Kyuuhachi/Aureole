@@ -982,7 +982,7 @@ mod char_animation {
 		let n = f.u8()?;
 		let mut a = Vec::with_capacity(n as usize);
 		if n == 0 {
-			f.check_u8(0);
+			f.check_u8(0)?;
 		}
 		for _ in 0..n {
 			a.push(f.u8()?);

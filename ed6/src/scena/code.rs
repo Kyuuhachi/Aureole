@@ -6,7 +6,7 @@ use hamu::write::le::*;
 use hamu::write::Label as HLabel;
 use hamu::write::LabelDef as HLabelDef;
 use crate::gamedata::Lookup;
-use crate::tables::{bgmtbl::BgmId, Element};
+use crate::tables::bgmtbl::BgmId;
 use crate::tables::btlset::BattleId;
 use crate::tables::item::ItemId;
 use crate::tables::quest::QuestId;
@@ -69,12 +69,31 @@ enum RawOInsn<'a> {
 	Label(HLabelDef),
 }
 
-pub fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet, lookup: &dyn Lookup, end: usize) -> Result<Vec<FlatInsn>, ReadError> {
+pub fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet, lookup: &dyn Lookup, end: Option<usize>) -> Result<Vec<FlatInsn>, ReadError> {
 	let mut insns = Vec::new();
-	while f.pos() < end {
+	let mut extent = f.pos();
+	loop {
+		if let Some(end) = end && f.pos() >= end {
+			ensure!(f.pos() == end, "overshot while reading function");
+			break
+		}
 		let pos = f.pos();
 		match read_raw_insn(f, iset, lookup) {
-			Ok(insn) => insns.push((pos, insn)),
+			Ok(insn) => {
+				insns.push((pos, insn));
+				match &insns.last().unwrap().1 {
+					RawIInsn::Insn(Insn::Return()) if end.is_none() && f.pos() > extent => break,
+					RawIInsn::Insn(_) => {}
+					RawIInsn::Unless(_, l) => extent = extent.max(*l),
+					RawIInsn::Goto(l) => extent = extent.max(*l),
+					RawIInsn::Switch(_, cs, l) => {
+						extent = cs.iter().map(|a| a.1)
+							.chain(Some(*l))
+							.chain(Some(extent))
+							.max().unwrap();
+					}
+				}
+			}
 			Err(err) => {
 				let start = pos.saturating_sub(48*2);
 				f.seek(start)?;
@@ -91,7 +110,6 @@ pub fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet, lookup: &dyn Lookup, 
 			}
 		}
 	}
-	ensure!(f.pos() == end, "overshot while reading function");
 
 	let mut labels = BTreeSet::new();
 	for (_, insn) in &insns {

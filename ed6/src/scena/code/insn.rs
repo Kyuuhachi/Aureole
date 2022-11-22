@@ -304,17 +304,17 @@ ed6_macros::bytecode! {
 		Shake(u32, u32, u32, u32 alias Time), // [quake]
 
 		#[game(Fc, FcEvo)] skip!(1), // {asm} two-byte nop
-		#[game(Sc, ScEvo, Tc, TcEvo)] Sc_7D(match {
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero)] Sc_7D(match {
 			0 => _0(u16 as CharId, u16, u16),
 			1 => _1(u16 as CharId, u16, u16), // args always zero; always paired with a _0 except when the char is 254
 		}),
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _7E(i16, i16, u16, u8, u32),
 
-		#[game(Zero)] skip!(2),
+		#[game(Zero)] skip!(1),
 		EffLoad(u8, String alias EffFileRef),
 		EffPlay(
 			u8 alias EffId, u8,
-			u16 as CharId, { IS::Zero => u16, _ => const 0u16}, Pos3, // source
+			u16 as CharId, { IS::Zero => u16, _ => const 0u16 }, Pos3, // source
 			i16, i16, i16,
 			u32, u32, u32, // scale?
 			u16 as CharId, Pos3, // target
@@ -322,7 +322,7 @@ ed6_macros::bytecode! {
 		),
 		EffPlay2(
 			u8 alias EffId, u8,
-			u8 as u16 alias ObjectId, String, { IS::Zero => u16, _ => const 0u16}, Pos3, // source
+			u8 as u16 alias ObjectId, String, { IS::Zero => u16, _ => const 0u16 }, Pos3, // source
 			i16, i16, i16,
 			u32, u32, u32, // scale
 			u32 alias Time, // period (0 if one-shot)
@@ -523,7 +523,7 @@ ed6_macros::bytecode! {
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero)] Sc_C1(u16 as ItemId, u32),
 		#[game(Sc, ScEvo)] Sc_C2(),
 		#[game(Tc, TcEvo)] Tc_C2(u8, u8),
-		#[game(Zero)] ED7_C2(u8, u8), // Achievement?
+		#[game(Zero)] ED7_C5(u8, u8), // Achievement?
 
 		/// Unused.
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero)] Sc_C3(u16),
@@ -715,8 +715,13 @@ ed6_macros::bytecode! {
 		#[game(Tc)] skip!(8),
 		#[game(TcEvo)] skip!(0),
 
-		#[game(Zero)] skip!(9),
+		#[game(Zero)] skip!(5),
+		#[game(Zero)] ED7_EE(u8, u16),
+		#[game(Zero)] skip!(3),
 		#[game(Zero)] ED7_F2(u8),
+		#[game(Zero)] skip!(5),
+		#[game(Zero)] ED7_F8(u16),
+		#[game(Zero)] skip!(7),
 	]
 }
 

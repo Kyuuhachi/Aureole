@@ -349,9 +349,8 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 		functions.push(code::read(&mut f.clone().at(start)?, iset, lookup, end)?);
 	}
 
-	f.dump_uncovered(|d| d.to_stdout());
-
-	strings.dump().to_stdout();
+	strings.dump().preview_encoding("sjis").to_stdout();
+	f.dump_uncovered(|d| d.preview_encoding("sjis").to_stdout());
 
 	return Ok(Scena);
 

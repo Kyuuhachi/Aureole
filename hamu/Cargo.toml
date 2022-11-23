@@ -1,9 +1,0 @@
-[package]
-name = "hamu"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-beryl = { path = "../beryl" }
-thiserror = "1.0.35"
-paste = "1.0.7"

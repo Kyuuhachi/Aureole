@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-hamu = { path = "../hamu" }
+hamu = { git = "https://github.com/Kyuuhachi/hamu" }
 ed6-macros = { path = "../ed6-macros" }
 cp932 = { path = "../cp932" }
 mapr = "0.8.0"

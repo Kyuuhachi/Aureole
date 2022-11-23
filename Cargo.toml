@@ -1,8 +1,5 @@
 [workspace]
 members = [
-	"beryl",
-	"beryl-cli",
-	"hamu",
 	"choubun",
 	"cp932",
 
@@ -11,11 +8,10 @@ members = [
 	"tools",
 ]
 
-exclude = ["_old"]
-
 [profile.dev]
 package.hamu.opt-level = 3
 package.choubun.opt-level = 3
+package.cp932.opt-level = 3
 
 package.backtrace.opt-level = 3
 
@@ -24,5 +20,3 @@ package.png.opt-level = 3
 package.crc32fast.opt-level = 3
 package.deflate.opt-level = 3
 package.adler32.opt-level = 3
-
-package.cp932.opt-level = 3

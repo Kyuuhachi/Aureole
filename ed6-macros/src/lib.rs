@@ -354,6 +354,16 @@ struct WriteArm {
 
 fn make_table(ctx: &Ctx) -> String {
 	let doc = choubun::node("table", |n| {
+		n.node("style", |n| n.text("\n\
+			#insn-table { text-align: center; width: min-content; overflow-x: unset; }\n\
+			#insn-table thead { position: sticky; top: 0; }\n\
+			#insn-table th { writing-mode: vertical-lr; }\n\
+			#insn-table td:first-child { text-align: left; }\n\
+			#insn-table td:not(:first-child) { vertical-align: middle; }\n\
+			#insn-table .insn-table-join { border-right: none; }\n\
+			#insn-table .insn-table-join + * { border-left: none; }\n\
+		"));
+		n.attr("id", "insn-table");
 		let mut hex: BTreeMap<Ident, BTreeMap<Ident, u8>> = BTreeMap::new();
 		for WriteArm { games, ident, .. } in &ctx.writes {
 			let entry = hex.entry(ident.clone()).or_default();
@@ -362,14 +372,12 @@ fn make_table(ctx: &Ctx) -> String {
 			}
 		}
 
-		n.attr("style", "text-align: center; width: min-content; overflow-x: unset");
 		n.node("thead", |n| {
-			n.attr("style", "position: sticky; top: 0");
+			n.indent();
 			n.node("tr", |n| {
 				n.node("th", |_| {});
 				for game in &ctx.games {
 					n.node("th", |n| {
-						n.attr("style", "writing-mode: vertical-lr");
 						let ty = &ctx.game_ty;
 						n.text(format_args!("[`{game}`]({ty}::{game})", ty=quote!{ #ty }))
 					});
@@ -378,6 +386,7 @@ fn make_table(ctx: &Ctx) -> String {
 		});
 
 		n.node("tbody", |n| {
+			n.indent();
 			let mut insns = ctx.defs.iter().peekable();
 			while let Some(def) = insns.next() {
 				let games = hex.get(&def.ident).unwrap();
@@ -388,7 +397,6 @@ fn make_table(ctx: &Ctx) -> String {
 
 				n.node("tr", |n| {
 					n.node("td", |n| {
-						n.attr("style", "text-align: left");
 						for Insn { ident, args, ..} in defs {
 							let aliases = args.iter().map(|a| a.alias());
 							let mut title = String::new();
@@ -408,15 +416,12 @@ fn make_table(ctx: &Ctx) -> String {
 					let mut prev = None;
 					for game in &ctx.games {
 						let node = choubun::node("td", |n| {
-							n.attr("style", "vertical-align: middle");
 							let hex = games.get(game);
 							if let Some(hex) = hex {
 								n.text(format_args!("{hex:02X}"));
 							}
 							if prev == Some(hex) {
-								let prev = columns.last_mut().unwrap();
-								n.attrs_mut().get_mut("style").unwrap().push_str("; border-left: none");
-								prev.attrs_mut().get_mut("style").unwrap().push_str("; border-right: none");
+								columns.last_mut().unwrap().class("insn-table-join");
 							}
 							prev = Some(hex);
 						});

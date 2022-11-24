@@ -50,7 +50,7 @@ pub fn encode(text: &str) -> Result<Vec<u8>, EncodeError> {
 	cp932::encode(text).map_err(|_| EncodeError { text: text.to_owned() })
 }
 
-pub trait OutExt: Out {
+pub trait OutExt1: Out {
 	fn string(&mut self, s: &str) -> Result<(), WriteError> {
 		let s = encode(s)?;
 		self.slice(&s);
@@ -113,4 +113,4 @@ pub trait OutExt: Out {
 		Ok(())
 	}
 }
-impl<T: Out + ?Sized> OutExt for T {}
+impl<T: Out + ?Sized> OutExt1 for T {}

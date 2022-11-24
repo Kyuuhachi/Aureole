@@ -53,7 +53,7 @@ pub fn decode(bytes: &[u8]) -> Result<String, DecodeError> {
 	cp932::decode(bytes).map_err(|_| DecodeError { text: cp932::decode_lossy(bytes) })
 }
 
-pub trait InExt<'a>: In<'a> {
+pub trait InExt1<'a>: In<'a> {
 	fn ptr(&mut self) -> Result<Self, ReadError> where Self: Clone {
 		Ok(self.clone().at(self.u16()? as usize)?)
 	}
@@ -132,4 +132,4 @@ pub trait InExt<'a>: In<'a> {
 		Ok(super::NameDesc { name, desc })
 	}
 }
-impl<'a, T: In<'a>> InExt<'a> for T {}
+impl<'a, T: In<'a>> InExt1<'a> for T {}

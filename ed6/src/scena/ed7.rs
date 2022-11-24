@@ -108,7 +108,7 @@ pub struct Battle {
 	move_speed: u16,
 	unk2: u16,
 	battlefield: String,
-	sepith: Option<[u8; 7]>,
+	sepith: Option<[u8; 8]>,
 	setups: Vec<BattleSetup>,
 }
 

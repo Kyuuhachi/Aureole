@@ -896,7 +896,6 @@ mod file_ref {
 }
 
 mod func_ref {
-	// TODO this is u8,u8 in ed7
 	use super::*;
 	pub(super) fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet) -> Result<FuncRef, ReadError> {
 		let a = f.u8()? as u16;

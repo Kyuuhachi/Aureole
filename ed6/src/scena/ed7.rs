@@ -361,7 +361,7 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 
 		// Sometimes there's an extra return statement after what the control flow analysis gives.
 		// Dunno why.
-		if end.is_none() && g.pos() != code_end && g.clone().u8()? == 0x01 {
+		if end.is_none() && g.pos() != code_end && (code_end - g.pos()) % 8 == 1 && g.clone().u8()? == 0x01 {
 			g.check_u8(0x01)?;
 			func.push(code::FlatInsn::Insn(code::Insn::Return()))
 		}

@@ -374,12 +374,6 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 		}
 	})).strict()?;
 
-	let junk = match strings.remaining() {
-		0 => None,
-		1 => Some(strings.u8()?),
-		n => bail!("unexpected {n} bytes of junk at end"),
-	};
-
 	println!("{name1} {name2} {filename}");
 	f.dump_uncovered(|d| d.preview_encoding("sjis").to_stdout());
 

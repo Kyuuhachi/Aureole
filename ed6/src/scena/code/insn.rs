@@ -149,11 +149,11 @@ ed6_macros::bytecode! {
 		BgmStop(u32 alias Time), // [stop_bgm]
 		BgmWait(), // [wait_bgm]
 
-		SoundPlay(u16 as SoundId, u8, { IS::Zero => u16, _ => u8 as u16 }), // [sound]
-		SoundStop(u16 as SoundId),
-		SoundLoop(u16 as SoundId, u8),
-		_Sound25(u16 as SoundId, Pos3, u32, u32, u8, u32),
-		SoundLoad(u16 as SoundId), // [sound_load]
+		SoundPlay({ IS::Zero => u32, _ => u16 as u32 } as SoundId, u8, { IS::Zero => u16, _ => u8 as u16 }), // [sound]
+		SoundStop(u16 as u32 as SoundId),
+		SoundLoop(u16 as u32 as SoundId, u8),
+		_Sound25(u16 as u32 as SoundId, Pos3, u32, u32, u8, u32),
+		SoundLoad(u16 as u32 as SoundId), // [sound_load]
 
 		skip!(1), // In Zero, this is used instead of NextFrame in ForkLoop
 

@@ -6,7 +6,7 @@ use hamu::write::le::*;
 use crate::gamedata::Lookup;
 use crate::util::*;
 
-newtype!(SoundId, u16);
+newtype!(SoundId, u32);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Sound {
@@ -20,7 +20,7 @@ pub fn read(lookup: &dyn Lookup, data: &[u8]) -> Result<BTreeMap<SoundId, Sound>
 	let mut f = Coverage::new(Bytes::new(data));
 	let mut table = BTreeMap::new();
 	while f.remaining() > 12 {
-		let id = SoundId(f.u16()?);
+		let id = SoundId(cast(f.u16()?)?);
 		let unk = f.u16()?;
 		let file = lookup.name(f.u32()?)?.to_owned();
 		let flag1 = cast_bool(f.u16()?)?;
@@ -41,7 +41,7 @@ pub fn read(lookup: &dyn Lookup, data: &[u8]) -> Result<BTreeMap<SoundId, Sound>
 pub fn write(lookup: &dyn Lookup, table: &BTreeMap<SoundId, Sound>) -> Result<Vec<u8>, WriteError> {
 	let mut out = OutBytes::new();
 	for (&id, &Sound { unk, ref file, flag1, flag2 }) in table {
-		out.u16(id.0);
+		out.u16(cast(id.0)?);
 		out.u16(unk);
 		out.u32(lookup.index(file)?);
 		out.u16(flag1.into());

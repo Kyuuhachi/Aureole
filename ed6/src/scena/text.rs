@@ -590,6 +590,10 @@ fn text(f: &mut Context, v: &Text) {
 			TextSegment::_09 => {
 				f.write("{09}")
 			},
+			TextSegment::Line2 => {
+				f.write("\\");
+				f.line()
+			},
 			TextSegment::_18 => {
 				f.write("{09}")
 			},

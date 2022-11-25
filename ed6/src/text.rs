@@ -19,6 +19,7 @@ impl std::fmt::Debug for Text {
 pub enum TextSegment {
 	String(String),
 	Line,
+	Line2,
 	Wait,
 	Page,
 	_05,
@@ -42,6 +43,7 @@ impl Text {
 				0x06 => TextSegment::_06,
 				0x07 => TextSegment::Color(f.u8()?),
 				0x09 => TextSegment::_09,
+				0x0D => TextSegment::Line2,
 				0x18 => TextSegment::_18,
 				0x1F => TextSegment::Item(ItemId(f.u16()?)),
 				ch@(0x00..=0x1F) => bail!("b{:?}", char::from(ch)),
@@ -68,6 +70,7 @@ impl Text {
 				TextSegment::_06 => f.u8(0x06),
 				TextSegment::Color(n) => { f.u8(0x07); f.u8(*n); }
 				TextSegment::_09 => f.u8(0x09),
+				TextSegment::Line2 => f.u8(0x0D),
 				TextSegment::_18 => f.u8(0x18),
 				TextSegment::Item(n) => { f.u8(0x1F); f.u16(n.0); }
 			}

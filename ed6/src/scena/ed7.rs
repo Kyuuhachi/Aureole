@@ -372,8 +372,8 @@ mod test {
 
 	macro_rules! test {
 		($a:item) => {
-			#[test_case::test_case(InstructionSet::Zero, true, "../data/zero-gf/data/scena", ".bin"; "zero_gf_jp")]
-			#[test_case::test_case(InstructionSet::Zero, false, "../data/zero-gf/data_en/scena", ".bin"; "zero_gf_en")]
+			#[test_case::test_case(InstructionSet::Zero, true, "../data/zero/data/scena", ".bin"; "zero_nisa_jp")]
+			#[test_case::test_case(InstructionSet::Zero, false, "../data/zero/data/scena_us", ".bin"; "zero_nisa_en")]
 			$a
 		}
 	}

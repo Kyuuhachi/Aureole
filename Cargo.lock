@@ -70,7 +70,7 @@ dependencies = [
 [[package]]
 name = "beryl"
 version = "0.1.0"
-source = "git+https://github.com/Kyuuhachi/hamu#0f1bbd4d3651a1ea590ea495ae2df69fb53e9b51"
+source = "git+https://github.com/Kyuuhachi/hamu#caa3bda5fae55f4bc01533c83db2fabf7bbf9e31"
 dependencies = [
  "ansi_term",
  "atty",
@@ -357,7 +357,7 @@ checksum = "22030e2c5a68ec659fde1e949a745124b48e6fa8b045b7ed5bd1fe4ccc5c4e5d"
 [[package]]
 name = "hamu"
 version = "0.1.0"
-source = "git+https://github.com/Kyuuhachi/hamu#0f1bbd4d3651a1ea590ea495ae2df69fb53e9b51"
+source = "git+https://github.com/Kyuuhachi/hamu#caa3bda5fae55f4bc01533c83db2fabf7bbf9e31"
 dependencies = [
  "beryl",
  "paste",

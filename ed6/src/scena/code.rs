@@ -69,7 +69,7 @@ enum RawOInsn<'a> {
 	Label(HLabelDef),
 }
 
-pub fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet, lookup: &dyn Lookup, end: Option<usize>) -> Result<Vec<FlatInsn>, ReadError> {
+pub fn read<'a>(f: &mut (impl In<'a> + Dump), iset: InstructionSet, lookup: &dyn Lookup, end: Option<usize>) -> Result<Vec<FlatInsn>, ReadError> {
 	let mut insns = Vec::new();
 	let mut extent = f.pos();
 	loop {

@@ -173,8 +173,8 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 		unk5: g.u32()?,
 	})).strict()?;
 
-	let (mut g, n) = (monsters, f.u8()? as usize);
-	let monsters = list(n, || Ok(Monster {
+	let mut g = monsters;
+	let monsters = list(f.u8()? as usize, || Ok(Monster {
 		pos: g.pos3()?,
 		angle: g.i16()?,
 		unk1: g.u16()?,
@@ -189,8 +189,8 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 	let battle_start = g.pos();
 	let battle_end = anims.pos();
 
-	let (mut g, n) = (triggers, f.u8()? as usize);
-	let triggers = list(n, || Ok(Trigger {
+	let mut g = triggers;
+	let triggers = list(f.u8()? as usize, || Ok(Trigger {
 		pos: (g.f32()?, g.f32()?, g.f32()?),
 		radius: g.f32()?,
 		transform: array(|| array(|| Ok(g.f32()?))).strict()?,
@@ -203,8 +203,8 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 		unk6: g.u32()?,
 	})).strict()?;
 
-	let (mut g, n) = (look_points, f.u8()? as usize);
-	let look_points = list(n, || Ok(LookPoint {
+	let mut g = look_points;
+	let look_points = list(f.u8()? as usize, || Ok(LookPoint {
 		pos: g.pos3()?,
 		radius: g.u32()?,
 		bubble_pos: g.pos3()?,
@@ -241,8 +241,8 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 	};
 
 	let anim_count = (func_table.pos()-anims.pos())/12;
-	let (mut g, n) = (anims, anim_count);
-	let anims = list(n, || {
+	let mut g = anims;
+	let anims = list(anim_count, || {
 		let speed = g.u16()?;
 		let unk = g.u8()?;
 		let count = g.u8()?;
@@ -256,8 +256,8 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 		})
 	}).strict()?;
 
-	let (mut g, n) = (func_table, func_count);
-	let func_table = list(n as usize, || Ok(g.u32()? as usize)).strict()?;
+	let mut g = func_table;
+	let func_table = list(func_count as usize, || Ok(g.u32()? as usize)).strict()?;
 
 	let mut functions = Vec::with_capacity(func_table.len());
 	let starts = func_table.iter().copied();
@@ -364,8 +364,8 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 		});
 	}
 
-	let (mut g, n) = (labels, n_labels as usize);
-	let labels = list(n, || Ok(Label {
+	let mut g = labels;
+	let labels = list(n_labels as usize, || Ok(Label {
 		pos: (g.f32()?, g.f32()?, g.f32()?),
 		flags: g.u32()?,
 		name: {

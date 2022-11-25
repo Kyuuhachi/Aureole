@@ -316,7 +316,7 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 	let sepith_start = strings_start - (strings_start - code_end) / 8 * 8;
 	let mut g = f.clone().at(sepith_start)?;
 	while g.pos() < strings_start {
-		field_sepith_pos.insert(g.pos() as u32, at_rolls.len() as u16);
+		field_sepith_pos.insert(g.pos() as u32, field_sepith.len() as u16);
 		field_sepith.push(g.array::<8>()?);
 	}
 

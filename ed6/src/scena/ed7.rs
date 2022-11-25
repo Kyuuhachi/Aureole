@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
 use crate::gamedata::Lookup;
@@ -154,7 +153,7 @@ pub struct BattleSetup {
 }
 
 pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Result<Scena, ReadError> {
-	let mut f = Coverage::new(Bytes::new(data));
+	let mut f = Bytes::new(data);
 
 	let name1 = f.sized_string::<10>()?;
 	let name2 = f.sized_string::<10>()?;
@@ -399,9 +398,6 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 			strings.string()?
 		}
 	})).strict()?;
-
-	println!("{name1} {name2} {filename}");
-	f.dump_uncovered(|d| d.preview_encoding("sjis").to_stdout());
 
 	Ok(Scena {
 		name1,

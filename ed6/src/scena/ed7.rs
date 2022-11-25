@@ -108,7 +108,7 @@ pub struct Battle {
 	move_speed: u16,
 	unk2: u16,
 	battlefield: String,
-	sepith: Option<[u8; 8]>,
+	sepith: Option<u16>, // index
 	setups: Vec<BattleSetup>,
 }
 
@@ -137,7 +137,7 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 	let flags = f.u32()?;
 	let includes = f.multiple_loose::<6, _>(&[0xFF;4], |g| Ok(lookup.name(g.u32()?)?))?;
 
-	let code_end = f.clone().u32()? as usize;
+	let strings_start = f.clone().u32()? as usize;
 	let mut strings = f.ptr32()?;
 	let filename = strings.string()?;
 
@@ -259,12 +259,42 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 	let (mut g, n) = (func_table, func_count);
 	let func_table = list(n as usize, || Ok(g.u32()? as usize)).strict()?;
 
+	let mut functions = Vec::with_capacity(func_table.len());
+	let starts = func_table.iter().copied();
+	let ends = func_table.iter().copied().skip(1).map(Some).chain(Some(None));
+
+	let mut code_end = strings_start;
+	for (start, end) in starts.zip(ends) {
+		let mut g = f.clone().at(start)?;
+		let mut func = code::read(&mut g, iset, lookup, end)?;
+
+		// Sometimes there's an extra return statement after what the control flow analysis gives.
+		// Probably if they end the function with an explicit return.
+		if end.is_none() && g.pos() != strings_start && (strings_start - g.pos()) % 8 == 1 && g.clone().u8()? == 0x01 {
+			g.check_u8(0x01)?;
+			func.push(code::FlatInsn::Insn(code::Insn::Return()))
+		}
+
+		functions.push(func);
+		code_end = g.pos();
+	}
+
+	let mut field_sepith = Vec::new();
+	let mut field_sepith_pos = HashMap::new();
 	let mut at_rolls = Vec::new();
 	let mut at_roll_pos = HashMap::new();
 	let mut placements = Vec::new();
 	let mut placement_pos = HashMap::new();
 	let mut battles = Vec::new();
 	let mut battle_pos = HashMap::new();
+
+	let sepith_start = strings_start - (strings_start - code_end) / 8 * 8;
+	let mut g = f.clone().at(sepith_start)?;
+	while g.pos() < strings_start {
+		field_sepith_pos.insert(g.pos() as u32, at_rolls.len() as u16);
+		field_sepith.push(g.array::<8>()?);
+	}
+
 	if battle_start != battle_end {
 		// I can't use anything but heuristics here. That sucks.
 		let mut g = f.clone().at(battle_start)?;
@@ -303,13 +333,9 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 					ensure!(g.ptr32()?.pos() == strings.pos(), "unexpected battlefield ptr");
 					strings.string()?
 				},
-				sepith: {
-					let mut h = g.ptr32()?;
-					if h.pos() == 0 {
-						None
-					} else {
-						Some(h.array()?)
-					}
+				sepith: match g.u32()? {
+					0 => None,
+					n => Some(*field_sepith_pos.get(&n).ok_or("invalid field sepith ptr")?)
 				},
 				setups: {
 					let mut setups = Vec::new();
@@ -323,11 +349,11 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 								0 => Ok(None),
 								n => Ok(Some(lookup.name(n)?))
 							}).strict()?,
-							placement: *placement_pos.get(&g.u16()?).ok_or("invalid placement ref")?,
-							placement_ambush: *placement_pos.get(&g.u16()?).ok_or("invalid placement ref")?,
+							placement: *placement_pos.get(&g.u16()?).ok_or("invalid placement ptr")?,
+							placement_ambush: *placement_pos.get(&g.u16()?).ok_or("invalid placement ptr")?,
 							bgm: BgmId(g.u16()?),
 							bgm_ambush: BgmId(g.u16()?),
-							at_roll: *at_roll_pos.get(&g.u32()?).ok_or("invalid at roll ref")?,
+							at_roll: *at_roll_pos.get(&g.u32()?).ok_or("invalid at roll ptr")?,
 						});
 					}
 					setups
@@ -351,23 +377,6 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 		1 => Some(strings.u8()?),
 		n => bail!("unexpected {n} bytes of junk at end"),
 	};
-
-	let mut functions = Vec::with_capacity(func_table.len());
-	let starts = func_table.iter().copied();
-	let ends = func_table.iter().copied().skip(1).map(Some).chain(Some(None));
-	for (start, end) in starts.zip(ends) {
-		let mut g = f.clone().at(start)?;
-		let mut func = code::read(&mut g, iset, lookup, end)?;
-
-		// Sometimes there's an extra return statement after what the control flow analysis gives.
-		// Dunno why.
-		if end.is_none() && g.pos() != code_end && (code_end - g.pos()) % 8 == 1 && g.clone().u8()? == 0x01 {
-			g.check_u8(0x01)?;
-			func.push(code::FlatInsn::Insn(code::Insn::Return()))
-		}
-
-		functions.push(func);
-	}
 
 	println!("{name1} {name2} {filename}");
 	f.dump_uncovered(|d| d.preview_encoding("sjis").to_stdout());

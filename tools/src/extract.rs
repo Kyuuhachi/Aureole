@@ -116,7 +116,7 @@ fn extract(force: bool, arc: &Archive, outdir: &Path, bar: ProgressBar, outerbar
 
 			let decomp = ed6::decompress::decompress(raw).ok();
 			if let Some(decomp) = &decomp {
-				let outfile2 = outdir.join(&format!("{}.dec", e.name));
+				let outfile2 = outdir.join(format!("{}.dec", e.name));
 				fs::write(&outfile2, decomp)
 					.with_context(|| format!("failed to write output file {}", outfile.display()))?;
 				filetime::set_file_mtime(&outfile2, filetime::FileTime::from_unix_time(e.timestamp as i64, 0))

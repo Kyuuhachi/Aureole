@@ -180,7 +180,7 @@ impl Archives {
 				Err(e) if e.kind() == io::ErrorKind::NotFound => continue,
 				e => e?,
 			};
-			let dat = File::open(&datpath)?;
+			let dat = File::open(datpath)?;
 			let arch = Archive::from_dir_dat(&dir, &dat).map_err(|e| Error::Archive { dirpath, source: e.into() })?;
 			for ent in arch.entries() {
 				names.insert(ent.name.to_owned(), num);

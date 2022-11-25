@@ -137,6 +137,7 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 	let flags = f.u32()?;
 	let includes = f.multiple_loose::<6, _>(&[0xFF;4], |g| Ok(lookup.name(g.u32()?)?))?;
 
+	let code_end = f.clone().u32()? as usize;
 	let mut strings = f.ptr32()?;
 	let filename = strings.string()?;
 
@@ -355,7 +356,17 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 	let starts = func_table.iter().copied();
 	let ends = func_table.iter().copied().skip(1).map(Some).chain(Some(None));
 	for (start, end) in starts.zip(ends) {
-		functions.push(code::read(&mut f.clone().at(start)?, iset, lookup, end)?);
+		let mut g = f.clone().at(start)?;
+		let mut func = code::read(&mut g, iset, lookup, end)?;
+
+		// Sometimes there's an extra return statement after what the control flow analysis gives.
+		// Dunno why.
+		if end.is_none() && g.pos() != code_end && g.clone().u8()? == 0x01 {
+			g.check_u8(0x01)?;
+			func.push(code::FlatInsn::Insn(code::Insn::Return()))
+		}
+
+		functions.push(func);
 	}
 
 	println!("{name1} {name2} {filename}");

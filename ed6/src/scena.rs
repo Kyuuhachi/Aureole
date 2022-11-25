@@ -55,6 +55,8 @@ newtype!(ObjectFlags, u32);
 
 newtype!(Var, u16); // called Work internally
 
+newtype!(Global, u8);
+
 // 0 SW_ENTRY_NO
 // 1 SW_BGM_NO
 // 3 battle result

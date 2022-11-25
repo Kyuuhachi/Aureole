@@ -564,7 +564,7 @@ ed6_macros::bytecode! {
 			5 => _5(u8 alias SelectId, u8),
 		}),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero)] Sc_CD(u16 as CharId), // related to showing photographs
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero)] Sc_ExprUnk(u8, expr(iset, lookup) -> Expr), // I think this is integer variables that are not local
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero)] Global(u8 as Global, expr(iset, lookup) -> Expr),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero)] Sc_CF(u16 as CharId, u8, String), // something with skeleton animation
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero)] Sc_D0(i32 alias Angle32, u32 alias Time),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero)] Sc_D1(u16 as CharId, i32, i32, i32, u32 alias Time), // something with camera?

@@ -17,7 +17,7 @@ use crate::text::Text;
 
 use super::{
 	Attr, CharAttr, CharFlags, CharId, Color, Emote, Flag, SystemFlags, FuncRef, InExt2, MagicId,
-	Member, MemberAttr, OutExt2, Pos2, Pos3, QuestFlags, ShopId, Var, ObjectFlags,
+	Member, MemberAttr, OutExt2, Pos2, Pos3, QuestFlags, ShopId, Var, ObjectFlags, Global,
 };
 
 mod insn;
@@ -318,10 +318,10 @@ pub enum Expr {
 	CharAttr(CharAttr),
 	/// Returns a 15-bit pseudorandom number
 	Rand,
-	/// I think this is global integer variables.
+	/// Persistent integer variable.
 	///
 	/// Only available on SC onward.
-	ExprUnk(u8),
+	Global(Global),
 }
 
 mod expr {
@@ -347,7 +347,7 @@ mod expr {
 					0x20 => Expr::Attr(Attr(f.u8()?)),
 					0x21 => Expr::CharAttr(char_attr::read(f)?),
 					0x22 => Expr::Rand,
-					0x23 => Expr::ExprUnk(f.u8()?),
+					0x23 => Expr::Global(Global(f.u8()?)),
 					op => return Err(format!("unknown Expr: 0x{op:02X}").into())
 				}
 			};
@@ -377,7 +377,7 @@ mod expr {
 				Expr::Attr(v)        => { f.u8(0x20); f.u8(v.0); },
 				Expr::CharAttr(v)    => { f.u8(0x21); char_attr::write(f, &v)?; },
 				Expr::Rand           => { f.u8(0x22); },
-				Expr::ExprUnk(v)     => { f.u8(0x23); f.u8(v); },
+				Expr::Global(v)      => { f.u8(0x23); f.u8(v.0); },
 			}
 			Ok(())
 		}

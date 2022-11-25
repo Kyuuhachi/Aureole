@@ -386,6 +386,7 @@ fn val(f: &mut Context, a: I) {
 		I::Flag(v) => f.write(&format!("flag[{}]", v.0)),
 		I::Attr(v) => f.write(&format!("system[{}]", v.0)),
 		I::Var(v) => f.write(&format!("var[{}]", v.0)),
+		I::Global(v) => f.write(&format!("global[{}]", v.0)),
 		I::CharAttr(v) => { val(f, I::CharId(&v.0)); f.write(&format!(":{}", v.1)) },
 
 		I::SystemFlags(v) => f.write(&format!("0x{:08X}", v.0)),
@@ -492,7 +493,7 @@ fn expr_prio(f: &mut Context, e: &Expr, prio: u8) {
 		Expr::Attr(v)     => val(f, I::Attr(v)),
 		Expr::CharAttr(v) => val(f, I::CharAttr(v)),
 		Expr::Rand        => f.write("Rand"),
-		Expr::ExprUnk(v)     => { f.write("ExprUnk "); val(f, I::u8(v)); },
+		Expr::Global(v)   => val(f, I::Global(v)),
 
 		Expr::Binop(op, a, b) => {
 			let (text, prio2) = binop(*op);

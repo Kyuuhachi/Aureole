@@ -1,5 +1,5 @@
 [package]
-name = "ed6-macros"
+name = "themelios-macros"
 version = "0.1.0"
 edition = "2021"
 

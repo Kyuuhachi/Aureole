@@ -1,6 +1,6 @@
 use super::*;
 
-ed6_macros::bytecode! {
+themelios_macros::bytecode! {
 	(iset: InstructionSet, lookup: &dyn Lookup)
 	#[games(iset => InstructionSet::{Fc, FcEvo, Sc, ScEvo, Tc, TcEvo, Zero})]
 	[

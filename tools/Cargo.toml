@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ed6 = { path = "../ed6" }
+themelios = { path = "../themelios" }
 eyre = "0.6.8"
 color-eyre = { version = "0.6.2", default-features = false }
 clap = { version = "3.1.15", features = ["derive"] }
@@ -15,5 +15,5 @@ filetime = "0.2.16"
 chrono = "0.4.22"
 
 [[bin]]
-name = "ed6"
+name = "themelios-tools"
 path = "src/main.rs"

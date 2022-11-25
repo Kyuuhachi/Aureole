@@ -1,11 +1,11 @@
 [package]
-name = "ed6"
+name = "themelios"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 hamu = { git = "https://github.com/Kyuuhachi/hamu", features = ["beryl"] }
-ed6-macros = { path = "../ed6-macros" }
+themelios-macros = { path = "../themelios-macros" }
 cp932 = { path = "../cp932" }
 mapr = "0.8.0"
 

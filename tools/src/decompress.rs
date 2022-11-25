@@ -1,5 +1,5 @@
 use std::{io::{self, Write}, path::{PathBuf, Path}};
-use ed6::decompress;
+use themelios::decompress;
 
 /// Decompress a file or stdin into stdout
 #[derive(Debug, Clone, clap::Args)]

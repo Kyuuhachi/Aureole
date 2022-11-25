@@ -4,7 +4,7 @@ use std::{
 	io::Write as _, ffi::OsStr,
 };
 use indicatif::{ProgressBar, MultiProgress, ProgressStyle};
-use ed6::archive::{Archive, Archives};
+use themelios::archive::{Archive, Archives};
 use eyre::*;
 
 /// Extract one or several .dir/dat archives.
@@ -114,7 +114,7 @@ fn extract(force: bool, arc: &Archive, outdir: &Path, bar: ProgressBar, outerbar
 			filetime::set_file_mtime(&outfile, filetime::FileTime::from_unix_time(e.timestamp as i64, 0))
 				.with_context(|| format!("failed to set mtime on {}", outfile.display()))?;
 
-			let decomp = ed6::decompress::decompress(raw).ok();
+			let decomp = themelios::decompress::decompress(raw).ok();
 			if let Some(decomp) = &decomp {
 				let outfile2 = outdir.join(format!("{}.dec", e.name));
 				fs::write(&outfile2, decomp)

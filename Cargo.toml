@@ -3,8 +3,8 @@ members = [
 	"choubun",
 	"cp932",
 
-	"ed6-macros",
-	"ed6",
+	"themelios-macros",
+	"themelios",
 	"tools",
 ]
 

@@ -11,6 +11,36 @@ use crate::util::*;
 use super::*;
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct Scena {
+	pub name1: String,
+	pub name2: String,
+	pub filename: String, // first string in string table (always @FileName in ed6, but valid here)
+	pub town: TownId,
+	pub bgm: BgmId,
+	pub flags: u32,
+	pub includes: [Option<String>; 6],
+
+	pub chcp: Vec<Option<String>>,
+	pub labels: Vec<Label>,
+	pub npcs: Vec<Npc>,
+	pub monsters: Vec<Monster>,
+	pub triggers: Vec<Trigger>,
+	pub look_points: Vec<LookPoint>,
+	pub animations: Vec<Animation>,
+	pub entry: Option<Entry>,
+	pub functions: Vec<Vec<code::FlatInsn>>,
+
+	/// The first five, if present, are always the same nonsensical values.
+	pub field_sepith: Vec<[u8; 8]>,
+	pub at_rolls: Vec<[u8; 16]>,
+	pub placements: Vec<[(u8,u8,u16); 8]>,
+	pub battles: Vec<Battle>,
+
+	pub unk1: u8,
+	pub unk2: u16,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Label {
 	pub name: String,
 	pub pos: (f32, f32, f32),
@@ -123,10 +153,6 @@ pub struct BattleSetup {
 	at_roll: u16, // index
 }
 
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Scena;
-
 pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Result<Scena, ReadError> {
 	let mut f = Coverage::new(Bytes::new(data));
 
@@ -149,7 +175,7 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 
 	let func_table = f.ptr()?;
 	let func_count = f.u16()? / 4;
-	let anims = f.ptr()?;
+	let animations = f.ptr()?;
 
 	let labels = f.ptr()?;
 	let n_labels = f.u16()?;
@@ -187,7 +213,7 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 	})).strict()?;
 
 	let battle_start = g.pos();
-	let battle_end = anims.pos();
+	let battle_end = animations.pos();
 
 	let mut g = triggers;
 	let triggers = list(f.u8()? as usize, || Ok(Trigger {
@@ -240,9 +266,9 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 		None
 	};
 
-	let anim_count = (func_table.pos()-anims.pos())/12;
-	let mut g = anims;
-	let anims = list(anim_count, || {
+	let anim_count = (func_table.pos()-animations.pos())/12;
+	let mut g = animations;
+	let animations = list(anim_count, || {
 		let speed = g.u16()?;
 		let unk = g.u8()?;
 		let count = g.u8()?;
@@ -377,7 +403,30 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 	println!("{name1} {name2} {filename}");
 	f.dump_uncovered(|d| d.preview_encoding("sjis").to_stdout());
 
-	Ok(Scena)
+	Ok(Scena {
+		name1,
+		name2,
+		filename,
+		town,
+		bgm,
+		flags,
+		includes,
+		chcp,
+		labels,
+		npcs,
+		monsters,
+		triggers,
+		look_points,
+		animations,
+		entry,
+		functions,
+		field_sepith,
+		at_rolls,
+		placements,
+		battles,
+		unk1,
+		unk2,
+	})
 }
 
 #[cfg(test)]

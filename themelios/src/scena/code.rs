@@ -234,25 +234,34 @@ pub fn write(f: &mut impl OutDelay, iset: InstructionSet, lookup: &dyn Lookup, i
 }
 
 fn write_raw_insn(f: &mut impl OutDelay, iset: InstructionSet, lookup: &dyn Lookup, insn: RawOInsn) -> Result<(), WriteError> {
+	fn addr(f: &mut impl OutDelay, iset: InstructionSet, l: HLabel) {
+		match iset {
+			InstructionSet::Zero => f.delay_u32(l),
+			_ => f.delay_u16(l),
+		}
+	}
 	match insn {
 		RawOInsn::Unless(e, l) => {
 			f.u8(0x02);
 			expr::write(f, iset, lookup, e)?;
-			f.delay_u16(l);
+			addr(f, iset, l);
 		},
 		RawOInsn::Goto(l) => {
 			f.u8(0x03);
-			f.delay_u16(l);
+			addr(f, iset, l);
 		},
 		RawOInsn::Switch(e, cs, l) => {
 			f.u8(0x04);
 			expr::write(f, iset, lookup, e)?;
-			f.u16(cast(cs.len())?);
+			match iset {
+				InstructionSet::Zero => f.u8(cast(cs.len())?),
+				_ => f.u16(cast(cs.len())?),
+			}
 			for (k, v) in cs {
 				f.u16(k);
-				f.delay_u16(v);
+				addr(f, iset, v);
 			}
-			f.delay_u16(l);
+			addr(f, iset, l);
 		}
 		RawOInsn::Insn(i) => {
 			Insn::write(f, iset, lookup, i)?

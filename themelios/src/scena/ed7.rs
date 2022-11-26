@@ -20,7 +20,7 @@ pub struct Scena {
 	pub includes: [Option<String>; 6],
 
 	pub chcp: Vec<Option<String>>,
-	pub labels: Vec<Label>,
+	pub labels: Option<Vec<Label>>,
 	pub npcs: Vec<Npc>,
 	pub monsters: Vec<Monster>,
 	pub triggers: Vec<Trigger>,
@@ -162,8 +162,9 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 	let flags = f.u32()?;
 	let includes = f.multiple_loose::<6, _>(&[0xFF;4], |g| Ok(lookup.name(g.u32()?)?))?;
 
-	let strings_start = f.clone().u32()? as usize;
+
 	let mut strings = f.ptr32()?;
+	let strings_start = strings.pos();
 	let filename = strings.string()?;
 
 	let chcp     = f.ptr()?;
@@ -179,14 +180,14 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 	let labels = f.ptr()?;
 	let n_labels = f.u16()?;
 
-	let (mut g, n) = (chcp, f.u8()? as usize);
-	let chcp = list(n, || Ok(match g.u32()? {
+	let mut g = chcp;
+	let chcp = list(f.u8()? as usize, || Ok(match g.u32()? {
 		0 => None,
 		n => Some(lookup.name(n)?)
 	})).strict()?;
 
-	let (mut g, n) = (npcs, f.u8()? as usize);
-	let npcs = list(n, || Ok(Npc {
+	let mut g = npcs;
+	let npcs = list(f.u8()? as usize, || Ok(Npc {
 		name: strings.string()?,
 		pos: g.pos3()?,
 		angle: g.i16()?,
@@ -218,7 +219,9 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 	let triggers = list(f.u8()? as usize, || Ok(Trigger {
 		pos: (g.f32()?, g.f32()?, g.f32()?),
 		radius: g.f32()?,
-		transform: array(|| array(|| Ok(g.f32()?))).strict()?,
+		transform: array(|| {
+			array(|| Ok(g.f32()?))
+		}).strict()?,
 		unk1: g.u8()?,
 		unk2: g.u16()?,
 		function: FuncRef(g.u8()? as u16, g.u8()? as u16),
@@ -306,13 +309,6 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 
 	let mut field_sepith = Vec::new();
 	let mut field_sepith_pos = HashMap::new();
-	let mut at_rolls = Vec::new();
-	let mut at_roll_pos = HashMap::new();
-	let mut placements = Vec::new();
-	let mut placement_pos = HashMap::new();
-	let mut battles = Vec::new();
-	let mut battle_pos = HashMap::new();
-
 	let sepith_start = strings_start - (strings_start - code_end) / 8 * 8;
 	let mut g = f.clone().at(sepith_start)?;
 	while g.pos() < strings_start {
@@ -324,6 +320,9 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 	// chunks, so I can't do anything other than simple heuristics for parsing those. Which sucks,
 	// but there's nothing I can do about it.
 	let mut g = f.clone().at(battle_start)?;
+
+	let mut at_rolls = Vec::new();
+	let mut at_roll_pos = HashMap::new();
 	while g.pos() < battle_end {
 		// Heuristic: first field of AT rolls is 100
 		if g.clone().u8()? != 100 {
@@ -333,6 +332,8 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 		at_rolls.push(g.array::<16>()?);
 	}
 
+	let mut placements = Vec::new();
+	let mut placement_pos = HashMap::new();
 	while g.pos() < battle_end {
 		// if both alternatives and field sepith is zero, it's not a placement
 		if g.pos() + 16+8 <= battle_end && g.clone().at(g.pos()+16)?.u64()? == 0 {
@@ -346,6 +347,8 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 		placements.push(array::<8, _>(|| Ok((g.u8()?, g.u8()?, g.u16()?))).strict()?);
 	}
 
+	let mut battles = Vec::new();
+	let mut battle_pos = HashMap::new();
 	while g.pos() < battle_end {
 		battle_pos.insert(g.pos() as u32, battles.len());
 		battles.push(Battle {
@@ -357,10 +360,7 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 			can_move: g.u8()?,
 			move_speed: g.u16()?,
 			unk2: g.u16()?,
-			battlefield: {
-				ensure!(g.ptr32()?.pos() == strings.pos(), "unexpected battlefield ptr");
-				strings.string()?
-			},
+			battlefield: g.ptr32()?.string()?,
 			sepith: match g.u32()? {
 				0 => None,
 				n => Some(*field_sepith_pos.get(&n).ok_or("invalid field sepith ptr")?)
@@ -389,15 +389,16 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 		});
 	}
 
-	let mut g = labels;
-	let labels = list(n_labels as usize, || Ok(Label {
-		pos: (g.f32()?, g.f32()?, g.f32()?),
-		flags: g.u32()?,
-		name: {
-			ensure!(g.ptr32()?.pos() == strings.pos(), "unexpected battlefield ptr");
-			strings.string()?
-		}
-	})).strict()?;
+	let labels = if labels.pos() == 0 {
+		None
+	} else {
+		let mut g = labels;
+		Some(list(n_labels as usize, || Ok(Label {
+			pos: (g.f32()?, g.f32()?, g.f32()?),
+			flags: g.u32()?,
+			name: g.ptr32()?.string()?,
+		})).strict()?)
+	};
 
 	Ok(Scena {
 		name1,
@@ -423,6 +424,250 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 		unk1,
 		unk2,
 	})
+}
+
+pub fn write(iset: code::InstructionSet, lookup: &dyn Lookup, scena: &Scena) -> Result<Vec<u8>, WriteError> {
+	let mut f = OutBytes::new();
+	f.sized_string::<10>(&scena.name1)?;
+	f.sized_string::<10>(&scena.name2)?;
+	f.u16(scena.town.0);
+	f.u16(scena.bgm.0);
+	f.u32(scena.flags);
+	f.multiple_loose::<6, _>(&[0xFF; 4], &scena.includes, |g, a| { g.u32(lookup.index(a)?); Ok(()) }).strict()?;
+
+	let mut strings = f.ptr32();
+	strings.string(&scena.filename)?;
+
+	let mut chcp = f.ptr();
+	let mut npcs = f.ptr();
+	let mut monsters = f.ptr();
+	let mut triggers = f.ptr();
+	let mut look_points = f.ptr();
+
+	let mut func_table = f.ptr();
+	f.u16(cast(scena.functions.len() * 4)?);
+	let mut animations = f.ptr();
+
+	let mut labels = OutBytes::new();
+	if let Some(l) = &scena.labels {
+		f.delay_u16(labels.here());
+		f.u16(cast(l.len())?);
+	} else {
+		f.u16(0);
+		f.u16(0);
+	}
+
+	let mut entry = OutBytes::new();
+	let mut functions = OutBytes::new();
+	let mut field_sepith = OutBytes::new();
+	let mut at_rolls = OutBytes::new();
+	let mut placements = OutBytes::new();
+	let mut battles = OutBytes::new();
+
+	f.u8(cast(scena.chcp.len())?);
+	let g = &mut chcp;
+	for chcp in &scena.chcp {
+		g.u32(chcp.as_ref().map_or(Ok(0), |a| lookup.index(a))?);
+	}
+
+	f.u8(cast(scena.npcs.len())?);
+	let g = &mut npcs;
+	for npc in &scena.npcs {
+		strings.string(&npc.name)?;
+		g.pos3(npc.pos);
+		g.i16(npc.angle);
+		g.u16(npc.unk1);
+		g.u16(npc.unk2);
+		g.u16(npc.unk3);
+		g.u16(npc.unk4);
+		g.u8(cast(npc.init.0)?);
+		g.u8(cast(npc.init.1)?);
+		g.u32(npc.unk5);
+	}
+
+	f.u8(cast(scena.monsters.len())?);
+	let g = &mut monsters;
+	for monster in &scena.monsters {
+		g.pos3(monster.pos);
+		g.i16(monster.angle);
+		g.u16(monster.unk1);
+		g.u16(cast(monster.battle.0)?);
+		g.u16(monster.flag.0);
+		g.u16(monster.chcp);
+		g.u16(monster.unk2);
+		g.u32(monster.stand_anim);
+		g.u32(monster.walk_anim);
+	}
+
+	f.u8(cast(scena.triggers.len())?);
+	let g = &mut triggers;
+	for trigger in &scena.triggers {
+		g.f32(trigger.pos.0);
+		g.f32(trigger.pos.1);
+		g.f32(trigger.pos.2);
+		g.f32(trigger.radius);
+		for row in trigger.transform {
+			for col in row {
+				g.f32(col)
+			}
+		}
+		g.u8(trigger.unk1);
+		g.u16(trigger.unk2);
+		g.u8(cast(trigger.function.0)?);
+		g.u8(cast(trigger.function.1)?);
+		g.u8(trigger.unk3);
+		g.u16(trigger.unk4);
+		g.u32(trigger.unk5);
+		g.u32(trigger.unk6);
+	}
+
+	f.u8(cast(scena.look_points.len())?);
+	let g = &mut look_points;
+	for lp in &scena.look_points {
+		g.pos3(lp.pos);
+		g.u32(lp.radius);
+		g.pos3(lp.bubble_pos);
+		g.u8(lp.unk1);
+		g.u16(lp.unk2);
+		g.u8(cast(lp.function.0)?);
+		g.u8(cast(lp.function.1)?);
+		g.u8(lp.unk3);
+		g.u16(lp.unk4);
+	}
+
+	f.u8(scena.unk1);
+	f.u16(scena.unk2);
+
+	let g = &mut entry;
+	for entry in &scena.entry {
+		g.pos3(entry.pos);
+		g.u32(entry.unk1);
+		g.pos3(entry.cam_from);
+		g.u32(entry.cam_pers);
+		g.u16(entry.unk2);
+		g.u16(entry.cam_deg);
+		g.u16(entry.cam_limit1);
+		g.u16(entry.cam_limit2);
+		g.pos3(entry.cam_at);
+		g.u16(entry.unk3);
+		g.u16(entry.unk4);
+		g.u16(entry.flags);
+		g.u16(entry.town.0);
+		g.u8(cast(entry.init.0)?);
+		g.u8(cast(entry.init.1)?);
+		g.u8(cast(entry.reinit.0)?);
+		g.u8(cast(entry.reinit.1)?);
+	}
+
+	let g = &mut animations;
+	for anim in &scena.animations {
+		let count = anim.frames.len();
+		ensure!(count <= 8, "too many frames: {count}");
+		let mut frames = [0; 8];
+		frames[..count].copy_from_slice(&anim.frames);
+		g.u16(anim.speed);
+		g.u8(anim.unk);
+		g.u8(count as u8);
+		g.slice(&frames);
+	}
+
+	for func in &scena.functions {
+		func_table.delay_u32(functions.here());
+		code::write(&mut functions, iset, lookup, func)?;
+	}
+
+	let mut field_sepith_pos = Vec::new();
+	for sep in &scena.field_sepith {
+		field_sepith_pos.push(field_sepith.here());
+		field_sepith.slice(sep);
+	}
+
+	let mut at_roll_pos = Vec::new();
+	for roll in &scena.at_rolls {
+		at_roll_pos.push(at_rolls.here());
+		at_rolls.slice(roll);
+	}
+
+	let g = &mut placements;
+	let mut placement_pos = Vec::new();
+	for plac in &scena.placements {
+		placement_pos.push(g.here());
+		for p in plac {
+			g.u8(p.0);
+			g.u8(p.1);
+			g.u16(p.2);
+		}
+	}
+
+	let g = &mut battles;
+	let mut battle_pos = Vec::new();
+	for battle in &scena.battles {
+		battle_pos.push(g.here());
+		g.u16(battle.flags);
+		g.u16(battle.level);
+		g.u8(battle.unk1);
+		g.u8(battle.vision_range);
+		g.u8(battle.move_range);
+		g.u8(battle.can_move);
+		g.u16(battle.move_speed);
+		g.u16(battle.unk2);
+		g.delay_u32(strings.here());
+		strings.string(&battle.battlefield)?;
+		if let Some(s) = battle.sepith {
+			g.delay_u32(field_sepith_pos.get(s as usize).cloned()
+				.ok_or_else(|| "field sepith out of bounds".to_owned())?);
+		} else {
+			g.u32(0);
+		}
+		let mut weights = [0u8; 4];
+		let mut h = OutBytes::new();
+		ensure!(battle.setups.len() <= 4, "too many setups");
+		for (i, setup) in battle.setups.iter().enumerate() {
+			weights[i] = setup.weight;
+			for ms in &setup.enemies {
+				h.u32(ms.as_ref().map_or(Ok(0), |a| lookup.index(a))?);
+			}
+			h.delay_u16(placement_pos.get(setup.placement as usize).cloned()
+				.ok_or_else(|| "placement out of bounds".to_owned())?);
+			h.delay_u16(placement_pos.get(setup.placement_ambush as usize).cloned()
+				.ok_or_else(|| "placement out of bounds".to_owned())?);
+			h.u16(setup.bgm.0);
+			h.u16(setup.bgm_ambush.0);
+			h.delay_u32(at_roll_pos.get(setup.at_roll as usize).cloned()
+				.ok_or_else(|| "at roll out of bounds".to_owned())?);
+		}
+		g.array(weights);
+		g.append(h);
+	}
+
+	if let Some(l) = &scena.labels {
+		let g = &mut labels;
+		for l in l {
+			g.f32(l.pos.0);
+			g.f32(l.pos.1);
+			g.f32(l.pos.2);
+			g.u32(l.flags);
+			g.delay_u32(strings.here());
+			strings.string(&l.name)?;
+		}
+	}
+
+	f.append(entry);
+	f.append(labels);
+	f.append(triggers);
+	f.append(look_points);
+	f.append(chcp);
+	f.append(npcs);
+	f.append(monsters);
+	f.append(at_rolls);
+	f.append(placements);
+	f.append(battles);
+	f.append(animations);
+	f.append(func_table);
+	f.append(functions);
+	f.append(field_sepith);
+	f.append(strings);
+	Ok(f.finish()?)
 }
 
 #[cfg(test)]
@@ -457,7 +702,11 @@ mod test {
 
 			let data = std::fs::read(&path)?;
 			
-			if let Err(err) = super::read(iset, &ED7Lookup, &data) {
+			if let Err(err) = check_roundtrip_strict(
+				&data,
+				|a| super::read(iset, &ED7Lookup, a),
+				|a| super::write(iset, &ED7Lookup, a),
+			) {
 				println!("{name}: {err:?}");
 				failed = true;
 			};

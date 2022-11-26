@@ -114,3 +114,18 @@ pub trait OutExt1: Out {
 	}
 }
 impl<T: Out + ?Sized> OutExt1 for T {}
+
+#[extend::ext]
+pub impl OutBytes {
+	fn ptr(&mut self) -> OutBytes {
+		let mut g = OutBytes::new();
+		self.delay_u16(g.here());
+		g
+	}
+
+	fn ptr32(&mut self) -> OutBytes {
+		let mut g = OutBytes::new();
+		self.delay_u32(g.here());
+		g
+	}
+}

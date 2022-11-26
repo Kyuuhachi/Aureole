@@ -125,12 +125,12 @@ impl Lookup for ED7Lookup {
 				let a = (index & 0xF00000) >> 20;
 				let b = index & 0x0FFFFF;
 				let prefix = match a {
-					0 => "battle/ms",
-					1 => "battle/as",
-					2 => "battle/bs",
+					0 => "ms",
+					1 => "as",
+					2 => "bs",
 					_ => return Err(index.into())
 				};
-				Ok(format!("{prefix}/ch{b:05x}.dat"))
+				Ok(format!("battle/dat/{prefix}{b:05x}.dat"))
 			}
 
 			_ => Err(index.into())
@@ -172,20 +172,22 @@ impl Lookup for ED7Lookup {
 				return Some(0x21000000 | a << 20 | b << 4 | c)
 			}
 
-			if let Some(name) = name.strip_prefix("battle/ms") {
-				let name = name.strip_suffix(".dat")?;
-				let b = u32::from_str_radix(name, 16).ok()?;
-				return Some(0x30000000 | b)
-			}
-			if let Some(name) = name.strip_prefix("battle/as") {
-				let name = name.strip_suffix(".dat")?;
-				let b = u32::from_str_radix(name, 16).ok()?;
-				return Some(0x30100000 | b)
-			}
-			if let Some(name) = name.strip_prefix("battle/bs") {
-				let name = name.strip_suffix(".dat")?;
-				let b = u32::from_str_radix(name, 16).ok()?;
-				return Some(0x30200000 | b)
+			if let Some(name) = name.strip_prefix("battle/dat/") {
+				if let Some(name) = name.strip_prefix("ms") {
+					let name = name.strip_suffix(".dat")?;
+					let b = u32::from_str_radix(name, 16).ok()?;
+					return Some(0x30000000 | b)
+				}
+				if let Some(name) = name.strip_prefix("as") {
+					let name = name.strip_suffix(".dat")?;
+					let b = u32::from_str_radix(name, 16).ok()?;
+					return Some(0x30100000 | b)
+				}
+				if let Some(name) = name.strip_prefix("bs") {
+					let name = name.strip_suffix(".dat")?;
+					let b = u32::from_str_radix(name, 16).ok()?;
+					return Some(0x30200000 | b)
+				}
 			}
 
 			None

@@ -38,6 +38,7 @@ themelios_macros::bytecode! {
 			read => |f| {
 				let ptr = f.u32()?;
 				if ptr != 0xFFFFFFFF {
+					// Pointer is filled in properly later
 					Ok(Self::ED7Battle(
 						BattleId(ptr),
 						f.u16()?, f.u8()?, f.u8()?, f.u8()?,
@@ -61,7 +62,7 @@ themelios_macros::bytecode! {
 				}
 			},
 			write ED7Battle(ptr, s1,s2,s3,s4, a1, a2, ch) => |f| {
-				f.u32(ptr.0);
+				f.delay_u32(hamu::write::Label::known(ptr.0).0);
 				f.u16(*s1); f.u8(*s2); f.u8(*s3); f.u8(*s4);
 				f.u16(*a1); f.u16(*a2);
 				f.u16(ch.0);

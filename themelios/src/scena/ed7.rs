@@ -200,7 +200,7 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 	})).strict()?;
 
 	let mut g = monsters;
-	let monsters = list(f.u8()? as usize, || Ok(Monster {
+	let mut monsters = list(f.u8()? as usize, || Ok(Monster {
 		pos: g.pos3()?,
 		angle: g.i16()?,
 		unk1: g.u16()?,
@@ -350,7 +350,7 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 	let mut battles = Vec::new();
 	let mut battle_pos = HashMap::new();
 	while g.pos() < battle_end {
-		battle_pos.insert(g.pos() as u32, battles.len());
+		battle_pos.insert(g.pos() as u32, battles.len() as u32);
 		battles.push(Battle {
 			flags: g.u16()?,
 			level: g.u16()?,
@@ -399,6 +399,18 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 			name: g.ptr32()?.string()?,
 		})).strict()?)
 	};
+
+	// Fill in battles
+	for mons in &mut monsters {
+		mons.battle.0 = *battle_pos.get(&mons.battle.0).ok_or("invalid battle ptr")?;
+	}
+	for func in &mut functions {
+		for insn in func {
+			if let code::FlatInsn::Insn(code::Insn::ED7Battle { 0: btl, .. }) = insn {
+				btl.0 = *battle_pos.get(&btl.0).ok_or("invalid battle ptr")?;
+			}
+		}
+	}
 
 	Ok(Scena {
 		name1,
@@ -491,7 +503,7 @@ pub fn write(iset: code::InstructionSet, lookup: &dyn Lookup, scena: &Scena) -> 
 		g.pos3(monster.pos);
 		g.i16(monster.angle);
 		g.u16(monster.unk1);
-		g.u16(cast(monster.battle.0)?);
+		g.delay_u16(hamu::write::Label::known(monster.battle.0).0);
 		g.u16(monster.flag.0);
 		g.u16(monster.chcp);
 		g.u16(monster.unk2);
@@ -600,9 +612,8 @@ pub fn write(iset: code::InstructionSet, lookup: &dyn Lookup, scena: &Scena) -> 
 	}
 
 	let g = &mut battles;
-	let mut battle_pos = Vec::new();
-	for battle in &scena.battles {
-		battle_pos.push(g.here());
+	for (idx, battle) in scena.battles.iter().enumerate() {
+		g.label(hamu::write::Label::known(idx as u32).1);
 		g.u16(battle.flags);
 		g.u16(battle.level);
 		g.u8(battle.unk1);

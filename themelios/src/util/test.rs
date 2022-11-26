@@ -87,7 +87,40 @@ pub fn check_roundtrip_strict<T>(
 		let diff = similar::capture_diff_slices(similar::Algorithm::Patience, data, &data2);
 
 		for chunk in diff {
-			println!("{chunk:?}");
+			match chunk {
+				similar::DiffOp::Equal { old_index, new_index, len } => {
+					println!(
+						"{:?} = {:?}",
+						old_index..old_index+len,
+						new_index..new_index+len,
+					);
+				}
+				similar::DiffOp::Delete { old_index, old_len, new_index } => {
+					println!(
+						"{:?} ⇒ {} ({:02X?} ⇒ [])",
+						old_index..old_index+old_len,
+						new_index,
+						&data[old_index..old_index+old_len],
+					);
+				}
+				similar::DiffOp::Insert { old_index, new_index, new_len } => {
+					println!(
+						"{} ⇐ {:?} ([] ⇐ {:02X?})",
+						old_index,
+						new_index..new_index+new_len,
+						&data2[new_index..new_index+new_len],
+					);
+				}
+				similar::DiffOp::Replace { old_index, old_len, new_index, new_len } => {
+					println!(
+						"{:?} ≠ {:?} ({:02X?} ≠ {:02X?})",
+						old_index..old_index+old_len,
+						new_index..new_index+new_len,
+						&data[old_index..old_index+old_len],
+						&data2[new_index..new_index+new_len],
+					);
+				}
+			}
 		}
 		return Err(format!("{} bytes differ", std::any::type_name::<T>()).into())
 	}

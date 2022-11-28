@@ -365,10 +365,16 @@ fn make_table(ctx: &Ctx) -> String {
 		"));
 		n.attr("id", "insn-table");
 		let mut hex: BTreeMap<Ident, BTreeMap<Ident, u8>> = BTreeMap::new();
+		for insn in &ctx.defs {
+			hex.insert(insn.ident.clone(), BTreeMap::new());
+		}
 		for WriteArm { games, ident, .. } in &ctx.writes {
-			let entry = hex.entry(ident.clone()).or_default();
-			for (game, hex) in games {
-				entry.insert(game.clone(), *hex);
+			if let Some(entry) = hex.get_mut(ident) {
+				for (game, hex) in games {
+					entry.insert(game.clone(), *hex);
+				}
+			} else {
+				// will error because of unknown branch
 			}
 		}
 

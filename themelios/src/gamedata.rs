@@ -1,4 +1,30 @@
+use crate::scena::code::InstructionSet;
+
 type Backtrace = Box<std::backtrace::Backtrace>;
+
+pub struct GameData<'a> {
+	pub iset: InstructionSet,
+	pub lookup: &'a dyn Lookup,
+	pub kai: bool,
+}
+
+impl GameData<'static> {
+	pub const ZERO: &GameData<'static> = &GameData {
+		iset: InstructionSet::Zero,
+		lookup: &ED7Lookup,
+		kai: false,
+	};
+	pub const ZERO_EVO: &GameData<'static> = &GameData {
+		iset: InstructionSet::ZeroEvo,
+		lookup: &ED7Lookup,
+		kai: false,
+	};
+	pub const ZERO_KAI: &GameData<'static> = &GameData {
+		iset: InstructionSet::Zero,
+		lookup: &ED7Lookup,
+		kai: true,
+	};
+}
 
 #[derive(thiserror::Error)]
 pub enum LookupError {
@@ -10,12 +36,12 @@ pub enum LookupError {
 }
 
 impl std::fmt::Debug for LookupError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Name { name, backtrace } => f.debug_struct("Name").field("name", name).field("backtrace", backtrace).finish(),
-            Self::Index { index, backtrace } => f.debug_struct("Index").field("index", &format_args!("0x{:08X}", index)).field("backtrace", backtrace).finish(),
-        }
-    }
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::Name { name, backtrace } => f.debug_struct("Name").field("name", name).field("backtrace", backtrace).finish(),
+			Self::Index { index, backtrace } => f.debug_struct("Index").field("index", &format_args!("0x{:08X}", index)).field("backtrace", backtrace).finish(),
+		}
+	}
 }
 
 impl std::convert::From<&str> for LookupError {

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use hamu::read::le::*;
 use hamu::write::le::*;
-use crate::gamedata::Lookup;
+use crate::gamedata::GameData;
 use crate::tables::bgmtbl::BgmId;
 use crate::tables::btlset::BattleId;
 use crate::tables::town::TownId;
@@ -152,7 +152,7 @@ pub struct BattleSetup {
 	at_roll: u16, // index
 }
 
-pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Result<Scena, ReadError> {
+pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	let mut f = Bytes::new(data);
 
 	let name1 = f.sized_string::<10>()?;
@@ -160,7 +160,7 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 	let town = TownId(f.u16()?);
 	let bgm = BgmId(f.u16()?);
 	let flags = f.u32()?;
-	let includes = f.multiple_loose::<6, _>(&[0xFF;4], |g| Ok(lookup.name(g.u32()?)?))?;
+	let includes = f.multiple_loose::<6, _>(&[0xFF;4], |g| Ok(game.lookup.name(g.u32()?)?))?;
 
 
 	let mut strings = f.ptr32()?;
@@ -183,7 +183,7 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 	let mut g = chcp;
 	let chcp = list(f.u8()? as usize, || Ok(match g.u32()? {
 		0 => None,
-		n => Some(lookup.name(n)?)
+		n => Some(game.lookup.name(n)?)
 	})).strict()?;
 
 	let mut g = npcs;
@@ -294,7 +294,7 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 	let mut code_end = strings_start;
 	for (start, end) in starts.zip(ends) {
 		let mut g = f.clone().at(start)?;
-		let mut func = code::read(&mut g, iset, lookup, end)?;
+		let mut func = code::read(&mut g, game, end)?;
 
 		// Sometimes there's an extra return statement after what the control flow analysis gives.
 		// Probably if they end the function with an explicit return.
@@ -375,7 +375,7 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 						weight,
 						enemies: array(|| match g.u32()? {
 							0 => Ok(None),
-							n => Ok(Some(lookup.name(n)?))
+							n => Ok(Some(game.lookup.name(n)?))
 						}).strict()?,
 						placement: *placement_pos.get(&g.u16()?).ok_or("invalid placement ptr")?,
 						placement_ambush: *placement_pos.get(&g.u16()?).ok_or("invalid placement ptr")?,
@@ -438,14 +438,14 @@ pub fn read(iset: code::InstructionSet, lookup: &dyn Lookup, data: &[u8]) -> Res
 	})
 }
 
-pub fn write(iset: code::InstructionSet, lookup: &dyn Lookup, scena: &Scena) -> Result<Vec<u8>, WriteError> {
+pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	let mut f = OutBytes::new();
 	f.sized_string::<10>(&scena.name1)?;
 	f.sized_string::<10>(&scena.name2)?;
 	f.u16(scena.town.0);
 	f.u16(scena.bgm.0);
 	f.u32(scena.flags);
-	f.multiple_loose::<6, _>(&[0xFF; 4], &scena.includes, |g, a| { g.u32(lookup.index(a)?); Ok(()) }).strict()?;
+	f.multiple_loose::<6, _>(&[0xFF; 4], &scena.includes, |g, a| { g.u32(game.lookup.index(a)?); Ok(()) }).strict()?;
 
 	let mut strings = f.ptr32();
 	strings.string(&scena.filename)?;
@@ -479,7 +479,7 @@ pub fn write(iset: code::InstructionSet, lookup: &dyn Lookup, scena: &Scena) -> 
 	f.u8(cast(scena.chcp.len())?);
 	let g = &mut chcp;
 	for chcp in &scena.chcp {
-		g.u32(chcp.as_ref().map_or(Ok(0), |a| lookup.index(a))?);
+		g.u32(chcp.as_ref().map_or(Ok(0), |a| game.lookup.index(a))?);
 	}
 
 	f.u8(cast(scena.npcs.len())?);
@@ -585,7 +585,7 @@ pub fn write(iset: code::InstructionSet, lookup: &dyn Lookup, scena: &Scena) -> 
 
 	for func in &scena.functions {
 		func_table.delay_u32(functions.here());
-		code::write(&mut functions, iset, lookup, func)?;
+		code::write(&mut functions, game, func)?;
 	}
 
 	let mut field_sepith_pos = Vec::new();
@@ -636,7 +636,7 @@ pub fn write(iset: code::InstructionSet, lookup: &dyn Lookup, scena: &Scena) -> 
 		for (i, setup) in battle.setups.iter().enumerate() {
 			weights[i] = setup.weight;
 			for ms in &setup.enemies {
-				h.u32(ms.as_ref().map_or(Ok(0), |a| lookup.index(a))?);
+				h.u32(ms.as_ref().map_or(Ok(0), |a| game.lookup.index(a))?);
 			}
 			h.delay_u16(placement_pos.get(setup.placement as usize).cloned()
 				.ok_or_else(|| "placement out of bounds".to_owned())?);
@@ -683,20 +683,19 @@ pub fn write(iset: code::InstructionSet, lookup: &dyn Lookup, scena: &Scena) -> 
 
 #[cfg(test)]
 mod test {
-	use super::code::InstructionSet;
 	use crate::util::test::*;
-	use crate::gamedata::ED7Lookup;
+	use crate::gamedata::GameData;
 
 	macro_rules! test {
 		($a:item) => {
-			#[test_case::test_case(InstructionSet::Zero, true, "../data/zero/data/scena", ".bin"; "zero_nisa_jp")]
-			#[test_case::test_case(InstructionSet::Zero, false, "../data/zero/data/scena_us", ".bin"; "zero_nisa_en")]
+			#[test_case::test_case(&GameData::ZERO_KAI, true, "../data/zero/data/scena", ".bin"; "zero_nisa_jp")]
+			#[test_case::test_case(&GameData::ZERO_KAI, false, "../data/zero/data/scena_us", ".bin"; "zero_nisa_en")]
 			$a
 		}
 	}
 
 	test! {
-	fn roundtrip(iset: InstructionSet, _decomp: bool, scenapath: &str, suffix: &str) -> Result<(), Error> {
+	fn roundtrip(game: &GameData, _decomp: bool, scenapath: &str, suffix: &str) -> Result<(), Error> {
 		let mut failed = false;
 
 		let mut paths = std::fs::read_dir(scenapath)?
@@ -715,8 +714,8 @@ mod test {
 			
 			if let Err(err) = check_roundtrip_strict(
 				&data,
-				|a| super::read(iset, &ED7Lookup, a),
-				|a| super::write(iset, &ED7Lookup, a),
+				|a| super::read(game, a),
+				|a| super::write(game, a),
 			) {
 				println!("{name}: {err:?}");
 				failed = true;

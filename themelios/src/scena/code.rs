@@ -5,7 +5,7 @@ use hamu::read::le::*;
 use hamu::write::le::*;
 use hamu::write::Label as HLabel;
 use hamu::write::LabelDef as HLabelDef;
-use crate::gamedata::Lookup;
+use crate::gamedata::GameData;
 use crate::tables::bgmtbl::BgmId;
 use crate::tables::btlset::BattleId;
 use crate::tables::item::ItemId;
@@ -69,7 +69,7 @@ enum RawOInsn<'a> {
 	Label(HLabelDef),
 }
 
-pub fn read<'a>(f: &mut (impl In<'a> + Dump), iset: InstructionSet, lookup: &dyn Lookup, end: Option<usize>) -> Result<Vec<FlatInsn>, ReadError> {
+pub fn read<'a>(f: &mut (impl In<'a> + Dump), game: &GameData, end: Option<usize>) -> Result<Vec<FlatInsn>, ReadError> {
 	let mut insns = Vec::new();
 	let mut extent = f.pos();
 	loop {
@@ -78,7 +78,7 @@ pub fn read<'a>(f: &mut (impl In<'a> + Dump), iset: InstructionSet, lookup: &dyn
 			break
 		}
 		let pos = f.pos();
-		match read_raw_insn(f, iset, lookup) {
+		match read_raw_insn(f, game) {
 			Ok(insn) => {
 				insns.push((pos, insn));
 				match &insns.last().unwrap().1 {
@@ -148,47 +148,47 @@ pub fn read<'a>(f: &mut (impl In<'a> + Dump), iset: InstructionSet, lookup: &dyn
 	Ok(insns2)
 }
 
-fn read_raw_insn<'a>(f: &mut impl In<'a>, iset: InstructionSet, lookup: &dyn Lookup) -> Result<RawIInsn, ReadError> {
+fn read_raw_insn<'a>(f: &mut impl In<'a>, game: &GameData) -> Result<RawIInsn, ReadError> {
 	let pos = f.pos();
-	fn addr<'a>(f: &mut impl In<'a>, iset: InstructionSet) -> Result<usize, ReadError> {
-		match iset {
+	fn addr<'a>(f: &mut impl In<'a>, game: &GameData) -> Result<usize, ReadError> {
+		match game.iset {
 			InstructionSet::Zero => Ok(f.u32()? as usize),
 			_ => Ok(f.u16()? as usize),
 		}
 	}
 	let insn = match f.u8()? {
 		0x02 => {
-			let e = expr::read(f, iset, lookup)?;
-			let l = addr(f, iset)?;
+			let e = expr::read(f, game)?;
+			let l = addr(f, game)?;
 			RawIInsn::Unless(e, l)
 		}
 		0x03 => {
-			let l = addr(f, iset)?;
+			let l = addr(f, game)?;
 			RawIInsn::Goto(l)
 		}
 		0x04 => {
-			let e = expr::read(f, iset, lookup)?;
-			let count = match iset {
+			let e = expr::read(f, game)?;
+			let count = match game.iset {
 				InstructionSet::Zero => f.u8()? as u16,
 				_ => f.u16()?,
 			};
 			let mut cs = Vec::with_capacity(count as usize);
 			for _ in 0..count {
-				cs.push((f.u16()?, addr(f, iset)?));
+				cs.push((f.u16()?, addr(f, game)?));
 			}
-			let l = addr(f, iset)?;
+			let l = addr(f, game)?;
 			RawIInsn::Switch(e, cs, l)
 		}
 		_ => {
 			f.seek(pos)?;
-			let i = Insn::read(f, iset, lookup)?;
+			let i = Insn::read(f, game)?;
 			RawIInsn::Insn(i)
 		}
 	};
 	Ok(insn)
 }
 
-pub fn write(f: &mut impl OutDelay, iset: InstructionSet, lookup: &dyn Lookup, insns: &[FlatInsn]) -> Result<(), WriteError> {
+pub fn write(f: &mut impl OutDelay, game: &GameData, insns: &[FlatInsn]) -> Result<(), WriteError> {
 	let mut labels = HashMap::new();
 	let mut labeldefs = HashMap::new();
 	let mut label = |k| {
@@ -219,7 +219,7 @@ pub fn write(f: &mut impl OutDelay, iset: InstructionSet, lookup: &dyn Lookup, i
 	}
 
 	for insn in insns {
-		write_raw_insn(f, iset, lookup, match insn {
+		write_raw_insn(f, game, match insn {
 			FlatInsn::Unless(e, l) => RawOInsn::Unless(e, labels[l].clone()),
 			FlatInsn::Goto(l) => RawOInsn::Goto(labels[l].clone()),
 			FlatInsn::Switch(e, cs, l) => RawOInsn::Switch(e, cs.iter().map(|(a, l)| (*a, labels[l].clone())).collect(), labels[l].clone()),
@@ -233,9 +233,9 @@ pub fn write(f: &mut impl OutDelay, iset: InstructionSet, lookup: &dyn Lookup, i
 	Ok(())
 }
 
-fn write_raw_insn(f: &mut impl OutDelay, iset: InstructionSet, lookup: &dyn Lookup, insn: RawOInsn) -> Result<(), WriteError> {
-	fn addr(f: &mut impl OutDelay, iset: InstructionSet, l: HLabel) {
-		match iset {
+fn write_raw_insn(f: &mut impl OutDelay, game: &GameData, insn: RawOInsn) -> Result<(), WriteError> {
+	fn addr(f: &mut impl OutDelay, game: &GameData, l: HLabel) {
+		match game.iset {
 			InstructionSet::Zero => f.delay_u32(l),
 			_ => f.delay_u16(l),
 		}
@@ -243,28 +243,28 @@ fn write_raw_insn(f: &mut impl OutDelay, iset: InstructionSet, lookup: &dyn Look
 	match insn {
 		RawOInsn::Unless(e, l) => {
 			f.u8(0x02);
-			expr::write(f, iset, lookup, e)?;
-			addr(f, iset, l);
+			expr::write(f, game, e)?;
+			addr(f, game, l);
 		},
 		RawOInsn::Goto(l) => {
 			f.u8(0x03);
-			addr(f, iset, l);
+			addr(f, game, l);
 		},
 		RawOInsn::Switch(e, cs, l) => {
 			f.u8(0x04);
-			expr::write(f, iset, lookup, e)?;
-			match iset {
+			expr::write(f, game, e)?;
+			match game.iset {
 				InstructionSet::Zero => f.u8(cast(cs.len())?),
 				_ => f.u16(cast(cs.len())?),
 			}
 			for (k, v) in cs {
 				f.u16(k);
-				addr(f, iset, v);
+				addr(f, game, v);
 			}
-			addr(f, iset, l);
+			addr(f, game, l);
 		}
 		RawOInsn::Insn(i) => {
-			Insn::write(f, iset, lookup, i)?
+			Insn::write(f, game, i)?
 		}
 		RawOInsn::Label(l) => {
 			f.label(l)
@@ -335,7 +335,7 @@ pub enum Expr {
 
 mod expr {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>, iset: InstructionSet, lookup: &dyn Lookup) -> Result<Expr, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl In<'a>, game: &GameData) -> Result<Expr, ReadError> {
 		let mut stack = Vec::new();
 		loop {
 			let op = f.u8()?;
@@ -350,7 +350,7 @@ mod expr {
 				match op {
 					0x00 => Expr::Const(f.u32()?),
 					0x01 => break,
-					0x1C => Expr::Insn(Box::new(Insn::read(f, iset, lookup)?)),
+					0x1C => Expr::Insn(Box::new(Insn::read(f, game)?)),
 					0x1E => Expr::Flag(Flag(f.u16()?)),
 					0x1F => Expr::Var(Var(f.u16()?)),
 					0x20 => Expr::Attr(Attr(f.u8()?)),
@@ -366,21 +366,21 @@ mod expr {
 		Ok(stack.pop().unwrap())
 	}
 
-	pub(super) fn write(f: &mut impl OutDelay, iset: InstructionSet, lookup: &dyn Lookup, v: &Expr) -> Result<(), WriteError> {
-		fn write_node(f: &mut impl OutDelay, iset: InstructionSet, lookup: &dyn Lookup, v: &Expr) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl OutDelay, game: &GameData, v: &Expr) -> Result<(), WriteError> {
+		fn write_node(f: &mut impl OutDelay, game: &GameData, v: &Expr) -> Result<(), WriteError> {
 			match *v {
 				Expr::Binop(op, ref a, ref b) => {
-					write_node(f, iset, lookup, a)?;
-					write_node(f, iset, lookup, b)?;
+					write_node(f, game, a)?;
+					write_node(f, game, b)?;
 					f.u8(op.into());
 				},
 				Expr::Unop(op, ref v) => {
-					write_node(f, iset, lookup, v)?;
+					write_node(f, game, v)?;
 					f.u8(op.into());
 				},
 				Expr::Const(n)       => { f.u8(0x00); f.u32(n); },
 				// 0x01 handled below
-				Expr::Insn(ref insn) => { f.u8(0x1C); Insn::write(f, iset, lookup, insn)?; },
+				Expr::Insn(ref insn) => { f.u8(0x1C); Insn::write(f, game, insn)?; },
 				Expr::Flag(v)        => { f.u8(0x1E); f.u16(v.0); },
 				Expr::Var(v)         => { f.u8(0x1F); f.u16(v.0); },
 				Expr::Attr(v)        => { f.u8(0x20); f.u8(v.0); },
@@ -390,7 +390,7 @@ mod expr {
 			}
 			Ok(())
 		}
-		write_node(f, iset, lookup, v)?;
+		write_node(f, game, v)?;
 		f.u8(0x01);
 		Ok(())
 	}

@@ -9,14 +9,19 @@ themelios_macros::bytecode! {
 		skip!(3), // control flow
 		Call(func_ref(iset) -> FuncRef),
 
-		/// Technically the last argument, which is always 7, is a separate hcf instruction.
-		/// But they are never used separately, so since treating it separately would just bloat the output, it's treated as a constant for now.
+		/// Loads another scena.
 		///
-		/// Official name is `new_scene`.
-		NewScene(file_ref(lookup) -> String alias ScenaFileRef, u8, u8, u8, u8),
+		/// The second argument is which entrance (in the `._en` file) to start at, the others are
+		/// unknown.
+		///
+		/// Official name is `new_scene`, which also implicitly adds a [`Hcf`](Self::Hcf).
+		NewScene(file_ref(lookup) -> String alias ScenaFileRef, u8, u8, u8),
 
-		// This is some kind of hcf instruction: like [`NextFrame`](Self::NextFrame), but does not advance the instruction pointer.
-		skip!(1),
+		/// Simply halts the script forever.
+		///
+		/// Doesn't exist naturally in vanilla scripts, but instead inserted implicitly after
+		/// `new_scene`.
+		Hcf(),
 
 		Sleep({ IS::Zero => u16 as u32, _ => u32 } alias Time), // [delay]
 		SystemFlagsSet(u32 as SystemFlags), // [set_system_flag]

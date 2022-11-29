@@ -155,7 +155,7 @@ themelios_macros::bytecode! {
 		BgmStop(u32 alias Time), // [stop_bgm]
 		BgmWait(), // [wait_bgm]
 
-		SoundPlay({ IS::Zero => u32, _ => u16 as u32 } as SoundId, u8, { IS::Zero => u16, _ => u8 as u16 }), // [sound]
+		SoundPlay({ IS::Zero if game.kai => u32, _ => u16 as u32 } as SoundId, u8, { IS::Zero => u16, _ => u8 as u16 }), // [sound]
 		SoundStop(u16 as u32 as SoundId),
 		SoundLoop(u16 as u32 as SoundId, u8),
 		_Sound25(u16 as u32 as SoundId, Pos3, u32, u32, u8, u32),

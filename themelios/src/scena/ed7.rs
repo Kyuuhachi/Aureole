@@ -162,7 +162,6 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	let flags = f.u32()?;
 	let includes = f.multiple_loose::<6, _>(&[0xFF;4], |g| Ok(game.lookup.name(g.u32()?)?))?;
 
-
 	let mut strings = f.ptr32()?;
 	let strings_start = strings.pos();
 	let filename = strings.string()?;
@@ -174,74 +173,17 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	let look_points = f.ptr()?;
 
 	let func_table = f.ptr()?;
-	let func_count = f.u16()? / 4;
+	let func_count = (f.u16()? / 4) as usize;
 	let animations = f.ptr()?;
 
 	let labels = f.ptr()?;
-	let n_labels = f.u16()?;
+	let n_labels = f.u16()? as usize;
 
-	let mut g = chcp;
-	let chcp = list(f.u8()? as usize, || Ok(match g.u32()? {
-		0 => None,
-		n => Some(game.lookup.name(n)?)
-	})).strict()?;
-
-	let mut g = npcs;
-	let npcs = list(f.u8()? as usize, || Ok(Npc {
-		name: strings.string()?,
-		pos: g.pos3()?,
-		angle: g.i16()?,
-		unk1: g.u16()?,
-		unk2: g.u16()?,
-		unk3: g.u16()?,
-		unk4: g.u16()?,
-		init: FuncRef(g.u8()? as u16, g.u8()? as u16),
-		unk5: g.u32()?,
-	})).strict()?;
-
-	let mut g = monsters;
-	let mut monsters = list(f.u8()? as usize, || Ok(Monster {
-		pos: g.pos3()?,
-		angle: g.i16()?,
-		unk1: g.u16()?,
-		battle: BattleId(cast(g.u16()?)?),
-		flag: Flag(g.u16()?),
-		chcp: g.u16()?,
-		unk2: g.u16()?,
-		stand_anim: g.u32()?,
-		walk_anim: g.u32()?,
-	})).strict()?;
-
-	let battle_start = g.pos();
-	let battle_end = animations.pos();
-
-	let mut g = triggers;
-	let triggers = list(f.u8()? as usize, || Ok(Trigger {
-		pos: (g.f32()?, g.f32()?, g.f32()?),
-		radius: g.f32()?,
-		transform: array(|| {
-			array(|| Ok(g.f32()?))
-		}).strict()?,
-		unk1: g.u8()?,
-		unk2: g.u16()?,
-		function: FuncRef(g.u8()? as u16, g.u8()? as u16),
-		unk3: g.u8()?,
-		unk4: g.u16()?,
-		unk5: g.u32()?,
-		unk6: g.u32()?,
-	})).strict()?;
-
-	let mut g = look_points;
-	let look_points = list(f.u8()? as usize, || Ok(LookPoint {
-		pos: g.pos3()?,
-		radius: g.u32()?,
-		bubble_pos: g.pos3()?,
-		unk1: g.u8()?,
-		unk2: g.u16()?,
-		function: FuncRef(g.u8()? as u16, g.u8()? as u16),
-		unk3: g.u8()?,
-		unk4: g.u16()?,
-	})).strict()?;
+	let n_chcp     = f.u8()? as usize;
+	let n_npcs     = f.u8()? as usize;
+	let n_monsters = f.u8()? as usize;
+	let n_triggers = f.u8()? as usize;
+	let n_look_points = f.u8()? as usize;
 
 	let unk1 = f.u8()?;
 	let unk2 = f.u16()?;
@@ -268,15 +210,110 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 		None
 	};
 
+	let data_chunks = [
+		(chcp.pos(),        n_chcp        != 0),
+		(npcs.pos(),        n_npcs        != 0),
+		(monsters.pos(),    n_monsters    != 0),
+		(triggers.pos(),    n_triggers    != 0),
+		(look_points.pos(), n_look_points != 0),
+		(labels.pos(),      n_labels      != 0),
+		(animations.pos(),  animations.pos() != f.pos()),
+		(func_table.pos(),  true),
+	];
+	let first_data_chunk = data_chunks.into_iter()
+		.filter_map(|(a, b)| b.then_some(a))
+		.min().unwrap();
+	let is_vanilla =
+		labels.pos() == 0
+		|| first_data_chunk == f.pos()
+		&& labels.pos() <= f.pos()
+		&& labels.pos() + n_labels*20 == triggers.pos()
+		&& triggers.pos() + n_triggers*96 == look_points.pos()
+		&& look_points.pos() + n_look_points*36 == chcp.pos()
+		&& chcp.pos() + n_chcp*4 == npcs.pos()
+		&& npcs.pos() + n_npcs*28 == monsters.pos()
+		&& monsters.pos() + n_monsters*32 <= animations.pos()
+		&& animations.pos() <= func_table.pos()
+	;
+	// This misidentifies a few eddec scenas as vanilla, but the battles seem to be in the right
+	// position in those anyway.
+
+	let battle_chunk = if is_vanilla {
+		Some((monsters.pos() + n_monsters * 32, animations.pos()))
+	} else {
+		None
+	};
+
+	let mut g = chcp;
+	let chcp = list(n_chcp, || Ok(match g.u32()? {
+		0 => None,
+		n => Some(game.lookup.name(n)?)
+	})).strict()?;
+
+	let mut g = npcs;
+	let npcs = list(n_npcs, || Ok(Npc {
+		name: strings.string()?,
+		pos: g.pos3()?,
+		angle: g.i16()?,
+		unk1: g.u16()?,
+		unk2: g.u16()?,
+		unk3: g.u16()?,
+		unk4: g.u16()?,
+		init: FuncRef(g.u8()? as u16, g.u8()? as u16),
+		unk5: g.u32()?,
+	})).strict()?;
+
+	let mut g = monsters;
+	let mut monsters = list(n_monsters, || Ok(Monster {
+		pos: g.pos3()?,
+		angle: g.i16()?,
+		unk1: g.u16()?,
+		battle: BattleId(cast(g.u16()?)?),
+		flag: Flag(g.u16()?),
+		chcp: g.u16()?,
+		unk2: g.u16()?,
+		stand_anim: g.u32()?,
+		walk_anim: g.u32()?,
+	})).strict()?;
+
+	let mut g = triggers;
+	let triggers = list(n_triggers, || Ok(Trigger {
+		pos: (g.f32()?, g.f32()?, g.f32()?),
+		radius: g.f32()?,
+		transform: array(|| {
+			array(|| Ok(g.f32()?))
+		}).strict()?,
+		unk1: g.u8()?,
+		unk2: g.u16()?,
+		function: FuncRef(g.u8()? as u16, g.u8()? as u16),
+		unk3: g.u8()?,
+		unk4: g.u16()?,
+		unk5: g.u32()?,
+		unk6: g.u32()?,
+	})).strict()?;
+
+	let mut g = look_points;
+	let look_points = list(n_look_points, || Ok(LookPoint {
+		pos: g.pos3()?,
+		radius: g.u32()?,
+		bubble_pos: g.pos3()?,
+		unk1: g.u8()?,
+		unk2: g.u16()?,
+		function: FuncRef(g.u8()? as u16, g.u8()? as u16),
+		unk3: g.u8()?,
+		unk4: g.u16()?,
+	})).strict()?;
+
+	// TODO is this correct in eddec?
 	let anim_count = (func_table.pos()-animations.pos())/12;
 	let mut g = animations;
 	let animations = list(anim_count, || {
 		let speed = g.u16()?;
 		let unk = g.u8()?;
-		let count = g.u8()?;
+		let count = g.u8()? as usize;
 		let frames = array::<8, _>(|| Ok(g.u8()?)).strict()?;
 		ensure!(count <= 8, "too many frames: {count}");
-		let frames = frames[..count as usize].to_owned();
+		let frames = frames[..count].to_owned();
 		Ok(Animation {
 			speed,
 			unk,
@@ -285,7 +322,7 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	}).strict()?;
 
 	let mut g = func_table;
-	let func_table = list(func_count as usize, || Ok(g.u32()? as usize)).strict()?;
+	let func_table = list(func_count, || Ok(g.u32()? as usize)).strict()?;
 
 	let mut functions = Vec::with_capacity(func_table.len());
 	let starts = func_table.iter().copied();
@@ -307,107 +344,65 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 		code_end = g.pos();
 	}
 
-	let mut field_sepith = Vec::new();
-	let mut field_sepith_pos = HashMap::new();
-	let sepith_start = strings_start - (strings_start - code_end) / 8 * 8;
-	let mut g = f.clone().at(sepith_start)?;
-	while g.pos() < strings_start {
-		field_sepith_pos.insert(g.pos() as u32, field_sepith.len() as u16);
-		field_sepith.push(g.array::<8>()?);
-	}
-
-	// The battle-related structs (including sepith above) are not as well-delineated as most other
-	// chunks, so I can't do anything other than simple heuristics for parsing those. Which sucks,
-	// but there's nothing I can do about it.
-	let mut g = f.clone().at(battle_start)?;
-
-	let mut at_rolls = Vec::new();
-	let mut at_roll_pos = HashMap::new();
-	while g.pos() < battle_end {
-		// Heuristic: first field of AT rolls is 100
-		if g.clone().u8()? != 100 {
-			break
-		}
-		at_roll_pos.insert(g.pos() as u32, at_rolls.len() as u16);
-		at_rolls.push(g.array::<16>()?);
-	}
-
-	let mut placements = Vec::new();
-	let mut placement_pos = HashMap::new();
-	while g.pos() < battle_end {
-		// if both alternatives and field sepith is zero, it's not a placement
-		if g.pos() + 16+8 <= battle_end && g.clone().at(g.pos()+16)?.u64()? == 0 {
-			break
-		}
-		// if there's a valid AT roll pointer for the first alternative, it's probably not a placement
-		if g.pos() + 64+4 <= battle_end && at_roll_pos.contains_key(&g.clone().at(g.pos()+64)?.u32()?) {
-			break
-		}
-		placement_pos.insert(g.pos() as u16, placements.len() as u16);
-		placements.push(array::<8, _>(|| Ok((g.u8()?, g.u8()?, g.u16()?))).strict()?);
-	}
-
-	let mut battles = Vec::new();
-	let mut battle_pos = HashMap::new();
-	while g.pos() < battle_end {
-		battle_pos.insert(g.pos() as u32, battles.len() as u32);
-		battles.push(Battle {
-			flags: g.u16()?,
-			level: g.u16()?,
-			unk1: g.u8()?,
-			vision_range: g.u8()?,
-			move_range: g.u8()?,
-			can_move: g.u8()?,
-			move_speed: g.u16()?,
-			unk2: g.u16()?,
-			battlefield: g.ptr32()?.string()?,
-			sepith: match g.u32()? {
-				0 => None,
-				n => Some(*field_sepith_pos.get(&n).ok_or("invalid field sepith ptr")?)
-			},
-			setups: {
-				let mut setups = Vec::new();
-				for weight in g.array::<4>()? {
-					if weight == 0 {
-						continue
-					}
-					setups.push(BattleSetup {
-						weight,
-						enemies: array(|| match g.u32()? {
-							0 => Ok(None),
-							n => Ok(Some(game.lookup.name(n)?))
-						}).strict()?,
-						placement: *placement_pos.get(&g.u16()?).ok_or("invalid placement ptr")?,
-						placement_ambush: *placement_pos.get(&g.u16()?).ok_or("invalid placement ptr")?,
-						bgm: BgmId(g.u16()?),
-						bgm_ambush: BgmId(g.u16()?),
-						at_roll: *at_roll_pos.get(&g.u32()?).ok_or("invalid at roll ptr")?,
-					});
-				}
-				setups
-			},
-		});
-	}
-
 	let labels = if labels.pos() == 0 {
 		None
 	} else {
 		let mut g = labels;
-		Some(list(n_labels as usize, || Ok(Label {
+		Some(list(n_labels, || Ok(Label {
 			pos: (g.f32()?, g.f32()?, g.f32()?),
 			flags: g.u32()?,
 			name: g.ptr32()?.string()?,
 		})).strict()?)
 	};
 
+	let mut btl = BattleRead::default();
+
+	let sepith_start = strings_start - (strings_start - code_end) / 8 * 8;
+	let mut g = f.clone().at(sepith_start)?;
+	while g.pos() < strings_start {
+		btl.get_sepith(&mut g)?;
+	}
+
+	// Load all battle parts in order, to be able to roundtrip them
+	if let Some((battle_start, battle_end)) = battle_chunk {
+		// The battle-related structs (including sepith above) are not as well-delineated as most other
+		// chunks, so I can't do anything other than simple heuristics for parsing those. Which sucks,
+		// but there's nothing I can do about it.
+		let mut g = f.clone().at(battle_start)?;
+
+		while g.pos() < battle_end {
+			// Heuristic: first field of AT rolls is 100
+			if g.clone().u8()? != 100 {
+				break
+			}
+			btl.get_at_roll(&mut g)?;
+		}
+
+		while g.pos() < battle_end {
+			// if both alternatives and field sepith is zero, it's not a placement
+			if g.pos() + 16+8 <= battle_end && g.clone().at(g.pos()+16)?.u64()? == 0 {
+				break
+			}
+			// if there's a valid AT roll pointer for the first alternative, it's probably not a placement
+			if g.pos() + 64+4 <= battle_end && btl.at_roll_pos.contains_key(&(g.clone().at(g.pos()+64)?.u32()? as usize)) {
+				break
+			}
+			btl.get_placement(&mut g)?;
+		}
+
+		while g.pos() < battle_end {
+			btl.get_battle(game, &mut g)?;
+		}
+	}
+
 	// Fill in battles
 	for mons in &mut monsters {
-		mons.battle.0 = *battle_pos.get(&mons.battle.0).ok_or("invalid battle ptr")?;
+		mons.battle.0 = btl.get_battle(game, &mut f.clone().at(mons.battle.0 as usize)?)?;
 	}
 	for func in &mut functions {
 		for insn in func {
-			if let code::FlatInsn::Insn(code::Insn::ED7Battle { 0: btl, .. }) = insn {
-				btl.0 = *battle_pos.get(&btl.0).ok_or("invalid battle ptr")?;
+			if let code::FlatInsn::Insn(code::Insn::ED7Battle { 0: battle, .. }) = insn {
+				battle.0 = btl.get_battle(game, &mut f.clone().at(battle.0 as usize)?)?;
 			}
 		}
 	}
@@ -429,13 +424,107 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 		animations,
 		entry,
 		functions,
-		field_sepith,
-		at_rolls,
-		placements,
-		battles,
+		field_sepith: btl.field_sepith,
+		at_rolls: btl.at_rolls,
+		placements: btl.placements,
+		battles: btl.battles,
 		unk1,
 		unk2,
 	})
+}
+
+#[derive(Default)]
+struct BattleRead {
+	field_sepith: Vec<[u8;8]>,
+	field_sepith_pos: HashMap<usize, u16>,
+	at_rolls: Vec<[u8;16]>,
+	at_roll_pos: HashMap<usize, u16>,
+	placements: Vec<[(u8,u8,u16);8]>,
+	placement_pos: HashMap<usize, u16>,
+	battles: Vec<Battle>,
+	battle_pos: HashMap<usize, u32>,
+}
+
+impl BattleRead {
+	fn get_sepith<'a, T: In<'a> + Clone>(&mut self, f: &mut T) -> Result<u16, ReadError> {
+		match self.field_sepith_pos.entry(f.pos()) {
+			std::collections::hash_map::Entry::Occupied(e) => Ok(*e.get()),
+			std::collections::hash_map::Entry::Vacant(e) => {
+				let v = *e.insert(self.field_sepith.len() as u16);
+				self.field_sepith.push(f.array::<8>()?);
+				Ok(v)
+			}
+		}
+	}
+
+	fn get_at_roll<'a, T: In<'a> + Clone>(&mut self, f: &mut T) -> Result<u16, ReadError> {
+		match self.at_roll_pos.entry(f.pos()) {
+			std::collections::hash_map::Entry::Occupied(e) => Ok(*e.get()),
+			std::collections::hash_map::Entry::Vacant(e) => {
+				let v = *e.insert(self.at_rolls.len() as u16);
+				self.at_rolls.push(f.array::<16>()?);
+				Ok(v)
+			}
+		}
+	}
+
+	fn get_placement<'a, T: In<'a> + Clone>(&mut self, f: &mut T) -> Result<u16, ReadError> {
+		match self.placement_pos.entry(f.pos()) {
+			std::collections::hash_map::Entry::Occupied(e) => Ok(*e.get()),
+			std::collections::hash_map::Entry::Vacant(e) => {
+				let v = *e.insert(self.placements.len() as u16);
+				self.placements.push(array::<8, _>(|| Ok((f.u8()?, f.u8()?, f.u16()?))).strict()?);
+				Ok(v)
+			}
+		}
+	}
+
+	fn get_battle<'a, T: In<'a> + Clone>(&mut self, game: &GameData, f: &mut T) -> Result<u32, ReadError> {
+		match self.battle_pos.entry(f.pos()) {
+			std::collections::hash_map::Entry::Occupied(e) => Ok(*e.get()),
+			std::collections::hash_map::Entry::Vacant(e) => {
+				let v = *e.insert(self.battles.len() as u32);
+				let battle = Battle {
+					flags: f.u16()?,
+					level: f.u16()?,
+					unk1: f.u8()?,
+					vision_range: f.u8()?,
+					move_range: f.u8()?,
+					can_move: f.u8()?,
+					move_speed: f.u16()?,
+					unk2: f.u16()?,
+					battlefield: f.ptr32()?.string()?,
+					sepith: match f.u32()? {
+						0 => None,
+						n => Some(self.get_sepith(&mut f.clone().at(n as usize)?)?)
+					},
+					setups: {
+						let mut setups = Vec::new();
+						for weight in f.array::<4>()? {
+							if weight == 0 {
+								continue
+							}
+							setups.push(BattleSetup {
+								weight,
+								enemies: array(|| match f.u32()? {
+									0 => Ok(None),
+									n => Ok(Some(game.lookup.name(n)?))
+								}).strict()?,
+								placement: self.get_placement(&mut f.ptr()?)?,
+								placement_ambush: self.get_placement(&mut f.ptr()?)?,
+								bgm: BgmId(f.u16()?),
+								bgm_ambush: BgmId(f.u16()?),
+								at_roll: self.get_at_roll(&mut f.ptr32()?)?,
+							});
+						}
+						setups
+					},
+				};
+				self.battles.push(battle);
+				Ok(v)
+			}
+		}
+	}
 }
 
 pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
@@ -469,6 +558,14 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		f.u16(0);
 	}
 
+	f.u8(cast(scena.chcp.len())?);
+	f.u8(cast(scena.npcs.len())?);
+	f.u8(cast(scena.monsters.len())?);
+	f.u8(cast(scena.triggers.len())?);
+	f.u8(cast(scena.look_points.len())?);
+	f.u8(scena.unk1);
+	f.u16(scena.unk2);
+
 	let mut entry = OutBytes::new();
 	let mut functions = OutBytes::new();
 	let mut field_sepith = OutBytes::new();
@@ -476,13 +573,11 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	let mut placements = OutBytes::new();
 	let mut battles = OutBytes::new();
 
-	f.u8(cast(scena.chcp.len())?);
 	let g = &mut chcp;
 	for chcp in &scena.chcp {
 		g.u32(chcp.as_ref().map_or(Ok(0), |a| game.lookup.index(a))?);
 	}
 
-	f.u8(cast(scena.npcs.len())?);
 	let g = &mut npcs;
 	for npc in &scena.npcs {
 		strings.string(&npc.name)?;
@@ -497,7 +592,6 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		g.u32(npc.unk5);
 	}
 
-	f.u8(cast(scena.monsters.len())?);
 	let g = &mut monsters;
 	for monster in &scena.monsters {
 		g.pos3(monster.pos);
@@ -511,7 +605,6 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		g.u32(monster.walk_anim);
 	}
 
-	f.u8(cast(scena.triggers.len())?);
 	let g = &mut triggers;
 	for trigger in &scena.triggers {
 		g.f32(trigger.pos.0);
@@ -533,7 +626,6 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		g.u32(trigger.unk6);
 	}
 
-	f.u8(cast(scena.look_points.len())?);
 	let g = &mut look_points;
 	for lp in &scena.look_points {
 		g.pos3(lp.pos);
@@ -546,9 +638,6 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		g.u8(lp.unk3);
 		g.u16(lp.unk4);
 	}
-
-	f.u8(scena.unk1);
-	f.u16(scena.unk2);
 
 	let g = &mut entry;
 	for entry in &scena.entry {
@@ -678,6 +767,10 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	f.append(functions);
 	f.append(field_sepith);
 	f.append(strings);
+	// EDDec has order
+	//   header, entry, at_rolls, field_sepith, placements, battles,
+	//   chcp, npcs, monsters, triggers, look_points, labels,
+	//   animations, func_table, functions, strings
 	Ok(f.finish()?)
 }
 
@@ -688,14 +781,16 @@ mod test {
 
 	macro_rules! test {
 		($a:item) => {
-			#[test_case::test_case(&GameData::ZERO_KAI, true, "../data/zero/data/scena", ".bin"; "zero_nisa_jp")]
-			#[test_case::test_case(&GameData::ZERO_KAI, false, "../data/zero/data/scena_us", ".bin"; "zero_nisa_en")]
+			// #[test_case::test_case(&GameData::ZERO, false, "../data/zero-gf/data/scena", ".bin"; "zero_gf_jp")]
+			#[test_case::test_case(&GameData::ZERO, false, "../data/zero-gf/data_en/scena", ".bin"; "zero_gf_en")]
+			// #[test_case::test_case(&GameData::ZERO_KAI, true, "../data/zero/data/scena", ".bin"; "zero_nisa_jp")]
+			// #[test_case::test_case(&GameData::ZERO_KAI, true, "../data/zero/data/scena_us", ".bin"; "zero_nisa_en")]
 			$a
 		}
 	}
 
 	test! {
-	fn roundtrip(game: &GameData, _decomp: bool, scenapath: &str, suffix: &str) -> Result<(), Error> {
+	fn roundtrip(game: &GameData, strict: bool, scenapath: &str, suffix: &str) -> Result<(), Error> {
 		let mut failed = false;
 
 		let mut paths = std::fs::read_dir(scenapath)?
@@ -711,12 +806,13 @@ mod test {
 			}
 
 			let data = std::fs::read(&path)?;
-			
-			if let Err(err) = check_roundtrip_strict(
-				&data,
-				|a| super::read(game, a),
-				|a| super::write(game, a),
-			) {
+
+			let res = if strict {
+				check_roundtrip_strict(&data, |a| super::read(game, a), |a| super::write(game, a))
+			} else {
+				check_roundtrip(&data, |a| super::read(game, a), |a| super::write(game, a))
+			};
+			if let Err(err) = res {
 				println!("{name}: {err:?}");
 				failed = true;
 			};

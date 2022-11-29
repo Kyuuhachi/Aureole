@@ -56,6 +56,22 @@ pub fn check_equal<T: PartialEq + std::fmt::Debug>(a: &T, b: &T) -> Result<(), E
 	Ok(())
 }
 
+pub fn check_roundtrip_flex<T>(
+	strict: bool,
+	data: &[u8],
+	read: impl Fn(&[u8]) -> Result<T, super::ReadError>,
+	write: impl Fn(&T) -> Result<Vec<u8>, super::WriteError>,
+) -> Result<T, Error> where
+	T: PartialEq + std::fmt::Debug,
+{
+	if strict {
+		check_roundtrip_strict(data, read, write)
+	} else {
+		check_roundtrip(data, read, write)
+	}
+}
+
+
 pub fn check_roundtrip<T>(
 	data: &[u8],
 	read: impl Fn(&[u8]) -> Result<T, super::ReadError>,

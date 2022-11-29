@@ -33,6 +33,12 @@ pub enum InstructionSet {
 	Azure, AzureEvo,
 }
 
+impl InstructionSet {
+	pub fn is_ed7(&self) -> bool {
+		matches!(self, Self::Zero|Self::ZeroEvo|Self::Azure|Self::AzureEvo)
+	}
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Label(pub usize);
 
@@ -151,9 +157,10 @@ pub fn read<'a>(f: &mut (impl In<'a> + Dump), game: &GameData, end: Option<usize
 fn read_raw_insn<'a>(f: &mut impl In<'a>, game: &GameData) -> Result<RawIInsn, ReadError> {
 	let pos = f.pos();
 	fn addr<'a>(f: &mut impl In<'a>, game: &GameData) -> Result<usize, ReadError> {
-		match game.iset {
-			InstructionSet::Zero => Ok(f.u32()? as usize),
-			_ => Ok(f.u16()? as usize),
+		if game.iset.is_ed7() {
+			Ok(f.u32()? as usize)
+		} else {
+			Ok(f.u16()? as usize)
 		}
 	}
 	let insn = match f.u8()? {
@@ -168,9 +175,10 @@ fn read_raw_insn<'a>(f: &mut impl In<'a>, game: &GameData) -> Result<RawIInsn, R
 		}
 		0x04 => {
 			let e = expr::read(f, game)?;
-			let count = match game.iset {
-				InstructionSet::Zero => f.u8()? as u16,
-				_ => f.u16()?,
+			let count = if game.iset.is_ed7() {
+				f.u8()? as u16
+			} else {
+				f.u16()?
 			};
 			let mut cs = Vec::with_capacity(count as usize);
 			for _ in 0..count {
@@ -235,9 +243,10 @@ pub fn write(f: &mut impl OutDelay, game: &GameData, insns: &[FlatInsn]) -> Resu
 
 fn write_raw_insn(f: &mut impl OutDelay, game: &GameData, insn: RawOInsn) -> Result<(), WriteError> {
 	fn addr(f: &mut impl OutDelay, game: &GameData, l: HLabel) {
-		match game.iset {
-			InstructionSet::Zero => f.delay_u32(l),
-			_ => f.delay_u16(l),
+		if game.iset.is_ed7() {
+			f.delay_u32(l)
+		} else {
+			f.delay_u16(l)
 		}
 	}
 	match insn {
@@ -253,9 +262,10 @@ fn write_raw_insn(f: &mut impl OutDelay, game: &GameData, insn: RawOInsn) -> Res
 		RawOInsn::Switch(e, cs, l) => {
 			f.u8(0x04);
 			expr::write(f, game, e)?;
-			match game.iset {
-				InstructionSet::Zero => f.u8(cast(cs.len())?),
-				_ => f.u16(cast(cs.len())?),
+			if game.iset.is_ed7() {
+				f.u8(cast(cs.len())?)
+			} else {
+				f.u16(cast(cs.len())?)
 			}
 			for (k, v) in cs {
 				f.u16(k);

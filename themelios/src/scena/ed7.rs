@@ -781,10 +781,11 @@ mod test {
 
 	macro_rules! test {
 		($a:item) => {
-			// #[test_case::test_case(&GameData::ZERO, false, "../data/zero-gf/data/scena", ".bin"; "zero_gf_jp")]
+			#[test_case::test_case(&GameData::ZERO, false, "../data/zero-gf/data/scena", ".bin"; "zero_gf_jp")]
 			#[test_case::test_case(&GameData::ZERO, false, "../data/zero-gf/data_en/scena", ".bin"; "zero_gf_en")]
-			// #[test_case::test_case(&GameData::ZERO_KAI, true, "../data/zero/data/scena", ".bin"; "zero_nisa_jp")]
-			// #[test_case::test_case(&GameData::ZERO_KAI, true, "../data/zero/data/scena_us", ".bin"; "zero_nisa_en")]
+			#[test_case::test_case(&GameData::ZERO_KAI, true, "../data/zero/data/scena", ".bin"; "zero_nisa_jp")]
+			#[test_case::test_case(&GameData::ZERO_KAI, true, "../data/zero/data/scena_us", ".bin"; "zero_nisa_en")]
+			#[test_case::test_case(&GameData::ZERO_EVO, true, "../data/vita/extract/zero/data1/data/scena", ".bin"; "zero_evo")]
 			$a
 		}
 	}
@@ -807,12 +808,9 @@ mod test {
 
 			let data = std::fs::read(&path)?;
 
-			let res = if strict {
-				check_roundtrip_strict(&data, |a| super::read(game, a), |a| super::write(game, a))
-			} else {
-				check_roundtrip(&data, |a| super::read(game, a), |a| super::write(game, a))
-			};
-			if let Err(err) = res {
+			let strict = strict && name != "c1440.bin"; // in Evo and Gf JP, contains a FA 57, which decodes to the same char as EE FC
+
+			if let Err(err) = check_roundtrip_flex(strict, &data, |a| super::read(game, a), |a| super::write(game, a)) {
 				println!("{name}: {err:?}");
 				failed = true;
 			};

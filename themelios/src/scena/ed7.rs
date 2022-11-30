@@ -786,6 +786,7 @@ mod test {
 			#[test_case::test_case(&GameData::ZERO_KAI, true, "../data/zero/data/scena", ".bin"; "zero_nisa_jp")]
 			#[test_case::test_case(&GameData::ZERO_KAI, true, "../data/zero/data/scena_us", ".bin"; "zero_nisa_en")]
 			#[test_case::test_case(&GameData::ZERO_EVO, true, "../data/vita/extract/zero/data1/data/scena", ".bin"; "zero_evo")]
+			#[test_case::test_case(&GameData::AO, false, "../data/ao-psp/PSP_GAME/USRDIR/data/scena", ".bin"; "ao_psp_jp")]
 			$a
 		}
 	}

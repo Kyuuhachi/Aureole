@@ -24,6 +24,21 @@ impl GameData<'static> {
 		lookup: &ED7Lookup,
 		kai: true,
 	};
+	pub const AO: &GameData<'static> = &GameData {
+		iset: InstructionSet::Ao,
+		lookup: &ED7Lookup,
+		kai: false,
+	};
+	pub const AO_EVO: &GameData<'static> = &GameData {
+		iset: InstructionSet::AoEvo,
+		lookup: &ED7Lookup,
+		kai: false,
+	};
+	pub const AO_KAI: &GameData<'static> = &GameData {
+		iset: InstructionSet::Ao,
+		lookup: &ED7Lookup,
+		kai: true,
+	};
 }
 
 #[derive(thiserror::Error)]
@@ -139,7 +154,7 @@ impl Lookup for ED7Lookup {
 				let a = (index & 0xF00000) >> 20;
 				let b = (index & 0x0FFFF0) >> 4;
 				let c = index & 0x00000F;
-				let prefix = "0atcrme".chars().nth(a as usize).ok_or(index)?;
+				let prefix = "0atcrmeb".chars().nth(a as usize).ok_or(index)?;
 				if c == 0 {
 					Ok(format!("scena/{prefix}{b:04x}.bin"))
 				} else {
@@ -186,7 +201,7 @@ impl Lookup for ED7Lookup {
 				let mut iter = name.chars();
 				let a = iter.next()?;
 				let name = iter.as_str();
-				let a = "0atcrme".chars().position(|x| x == a)? as u32;
+				let a = "0atcrmeb".chars().position(|x| x == a)? as u32;
 				let (b, c) = if let Some((b, c)) = name.split_once('_') {
 					let b = u32::from_str_radix(b, 16).ok()?;
 					let c = u32::from_str_radix(c, 16).ok()?;

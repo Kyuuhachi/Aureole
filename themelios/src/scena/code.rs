@@ -30,12 +30,12 @@ pub enum InstructionSet {
 	Sc, ScEvo,
 	Tc, TcEvo, // It's called 3rd, I know, but that's not a valid identifier
 	Zero, ZeroEvo,
-	Azure, AzureEvo,
+	Ao, AoEvo,
 }
 
 impl InstructionSet {
 	pub fn is_ed7(&self) -> bool {
-		matches!(self, Self::Zero|Self::ZeroEvo|Self::Azure|Self::AzureEvo)
+		matches!(self, Self::Zero|Self::ZeroEvo|Self::Ao|Self::AoEvo)
 	}
 }
 

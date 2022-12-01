@@ -37,13 +37,15 @@ pub struct Scena {
 
 	pub unk1: u8,
 	pub unk2: u16,
+	pub unk3: u8,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Label {
 	pub name: String,
 	pub pos: (f32, f32, f32),
-	pub flags: u32,
+	pub unk1: u16,
+	pub unk2: u16,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -177,7 +179,8 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	let animations = f.ptr()?;
 
 	let labels = f.ptr()?;
-	let n_labels = f.u16()? as usize;
+	let n_labels = f.u8()? as usize;
+	let unk3 = f.u8()?;
 
 	let n_chcp     = f.u8()? as usize;
 	let n_npcs     = f.u8()? as usize;
@@ -348,11 +351,15 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 		None
 	} else {
 		let mut g = labels;
-		Some(list(n_labels, || Ok(Label {
-			pos: (g.f32()?, g.f32()?, g.f32()?),
-			flags: g.u32()?,
-			name: g.ptr32()?.string()?,
-		})).strict()?)
+		Some(list(n_labels, || {
+			let mut h = g.clone();
+			Ok(Label {
+				pos: (g.f32()?, g.f32()?, g.f32()?),
+				unk1: g.u16()?,
+				unk2: g.u16()?,
+				name: g.ptr32()?.string()?,
+			})
+		}).strict()?)
 	};
 
 	let mut btl = BattleRead::default();
@@ -430,6 +437,7 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 		battles: btl.battles,
 		unk1,
 		unk2,
+		unk3,
 	})
 }
 
@@ -552,11 +560,12 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	let mut labels = OutBytes::new();
 	if let Some(l) = &scena.labels {
 		f.delay_u16(labels.here());
-		f.u16(cast(l.len())?);
+		f.u8(cast(l.len())?);
 	} else {
 		f.u16(0);
-		f.u16(0);
+		f.u8(0);
 	}
+	f.u8(scena.unk3);
 
 	f.u8(cast(scena.chcp.len())?);
 	f.u8(cast(scena.npcs.len())?);
@@ -746,7 +755,8 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 			g.f32(l.pos.0);
 			g.f32(l.pos.1);
 			g.f32(l.pos.2);
-			g.u32(l.flags);
+			g.u16(l.unk1);
+			g.u16(l.unk2);
 			g.delay_u32(strings.here());
 			strings.string(&l.name)?;
 		}
@@ -786,7 +796,7 @@ mod test {
 			#[test_case::test_case(&GameData::ZERO_KAI, true, "../data/zero/data/scena", ".bin"; "zero_nisa_jp")]
 			#[test_case::test_case(&GameData::ZERO_KAI, true, "../data/zero/data/scena_us", ".bin"; "zero_nisa_en")]
 			#[test_case::test_case(&GameData::ZERO_EVO, true, "../data/vita/extract/zero/data1/data/scena", ".bin"; "zero_evo")]
-			#[test_case::test_case(&GameData::AO, false, "../data/ao-psp/PSP_GAME/USRDIR/data/scena", ".bin"; "ao_psp_jp")]
+			#[test_case::test_case(&GameData::AO, true, "../data/ao-psp/PSP_GAME/USRDIR/data/scena", ".bin"; "ao_psp_jp")]
 			$a
 		}
 	}

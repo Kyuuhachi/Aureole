@@ -65,6 +65,7 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 			(__iset@(#(IS::#games_name)|*), Self::#ident(#args)) => {
 				__f.u8(match __iset {
 					#(IS::#games_name => #games_hex,)*
+					#[allow(unreachable_patterns)]
 					_g => unsafe { std::hint::unreachable_unchecked() }
 				});
 				run(__f, #body)?;

@@ -307,7 +307,6 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 		unk4: g.u16()?,
 	})).strict()?;
 
-	// TODO is this correct in eddec?
 	let anim_count = (func_table.pos()-animations.pos())/12;
 	let mut g = animations;
 	let animations = list(anim_count, || {
@@ -351,15 +350,12 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 		None
 	} else {
 		let mut g = labels;
-		Some(list(n_labels, || {
-			let mut h = g.clone();
-			Ok(Label {
-				pos: (g.f32()?, g.f32()?, g.f32()?),
-				unk1: g.u16()?,
-				unk2: g.u16()?,
-				name: g.ptr32()?.string()?,
-			})
-		}).strict()?)
+		Some(list(n_labels, || Ok(Label {
+			pos: (g.f32()?, g.f32()?, g.f32()?),
+			unk1: g.u16()?,
+			unk2: g.u16()?,
+			name: g.ptr32()?.string()?,
+		})).strict()?)
 	};
 
 	let mut btl = BattleRead::default();
@@ -791,18 +787,18 @@ mod test {
 
 	macro_rules! test {
 		($a:item) => {
-			#[test_case::test_case(&GameData::ZERO, false, "../data/zero-gf/data/scena", ".bin"; "zero_gf_jp")]
-			#[test_case::test_case(&GameData::ZERO, false, "../data/zero-gf/data_en/scena", ".bin"; "zero_gf_en")]
-			#[test_case::test_case(&GameData::ZERO_KAI, true, "../data/zero/data/scena", ".bin"; "zero_nisa_jp")]
-			#[test_case::test_case(&GameData::ZERO_KAI, true, "../data/zero/data/scena_us", ".bin"; "zero_nisa_en")]
-			#[test_case::test_case(&GameData::ZERO_EVO, true, "../data/vita/extract/zero/data1/data/scena", ".bin"; "zero_evo")]
-			#[test_case::test_case(&GameData::AO, true, "../data/ao-psp/PSP_GAME/USRDIR/data/scena", ".bin"; "ao_psp_jp")]
+			#[test_case::test_case(&GameData::ZERO, false, &[], "../data/zero-gf/data/scena", ".bin"; "zero_gf_jp")]
+			#[test_case::test_case(&GameData::ZERO, false, &[], "../data/zero-gf/data_en/scena", ".bin"; "zero_gf_en")]
+			#[test_case::test_case(&GameData::ZERO_KAI, true, &["c1440.bin"], "../data/zero/data/scena", ".bin"; "zero_nisa_jp")]
+			#[test_case::test_case(&GameData::ZERO_KAI, true, &[], "../data/zero/data/scena_us", ".bin"; "zero_nisa_en")]
+			#[test_case::test_case(&GameData::ZERO_EVO, true, &["c1440.bin"], "../data/vita/extract/zero/data1/data/scena", ".bin"; "zero_evo")]
+			#[test_case::test_case(&GameData::AO, true, &["r0000_1.bin"], "../data/ao-psp/PSP_GAME/USRDIR/data/scena", ".bin"; "ao_psp_jp")]
 			$a
 		}
 	}
 
 	test! {
-	fn roundtrip(game: &GameData, strict: bool, scenapath: &str, suffix: &str) -> Result<(), Error> {
+	fn roundtrip(game: &GameData, strict: bool, except: &[&str], scenapath: &str, suffix: &str) -> Result<(), Error> {
 		let mut failed = false;
 
 		let mut paths = std::fs::read_dir(scenapath)?
@@ -819,7 +815,7 @@ mod test {
 
 			let data = std::fs::read(&path)?;
 
-			let strict = strict && name != "c1440.bin"; // in Evo and Gf JP, contains a FA 57, which decodes to the same char as EE FC
+			let strict = strict ^ (except.iter().any(|a| *a == name));
 
 			if let Err(err) = check_roundtrip_flex(strict, &data, |a| super::read(game, a), |a| super::write(game, a)) {
 				println!("{name}: {err:?}");

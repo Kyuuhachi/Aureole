@@ -360,8 +360,11 @@ fn make_table(ctx: &Ctx) -> String {
 			#insn-table th { writing-mode: vertical-lr; }\n\
 			#insn-table td:first-child { text-align: left; }\n\
 			#insn-table td:not(:first-child) { vertical-align: middle; }\n\
-			#insn-table .insn-table-join { border-right: none; }\n\
-			#insn-table .insn-table-join + * { border-left: none; }\n\
+			#insn-table td { border-top: none; }\n\
+			#insn-table td:not(:first-child) { border-left: none; }\n\
+			#insn-table .insn-table-blank { background: linear-gradient(to right, transparent -75000%, currentcolor 1000000%); }\n\
+			#insn-table .insn-table-right { border-right: none; }\n\
+			#insn-table .insn-table-down { border-bottom: none; }\n\
 		"));
 		n.attr("id", "insn-table");
 		let mut hex: BTreeMap<Ident, BTreeMap<Ident, u8>> = BTreeMap::new();
@@ -391,50 +394,60 @@ fn make_table(ctx: &Ctx) -> String {
 			});
 		});
 
+		let mut table = Vec::new();
+		let mut insns = ctx.defs.iter().peekable();
+		while let Some(def) = insns.next() {
+			let games = hex.get(&def.ident).unwrap();
+			let mut defs = vec![def];
+			while let Some(next) = insns.peek() && hex.get(&next.ident).unwrap() == games {
+				defs.push(insns.next().unwrap());
+			}
+
+			let head = choubun::node("td", |n| {
+				for Insn { ident, args, ..} in defs {
+					let aliases = args.iter().map(|a| a.alias());
+					let mut title = String::new();
+					title.push_str(&ident.to_string());
+					for alias in aliases {
+						title.push_str(&format!(" {alias}"));
+					}
+					n.node("span", |n| {
+						n.attr("title", title);
+						n.text(format_args!("[`{ident}`](Self::{ident})"));
+					});
+					n.text(" ");
+				}
+			});
+
+			let row = ctx.games.iter().map(|a| games.get(a)).collect::<Vec<_>>();
+			table.push((head, row));
+		}
+
 		n.node("tbody", |n| {
 			n.indent();
-			let mut insns = ctx.defs.iter().peekable();
-			while let Some(def) = insns.next() {
-				let games = hex.get(&def.ident).unwrap();
-				let mut defs = vec![def];
-				while let Some(next) = insns.peek() && hex.get(&next.ident).unwrap() == games {
-					defs.push(insns.next().unwrap());
-				}
-
+			let mut iter = table.into_iter().peekable();
+			while let Some((head, row)) = iter.next() {
 				n.node("tr", |n| {
-					n.node("td", |n| {
-						for Insn { ident, args, ..} in defs {
-							let aliases = args.iter().map(|a| a.alias());
-							let mut title = String::new();
-							title.push_str(&ident.to_string());
-							for alias in aliases {
-								title.push_str(&format!(" {alias}"));
-							}
-							n.node("span", |n| {
-								n.attr("title", title);
-								n.text(format_args!("[`{ident}`](Self::{ident})"));
-							});
-							n.text(" ");
-						}
-					});
-
-					let mut columns = Vec::<choubun::Node>::new();
-					let mut prev = None;
-					for game in &ctx.games {
-						let node = choubun::node("td", |n| {
-							let hex = games.get(game);
+					n.add(head);
+					let mut row_iter = row.iter().copied().peekable();
+					let next = iter.peek();
+					let mut next_iter = next.iter().flat_map(|a| a.1.iter().copied());
+					while let Some(hex) = row_iter.next() {
+						let same_right = row_iter.peek() == Some(&hex);
+						let same_below = next_iter.next().map(|a| a.map(|a| *a as u16)) == Some(hex.map(|a| *a as u16 + 1));
+						n.node("td", |n| {
 							if let Some(hex) = hex {
 								n.text(format_args!("{hex:02X}"));
+							} else {
+								n.class("insn-table-blank")
 							}
-							if prev == Some(hex) {
-								columns.last_mut().unwrap().class("insn-table-join");
+							if same_right {
+								n.class("insn-table-right")
 							}
-							prev = Some(hex);
+							if same_below {
+								n.class("insn-table-down")
+							}
 						});
-						columns.push(node);
-					}
-					for item in columns {
-						n.add(item);
 					}
 				});
 			}

@@ -164,10 +164,10 @@ themelios_macros::bytecode! {
 		BgmWait(), // [wait_bgm]
 
 		SoundPlay({ i if i.is_ed7() && game.kai => u32, _ => u16 as u32 } as SoundId, u8, { i if i.is_ed7() => u16, _ => u8 as u16 }), // [sound]
-		SoundStop(u16 as u32 as SoundId),
+		SoundStop({ IS::Ao|IS::AoEvo if game.kai => u32, _ => u16 as u32 } as SoundId),
 		SoundLoop(u16 as u32 as SoundId, u8),
 		_Sound25(u16 as u32 as SoundId, Pos3, u32, u32, u8, u32),
-		SoundLoad(u16 as u32 as SoundId), // [sound_load]
+		SoundLoad({ IS::Ao|IS::AoEvo if game.kai => u32, _ => u16 as u32 } as SoundId), // [sound_load]
 
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] skip!(1),
 		#[game(Zero,ZeroEvo,Ao,AoEvo)] NextFrame2(),

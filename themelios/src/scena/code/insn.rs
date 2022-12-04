@@ -102,10 +102,10 @@ themelios_macros::bytecode! {
 		/// The third arg is an index to something, but it is unclear what.
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)]
 		ED6_12(i32, i32, u32),
-		#[game(AoEvo)]
-		AoEvoSoundStop(u16, u16, u8),
 		#[game(Zero, ZeroEvo, Ao, AoEvo)]
 		ED7_12(u16, u16, u8),
+		#[game(AoEvo)]
+		AoEvo_13(u16),
 
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, Ao)] PlaceSetName(u16 as TownId), // I am not certain whether it is this one or the one before that is not in Evo
 

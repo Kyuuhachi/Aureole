@@ -2,7 +2,7 @@ use super::*;
 
 themelios_macros::bytecode! {
 	(game: &GameData)
-	#[games(game.iset => InstructionSet::{Fc, FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao})]
+	#[games(game.iset => InstructionSet::{Fc, FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo})]
 	[
 		skip!(1), // null
 		Return(), // [return]
@@ -23,7 +23,7 @@ themelios_macros::bytecode! {
 		/// `new_scene`.
 		Hcf(),
 
-		Sleep({ IS::Zero|IS::ZeroEvo|IS::Ao => u16 as u32, _ => u32 } alias Time), // [delay]
+		Sleep({ i if i.is_ed7() => u16 as u32, _ => u32 } alias Time), // [delay]
 		SystemFlagsSet(u32 as SystemFlags), // [set_system_flag]
 		SystemFlagsUnset(u32 as SystemFlags), // [reset_system_flag]
 
@@ -38,7 +38,7 @@ themelios_macros::bytecode! {
 		def! ED7Battle(BattleId, u16,u8,u8,u8, u16, u16, CharId),
 		def! ED7NpcBattle(u16,u8,u8,u8, [Option<String>; 8] alias NpcBattleCombatants, u16, u16),
 
-		#[game(Zero, ZeroEvo, Ao)]
+		#[game(Zero, ZeroEvo, Ao, AoEvo)]
 		custom! {
 			read => |f| {
 				let ptr = f.u32()?;
@@ -102,15 +102,17 @@ themelios_macros::bytecode! {
 		/// The third arg is an index to something, but it is unclear what.
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)]
 		ED6_12(i32, i32, u32),
-		#[game(Zero, ZeroEvo, Ao)]
+		#[game(AoEvo)]
+		AoEvoSoundStop(u16, u16, u8),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)]
 		ED7_12(u16, u16, u8),
 
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, Ao)] PlaceSetName(u16 as TownId), // I am not certain whether it is this one or the one before that is not in Evo
 
 		#[game(Fc, FcEvo)] skip!(1), // Unused one-byte instruction that calls an unknown function
 		#[game(Fc, FcEvo)] skip!(1), // One-byte nop
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao)] Sc_14({ IS::Ao => u16 as u32, _ => u32 }, u32 as Color, { IS::Ao => u16 as u32, _ => u32 }, u8, { IS::Ao => u16 as u32, _ => u32 }),
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao)] Sc_15(u32),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_14({ IS::Ao|IS::AoEvo => u16 as u32, _ => u32 }, u32 as Color, { IS::Ao|IS::AoEvo => u16 as u32, _ => u32 }, u8, { IS::Ao|IS::AoEvo => u16 as u32, _ => u32 }),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_15(u32),
 
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)]
 		Map(match {
@@ -123,9 +125,9 @@ themelios_macros::bytecode! {
 			2 => _2(i32, Pos2, u16, u16, u16, u16),
 			3 => _3(u8, u16),
 		}),
-		#[game(Ao)]
+		#[game(Ao, AoEvo)]
 		AoMap(u8),
-		#[game(Fc, Sc, Tc, Zero, ZeroEvo, Ao)] Save(),
+		#[game(Fc, Sc, Tc, Zero, ZeroEvo, Ao, AoEvo)] Save(),
 		#[game(FcEvo, ScEvo, TcEvo)] EvoSave(u8),
 		#[game(Fc, FcEvo, Zero, Ao)] skip!(1), // two-byte nop
 		#[game(Sc, ScEvo, Tc, TcEvo)] Sc_18(u8, u8, u8),
@@ -145,30 +147,30 @@ themelios_macros::bytecode! {
 		EventEnd(u8),
 
 		_1B(u8, func_ref_u8_u16() -> FuncRef),
-		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, Ao)]
+		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, Ao, AoEvo)]
 		_1C(u8, u8, u8, u8, u8, u8, u16, u16),
 
-		#[game(Zero, ZeroEvo, Ao)]
+		#[game(Zero, ZeroEvo, Ao, AoEvo)]
 		ED7_1D(match {
 			0 => _0(u16 as CharId, u8, Pos3, i32, i32, i32),
 			2 => _2(u16 as CharId),
 			3 => _3(u16 as CharId),
 		}),
 
-		BgmPlay({ IS::Zero|IS::ZeroEvo|IS::Ao => u16, _ => u8 as u16 } as BgmId, { IS::Zero|IS::ZeroEvo|IS::Ao => u8, _ => const 0u8 }), // [play_bgm]
+		BgmPlay({ i if i.is_ed7() => u16, _ => u8 as u16 } as BgmId, { i if i.is_ed7() => u8, _ => const 0u8 }), // [play_bgm]
 		BgmResume(), // [resume_bgm]
 		BgmVolume(u8, u32 alias Time), // [volume_bgm]
 		BgmStop(u32 alias Time), // [stop_bgm]
 		BgmWait(), // [wait_bgm]
 
-		SoundPlay({ IS::Zero|IS::ZeroEvo|IS::Ao if game.kai => u32, _ => u16 as u32 } as SoundId, u8, { IS::Zero|IS::ZeroEvo|IS::Ao => u16, _ => u8 as u16 }), // [sound]
+		SoundPlay({ i if i.is_ed7() && game.kai => u32, _ => u16 as u32 } as SoundId, u8, { i if i.is_ed7() => u16, _ => u8 as u16 }), // [sound]
 		SoundStop(u16 as u32 as SoundId),
 		SoundLoop(u16 as u32 as SoundId, u8),
 		_Sound25(u16 as u32 as SoundId, Pos3, u32, u32, u8, u32),
 		SoundLoad(u16 as u32 as SoundId), // [sound_load]
 
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] skip!(1),
-		#[game(Zero,ZeroEvo,Ao)] NextFrame2(),
+		#[game(Zero,ZeroEvo,Ao,AoEvo)] NextFrame2(),
 
 		Quest(u16 as QuestId, match {
 			0x01 => TaskSet(u16 alias QuestTask),
@@ -188,13 +190,13 @@ themelios_macros::bytecode! {
 		PartyRemove(u8 as Member, u8), // [separate_party]
 		ScPartyClear(),
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] _Party30(u8 as Member),
-		#[game(Zero, ZeroEvo, Ao)] ED7_31(u8),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_31(u8),
 		PartySetAttr(u8 as Member, u8 as MemberAttr, u16), // [set_status]
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo,Zero,Ao)] skip!(2),
 		PartyAddArt(u8 as Member, u16 as MagicId),
 		PartyAddCraft(u8 as Member, u16 as MagicId),
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] PartyAddSCraft(u8 as Member, u16 as MagicId),
-		#[game(Zero, ZeroEvo,Ao)] ED7_37(),
+		#[game(Zero, ZeroEvo,Ao, AoEvo)] ED7_37(),
 		PartySetSlot(u8 as Member, u8, {
 			IS::Fc|IS::FcEvo => u8,
 			_ if (0x7F..=0xFE).contains(_1) => u8,
@@ -219,9 +221,9 @@ themelios_macros::bytecode! {
 
 		ForkFunc(u16 as CharId, u8 as u16 alias ForkId, func_ref(game) -> FuncRef), // [execute]
 		ForkQuit(u16 as CharId, u8 as u16 alias ForkId), // [terminate]
-		Fork(u16 as CharId, { IS::Zero|IS::ZeroEvo|IS::Ao => u8 as u16, _ => u16 } alias ForkId, fork(game) -> Vec<Insn> alias Fork), // [preset]? In t0311, only used with a single instruction inside
-		ForkLoop(u16 as CharId, { IS::Zero|IS::ZeroEvo|IS::Ao => u8 as u16, _ => u16 } alias ForkId, fork_loop(game) -> Vec<Insn> alias Fork),
-		ForkWait(u16 as CharId, { IS::Zero|IS::ZeroEvo|IS::Ao => u8 as u16, _ => u16 } alias ForkId), // [wait_terminate]
+		Fork(u16 as CharId, { i if i.is_ed7() => u8 as u16, _ => u16 } alias ForkId, fork(game) -> Vec<Insn> alias Fork), // [preset]? In t0311, only used with a single instruction inside
+		ForkLoop(u16 as CharId, { i if i.is_ed7() => u8 as u16, _ => u16 } alias ForkId, fork_loop(game) -> Vec<Insn> alias Fork),
+		ForkWait(u16 as CharId, { i if i.is_ed7() => u8 as u16, _ => u16 } alias ForkId), // [wait_terminate]
 		NextFrame(), // [next_frame]
 
 		Event(func_ref(game) -> FuncRef), // [event] Not sure how this differs from Call
@@ -242,7 +244,7 @@ themelios_macros::bytecode! {
 		///
 		/// I believe the CharId, which is only present in ED7, is used to select the textbox title.
 		/// However, it is 999 on chests.
-		TextMessage({ IS::Zero|IS::ZeroEvo|IS::Ao => u16, _ => const 255u16 } as CharId, text() -> Text), // [mes]
+		TextMessage({ i if i.is_ed7() => u16, _ => const 255u16 } as CharId, text() -> Text), // [mes]
 		skip!(1), // {asm} same as NextFrame
 		TextClose(u8), // [mes_close]
 		ScMenuSetTitle(u16, u16, u16, text() -> Text),
@@ -266,20 +268,20 @@ themelios_macros::bytecode! {
 		CamChangeAxis(u16), // [camera_change_axis] 0 CAMERA_ABSOLUTE_MODE, 1 CAMERA_RELATIVE_MODE
 		CamMove(i32, i32, i32, u32 alias Time), // [camera_move]
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] _Cam68(u8), // TODO this isn't in any scripts? Is it from the asm?
-		#[game(Zero,ZeroEvo,Ao)] ED7_Cam69(u8, u16),
+		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_Cam69(u8, u16),
 		CamLookChar(u16 as CharId, u32 alias Time), // [camera_look_chr]
 		_Char6A(u16 as CharId),
 		CamZoom(i32, u32 alias Time), // [camera_zoom]
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] CamRotate(i32 alias Angle32, u32 alias Time), // [camera_rotate]
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] CamLookPos(Pos3, u32 alias Time), // [camera_look_at]
-		#[game(Zero,ZeroEvo,Ao)] ED7CamRotate(i16 alias Angle, i16 alias Angle, i16 alias Angle, u32 alias Time),
+		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7CamRotate(i16 alias Angle, i16 alias Angle, i16 alias Angle, u32 alias Time),
 		CamPers(u32, u32 alias Time), // [camera_pers]
 
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] ObjFrame(u16 alias ObjectId, u32), // [mapobj_frame]
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] ObjPlay(u16 alias ObjectId, u32), // [mapobj_play]
-		#[game(Zero,ZeroEvo,Ao)] ED7_6F(u8),
-		#[game(Zero,ZeroEvo,Ao)] ED7ObjFrame(u8 as u16 alias ObjectId, u16),
-		#[game(Zero,ZeroEvo,Ao)] ED7ObjPlay(u8 as u16 alias ObjectId, u16, u32, u32), // TODO EDDec thinks the first u32 is two u16
+		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_6F(u8),
+		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7ObjFrame(u8 as u16 alias ObjectId, u16),
+		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7ObjPlay(u8 as u16 alias ObjectId, u16, u32, u32), // TODO EDDec thinks the first u32 is two u16
 		ObjFlagsSet( // [mapobj_set_flag]
 			{ IS::Fc|IS::FcEvo|IS::Sc|IS::ScEvo => u16, _ => u8 as u16 } alias ObjectId,
 			{ IS::Fc|IS::FcEvo|IS::Sc|IS::ScEvo => u16 as u32, _ => u32 } as ObjectFlags,
@@ -299,37 +301,38 @@ themelios_macros::bytecode! {
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _7A(u8 as u16 alias ObjectId, u16),
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _7B(),
 
-		#[game(Zero,ZeroEvo,Ao)] ED7_74(u8 as u16 alias ObjectId, u16),
-		#[game(Zero,ZeroEvo,Ao)] ED7_75(u8, u8, u32),
-		#[game(Zero,ZeroEvo,Ao)] ED7_76(u8 as u16 alias ObjectId, String, match {
+		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_74(u8 as u16 alias ObjectId, u16),
+		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_75(u8, u8, u32),
+		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_76(u8 as u16 alias ObjectId, String, match {
 			0 => _0(u32),
 			1 => _1(u32),
 			2 => _2(String),
 			3 => _3(i32),
+			4 => _4(i32),
 		}),
-		#[game(Zero,ZeroEvo,Ao)] ED7_77(u8, u16),
-		#[game(Zero,ZeroEvo,Ao)] ED7_78(u8, u16),
-		#[game(Zero,ZeroEvo,Ao)] ED7_79(u16),
-		#[game(Zero,Ao)] EventSkip(u8, u32), // TODO this one will need label handling
-		#[game(Zero,Ao)] ED7_7B(u8),
+		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_77(u8, u16),
+		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_78(u8, u16),
+		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_79(u16),
+		#[game(Zero,Ao,AoEvo)] EventSkip(u8, u32), // TODO this one will need label handling
+		#[game(Zero,Ao,AoEvo)] ED7_7B(u8),
 		#[game(Zero,Ao)] skip!(1),
-		#[game(Zero,ZeroEvo,Ao)] ED7_7D(u32, u32),
+		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_7D(u32, u32),
 		#[game(Zero,Ao)] skip!(4),
 
 		Shake(u32, u32, u32, u32 alias Time), // [quake]
 
 		#[game(Fc, FcEvo)] skip!(1), // {asm} two-byte nop
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao)] Sc_7D(match {
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_7D(match {
 			0 => _0(u16 as CharId, u16, u16),
 			1 => _1(u16 as CharId, u16, u16), // args always zero; always paired with a _0 except when the char is 254
 		}),
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _7E(i16, i16, u16, u8, u32),
 
-		#[game(Zero, Ao)] ED7_84(u8, u8),
+		#[game(Zero, Ao, AoEvo)] ED7_84(u8, u8),
 		EffLoad(u8, String alias EffFileRef),
 		EffPlay(
 			u8 alias EffId, u8,
-			u16 as CharId, { IS::Zero|IS::ZeroEvo|IS::Ao => u16, _ => const 0u16 }, Pos3, // source
+			u16 as CharId, { i if i.is_ed7() => u16, _ => const 0u16 }, Pos3, // source
 			i16, i16, i16,
 			u32, u32, u32, // scale?
 			u16 as CharId, Pos3, // target
@@ -337,20 +340,20 @@ themelios_macros::bytecode! {
 		),
 		EffPlay2(
 			u8 alias EffId, u8,
-			u8 as u16 alias ObjectId, String, { IS::Zero|IS::ZeroEvo|IS::Ao => u16, _ => const 0u16 }, Pos3, // source
+			u8 as u16 alias ObjectId, String, { i if i.is_ed7() => u16, _ => const 0u16 }, Pos3, // source
 			i16, i16, i16,
 			u32, u32, u32, // scale
 			u32 alias Time, // period (0 if one-shot)
 		),
 		_82(u8 alias EffId, u8),
 		#[game(Fc, FcEvo)] FcAchievement(u8, u8),
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao)] _83(u8, u8), // might have to do with EffPlay
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] _83(u8, u8), // might have to do with EffPlay
 		_84(u8),
 		_85(u8, u8),
 
-		CharSetBase    (u16 as CharId, { IS::Zero|IS::ZeroEvo|IS::Ao => u8 as u16, _ => u16 }), // [set_chr_base]
-		CharSetPattern (u16 as CharId, { IS::Zero|IS::ZeroEvo|IS::Ao => u8 as u16, _ => u16 }), // [set_chr_ptn]
-		#[game(Zero, ZeroEvo, Ao)] ED7CharSetName (u16 as CharId, String), // debug script only
+		CharSetBase    (u16 as CharId, { i if i.is_ed7() => u8 as u16, _ => u16 }), // [set_chr_base]
+		CharSetPattern (u16 as CharId, { i if i.is_ed7() => u8 as u16, _ => u16 }), // [set_chr_ptn]
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7CharSetName (u16 as CharId, String), // debug script only
 		CharSetPos     (u16 as CharId, Pos3, i16 alias Angle), // [set_pos]
 		CharSetPos2    (u16 as CharId, Pos3, i16 alias Angle),
 		CharLookAtChar (u16 as CharId, u16 as CharId, u16 alias Time16), // [look_to]
@@ -366,15 +369,15 @@ themelios_macros::bytecode! {
 		_94        (u8, u16 as CharId, i16 alias Angle, i32, u32 alias Speed, u8),
 		CharJump       (u16 as CharId, i32, i32, i32, u32, u32 alias Speed), // [jump]
 		_Char96        (u16 as CharId, Pos3, i32, i32),
-		_Char97        (u16 as CharId, Pos2, i32 alias Angle32, u32, u16), // used with pigeons
+		_Char97        (u16 as CharId, Pos2, i32 alias Angle32, u32, u16),
 		Sc_Char98(match {
 			0 => _0(u16 as CharId),
 			1 => _1(Pos3),
 			2 => _2(u16 as CharId, u32, u8),
 		}),
-		#[game(Zero, ZeroEvo, Ao)] ED7_A0(u16 as CharId, u16, u16),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_A0(u16 as CharId, u16, u16),
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] CharAnimation(u16 as CharId, u8, u8, u32 alias Time), // [chr_anime]
-		#[game(Zero, ZeroEvo, Ao)] ED7CharAnimation(u16 as CharId, u16, char_animation() -> Vec<u8> alias Animation),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7CharAnimation(u16 as CharId, u16, char_animation() -> Vec<u8> alias Animation),
 		CharFlagsSet   (u16 as CharId, u16 as CharFlags), // [set_state]
 		CharFlagsUnset (u16 as CharId, u16 as CharFlags), // [reset_state]
 		_Char9C        (u16 as CharId, u16), // TODO EDDec thinks these are CharBattleFlagsSet/Unset
@@ -462,8 +465,8 @@ themelios_macros::bytecode! {
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _ObjB0(u16 alias ObjectId, u8), // Used along with 6F, 70, and 73 during T0700#11
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] OpLoad(String alias OpFileRef),
 
-		#[game(Zero, ZeroEvo, Ao)] ED7_B1(u8),
-		#[game(Zero, ZeroEvo, Ao)] skip!(3),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_B1(u8),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] skip!(3),
 
 		_B2(match {
 			0 => Set(u8, u16),
@@ -491,9 +494,9 @@ themelios_macros::bytecode! {
 		/// This is related to [`PartyRemove`](Self::PartyRemove) and [`_B7`](Self::_B7), but as with that one, the details are unknown.
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _B8(u8 as Member),
 
-		#[game(Zero, ZeroEvo, Ao)] ED7_B8(u16, u16),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_B8(u16, u16),
 		#[game(Zero, ZeroEvo, Ao)] skip!(1),
-		#[game(Zero, ZeroEvo, Ao)] ED7_BA(u8),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_BA(u8),
 
 		/// Opens the book reading interface, as if using it from the inventory.
 		///
@@ -511,15 +514,15 @@ themelios_macros::bytecode! {
 
 		#[game(Fc, FcEvo)] skip!(10),
 
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao)] ScSetPortrait(u8 as Member, u8, u8, u8, u8, u8),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] ScSetPortrait(u8 as Member, u8, u8, u8, u8, u8),
 		// This instruction is only used a single time throughout FC..=3rd, but this is its signature according to the asm
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, Ao)] Sc_BC(u8, match {
 			0 => _0(u16),
 			1 => _1(u16),
 		}),
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao)] Sc_BD(),
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao)] Sc_BE(u8,u8,u8,u8, u16, u16, u8, i32,i32,i32,i32,i32,i32),
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao)] Sc_BF(u8,u8,u8,u8, u16),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_BD(),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_BE(u8,u8,u8,u8, u16, u16, u8, i32,i32,i32,i32,i32,i32),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_BF(u8,u8,u8,u8, u16),
 		/// ```text
 		///  1 ⇒ something about using items on the field
 		/// 11 ⇒ roulette
@@ -536,31 +539,31 @@ themelios_macros::bytecode! {
 		/// 22 ⇒ after Weissman sets up a barrier
 		/// 23 ⇒ used after sequences of ScLoadChcp
 		/// ```
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao)] ScMinigame(u8, i32,i32,i32,i32,i32,i32,i32,i32),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] ScMinigame(u8, i32,i32,i32,i32,i32,i32,i32,i32),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao)] Sc_C1(u16 as ItemId, u32),
 		#[game(Sc, ScEvo)] Sc_C2(),
 		#[game(Tc, TcEvo)] Tc_C2(u8, u8),
-		#[game(Zero, ZeroEvo, Ao)] ED7_C5(u8, u8), // Achievement?
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_C5(u8, u8), // Achievement?
 
 		/// Unused.
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, Ao)] Sc_C3(u16),
 
 		/// Something for setting some kind of bit flags I guess.
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, Ao, ZeroEvo)] Sc_C4(match {
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, Ao, AoEvo, ZeroEvo)] Sc_C4(match {
 			0 => Set(u32),
 			1 => Unset(u32),
 		}),
 
 		#[game(Fc)] skip!(3),
-		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao)] VisLoad(u8 alias VisId, i16,i16,u16,u16, i16,i16,u16,u16, i16,i16,u16,u16, u32 as Color, u8, String),
-		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao)] VisColor(u8 alias VisId, u8, u32 as Color, u32 alias Time, u32, { IS::FcEvo|IS::Ao => u32, _ => const 0u32 }),
-		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao)] VisDispose(u8, u8 alias VisId, u8),
+		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] VisLoad(u8 alias VisId, i16,i16,u16,u16, i16,i16,u16,u16, i16,i16,u16,u16, u32 as Color, u8, String),
+		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] VisColor(u8 alias VisId, u8, u32 as Color, u32 alias Time, u32, { IS::FcEvo|IS::Ao|IS::AoEvo => u32, _ => const 0u32 }),
+		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] VisDispose(u8, u8 alias VisId, u8),
 
 		#[game(Fc,FcEvo)] skip!(19),
 
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao)] Sc_C8(u16, u16, String, u8, u16), // Something with C_PLATnn._CH
-		#[game(Zero, Ao)] ED7_CC(u8),
-		#[game(Zero, Ao)] ED7_CD(match {
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_C8(u16, u16, String, u8, u16), // Something with C_PLATnn._CH
+		#[game(Zero, Ao, AoEvo)] ED7_CC(u8),
+		#[game(Zero, Ao, AoEvo)] ED7_CD(match {
 			0 => _0(u8),
 			1 => _1(u8, u8),
 		}),
@@ -577,7 +580,7 @@ themelios_macros::bytecode! {
 			2 => Show(u8 alias SelectId),
 			3 => SetDisabled(u8 alias SelectId, u8),
 		}),
-		#[game(Zero, ZeroEvo, Ao)] ED7Select(match {
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7Select(match {
 			0 => New(u8 alias SelectId),
 			1 => Add(u8 alias SelectId, String alias MenuItem),
 			2 => Show(u8 alias SelectId, u16, u16, u8),
@@ -586,16 +589,16 @@ themelios_macros::bytecode! {
 			5 => _5(u8 alias SelectId, u8),
 			6 => _6(u8 alias SelectId),
 		}),
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao)] Sc_CD(u16 as CharId), // related to showing photographs
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao)] Global(u8 as Global, expr(game) -> Expr),
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao)] Sc_CF(u16 as CharId, u8, String), // something with skeleton animation
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao)] Sc_D0(i32 alias Angle32, u32 alias Time),
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao)] Sc_D1(u16 as CharId, i32, i32, i32, u32 alias Time), // something with camera?
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_CD(u16 as CharId), // related to showing photographs
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Global(u8 as Global, expr(game) -> Expr),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_CF(u16 as CharId, u8, String), // something with skeleton animation
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_D0(i32 alias Angle32, u32 alias Time),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_D1(u16 as CharId, i32, i32, i32, u32 alias Time), // something with camera?
 		#[game(Sc, ScEvo, Tc, TcEvo)] ScLoadChcp(file_ref(game) -> String, file_ref(game) -> String, u8),
-		#[game(Zero, ZeroEvo, Ao)] ED7LoadChcp(file_ref(game) -> String, u8),
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao)] Sc_D3(u8),
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao)] PartyGetAttr(u8 as Member, u8),
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao)] PartyGetEquipped(u8 as Member, u8),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7LoadChcp(file_ref(game) -> String, u8),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_D3(u8),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] PartyGetAttr(u8 as Member, u8),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] PartyGetEquipped(u8 as Member, u8),
 
 		#[game(Sc, ScEvo, Tc, TcEvo)] Sc_D6(u8), // bool
 		#[game(Sc, ScEvo, Tc, TcEvo)] Sc_D7(u8, u32, u16 as CharId),
@@ -607,18 +610,18 @@ themelios_macros::bytecode! {
 		}),
 
 		#[game(Zero)] skip!(2),
-		#[game(Ao)] Ao_DA(u8),
+		#[game(Ao, AoEvo)] Ao_DA(u8),
 		#[game(ZeroEvo, Ao)] skip!(1),
-		#[game(Zero, ZeroEvo, Ao)] ED7_DA(u8),
-		#[game(Zero, ZeroEvo, Ao)] ED7_DB(),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_DA(u8),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_DB(),
 		#[game(Zero, ZeroEvo)] skip!(2),
-		#[game(Ao)] Ao_DE(String),
-		#[game(Ao)] skip!(1),
-		#[game(Zero, ZeroEvo, Ao)] ED7_DE(u16),
+		#[game(Ao, AoEvo)] Ao_DE(String),
+		#[game(Ao, AoEvo)] skip!(1),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_DE(u16),
 		#[game(Zero, Ao)] skip!(1),
-		#[game(Zero, ZeroEvo, Ao)] ED7_E0(u8),
-		#[game(Zero, ZeroEvo, Ao)] ED7_E1(Pos3),
-		#[game(Zero, ZeroEvo, Ao)] ED7Note(match {
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_E0(u8),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_E1(Pos3),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7Note(match {
 			0 => Fish(u8, match {
 				0 => Count(),
 				1 => MaxSize(),
@@ -629,11 +632,11 @@ themelios_macros::bytecode! {
 			2 => _2(u8),
 			3 => _3(),
 		}),
-		#[game(Zero, ZeroEvo, Ao)] ED7_E3(u8),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_E3(u8),
 		#[game(Zero, ZeroEvo)] skip!(1),
-		#[game(Ao)] Ao_E6(u8, u8, u32 as Color, u32),
+		#[game(Ao, AoEvo)] Ao_E6(u8, u8, u32 as Color, u32),
 
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao)] Sc_DA(), // Something to do with menus
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_DA(), // Something to do with menus
 
 		#[game(Tc, TcEvo)] Tc_DB(u8, u8 as Member),
 		#[game(Tc, TcEvo)] TcTeam(match {
@@ -681,6 +684,7 @@ themelios_macros::bytecode! {
 		#[game(FcEvo, Sc, ScEvo, TcEvo, Zero, ZeroEvo, Ao)] Sc_DB(),
 		/// A no-op. Always paired with [`Sc_DB`](Self::Sc_DB).
 		#[game(FcEvo, Sc, ScEvo, TcEvo, Zero, ZeroEvo, Ao)] Sc_DC(),
+		#[game(AoEvo)] AoEvo_D8(),
 		#[game(Tc)] skip!(2),
 
 		/// Opens the save menu in order to save clear data.
@@ -746,33 +750,41 @@ themelios_macros::bytecode! {
 		#[game(TcEvo)] skip!(0),
 
 		#[game(Zero, Ao)] skip!(5),
-		#[game(Zero, ZeroEvo, Ao)] ED7_EE(u8, u16),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_EE(u8, u16),
 		#[game(Zero, ZeroEvo)] skip!(3),
 		#[game(Ao)] skip!(2),
-		#[game(Ao)] Ao_F3(i32),
-		#[game(Zero, ZeroEvo, Ao)] ED7_F2(u8),
+		#[game(Ao, AoEvo)] Ao_F3(i32),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_F2(u8),
 		#[game(Zero)] skip!(5),
 		#[game(ZeroEvo)] skip!(3),
-		#[game(Zero, ZeroEvo, Ao)] ED7_F8(u16),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_F8(u16),
 		#[game(Zero)] skip!(7),
 		#[game(Ao)] skip!(5),
-		#[game(Ao)] Ao_FB(u8, u16),
-		#[game(Ao)] Ao_FC(u16),
-		#[game(Ao)] Ao_FD(u16, u16),
-		#[game(Ao)] Ao_FE(u8),
-		#[game(Ao)] Ao_FF(u8, Pos3),
+		#[game(Ao, AoEvo)] Ao_FB(u8, u16),
+		#[game(Ao, AoEvo)] Ao_FC(u16),
+		#[game(Ao, AoEvo)] Ao_FD(u16, u16),
+		#[game(Ao, AoEvo)] Ao_FE(u8),
+		#[game(Ao, AoEvo)] Ao_FF(u8, Pos3),
 
-		#[game(ZeroEvo)] ZE_E0(),
-		#[game(ZeroEvo)] ZE_E1(u32,u32,u32,u32, u32,u32,u32,u32, u32,u32,u32,u32),
-		#[game(ZeroEvo)] ZE_E2(u32,u32,u32, u8, u32, u32),
-		#[game(ZeroEvo)] ZE_E3(u8, String, u32, u32, u8),
-		#[game(ZeroEvo)] ZE_E4(u8, u16),
-		#[game(ZeroEvo)] ZE_E5(u8, u8, String, String, Pos3, Pos3, Pos3, u8),
-		#[game(ZeroEvo)] ZE_E6(u8, u8, Pos3, Pos3, Pos3),
-		#[game(ZeroEvo)] ZE_E7(u8, u8),
-		#[game(ZeroEvo)] ZE_E8(u8),
-		#[game(ZeroEvo)] ZE_E9(u16, u32,u32,u32,u32, u32,u32,u32,u32),
+		#[game(ZeroEvo, AoEvo)] ZeroEvo_E0(),
+		#[game(ZeroEvo, AoEvo)] ZeroEvo_E1(u32,u32,u32,u32, u32,u32,u32,u32, u32,u32,u32,u32),
+		#[game(ZeroEvo, AoEvo)] ZeroEvo_E2(u32,u32,u32, u8, u32, u32),
+		#[game(ZeroEvo, AoEvo)] ZeroEvo_E3(u8, String, u32, u32, u8),
+		#[game(AoEvo)] AoEvo_E7(u32, u32 as Color, u32, u32),
+		#[game(AoEvo)] AoEvo_E8(u8),
+		#[game(ZeroEvo, AoEvo)] ZeroEvo_E4(u8, u16),
+		#[game(ZeroEvo, AoEvo)] ZeroEvo_E5(u8, u8, String, String, Pos3, Pos3, Pos3, u8),
+		#[game(ZeroEvo, AoEvo)] ZeroEvo_E6(u8, u8, Pos3, Pos3, Pos3),
+		#[game(ZeroEvo, AoEvo)] ZeroEvo_E7(u8, u8),
+		#[game(ZeroEvo, AoEvo)] ZeroEvo_E8(u8),
+		#[game(ZeroEvo, AoEvo)] ZeroEvo_E9(u16, u32,u32,u32,u32, u32,u32,u32,u32),
+		#[game(AoEvo)] AoEvo_EF(),
+		#[game(AoEvo)] AoEvo_F0(),
+		#[game(AoEvo)] AoEvo_F1(),
+		#[game(AoEvo)] AoEvo_F2(u8, u8),
+		#[game(AoEvo)] AoEvo_F3(u8, u8),
 		#[game(ZeroEvo)] skip!(22),
+		#[game(AoEvo)] skip!(12),
 	]
 }
 

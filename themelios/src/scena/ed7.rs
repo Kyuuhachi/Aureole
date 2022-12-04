@@ -168,17 +168,17 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	let strings_start = strings.pos();
 	let filename = strings.string()?;
 
-	let chcp     = f.ptr()?;
-	let npcs     = f.ptr()?;
-	let monsters = f.ptr()?;
-	let triggers = f.ptr()?;
-	let look_points = f.ptr()?;
+	let p_chcp     = f.u16()? as usize;
+	let p_npcs     = f.u16()? as usize;
+	let p_monsters = f.u16()? as usize;
+	let p_triggers = f.u16()? as usize;
+	let p_look_points = f.u16()? as usize;
 
-	let func_table = f.ptr()?;
+	let p_func_table = f.u16()? as usize;
 	let func_count = (f.u16()? / 4) as usize;
-	let animations = f.ptr()?;
+	let p_animations = f.u16()? as usize;
 
-	let labels = f.ptr()?;
+	let p_labels = f.u16()? as usize;
 	let n_labels = f.u8()? as usize;
 	let unk3 = f.u8()?;
 
@@ -191,7 +191,7 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	let unk1 = f.u8()?;
 	let unk2 = f.u16()?;
 
-	let entry = if f.pos() != func_table.pos() {
+	let entry = if f.pos() != p_triggers {
 		Some(Entry {
 			pos: f.pos3()?,
 			unk1: f.u32()?,
@@ -214,46 +214,46 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	};
 
 	let data_chunks = [
-		(chcp.pos(),        n_chcp        != 0),
-		(npcs.pos(),        n_npcs        != 0),
-		(monsters.pos(),    n_monsters    != 0),
-		(triggers.pos(),    n_triggers    != 0),
-		(look_points.pos(), n_look_points != 0),
-		(labels.pos(),      n_labels      != 0),
-		(animations.pos(),  animations.pos() != f.pos()),
-		(func_table.pos(),  true),
+		(p_chcp,        n_chcp        != 0),
+		(p_npcs,        n_npcs        != 0),
+		(p_monsters,    n_monsters    != 0),
+		(p_triggers,    n_triggers    != 0),
+		(p_look_points, n_look_points != 0),
+		(p_labels,      n_labels      != 0),
+		(p_animations,  p_animations != f.pos()),
+		(p_func_table,  true),
 	];
 	let first_data_chunk = data_chunks.into_iter()
 		.filter_map(|(a, b)| b.then_some(a))
 		.min().unwrap();
 	let is_vanilla =
-		labels.pos() == 0
+		p_labels == 0
 		|| first_data_chunk == f.pos()
-		&& labels.pos() <= f.pos()
-		&& labels.pos() + n_labels*20 == triggers.pos()
-		&& triggers.pos() + n_triggers*96 == look_points.pos()
-		&& look_points.pos() + n_look_points*36 == chcp.pos()
-		&& chcp.pos() + n_chcp*4 == npcs.pos()
-		&& npcs.pos() + n_npcs*28 == monsters.pos()
-		&& monsters.pos() + n_monsters*32 <= animations.pos()
-		&& animations.pos() <= func_table.pos()
+		&& p_labels <= f.pos()
+		&& p_labels + n_labels*20 == p_triggers
+		&& p_triggers + n_triggers*96 == p_look_points
+		&& p_look_points + n_look_points*36 == p_chcp
+		&& p_chcp + n_chcp*4 == p_npcs
+		&& p_npcs + n_npcs*28 == p_monsters
+		&& p_monsters + n_monsters*32 <= p_animations
+		&& p_animations <= p_func_table
 	;
 	// This misidentifies a few eddec scenas as vanilla, but the battles seem to be in the right
 	// position in those anyway.
 
 	let battle_chunk = if is_vanilla {
-		Some((monsters.pos() + n_monsters * 32, animations.pos()))
+		Some((p_monsters + n_monsters * 32, p_animations))
 	} else {
 		None
 	};
 
-	let mut g = chcp;
+	let mut g = f.clone().at(p_chcp)?;
 	let chcp = list(n_chcp, || Ok(match g.u32()? {
 		0 => None,
 		n => Some(game.lookup.name(n)?)
 	})).strict()?;
 
-	let mut g = npcs;
+	let mut g = f.clone().at(p_npcs)?;
 	let npcs = list(n_npcs, || Ok(Npc {
 		name: strings.string()?,
 		pos: g.pos3()?,
@@ -266,7 +266,7 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 		unk5: g.u32()?,
 	})).strict()?;
 
-	let mut g = monsters;
+	let mut g = f.clone().at(p_monsters)?;
 	let mut monsters = list(n_monsters, || Ok(Monster {
 		pos: g.pos3()?,
 		angle: g.i16()?,
@@ -279,7 +279,7 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 		walk_anim: g.u32()?,
 	})).strict()?;
 
-	let mut g = triggers;
+	let mut g = f.clone().at(p_triggers)?;
 	let triggers = list(n_triggers, || Ok(Trigger {
 		pos: (g.f32()?, g.f32()?, g.f32()?),
 		radius: g.f32()?,
@@ -295,7 +295,7 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 		unk6: g.u32()?,
 	})).strict()?;
 
-	let mut g = look_points;
+	let mut g = f.clone().at(p_look_points)?;
 	let look_points = list(n_look_points, || Ok(LookPoint {
 		pos: g.pos3()?,
 		radius: g.u32()?,
@@ -307,8 +307,8 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 		unk4: g.u16()?,
 	})).strict()?;
 
-	let anim_count = (func_table.pos()-animations.pos())/12;
-	let mut g = animations;
+	let anim_count = (p_func_table-p_animations)/12;
+	let mut g = f.clone().at(p_animations)?;
 	let animations = list(anim_count, || {
 		let speed = g.u16()?;
 		let unk = g.u8()?;
@@ -323,7 +323,7 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 		})
 	}).strict()?;
 
-	let mut g = func_table;
+	let mut g = f.clone().at(p_func_table)?;
 	let func_table = list(func_count, || Ok(g.u32()? as usize)).strict()?;
 
 	let mut functions = Vec::with_capacity(func_table.len());
@@ -346,10 +346,10 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 		code_end = g.pos();
 	}
 
-	let labels = if labels.pos() == 0 {
+	let labels = if p_labels == 0 {
 		None
 	} else {
-		let mut g = labels;
+		let mut g = f.clone().at(p_labels)?;
 		Some(list(n_labels, || Ok(Label {
 			pos: (g.f32()?, g.f32()?, g.f32()?),
 			unk1: g.u16()?,
@@ -792,7 +792,7 @@ mod test {
 			#[test_case::test_case(&GameData::ZERO_KAI, true, &["c1440.bin"], "../data/zero/data/scena", ".bin"; "zero_nisa_jp")]
 			#[test_case::test_case(&GameData::ZERO_KAI, true, &[], "../data/zero/data/scena_us", ".bin"; "zero_nisa_en")]
 			#[test_case::test_case(&GameData::ZERO_EVO, true, &["c1440.bin"], "../data/vita/extract/zero/data1/data/scena", ".bin"; "zero_evo")]
-			#[test_case::test_case(&GameData::AO, true, &["r0000_1.bin"], "../data/ao-psp/PSP_GAME/USRDIR/data/scena", ".bin"; "ao_psp")]
+			#[test_case::test_case(&GameData::AO, true, &[], "../data/ao-psp/PSP_GAME/USRDIR/data/scena", ".bin"; "ao_psp")]
 			#[test_case::test_case(&GameData::AO_EVO, true, &[], "../data/vita/extract/ao/data1/data/scena", ".bin"; "ao_evo")]
 			$a
 		}

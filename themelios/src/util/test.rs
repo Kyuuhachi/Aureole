@@ -106,14 +106,14 @@ pub fn check_roundtrip_strict<T>(
 			match chunk {
 				similar::DiffOp::Equal { old_index, new_index, len } => {
 					println!(
-						"{:?} = {:?}",
+						"{:04X?} = {:04X?}",
 						old_index..old_index+len,
 						new_index..new_index+len,
 					);
 				}
 				similar::DiffOp::Delete { old_index, old_len, new_index } => {
 					println!(
-						"{:?} ⇒ {} ({:02X?} ⇒ [])",
+						"{:04X?} ⇒ {:04X?} ({:02X?} ⇒ [])",
 						old_index..old_index+old_len,
 						new_index,
 						&data[old_index..old_index+old_len],
@@ -121,7 +121,7 @@ pub fn check_roundtrip_strict<T>(
 				}
 				similar::DiffOp::Insert { old_index, new_index, new_len } => {
 					println!(
-						"{} ⇐ {:?} ([] ⇐ {:02X?})",
+						"{:04X?} ⇐ {:04X?} ([] ⇐ {:02X?})",
 						old_index,
 						new_index..new_index+new_len,
 						&data2[new_index..new_index+new_len],
@@ -129,7 +129,7 @@ pub fn check_roundtrip_strict<T>(
 				}
 				similar::DiffOp::Replace { old_index, old_len, new_index, new_len } => {
 					println!(
-						"{:?} ≠ {:?} ({:02X?} ≠ {:02X?})",
+						"{:04X?} ≠ {:04X?} ({:02X?} ≠ {:02X?})",
 						old_index..old_index+old_len,
 						new_index..new_index+new_len,
 						&data[old_index..old_index+old_len],

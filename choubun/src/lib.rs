@@ -2,6 +2,7 @@ use std::fmt;
 
 use linked_hash_map::LinkedHashMap;
 
+#[must_use]
 #[derive(Clone)]
 pub enum Item {
 	Node(Node),
@@ -40,12 +41,14 @@ impl fmt::Debug for Item {
 	}
 }
 
+#[must_use]
 #[derive(Debug, Clone)]
 pub struct Leaf {
 	name: String,
 	attrs: LinkedHashMap<String, String>,
 }
 
+#[must_use]
 #[derive(Clone)]
 pub struct Node {
 	leaf: Leaf,
@@ -157,6 +160,7 @@ pub fn leaf(name: &str, body: impl FnOnce(&mut Leaf)) -> Leaf {
 	node
 }
 
+#[must_use]
 #[derive(Debug, Clone)]
 pub struct Document {
 	pub root: Leaf,

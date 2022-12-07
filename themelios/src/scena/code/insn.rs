@@ -147,8 +147,10 @@ themelios_macros::bytecode! {
 		EventEnd(u8),
 
 		_1B(u8, func_ref_u8_u16() -> FuncRef),
-		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, Ao, AoEvo)]
-		_1C(u8, u8, u8, u8, u8, u8, u16, u16),
+		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)]
+		_1C(u8, u8, u16),
+		#[game(Zero, Ao, AoEvo)]
+		ED7_1C(u8, u8, u8, u8, u8, u8, u16, u16),
 
 		#[game(Zero, ZeroEvo, Ao, AoEvo)]
 		ED7_1D(match {

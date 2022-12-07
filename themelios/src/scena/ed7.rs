@@ -794,6 +794,7 @@ mod test {
 			#[test_case::test_case(&GameData::ZERO_EVO, true, &["c1440.bin"], "../data/vita/extract/zero/data1/data/scena", ".bin"; "zero_evo")]
 			#[test_case::test_case(&GameData::AO, true, &[], "../data/ao-psp/PSP_GAME/USRDIR/data/scena", ".bin"; "ao_psp")]
 			#[test_case::test_case(&GameData::AO_EVO, true, &[], "../data/vita/extract/ao/data1/data/scena", ".bin"; "ao_evo")]
+			#[test_case::test_case(&GameData::AO, false, &[], "../data/ao-gf/data_en/scena", ".bin"; "ao_gf_en")]
 			$a
 		}
 	}

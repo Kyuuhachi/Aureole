@@ -22,12 +22,9 @@ pub enum TextSegment {
 	Line2,
 	Wait,
 	Page,
-	_05,
-	_06,
 	Color(u8),
-	_09,
 	Item(ItemId),
-	_18,
+	Byte(u8), // other byte of unknown meaning
 }
 
 impl Text {
@@ -39,13 +36,11 @@ impl Text {
 				0x01 => TextSegment::Line,
 				0x02 => TextSegment::Wait,
 				0x03 => TextSegment::Page,
-				0x05 => TextSegment::_05,
-				0x06 => TextSegment::_06,
 				0x07 => TextSegment::Color(f.u8()?),
-				0x09 => TextSegment::_09,
 				0x0D => TextSegment::Line2,
-				0x18 => TextSegment::_18,
 				0x1F => TextSegment::Item(ItemId(f.u16()?)),
+				ch@(0x05 | 0x06 | 0x09 | 0x18) => TextSegment::Byte(ch),
+				ch@(0x0A | 0x0C) => TextSegment::Byte(ch), // Geofront Azure only
 				ch@(0x00..=0x1F) => bail!("b{:?}", char::from(ch)),
 				0x20.. => {
 					let start = f.pos() - 1;
@@ -66,13 +61,10 @@ impl Text {
 				TextSegment::Line => f.u8(0x01),
 				TextSegment::Wait => f.u8(0x02),
 				TextSegment::Page => f.u8(0x03),
-				TextSegment::_05 => f.u8(0x05),
-				TextSegment::_06 => f.u8(0x06),
 				TextSegment::Color(n) => { f.u8(0x07); f.u8(*n); }
-				TextSegment::_09 => f.u8(0x09),
 				TextSegment::Line2 => f.u8(0x0D),
-				TextSegment::_18 => f.u8(0x18),
 				TextSegment::Item(n) => { f.u8(0x1F); f.u16(n.0); }
+				TextSegment::Byte(n) => f.u8(*n),
 			}
 		}
 		f.u8(0);

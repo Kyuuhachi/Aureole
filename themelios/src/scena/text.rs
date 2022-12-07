@@ -579,29 +579,20 @@ fn text(f: &mut Context, v: &Text) {
 				f.line();
 				f.indent += 1;
 			},
-			TextSegment::_05 => {
-				f.write("{05}")
-			},
-			TextSegment::_06 => {
-				f.write("{06}")
-			},
 			TextSegment::Color(n) => {
 				f.write(&format!("{{color {n}}}"));
-			},
-			TextSegment::_09 => {
-				f.write("{09}")
 			},
 			TextSegment::Line2 => {
 				f.write("\\");
 				f.line()
 			},
-			TextSegment::_18 => {
-				f.write("{09}")
-			},
 			TextSegment::Item(n) => {
 				f.write("{item ");
 				val(f, I::ItemId(n));
 				f.write("}");
+			},
+			TextSegment::Byte(n) => {
+				f.write(&format!("{{0x{n:02X}}}"))
 			},
 		}
 	}

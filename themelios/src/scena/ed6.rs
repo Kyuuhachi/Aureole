@@ -129,11 +129,9 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 
 	let (mut g, n) = ch;
 	let ch = list(n as usize, || Ok(game.lookup.name(g.u32()?)?)).strict()?;
-	g.check_u8(0xFF)?;
 
 	let (mut g, n) = cp;
 	let cp = list(n as usize, || Ok(game.lookup.name(g.u32()?)?)).strict()?;
-	g.check_u8(0xFF)?;
 
 	let (mut g, n) = npcs;
 	let npcs = list(n as usize, || Ok(Npc {
@@ -215,8 +213,6 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	for (start, end) in starts.zip(ends) {
 		functions.push(code::read(&mut f.clone().at(start)?, game, Some(end))?);
 	}
-
-	f.assert_covered()?;
 
 	Ok(Scena {
 		path, map,
@@ -383,24 +379,28 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 
 #[cfg(test)]
 mod test {
+	use std::path::Path;
 	use super::code::InstructionSet;
 	use crate::util::test::*;
 	use crate::gamedata::{Lookup, GameData};
 
 	macro_rules! test {
 		($a:item) => {
-			#[test_case::test_case(InstructionSet::Fc,    &*FC, "../data/fc.extract/01/", "._sn"; "fc")]
-			#[test_case::test_case(InstructionSet::FcEvo, &*FC, "../data/vita/extract/fc/gamedata/data/data/scenario/0/", ".bin"; "fc_evo")]
-			#[test_case::test_case(InstructionSet::Sc,    &*SC, "../data/sc.extract/21/", "._sn"; "sc")]
-			#[test_case::test_case(InstructionSet::ScEvo, &*SC, "../data/vita/extract/sc/gamedata/data/data_sc/scenario/1/", ".bin"; "sc_evo")]
-			#[test_case::test_case(InstructionSet::Tc,    &*TC, "../data/3rd.extract/21/", "._sn"; "tc")]
-			#[test_case::test_case(InstructionSet::TcEvo, &*TC, "../data/vita/extract/3rd/gamedata/data/data_3rd/scenario/2/", ".bin"; "tc_evo")]
+			#[test_case::test_case(InstructionSet::Fc,    &*FC, true, "../data/fc.extract/01/", "._sn"; "fc")]
+			#[test_case::test_case(InstructionSet::FcEvo, &*FC, true, "../data/vita/extract/fc/gamedata/data/data/scenario/0/", ".bin"; "fc_evo")]
+			#[test_case::test_case(InstructionSet::Sc,    &*SC, true, "../data/sc.extract/21/", "._sn"; "sc")]
+			#[test_case::test_case(InstructionSet::ScEvo, &*SC, true, "../data/vita/extract/sc/gamedata/data/data_sc/scenario/1/", ".bin"; "sc_evo")]
+			#[test_case::test_case(InstructionSet::Tc,    &*TC, true, "../data/3rd.extract/21/", "._sn"; "tc")]
+			#[test_case::test_case(InstructionSet::TcEvo, &*TC, true, "../data/vita/extract/3rd/gamedata/data/data_3rd/scenario/2/", ".bin"; "tc_evo")]
 			$a
 		}
 	}
 
 	test! {
-	fn roundtrip(iset: InstructionSet, lookup: &dyn Lookup, scenapath: &str, suffix: &str) -> Result<(), Error> {
+	#[test_case::test_case(InstructionSet::Fc,    &*FC, false, "../data/fc-voice/scena/", "._SN"; "fc_voice")]
+	#[test_case::test_case(InstructionSet::Sc,    &*SC, false, "../data/sc-voice/scena/", "._SN"; "sc_voice")]
+	#[test_case::test_case(InstructionSet::Tc,    &*TC, false, "../data/3rd-voice/scena/", "._SN"; "tc_voice")]
+	fn roundtrip(iset: InstructionSet, lookup: &dyn Lookup, strict: bool, scenapath: &str, suffix: &str) -> Result<(), Error> {
 		let game = GameData { iset, lookup, kai: false };
 		let mut failed = false;
 
@@ -418,11 +418,7 @@ mod test {
 
 			let data = std::fs::read(&path)?;
 
-			if let Err(err) = check_roundtrip_strict(
-				&data,
-				|a| super::read(&game, a),
-				|a| super::write(&game, a),
-			) {
+			if let Err(err) = check_roundtrip_flex(strict, &data, |a| super::read(&game, a), |a| super::write(&game, a)) {
 				println!("{name}: {err:?}");
 				failed = true;
 			};
@@ -434,7 +430,7 @@ mod test {
 	}
 
 	test! {
-	fn decompile(iset: InstructionSet, lookup: &dyn Lookup, scenapath: &str, suffix: &str) -> Result<(), Error> {
+	fn decompile(iset: InstructionSet, lookup: &dyn Lookup, _strict: bool, scenapath: &str, suffix: &str) -> Result<(), Error> {
 		let game = GameData { iset, lookup, kai: false };
 		let mut failed = false;
 

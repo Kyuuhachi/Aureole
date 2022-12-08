@@ -381,6 +381,7 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 mod test {
 	use std::path::Path;
 	use super::code::InstructionSet;
+	use crate::scena::code::decompile::fixup_eddec;
 	use crate::util::test::*;
 	use crate::gamedata::{Lookup, GameData};
 
@@ -481,5 +482,96 @@ mod test {
 
 		Ok(())
 	}
+	}
+
+	#[test_case::test_case(InstructionSet::Fc, &*FC, "../data/fc.extract/01/", "../data/fc-voice/scena/";  "fc")]
+	#[test_case::test_case(InstructionSet::Sc, &*SC, "../data/sc.extract/21/", "../data/sc-voice/scena/";  "sc")]
+	#[test_case::test_case(InstructionSet::Tc, &*TC, "../data/3rd.extract/21/","../data/3rd-voice/scena/"; "tc")]
+	fn eddec(iset: InstructionSet, lookup: &dyn Lookup, vanilla: impl AsRef<Path>, voice: impl AsRef<Path>) -> Result<(), Error> {
+		let game = GameData { iset, lookup, kai: false };
+		let mut failed = false;
+
+		let mut paths = std::fs::read_dir(voice)?
+			.map(|r| r.unwrap())
+			.collect::<Vec<_>>();
+		paths.sort_by_key(|dir| dir.path());
+		for file in paths {
+			let vpath = file.path();
+			let vname = vpath.file_name().unwrap().to_str().unwrap();
+			let name = vname.replace(' ', "").to_lowercase();
+			let path = vanilla.as_ref().join(&name);
+
+			if !path.exists() {
+				println!("{} does not exist (from {})", path.display(), vpath.display());
+				continue;
+			}
+			let data = std::fs::read(path)?;
+			let vdata = std::fs::read(vpath)?;
+			let scena = super::read(&game, &data)?;
+			let vscena = match super::read(&game, &vdata) {
+				Ok(a) => a,
+				Err(err) =>  {
+					println!("{name}: {err:?}");
+					failed = true;
+					continue;
+				}
+			};
+
+			for (i, (func, vfunc)) in scena.functions.iter().zip(vscena.functions.iter()).enumerate() {
+				if let Some(vfunc2) = fixup_eddec(func, vfunc) {
+					let decomp = super::code::decompile::decompile(&vfunc2).map_err(|e| format!("{name}:{i}: {e}"));
+					let decomp = match decomp {
+						Ok(d) => d,
+						Err(e) => {
+							println!("{name}:{i}: failed to decompile: {e}");
+							let mut ctx = super::text::Context::new().blind();
+							ctx.indent += 1;
+							super::text::flat_func(&mut ctx, func);
+							print!("{}", ctx.output);
+							println!("\n======\n");
+
+							let mut ctx = super::text::Context::new().blind();
+							ctx.indent += 1;
+							super::text::flat_func(&mut ctx, vfunc);
+							print!("{}", ctx.output);
+							println!("\n======\n");
+
+							let mut ctx = super::text::Context::new().blind();
+							ctx.indent += 1;
+							super::text::flat_func(&mut ctx, &vfunc2);
+							print!("{}", ctx.output);
+							continue
+						}
+					};
+					let recomp = super::code::decompile::recompile(&decomp).map_err(|e| format!("{name}:{i}: {e}"))?;
+					if recomp != vfunc2 {
+						println!("{name}:{i}: incorrect recompile");
+
+						let mut ctx = super::text::Context::new().blind();
+						ctx.indent += 1;
+						super::text::flat_func(&mut ctx, func);
+						print!("{}", ctx.output);
+						println!("\n======\n");
+
+						let mut ctx = super::text::Context::new().blind();
+						ctx.indent += 1;
+						super::text::flat_func(&mut ctx, &vfunc2);
+						print!("{}", ctx.output);
+						println!("\n======\n");
+
+						let mut ctx = super::text::Context::new().blind();
+						ctx.indent += 1;
+						super::text::flat_func(&mut ctx, &recomp);
+						println!("{}", ctx.output);
+
+						failed = true;
+					}
+				}
+			}
+		}
+
+		assert!(!failed);
+
+		Ok(())
 	}
 }

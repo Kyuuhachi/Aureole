@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use super::{FlatInsn, Insn, Expr, Label};
 
@@ -284,14 +284,42 @@ fn recompile0(insns: &[TreeInsn], out: &mut Vec<FlatInsn>, count: &mut usize, co
 	Ok(())
 }
 
+/// Combines duplicate labels, removes unused ones, and orders them in a consistent order.
 fn fixup_labels(insns: &mut Vec<FlatInsn>) {
+	use FlatInsn as F;
+
+	// Find referenced labels
+	let mut referenced = HashSet::new();
+	let mut label = |a: &Label| { referenced.insert(*a) };
+	for insn in insns.iter() {
+		match insn {
+			F::Unless(_, target) => {
+				label(target);
+			},
+			F::Goto(target) => {
+				label(target);
+			},
+			F::Switch(_, branches, default) => {
+				for (_, target) in branches {
+					label(target);
+				}
+				label(default);
+			}
+			F::Insn(_) => {}
+			F::Label(_) => {},
+		}
+	}
+
+	// Collapse consecutive labels
 	let mut labels = HashMap::new();
 	let mut n = 0;
 	let mut current = None;
 	insns.retain_mut(|insn| {
 		match insn {
-			FlatInsn::Label(l) => {
-				if let Some(replace) = current {
+			F::Label(l) => {
+				if !referenced.contains(l) {
+					false
+				} else if let Some(replace) = current {
 					labels.insert(*l, replace);
 					false
 				} else {
@@ -309,23 +337,201 @@ fn fixup_labels(insns: &mut Vec<FlatInsn>) {
 		}
 	});
 
+	// Remap the collapsed consecutive ones
 	let label = |a: &mut Label| { *a = labels[a] };
 	for insn in insns {
 		match insn {
-			FlatInsn::Unless(_, target) => {
+			F::Unless(_, target) => {
 				label(target);
 			},
-			FlatInsn::Goto(target) => {
+			F::Goto(target) => {
 				label(target);
 			},
-			FlatInsn::Switch(_, branches, default) => {
+			F::Switch(_, branches, default) => {
 				for (_, target) in branches {
 					label(target);
 				}
 				label(default);
 			}
-			FlatInsn::Insn(_) => {}
-			FlatInsn::Label(l) => label(l),
+			F::Insn(_) => {}
+			F::Label(l) => label(l),
 		}
 	}
+}
+
+pub fn fixup_eddec(vanilla: &[FlatInsn], eddec: &[FlatInsn]) -> Option<Vec<FlatInsn>> {
+	use FlatInsn as F;
+
+	let mut eddec = eddec.to_owned();
+
+	let offset = 10000000;
+	let label = |a: &mut Label| { a.0 += offset; };
+	for insn in eddec.iter_mut() {
+		match insn {
+			F::Unless(_, target) => {
+				label(target);
+			},
+			F::Goto(target) => {
+				label(target);
+			},
+			F::Switch(_, branches, default) => {
+				for (_, target) in branches {
+					label(target);
+				}
+				label(default);
+			}
+			F::Insn(_) => {}
+			F::Label(l) => label(l),
+		}
+	}
+
+	let mut i = 0;
+	let mut j = 0;
+	let mut reachable = HashSet::new();
+	let mut is_reachable = true;
+	while i < vanilla.len() && j < eddec.len() {
+		let v = &vanilla[i];
+		match v {
+			F::Label(l) => {
+				if is_reachable {
+					reachable.insert(*l);
+				}
+				is_reachable = reachable.contains(l);
+			}
+			F::Unless(_, target) => if is_reachable {
+				reachable.insert(*target);
+			}
+			F::Goto(target) => if is_reachable {
+				reachable.insert(*target);
+			}
+			F::Switch(_, branches, default) => if is_reachable {
+				reachable.extend(branches.iter().map(|a| a.1));
+				reachable.insert(*default);
+			}
+			F::Insn(_) => {}
+		}
+		let i0 = i;
+		if is_reachable {
+			match (&vanilla[i], &eddec[j]) {
+				(F::Insn(e), _) if e != &Insn::Return() => i += 1,
+				(_, F::Insn(e)) if e != &Insn::Return() => j += 1,
+
+				| (F::Insn(Insn::Return()), F::Insn(Insn::Return()))
+				| (F::Goto(..),   F::Goto(..))
+				| (F::Unless(..), F::Unless(..))
+				| (F::Switch(..), F::Switch(..)) => {
+					i += 1;
+					j += 1;
+				},
+				(F::Label(l),  F::Label(..)) => {
+					eddec.insert(j, F::Label(*l));
+					i += 1;
+					j += 2;
+				}
+				(F::Label(l), _) => {
+					let mut k = j;
+					while k > 0 && let F::Insn(e) = &eddec[k-1] && e != &Insn::Return() {
+						k -= 1;
+					}
+					eddec.insert(k, F::Label(*l));
+					i += 1;
+					j += 1;
+
+					eddec.insert(k, F::Insn(Insn::Hcf()));
+					j+=1;
+					eddec.insert(j, F::Insn(Insn::Hcf()));
+					j+=1;
+				}
+
+				a => { // mismatch
+					println!("failure: {:?} at ({i}, {j})", a);
+					// let mut ctx = super::super::text::Context::new();
+					// ctx.indent += 1;
+					// super::super::text::flat_func(&mut ctx, vanilla);
+					// print!("{}", ctx.output);
+					// println!("\n======\n");
+					// let mut ctx = super::super::text::Context::new();
+					// ctx.indent += 1;
+					// super::super::text::flat_func(&mut ctx, eddec);
+					// println!("{}\n\n\n\n", ctx.output);
+					return None
+				},
+			}
+		} else {
+					eddec.insert(j, F::Insn(Insn::Hcf()));
+					j += 1;
+			eddec.insert(j, v.clone());
+			i += 1;
+			j += 1;
+		}
+
+		if i != i0 {
+			match v {
+				| F::Goto(..)
+				| F::Switch(..)
+				| F::Insn(Insn::Return()) => {
+					is_reachable = false;
+				}
+				_ => {}
+			}
+		}
+	}
+
+	eddec.extend_from_slice(&vanilla[i..]);
+
+	fixup_labels(&mut eddec);
+	Some(eddec)
+}
+
+pub fn to_d2(code: &[FlatInsn], mut f: impl std::io::Write) -> std::io::Result<()> {
+	fn label(l: Label, n: usize) -> String {
+		format!("L{}{}", l.0, "'".repeat(n))
+	}
+	let mut cur_label = Label(1000000);
+	let mut sublabel = 0;
+	let mut reachable = false;
+	for i in code {
+		match i {
+			FlatInsn::Unless(_, l) => {
+				let l1 = label(cur_label, sublabel);
+				sublabel += 1;
+				let l2 = label(cur_label, sublabel);
+				let l3 = label(*l, 0);
+				writeln!(f, "{l1}.shape: diamond" )?;
+				writeln!(f, "{l1} -> {l2}")?;
+				writeln!(f, "{l1} -> {l3}: {{ target-arrowhead: {{ shape: diamond }} }}")?;
+			},
+			FlatInsn::Goto(l) => {
+				let l1 = label(cur_label, sublabel);
+				let l2 = label(*l, 0);
+				writeln!(f, "{l1} -> {l2}: {{ target-arrowhead: {{ shape: diamond; style.filled: true }} }}")?;
+				sublabel += 1;
+				reachable = false;
+			},
+			FlatInsn::Switch(_, cs, l) => {
+				let l1 = label(cur_label, sublabel);
+				writeln!(f, "{l1}.shape: hexagon" )?;
+				for (n, l) in cs {
+					let l2 = label(*l, 0);
+					writeln!(f, "{l1} -> {l2}: \"{n}\" {{ target-arrowhead: {{ shape: diamond }} }}" )?;
+				}
+				let l2 = label(*l, 0);
+				writeln!(f, "{l1} -> {l2}: {{ target-arrowhead: {{ shape: diamond; style.filled: true }} }}")?;
+				sublabel += 1;
+				reachable = false;
+			},
+			FlatInsn::Insn(_) => {},
+			FlatInsn::Label(l) => {
+				if reachable {
+					let l1 = label(cur_label, sublabel);
+					let l2 = label(*l, 0);
+					writeln!(f, "{l1} -> {l2}")?;
+				}
+				cur_label = *l;
+				sublabel = 0;
+				reachable = true;
+			},
+		}
+	}
+	Ok(())
 }

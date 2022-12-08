@@ -9,6 +9,8 @@ pub mod write;
 pub use read::*;
 pub use write::*;
 
+pub use strict_result::ResultAsStrict;
+
 pub type Backtrace = Box<std::backtrace::Backtrace>;
 
 #[derive(Debug, thiserror::Error)]
@@ -88,53 +90,6 @@ pub use __newtype as newtype;
 pub struct NameDesc {
 	pub name: String,
 	pub desc: String,
-}
-
-
-#[repr(transparent)]
-pub struct StrictResult<A, B>(Result<A, B>);
-
-pub trait ResultExt<A, B> {
-	fn strict(self) -> StrictResult<A, B>;
-}
-
-impl<A, B> ResultExt<A, B> for Result<A, B> {
-	fn strict(self) -> StrictResult<A, B> {
-		StrictResult(self)
-	}
-}
-
-impl<A, B> FromResidual<StrictResult<!, B>> for StrictResult<A, B> {
-	fn from_residual(r: StrictResult<!, B>) -> Self {
-		match r {
-			StrictResult(Ok(v)) => match v {},
-			StrictResult(Err(v)) => StrictResult(Err(v))
-		}
-	}
-}
-impl<A, B> FromResidual<StrictResult<!, B>> for Result<A, B> {
-	fn from_residual(r: StrictResult<!, B>) -> Self {
-		match r {
-			StrictResult(Ok(v)) => match v {},
-			StrictResult(Err(r)) => Err(r)
-		}
-	}
-}
-
-impl<A, B> Try for StrictResult<A, B> {
-	type Output = A;
-	type Residual = StrictResult<!, B>;
-
-	fn from_output(r: A) -> Self {
-		StrictResult(Ok(r))
-	}
-
-	fn branch(self) -> ControlFlow<Self::Residual, Self::Output> {
-		match self {
-			StrictResult(Ok(v)) => ControlFlow::Continue(v),
-			StrictResult(Err(e)) => ControlFlow::Break(StrictResult(Err(e))),
-		}
-	}
 }
 
 pub fn array<const N: usize, R: Try>(

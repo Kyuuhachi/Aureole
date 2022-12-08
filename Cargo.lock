@@ -637,6 +637,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2fd0db749597d91ff862fd1d55ea87f7855a744a8425a64695b6fca237d1dad1"
 
 [[package]]
+name = "strict_result"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e865c5d59e06f40a99373204104cb300d6ada86c9cc55bdfb90599ce124e231"
+
+[[package]]
 name = "strsim"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -725,6 +731,7 @@ dependencies = [
  "mapr",
  "num_enum",
  "similar",
+ "strict_result",
  "test-case",
  "themelios-macros",
  "thiserror",

@@ -1,0 +1,9 @@
+[package]
+name = "calmare"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+themelios = { path = "../themelios" }
+strict_result = "1.0.1"
+extend = "1.1.2"

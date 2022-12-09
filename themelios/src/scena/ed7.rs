@@ -822,7 +822,7 @@ mod test {
 			if let Err(err) = check_roundtrip_flex(strict, &data, |a| super::read(game, a), |a| super::write(game, a)) {
 				println!("{name}: {err:?}");
 				failed = true;
-			};
+			}
 		}
 
 		assert!(!failed);

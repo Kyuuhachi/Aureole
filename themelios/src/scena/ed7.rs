@@ -32,7 +32,7 @@ pub struct Scena {
 	/// The first five, if present, are always the same nonsensical values.
 	pub field_sepith: Vec<[u8; 8]>,
 	pub at_rolls: Vec<[u8; 16]>,
-	pub placements: Vec<[(u8,u8,u16); 8]>,
+	pub placements: Vec<[(u8,u8,i16); 8]>,
 	pub battles: Vec<Battle>,
 
 	pub unk1: u8,
@@ -443,7 +443,7 @@ struct BattleRead {
 	field_sepith_pos: HashMap<usize, u16>,
 	at_rolls: Vec<[u8;16]>,
 	at_roll_pos: HashMap<usize, u16>,
-	placements: Vec<[(u8,u8,u16);8]>,
+	placements: Vec<[(u8,u8,i16);8]>,
 	placement_pos: HashMap<usize, u16>,
 	battles: Vec<Battle>,
 	battle_pos: HashMap<usize, u32>,
@@ -477,7 +477,7 @@ impl BattleRead {
 			std::collections::hash_map::Entry::Occupied(e) => Ok(*e.get()),
 			std::collections::hash_map::Entry::Vacant(e) => {
 				let v = *e.insert(self.placements.len() as u16);
-				self.placements.push(array::<8, _>(|| Ok((f.u8()?, f.u8()?, f.u16()?))).strict()?);
+				self.placements.push(array::<8, _>(|| Ok((f.u8()?, f.u8()?, f.i16()?))).strict()?);
 				Ok(v)
 			}
 		}
@@ -702,7 +702,7 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		for p in plac {
 			g.u8(p.0);
 			g.u8(p.1);
-			g.u16(p.2);
+			g.i16(p.2);
 		}
 	}
 

@@ -313,12 +313,12 @@ themelios_macros::bytecode! {
 			4 => _4(i32),
 		}),
 		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_77(u8, u16),
-		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_78(u8, u16),
-		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_79(u16),
+		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_78(u8 as u16 alias ObjectId, u16 as CharId),
+		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_79(u16 alias ObjectId),
 		#[game(Zero,Ao,AoEvo)] EventSkip(u8, u32), // TODO this one will need label handling
 		#[game(Zero,Ao,AoEvo)] ED7_7B(u8),
 		#[game(Zero,Ao)] skip!(1),
-		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_7D(u32, u32),
+		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_7D(u32 as Color, u32),
 		#[game(Zero,Ao)] skip!(4),
 
 		Shake(u32, u32, u32, u32 alias Time), // [quake]
@@ -382,8 +382,8 @@ themelios_macros::bytecode! {
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7CharAnimation(u16 as CharId, u16, char_animation() -> Vec<u8> alias Animation),
 		CharFlagsSet   (u16 as CharId, u16 as CharFlags), // [set_state]
 		CharFlagsUnset (u16 as CharId, u16 as CharFlags), // [reset_state]
-		_Char9C        (u16 as CharId, u16), // TODO EDDec thinks these are CharBattleFlagsSet/Unset
-		_Char9D        (u16 as CharId, u16),
+		CharFlag2Set   (u16 as CharId, u16 as CharFlags),
+		CharFlags2Unset(u16 as CharId, u16 as CharFlags),
 		CharShake      (u16 as CharId, u32, u32, u32, u32 alias Time),
 		CharColor      (u16 as CharId, u32 as Color, u32 alias Time),
 		Sc_A0          (u16 as CharId, u32 as Color, u8,u8,u8), // TODO Double-check

@@ -579,26 +579,6 @@ fn insn(f: &mut Context, i: &Insn) -> Result<()> {
 				}).strict()?;
 			}
 
-			I::Menu(a) => {
-				f.suf(":")?.line()?;
-				f.indent(|f| {
-					for line in a {
-						f.val(I::MenuItem(line))?.line()?;
-					}
-					Ok(())
-				}).strict()?;
-			}
-
-			I::QuestList(a) => {
-				f.suf(":")?.line()?;
-				f.indent(|f| {
-					for line in a {
-						f.val(I::QuestId(line))?.line()?;
-					}
-					Ok(())
-				}).strict()?;
-			}
-
 			a => {
 				f.val(a)?;
 			}
@@ -609,10 +589,7 @@ fn insn(f: &mut Context, i: &Insn) -> Result<()> {
 
 fn val(f: &mut Context, a: I) -> Result<()> {
 	match a {
-		| I::Fork(_)
-		| I::Menu(_)
-		| I::QuestList(_)
-		=> panic!("block elements should be handled outside"),
+		I::Fork(_) => panic!("block elements should be handled outside"),
 
 		// I::i8(v)  => write!(f, "{v}")),
 		I::i16(v) => write!(f, "{v}")?,
@@ -665,7 +642,19 @@ fn val(f: &mut Context, a: I) -> Result<()> {
 				f.no_space()?;
 			}
 			write!(f, ":{}", v.1)?;
-		},
+		}
+
+		I::Menu(a) => {
+			for line in a {
+				f.val(I::MenuItem(line))?;
+			}
+		}
+
+		I::QuestList(a) => {
+			for line in a {
+				f.val(I::QuestId(line))?;
+			}
+		}
 
 		I::TextTitle(_) if f.blind => write!(f, "\"…\"")?,
 		I::TextTitle(v) => write!(f, "{v:?}")?,

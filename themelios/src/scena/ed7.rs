@@ -130,28 +130,28 @@ pub struct Animation {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Battle {
-	flags: u16,
-	level: u16,
-	unk1: u8,
-	vision_range: u8,
-	move_range: u8,
-	can_move: u8,
-	move_speed: u16,
-	unk2: u16,
-	battlefield: String,
-	sepith: Option<u16>, // index
-	setups: Vec<BattleSetup>,
+	pub flags: u16,
+	pub level: u16,
+	pub unk1: u8,
+	pub vision_range: u8,
+	pub move_range: u8,
+	pub can_move: u8,
+	pub move_speed: u16,
+	pub unk2: u16,
+	pub battlefield: String,
+	pub sepith: Option<u16>, // index
+	pub setups: Vec<BattleSetup>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BattleSetup {
-	weight: u8,
-	enemies: [Option<String>; 8],
-	placement: u16, // index
-	placement_ambush: u16,
-	bgm: BgmId,
-	bgm_ambush: BgmId, // not entirely sure if this is what it is
-	at_roll: u16, // index
+	pub weight: u8,
+	pub enemies: [Option<String>; 8],
+	pub placement: u16, // index
+	pub placement_ambush: u16,
+	pub bgm: BgmId,
+	pub bgm_ambush: BgmId, // not entirely sure if this is what it is
+	pub at_roll: u16, // index
 }
 
 pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {

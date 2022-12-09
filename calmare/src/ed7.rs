@@ -189,6 +189,7 @@ pub fn dump(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 		}).strict()?;
 		f.line()?;
 	}
+	f.line()?;
 
 	for (i, chcp) in chcp.iter().enumerate() {
 		f.kw("chcp")?.val(I::ChcpId(&(i as u16)))?;
@@ -221,6 +222,9 @@ pub fn dump(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 		n += 1;
 		f.line()?;
 	}
+	if !npcs.is_empty() {
+		f.line()?;
+	}
 
 	for monster in monsters {
 		f.kw("monster")?.val(I::CharId(&CharId(n)))?.suf(":")?.line()?.indent(|f| {
@@ -236,6 +240,45 @@ pub fn dump(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 			Ok(())
 		}).strict()?;
 		n += 1;
+		f.line()?;
+	}
+	if !monsters.is_empty() {
+		f.line()?;
+	}
+
+	for (i, tr) in triggers.iter().enumerate() {
+		f.kw("trigger")?.val(I::u16(&(i as u16)))?.suf(":")?.line()?.indent(|f| {
+			f.kw("pos")?;
+			write!(f, "({}, {}, {})", tr.pos.0, tr.pos.1, tr.pos.2)?;
+			f.line()?;
+
+			f.kw("radius")?;
+			write!(f, "{}", tr.radius)?;
+			f.line()?;
+
+			f.kw("transform")?;
+			f.line()?.indent(|f| {
+				for r in &tr.transform {
+					write!(f, "({}, {}, {}, {})", r[0], r[1], r[2], r[3])?;
+					f.line()?;
+				}
+				Ok(())
+			}).strict()?;
+
+			f.kw("unk1")?.val(I::u8(&tr.unk1))?.line()?;
+			f.kw("unk2")?.val(I::u16(&tr.unk2))?.line()?;
+			f.kw("function")?.val(I::FuncRef(&tr.function))?.line()?;
+			f.kw("unk3")?.val(I::u8(&tr.unk3))?.line()?;
+			f.kw("unk4")?.val(I::u16(&tr.unk4))?.line()?;
+			f.kw("unk5")?.val(I::u32(&tr.unk5))?.line()?;
+			f.kw("unk6")?.val(I::u32(&tr.unk6))?.line()?;
+
+			Ok(())
+		}).strict()?;
+		n += 1;
+		f.line()?;
+	}
+	if !triggers.is_empty() {
 		f.line()?;
 	}
 
@@ -254,8 +297,146 @@ pub fn dump(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 		n += 1;
 		f.line()?;
 	}
+	if !look_points.is_empty() {
+		f.line()?;
+	}
 
-	// TODO more stuff
+	if let Some(labels) = labels {
+		for (i, lb) in labels.iter().enumerate() {
+			f.kw("label")?.val(I::u16(&(i as u16)))?.suf(":")?.line()?.indent(|f| {
+				f.kw("name")?.val(I::TextTitle(&lb.name))?.line()?;
+
+				f.kw("pos")?;
+				write!(f, "({}, {}, {})", lb.pos.0, lb.pos.1, lb.pos.2)?;
+				f.line()?;
+
+				f.kw("unk1")?.val(I::u16(&lb.unk1))?.line()?;
+				f.kw("unk2")?.val(I::u16(&lb.unk2))?.line()?;
+
+				Ok(())
+			}).strict()?;
+			n += 1;
+			f.line()?;
+		}
+		if !labels.is_empty() {
+			f.line()?;
+		}
+	} else {
+		// need to keep this for roundtripping
+		f.kw("labels")?.kw("-")?.line()?.line()?;
+	}
+
+	for (i, anim) in animations.iter().enumerate() {
+		f.kw("anim")?.val(I::u16(&(i as u16)))?.suf(":")?;
+		f.val(I::Time(&(anim.speed as u32)))?.val(I::u8(&anim.unk))?.suf(";")?;
+		for val in &anim.frames {
+			f.val(I::u8(val))?;
+		}
+		f.line()?;
+	}
+	if !animations.is_empty() {
+		f.line()?;
+	}
+
+	f.line()?;
+
+	let junk_sepith = matches!(field_sepith.as_slice(), &[
+		[100, 1, 2, 3, 70, 89, 99, 0],
+		[100, 5, 1, 5, 1, 5, 1, 0],
+		[100, 5, 1, 5, 1, 5, 1, 0],
+		[100, 5, 0, 5, 0, 5, 0, 0],
+		[100, 5, 0, 5, 0, 5, 0, 0],
+		..
+	]);
+	if junk_sepith {
+		write!(f, "// NB: the first five sepith sets are seemingly junk data.")?;
+		f.line()?;
+	}
+	for (i, sep) in field_sepith.iter().enumerate() {
+		f.kw("sepith")?.val(I::u16(&(i as u16)))?.suf(":")?;
+		for val in sep {
+			f.val(I::u8(val))?;
+		}
+		f.line()?;
+		if junk_sepith && i == 4 && field_sepith.len() != 5 {
+			f.line()?;
+		}
+	}
+	if !field_sepith.is_empty() {
+		f.line()?;
+	}
+
+	for (i, roll) in at_rolls.iter().enumerate() {
+		f.kw("at_roll")?.val(I::u16(&(i as u16)))?.suf(":")?;
+		for val in roll {
+			f.val(I::u8(val))?;
+		}
+		f.line()?;
+	}
+	if !at_rolls.is_empty() {
+		f.line()?;
+	}
+
+	for (i, plac) in placements.iter().enumerate() {
+		f.kw("battle_placement")?.val(I::u16(&(i as u16)))?.suf(":")?;
+		for (i, (x, y, r)) in plac.iter().enumerate() {
+			f.val(I::u8(x))?;
+			f.val(I::u8(y))?;
+			f.val(I::Angle(r))?;
+			if i != 7 {
+				f.suf(",")?;
+			}
+		}
+		f.line()?;
+	}
+	if !placements.is_empty() {
+		f.line()?;
+	}
+
+	for (i, btl) in battles.iter().enumerate() {
+		f.kw("battle")?.val(I::BattleId(&(i as u32).into()))?.suf(":")?.line()?.indent(|f| {
+			f.kw("flags")?.val(I::u16(&btl.flags))?.line()?;
+			f.kw("level")?.val(I::u16(&btl.level))?.line()?;
+			f.kw("unk1")?.val(I::u8(&btl.unk1))?.line()?;
+			f.kw("vision_range")?.val(I::u8(&btl.vision_range))?.line()?;
+			f.kw("move_range")?.val(I::u8(&btl.move_range))?.line()?;
+			f.kw("can_move")?.val(I::u8(&btl.can_move))?.line()?;
+			f.kw("move_speed")?.val(I::u16(&btl.move_speed))?.line()?;
+			f.kw("unk2")?.val(I::u16(&btl.unk2))?.line()?;
+			f.kw("battlefiled")?.val(I::String(&btl.battlefield))?.line()?;
+
+			f.kw("sepith")?;
+			if let Some(sepith) = &btl.sepith {
+				f.val(I::u16(sepith))?;
+			} else {
+				f.kw("-")?;
+			}
+			f.line()?;
+
+			for setup in &btl.setups {
+				f.kw("setup")?.val(I::u8(&setup.weight))?.suf(":")?.line()?.indent(|f| {
+					f.kw("enemies")?;
+					for e in &setup.enemies {
+						if let Some(e) = e {
+							f.val(I::String(e))?;
+						} else {
+							f.kw("-")?;
+						}
+					}
+					f.line()?;
+					f.kw("placement")?.val(I::u16(&setup.placement))?.val(I::u16(&setup.placement_ambush))?.line()?;
+					f.kw("bgm")?.val(I::BgmId(&setup.bgm))?.val(I::BgmId(&setup.bgm))?.line()?;
+					f.kw("at_roll")?.val(I::u16(&setup.at_roll))?.line()?;
+					Ok(())
+				}).strict()?;
+			}
+
+			Ok(())
+		}).strict()?;
+		f.line()?;
+	}
+
+	f.line()?;
 
 	for (i, func) in functions.iter().enumerate() {
 		if i != 0 {
@@ -458,7 +639,7 @@ fn val(f: &mut Context, a: I) -> Result<()> {
 		I::Color(v)       => write!(f, "#{:08X}", v.0)?,
 
 		I::Member(v)   => write!(f, "{v:?}")?,
-		I::CharId(v)   => write!(f, "{v:?}")?,
+		I::CharId(v)   => write!(f, "char[{}]", v.0)?,
 		I::BattleId(v) => write!(f, "{v:?}")?,
 		I::BgmId(v)    => write!(f, "{v:?}")?,
 		I::ItemId(v)   => write!(f, "{v:?}")?,

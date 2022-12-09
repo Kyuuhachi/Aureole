@@ -353,14 +353,14 @@ themelios_macros::bytecode! {
 		_84(u8),
 		_85(u8, u8),
 
-		CharSetBase    (u16 as CharId, { i if i.is_ed7() => u8 as u16, _ => u16 }), // [set_chr_base]
+		CharSetBase    (u16 as CharId, { i if i.is_ed7() => u8 as u16, _ => u16 } alias ChcpId), // [set_chr_base]
 		CharSetPattern (u16 as CharId, { i if i.is_ed7() => u8 as u16, _ => u16 }), // [set_chr_ptn]
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7CharSetName (u16 as CharId, String), // debug script only
 		CharSetPos     (u16 as CharId, Pos3, i16 alias Angle), // [set_pos]
 		CharSetPos2    (u16 as CharId, Pos3, i16 alias Angle),
-		CharLookAtChar (u16 as CharId, u16 as CharId, u16 alias Time16), // [look_to]
-		CharLookAtPos  (u16 as CharId, Pos2, u16 alias Time16),
-		CharTurn       (u16 as CharId, i16 alias Angle, u16 alias Time16), // [turn_to]
+		CharLookAtChar (u16 as CharId, u16 as CharId, u16 as u32 alias Time), // [look_to]
+		CharLookAtPos  (u16 as CharId, Pos2, u16 as u32 alias Time),
+		CharTurn       (u16 as CharId, i16 alias Angle, u16 as u32 alias Time), // [turn_to]
 		CharIdle       (u16 as CharId, Pos2, Pos2, u32 alias Speed),
 		CharWalkToPos  (u16 as CharId, Pos3, u32 alias Speed, u8), // [walk_to]
 		CharWalkToPos2 (u16 as CharId, Pos3, u32 alias Speed, u8),
@@ -596,9 +596,9 @@ themelios_macros::bytecode! {
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_CF(u16 as CharId, u8, String), // something with skeleton animation
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_D0(i32 alias Angle32, u32 alias Time),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_D1(u16 as CharId, i32, i32, i32, u32 alias Time), // something with camera?
-		#[game(Sc, ScEvo, Tc, TcEvo)] ScLoadChcp(file_ref(game) -> String, file_ref(game) -> String, u8),
-		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7LoadChcp(file_ref(game) -> String, u8),
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_D3(u8),
+		#[game(Sc, ScEvo, Tc, TcEvo)] ED6LoadChcp(file_ref(game) -> String, file_ref(game) -> String, u8 as u16 alias ChcpId),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7LoadChcp(file_ref(game) -> String, u8 as u16 alias ChcpId),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] UnloadChcp(u8 as u16 alias ChcpId),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] PartyGetAttr(u8 as Member, u8),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] PartyGetEquipped(u8 as Member, u8),
 

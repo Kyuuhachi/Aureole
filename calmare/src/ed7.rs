@@ -1,7 +1,7 @@
 use std::io::{self, Write};
 
-use themelios::scena::{Pos2, Pos3, FuncRef};
-use themelios::scena::ed7::Scena;
+use themelios::scena::{Pos2, Pos3, FuncRef, CharId};
+use themelios::scena::ed7;
 use themelios::scena::code::{InsnArg as I, Expr, ExprBinop, ExprUnop, FlatInsn, Label, Insn};
 use themelios::scena::code::decompile::{decompile, TreeInsn};
 use themelios::text::{Text, TextSegment};
@@ -70,6 +70,11 @@ impl<'a> Context<'a> {
 		Ok(self)
 	}
 
+	pub fn no_space(&mut self) -> Result<&mut Self> {
+		self.space = Space::None;
+		Ok(self)
+	}
+
 	pub fn kw(&mut self, arg: &str) -> Result<&mut Self> {
 		self.put_space()?;
 		write!(&mut self.out, "{arg}")?;
@@ -114,8 +119,8 @@ impl<'a> Context<'a> {
 	}
 }
 
-pub fn dump(mut f: Context, scena: &Scena) -> Result<()> {
-	let Scena {
+pub fn dump(mut f: Context, scena: &ed7::Scena) -> Result<()> {
+	let ed7::Scena {
 		name1,
 		name2,
 		filename,
@@ -145,30 +150,110 @@ pub fn dump(mut f: Context, scena: &Scena) -> Result<()> {
 		functions,
 	} = scena;
 
-	f.kw("ed7")?
-		.line()?;
+	f.kw("scena")?.kw("ed7")?.suf(":")?.line()?.indent(|f| {
+		f.kw("name")?.val(I::String(name1))?.val(I::String(name2))?.val(I::String(filename))?.line()?;
+		f.kw("town")?.val(I::TownId(town))?.line()?;
+		f.kw("bgm")?.val(I::BgmId(bgm))?.line()?;
+		f.kw("flags")?.val(I::u32(flags))?.line()?;
+		f.kw("unk")?.val(I::u8(unk1))?.val(I::u16(unk2))?.val(I::u8(unk3))?.line()?;
+		Ok(())
+	}).strict()?;
 	f.line()?;
 
-	f.kw("name")?
-		.val(I::String(name1))?
-		.val(I::String(name2))?
-		.val(I::String(filename))?
-		.line()?;
-	f.kw("town")?
-		.val(I::TownId(town))?
-		.line()?;
-	f.kw("bgm")?
-		.val(I::BgmId(bgm))?
-		.line()?;
-	f.kw("flags")?
-		.val(I::u32(flags))?
-		.line()?;
-	f.kw("unknown")?
-		.val(I::u8(unk1))?
-		.val(I::u16(unk2))?
-		.val(I::u8(unk3))?
-		.line()?;
-	f.line()?;
+	for (i, a) in includes.iter().enumerate() {
+		if let Some(a) = a {
+			f.kw("scp")?.val(I::u16(&(i as u16)))?.val(I::String(a))?.line()?;
+		}
+	}
+	if includes.iter().any(|a| a.is_some()) {
+		f.line()?;
+	}
+
+	if let Some(entry) = entry {
+		f.kw("entry")?.suf(":")?.line()?.indent(|f| {
+			f.kw("pos")?.val(I::Pos3(&entry.pos))?.line()?;
+			f.kw("unk1")?.val(I::u32(&entry.unk1))?.line()?;
+			f.kw("cam_from")?.val(I::Pos3(&entry.cam_from))?.line()?;
+			f.kw("cam_pers")?.val(I::u32(&entry.cam_pers))?.line()?;
+			f.kw("unk2")?.val(I::u16(&entry.unk2))?.line()?;
+			f.kw("cam_deg")?.val(I::u16(&entry.cam_deg))?.line()?;
+			f.kw("cam_limit")?.val(I::u16(&entry.cam_limit1))?.val(I::u16(&entry.cam_limit2))?.line()?;
+			f.kw("cam_at")?.val(I::Pos3(&entry.cam_at))?.line()?;
+			f.kw("unk3")?.val(I::u16(&entry.unk3))?.line()?;
+			f.kw("unk4")?.val(I::u16(&entry.unk4))?.line()?;
+			f.kw("flags")?.val(I::u16(&entry.flags))?.line()?;
+			f.kw("town")?.val(I::TownId(&entry.town))?.line()?;
+			f.kw("init")?.val(I::FuncRef(&entry.init))?.line()?;
+			f.kw("reinit")?.val(I::FuncRef(&entry.reinit))?.line()?;
+			Ok(())
+		}).strict()?;
+		f.line()?;
+	}
+
+	for (i, chcp) in chcp.iter().enumerate() {
+		f.kw("chcp")?.val(I::ChcpId(&(i as u16)))?;
+		if let Some(chcp) = chcp {
+			f.val(I::String(chcp))?;
+		} else {
+			f.kw("-")?;
+		}
+		f.line()?;
+	}
+	if !chcp.is_empty() {
+		f.line()?;
+	}
+
+	let mut n = 8;
+
+	for npc in npcs {
+		f.kw("npc")?.val(I::CharId(&CharId(n)))?.suf(":")?.line()?.indent(|f| {
+			f.kw("name")?.val(I::TextTitle(&npc.name))?.line()?;
+			f.kw("pos")?.val(I::Pos3(&npc.pos))?.line()?;
+			f.kw("angle")?.val(I::Angle(&npc.angle))?.line()?;
+			f.kw("unk1")?.val(I::u16(&npc.unk1))?.line()?;
+			f.kw("unk2")?.val(I::u16(&npc.unk2))?.line()?;
+			f.kw("unk3")?.val(I::u16(&npc.unk3))?.line()?;
+			f.kw("init")?.val(I::FuncRef(&npc.init))?.line()?;
+			f.kw("talk")?.val(I::FuncRef(&npc.talk))?.line()?;
+			f.kw("unk4")?.val(I::u32(&npc.unk4))?.line()?;
+			Ok(())
+		}).strict()?;
+		n += 1;
+		f.line()?;
+	}
+
+	for monster in monsters {
+		f.kw("monster")?.val(I::CharId(&CharId(n)))?.suf(":")?.line()?.indent(|f| {
+			f.kw("pos")?.val(I::Pos3(&monster.pos))?.line()?;
+			f.kw("angle")?.val(I::Angle(&monster.angle))?.line()?;
+			f.kw("unk1")?.val(I::u16(&monster.unk1))?.line()?;
+			f.kw("battle")?.val(I::BattleId(&monster.battle))?.line()?;
+			f.kw("flag")?.val(I::Flag(&monster.flag))?.line()?;
+			f.kw("chcp")?.val(I::u16(&monster.chcp))?.line()?;
+			f.kw("unk2")?.val(I::u16(&monster.unk2))?.line()?;
+			f.kw("stand_anim")?.val(I::u32(&monster.stand_anim))?.line()?;
+			f.kw("walk_anim")?.val(I::u32(&monster.walk_anim))?.line()?;
+			Ok(())
+		}).strict()?;
+		n += 1;
+		f.line()?;
+	}
+
+	for (i, lp) in look_points.iter().enumerate() {
+		f.kw("look_point")?.val(I::ObjectId(&(i as u16)))?.suf(":")?.line()?.indent(|f| {
+			f.kw("pos")?.val(I::Pos3(&lp.pos))?.line()?;
+			f.kw("radius")?.val(I::u32(&lp.radius))?.line()?;
+			f.kw("bubble_pos")?.val(I::Pos3(&lp.bubble_pos))?.line()?;
+			f.kw("unk1")?.val(I::u8(&lp.unk1))?.line()?;
+			f.kw("unk2")?.val(I::u16(&lp.unk2))?.line()?;
+			f.kw("function")?.val(I::FuncRef(&lp.function))?.line()?;
+			f.kw("unk3")?.val(I::u8(&lp.unk3))?.line()?;
+			f.kw("unk4")?.val(I::u16(&lp.unk4))?.line()?;
+			Ok(())
+		}).strict()?;
+		n += 1;
+		f.line()?;
+	}
 
 	// TODO more stuff
 
@@ -362,6 +447,7 @@ fn val(f: &mut Context, a: I) -> Result<()> {
 		I::Global(v) => write!(f, "global[{}]", v.0)?,
 		I::CharAttr(v) => {
 			f.val(I::CharId(&v.0))?;
+			f.no_space()?;
 			write!(f, ":{}", v.1)?;
 		},
 
@@ -389,11 +475,13 @@ fn val(f: &mut Context, a: I) -> Result<()> {
 		I::ObjectId(v) => write!(f, "ObjectId({v})")?,
 		I::VisId(v)    => write!(f, "VisId({v})")?,
 		I::EffId(v)    => write!(f, "EffId({v})")?,
+		I::ChcpId(v)   => write!(f, "ChcpId({v})")?,
 
 		I::Expr(v) => expr(f, v)?,
 		I::FuncRef(v) => {
 			if v.0 != 0 {
 				write!(f, "{}", v.0)?;
+				f.no_space()?;
 			}
 			write!(f, ":{}", v.1)?;
 		},
@@ -409,7 +497,6 @@ fn val(f: &mut Context, a: I) -> Result<()> {
 		I::Angle32(v) => write!(f, "{v}°₃₂")?,
 		I::Speed(v)   => write!(f, "{v}mm/s")?,
 		I::Time(v)    => write!(f, "{v}ms")?,
-		I::Time16(v)  => write!(f, "{v}ms₁₆")?,
 
 		I::Pos2(Pos2(x,z))   => write!(f, "({x}, -, {z})")?,
 		I::Pos3(Pos3(x,y,z)) => write!(f, "({x}, {y}, {z})")?,
@@ -547,7 +634,7 @@ fn text(f: &mut Context, v: &Text) -> Result<()> {
 					}
 					TextSegment::Item(n) => {
 						write!(f, "{{item ")?;
-						f.val(I::ItemId(n))?;
+						f.val(I::ItemId(n))?.no_space()?;
 						write!(f, "}}")?;
 					}
 					TextSegment::Byte(n) => {
@@ -585,7 +672,7 @@ fn text_blind(f: &mut Context, v: &Text) -> Result<()> {
 #[test]
 fn test() {
 	use themelios::gamedata::GameData;
-	let path = "../data/zero/data/scena/t113b.bin";
+	let path = "../data/zero/data/scena/t1000.bin";
 	let data = std::fs::read(path).unwrap();
 	let scena = themelios::scena::ed7::read(GameData::ZERO_KAI, &data).unwrap();
 	let c = Context::new(std::io::stdout());

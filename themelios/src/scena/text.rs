@@ -413,6 +413,7 @@ fn val(f: &mut Context, a: I) {
 		I::ObjectId(v) => f.write(&format!("ObjectId({v})")),
 		I::VisId(v)    => f.write(&format!("VisId({v})")),
 		I::EffId(v)    => f.write(&format!("EffId({v})")),
+		I::ChcpId(v)   => f.write(&format!("ChcpId({v})")),
 
 		I::Expr(v) => expr(f, v),
 		I::Fork(v) => {
@@ -455,7 +456,6 @@ fn val(f: &mut Context, a: I) {
 		I::Angle32(v) => f.write(&format!("{v}°₃₂")),
 		I::Speed(v)   => f.write(&format!("{v}mm/s")),
 		I::Time(v)    => f.write(&format!("{v}ms")),
-		I::Time16(v)  => f.write(&format!("{v}ms₁₆")),
 
 		I::Pos2(Pos2(x,z))   => f.write(&format!("({x}, -, {z})")),
 		I::Pos3(Pos3(x,y,z)) => f.write(&format!("({x}, {y}, {z})")),

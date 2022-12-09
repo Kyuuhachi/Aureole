@@ -56,9 +56,9 @@ pub struct Npc {
 	pub unk1: u16,
 	pub unk2: u16,
 	pub unk3: u16,
-	pub unk4: u16,
 	pub init: FuncRef,
-	pub unk5: u32,
+	pub talk: FuncRef,
+	pub unk4: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -261,9 +261,9 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 		unk1: g.u16()?,
 		unk2: g.u16()?,
 		unk3: g.u16()?,
-		unk4: g.u16()?,
 		init: FuncRef(g.u8()? as u16, g.u8()? as u16),
-		unk5: g.u32()?,
+		talk: FuncRef(g.u8()? as u16, g.u8()? as u16),
+		unk4: g.u32()?,
 	})).strict()?;
 
 	let mut g = f.clone().at(p_monsters)?;
@@ -591,10 +591,11 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		g.u16(npc.unk1);
 		g.u16(npc.unk2);
 		g.u16(npc.unk3);
-		g.u16(npc.unk4);
 		g.u8(cast(npc.init.0)?);
 		g.u8(cast(npc.init.1)?);
-		g.u32(npc.unk5);
+		g.u8(cast(npc.talk.0)?);
+		g.u8(cast(npc.talk.1)?);
+		g.u32(npc.unk4);
 	}
 
 	let g = &mut monsters;

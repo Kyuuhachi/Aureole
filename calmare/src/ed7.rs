@@ -568,29 +568,13 @@ pub fn tree_func(f: &mut Context, func: &[TreeInsn]) -> Result<()> {
 fn insn(f: &mut Context, i: &Insn) -> Result<()> {
 	f.kw(i.name())?;
 	for &a in i.args().iter() {
-		match a {
-			I::Fork(a) => {
-				f.suf(":")?.line()?;
-				f.indent(|f| {
-					for line in a {
-						insn(f, line)?;
-					}
-					Ok(())
-				}).strict()?;
-			}
-
-			a => {
-				f.val(a)?;
-			}
-		}
+		f.val(a)?;
 	}
 	Ok(())
 }
 
 fn val(f: &mut Context, a: I) -> Result<()> {
 	match a {
-		I::Fork(_) => panic!("block elements should be handled outside"),
-
 		// I::i8(v)  => write!(f, "{v}")),
 		I::i16(v) => write!(f, "{v}")?,
 		I::i32(v) => write!(f, "{v}")?,
@@ -636,6 +620,7 @@ fn val(f: &mut Context, a: I) -> Result<()> {
 		I::ChcpId(v)   => write!(f, "ChcpId({v})")?,
 
 		I::Expr(v) => expr(f, v)?,
+
 		I::FuncRef(v) => {
 			if v.0 != 0 {
 				write!(f, "{}", v.0)?;
@@ -644,10 +629,26 @@ fn val(f: &mut Context, a: I) -> Result<()> {
 			write!(f, ":{}", v.1)?;
 		}
 
+		I::Fork(a) => {
+			f.suf(":")?;
+			f.indent(|f| {
+				for line in a.iter() {
+					f.line()?;
+					insn(f, line)?;
+				}
+				Ok(())
+			}).strict()?;
+		}
+
 		I::Menu(a) => {
-			for line in a {
-				f.val(I::MenuItem(line))?;
-			}
+			f.suf(":")?;
+			f.indent(|f| {
+				for line in a.iter() {
+					f.line()?;
+					f.val(I::MenuItem(line))?;
+				}
+				Ok(())
+			}).strict()?;
 		}
 
 		I::QuestList(a) => {

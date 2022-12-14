@@ -39,14 +39,3 @@ pub fn write(table: &BTreeMap<BgmId, Bgm>) -> Result<Vec<u8>, WriteError> {
 	}
 	Ok(f.finish()?)
 }
-
-#[cfg(test)]
-mod test {
-	use crate::util::test::*;
-
-	#[test_case::test_case(&FC; "fc")]
-	fn roundtrip(arc: &crate::archive::Archives) -> Result<(), Error> {
-		check_roundtrip(&arc.get_decomp("t_bgmtbl._dt").unwrap(), super::read, super::write)?;
-		Ok(())
-	}
-}

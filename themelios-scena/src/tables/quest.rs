@@ -101,15 +101,3 @@ pub fn write(table: &BTreeMap<QuestId, Quest>) -> Result<Vec<u8>, WriteError> {
 
 	Ok(f.concat(g).finish()?)
 }
-
-#[cfg(test)]
-mod test {
-	use crate::util::test::*;
-
-	#[test_case::test_case(&FC; "fc")]
-	fn roundtrip(arc: &crate::archive::Archives) -> Result<(), Error> {
-		check_roundtrip(&arc.get_decomp("t_quest._dt").unwrap(), super::read, super::write)?;
-		Ok(())
-	}
-}
-

@@ -622,6 +622,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "roundtrip"
+version = "0.1.0"
+dependencies = [
+ "lazy_static",
+ "similar",
+ "test-case",
+ "themelios",
+ "thiserror",
+]
+
+[[package]]
 name = "rustc-demangle"
 version = "0.1.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -1,8 +1,5 @@
 use std::ops::*;
 
-#[cfg(test)]
-pub mod test;
-
 pub mod read;
 pub mod write;
 

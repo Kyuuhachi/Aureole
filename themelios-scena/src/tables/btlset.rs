@@ -246,15 +246,3 @@ pub fn read(lookup: &dyn Lookup, data: &[u8]) -> Result<(BTreeMap<BattleId, Batt
 }
 
 // I'll skip the writing for now.
-
-#[cfg(test)]
-mod test {
-	use crate::util::test::*;
-
-	#[test_case::test_case(&FC; "fc")]
-	fn parse(arc: &crate::archive::Archives) -> Result<(), Error> {
-		let data = arc.get_decomp("t_btlset._dt").unwrap();
-		let _parsed = super::read(arc, &data)?;
-		Ok(())
-	}
-}

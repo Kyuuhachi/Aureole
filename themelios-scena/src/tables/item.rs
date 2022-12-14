@@ -94,19 +94,3 @@ pub fn write(table: &BTreeMap<ItemId, Item>) -> Result<(Vec<u8>, Vec<u8>), Write
 	}
 	Ok((f1.concat(g1).finish()?, f2.concat(g2).finish()?))
 }
-
-#[cfg(test)]
-mod test {
-	use crate::util::test::*;
-
-	#[test_case::test_case(&FC; "fc")]
-	fn roundtrip(arc: &crate::archive::Archives) -> Result<(), Error> {
-		let t_item = arc.get_decomp("t_item._dt").unwrap();
-		let t_item2 = arc.get_decomp("t_item2._dt").unwrap();
-		let items = super::read(&t_item, &t_item2)?;
-		let (t_item_, t_item2_) = super::write(&items)?;
-		let items2 = super::read(&t_item_, &t_item2_)?;
-		check_equal(&items, &items2)?;
-		Ok(())
-	}
-}

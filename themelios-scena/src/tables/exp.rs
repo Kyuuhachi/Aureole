@@ -20,8 +20,3 @@ pub fn write(table: &[u32]) -> Result<Vec<u8>, WriteError> {
 	}
 	Ok(out.finish()?)
 }
-
-#[cfg(test)]
-mod test {
-	crate::util::test::simple_roundtrip!("t_exp._dt");
-}

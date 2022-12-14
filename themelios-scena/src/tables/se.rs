@@ -56,8 +56,3 @@ pub fn write(lookup: &dyn Lookup, table: &BTreeMap<SoundId, Sound>) -> Result<Ve
 
 	Ok(out.finish()?)
 }
-
-#[cfg(test)]
-mod test {
-	crate::util::test::simple_roundtrip_arc!("t_se._dt");
-}

@@ -1,4 +1,4 @@
-use crate::archive::Archives;
+use themelios::archive::Archives;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -6,13 +6,13 @@ pub enum Error {
 	Io { #[from] source: std::io::Error, backtrace: std::backtrace::Backtrace },
 
 	#[error("{source}")]
-	Lookup { #[from] source: crate::gamedata::LookupError, backtrace: std::backtrace::Backtrace },
+	Lookup { #[from] source: themelios::gamedata::LookupError, backtrace: std::backtrace::Backtrace },
 
 	#[error(transparent)]
-	Read { #[from] #[backtrace] source: crate::util::ReadError },
+	Read { #[from] #[backtrace] source: themelios::util::ReadError },
 
 	#[error(transparent)]
-	Write { #[from] #[backtrace] source: crate::util::WriteError },
+	Write { #[from] #[backtrace] source: themelios::util::WriteError },
 
 	#[error("{assertion}")]
 	Assert { assertion: Box<str>, backtrace: Box<std::backtrace::Backtrace> },
@@ -59,8 +59,8 @@ pub fn check_equal<T: PartialEq + std::fmt::Debug>(a: &T, b: &T) -> Result<(), E
 pub fn check_roundtrip_flex<T>(
 	strict: bool,
 	data: &[u8],
-	read: impl Fn(&[u8]) -> Result<T, super::ReadError>,
-	write: impl Fn(&T) -> Result<Vec<u8>, super::WriteError>,
+	read: impl Fn(&[u8]) -> Result<T, themelios::util::ReadError>,
+	write: impl Fn(&T) -> Result<Vec<u8>, themelios::util::WriteError>,
 ) -> Result<T, Error> where
 	T: PartialEq + std::fmt::Debug,
 {
@@ -74,8 +74,8 @@ pub fn check_roundtrip_flex<T>(
 
 pub fn check_roundtrip<T>(
 	data: &[u8],
-	read: impl Fn(&[u8]) -> Result<T, super::ReadError>,
-	write: impl Fn(&T) -> Result<Vec<u8>, super::WriteError>,
+	read: impl Fn(&[u8]) -> Result<T, themelios::util::ReadError>,
+	write: impl Fn(&T) -> Result<Vec<u8>, themelios::util::WriteError>,
 ) -> Result<T, Error> where
 	T: PartialEq + std::fmt::Debug,
 {
@@ -88,8 +88,8 @@ pub fn check_roundtrip<T>(
 
 pub fn check_roundtrip_strict<T>(
 	data: &[u8],
-	read: impl Fn(&[u8]) -> Result<T, super::ReadError>,
-	write: impl Fn(&T) -> Result<Vec<u8>, super::WriteError>,
+	read: impl Fn(&[u8]) -> Result<T, themelios::util::ReadError>,
+	write: impl Fn(&T) -> Result<Vec<u8>, themelios::util::WriteError>,
 ) -> Result<T, Error> where
 	T: PartialEq + std::fmt::Debug,
 {
@@ -142,35 +142,3 @@ pub fn check_roundtrip_strict<T>(
 	}
 	Ok(val)
 }
-
-#[macro_export]
-macro_rules! __simple_roundtrip {
-	($name:literal) => {
-		#[test_case::test_case(&$crate::util::test::FC; "fc")]
-		fn roundtrip(arc: &$crate::archive::Archives) -> Result<(), $crate::util::test::Error> {
-			$crate::util::test::check_roundtrip_strict(
-				&arc.get_decomp($name).unwrap(),
-				super::read,
-				|a| super::write(a),
-			)?;
-			Ok(())
-		}
-	};
-}
-pub use __simple_roundtrip as simple_roundtrip;
-
-#[macro_export]
-macro_rules! __simple_roundtrip_arc {
-	($name:literal) => {
-		#[test_case::test_case(&$crate::util::test::FC; "fc")]
-		fn roundtrip(arc: &$crate::archive::Archives) -> Result<(), $crate::util::test::Error> {
-			$crate::util::test::check_roundtrip_strict(
-				&arc.get_decomp($name).unwrap(),
-				|a| super::read(arc, a),
-				|a| super::write(arc, a),
-			)?;
-			Ok(())
-		}
-	};
-}
-pub use __simple_roundtrip_arc as simple_roundtrip_arc;

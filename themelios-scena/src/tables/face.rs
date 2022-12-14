@@ -23,8 +23,3 @@ pub fn write(lookup: &dyn Lookup, names: &Vec<String>) -> Result<Vec<u8>, WriteE
 	}
 	Ok(out.finish()?)
 }
-
-#[cfg(test)]
-mod test {
-	crate::util::test::simple_roundtrip_arc!("t_face._dt");
-}

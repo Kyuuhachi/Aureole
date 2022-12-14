@@ -35,8 +35,3 @@ pub fn write(lookup: &dyn Lookup, table: &Vec<World>) -> Result<Vec<u8>, WriteEr
 	out.u32(0);
 	Ok(out.finish()?)
 }
-
-#[cfg(test)]
-mod test {
-	crate::util::test::simple_roundtrip_arc!("t_world._dt");
-}

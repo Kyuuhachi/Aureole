@@ -57,14 +57,3 @@ pub fn write(towns: &[Town]) -> Result<Vec<u8>, WriteError> {
 	}
 	Ok(f.concat(g).finish()?)
 }
-
-#[cfg(test)]
-mod test {
-	use crate::util::test::*;
-
-	#[test_case::test_case(&FC; "fc")]
-	fn roundtrip(arc: &crate::archive::Archives) -> Result<(), Error> {
-		check_roundtrip(&arc.get_decomp("t_town._dt").unwrap(), super::read, |a| super::write(a))?;
-		Ok(())
-	}
-}

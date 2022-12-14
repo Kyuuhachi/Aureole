@@ -69,8 +69,3 @@ pub fn write(table: &BTreeMap<RecipeId, Recipe>) -> Result<Vec<u8>, WriteError> 
 	}
 	Ok(f.concat(g).finish()?)
 }
-
-#[cfg(test)]
-mod test {
-	crate::util::test::simple_roundtrip!("t_cook2._dt");
-}

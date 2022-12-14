@@ -79,8 +79,3 @@ pub fn write(lookup: &dyn Lookup, table: &BTreeMap<NameId, Name>) -> Result<Vec<
 
 	Ok(f.concat(g).finish()?)
 }
-
-#[cfg(test)]
-mod test {
-	crate::util::test::simple_roundtrip_arc!("t_name._dt");
-}

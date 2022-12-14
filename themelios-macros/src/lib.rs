@@ -169,7 +169,7 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		let aliases = args.iter().map(|a| a.alias());
 		pq!{span=>
 			stringify!(#ident) => {
-				#(let #arg_names = if let Some(Arg::#aliases(v)) = it.next() { v } else { return None; };)*
+				#(let Some(Arg::#aliases(#arg_names)) = it.next() else { return None; };)*
 				Self::#ident(#(#arg_names),*)
 			},
 		}

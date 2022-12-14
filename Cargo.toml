@@ -16,8 +16,7 @@ package.cp932.opt-level = 3
 
 package.backtrace.opt-level = 3
 
-package.image.opt-level = 3
-package.png.opt-level = 3
-package.crc32fast.opt-level = 3
-package.deflate.opt-level = 3
-package.adler32.opt-level = 3
+package.themelios-macros.opt-level = 3
+package.syn.opt-level = 3
+package.quote.opt-level = 3
+package.proc-macro2.opt-level = 3

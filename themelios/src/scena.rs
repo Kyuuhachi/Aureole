@@ -53,6 +53,8 @@ newtype!(CharFlags, u16);
 // 0x0020 MOF_LOOPPLAY
 newtype!(ObjectFlags, u32);
 
+newtype!(LookPointFlags, u32);
+
 newtype!(Var, u16); // called Work internally
 
 newtype!(Global, u8);

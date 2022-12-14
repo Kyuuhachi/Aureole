@@ -1,4 +1,4 @@
-use super::{ed6::{Scena, Npc, Monster, Trigger, Object, Entry}, FuncRef, CharId, Pos2, Pos3};
+use super::{ed6::{Scena, Npc, Monster, Trigger, LookPoint, Entry}, FuncRef, CharId, Pos2, Pos3};
 use super::code::{InsnArg as I, FlatInsn, Label, Insn, Expr, ExprBinop, ExprUnop};
 use super::code::decompile::{decompile, TreeInsn};
 use crate::text::{Text, TextSegment};
@@ -82,7 +82,7 @@ pub fn dump(f: &mut Context, scena: &Scena) {
 		npcs,
 		monsters,
 		triggers,
-		objects,
+		look_points,
 		entries,
 		functions,
 	} = scena;
@@ -174,46 +174,46 @@ pub fn dump(f: &mut Context, scena: &Scena) {
 		n += 1;
 	}
 
-	for Monster { name, pos, angle, _1, flags, _2, battle, flag, _3 } in monsters {
+	for Monster { name, pos, angle, unk1, flags, unk2, battle, flag, unk3 } in monsters {
 		f.write("monster ");
 		val(f, I::CharId(&CharId(n)));
 		object(f, &[
 			("name", I::TextTitle(name)),
 			("pos", I::Pos3(pos)),
 			("angle", I::Angle(angle)),
-			("_1", I::u16(_1)),
+			("unk1", I::u16(unk1)),
 			("flags", I::CharFlags(flags)),
-			("_2", I::i32(_2)),
+			("unk2", I::i32(unk2)),
 			("battle", I::BattleId(battle)),
 			("flag", I::Flag(flag)),
-			("_3", I::u16(_3)),
+			("unk3", I::u16(unk3)),
 		]);
 		f.line();
 		n += 1;
 	}
 
-	for Trigger { pos1, pos2, flags, func, _1 } in triggers {
+	for Trigger { pos1, pos2, flags, func, unk1 } in triggers {
 		f.write("trigger");
 		object(f, &[
 			("pos1", I::Pos3(pos1)),
 			("pos2", I::Pos3(pos2)),
 			("flags", I::u16(flags)),
 			("func", I::FuncRef(func)),
-			("_1", I::u16(_1)),
+			("unk1", I::u16(unk1)),
 		]);
 		f.line();
 	}
 
-	for (n, Object { pos, radius, bubble_pos, flags, func, _1 }) in objects.iter().enumerate() {
-		f.write("object ");
+	for (n, LookPoint { pos, radius, bubble_pos, flags, func, unk1 }) in look_points.iter().enumerate() {
+		f.write("look_point ");
 		val(f, I::LookPointId(&(n as u16)));
 		object(f, &[
 			("pos", I::Pos3(pos)),
 			("radius", I::u32(radius)),
 			("bubble_pos", I::Pos3(bubble_pos)),
-			("flags", I::ObjectFlags(flags)),
+			("flags", I::LookPointFlags(flags)),
 			("func", I::FuncRef(func)),
-			("_1", I::u16(_1)),
+			("unk1", I::u16(unk1)),
 		]);
 		f.line();
 	}

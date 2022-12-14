@@ -264,8 +264,8 @@ themelios_macros::bytecode! {
 		Emote(u16 as CharId, i32, i32, emote() -> Emote, u8), // [emotion] mostly used through macros such as EMO_BIKKURI3(). Third argument is height.
 		EmoteStop(u16 as CharId), // [emotion_close]
 
-		LookPointFlagsSet(u8 as u16 alias LookPointId, u16), // What's the difference between this and ObjFlagsSet?
-		LookPointFlagsUnset(u8 as u16 alias LookPointId, u16),
+		LookPointFlagsSet(u8 as u16 alias LookPointId, u16 as u32 as LookPointFlags),
+		LookPointFlagsUnset(u8 as u16 alias LookPointId, u16 as u32 as LookPointFlags),
 
 		CamChangeAxis(u16), // [camera_change_axis] 0 CAMERA_ABSOLUTE_MODE, 1 CAMERA_RELATIVE_MODE
 		CamMove(i32, i32, i32, u32 alias Time), // [camera_move]

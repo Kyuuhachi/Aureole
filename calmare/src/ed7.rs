@@ -283,7 +283,7 @@ pub fn dump(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 	}
 
 	for (i, lp) in look_points.iter().enumerate() {
-		f.kw("look_point")?.val(I::ObjectId(&(i as u16)))?.suf(":")?.line()?.indent(|f| {
+		f.kw("look_point")?.val(I::LookPointId(&(i as u16)))?.suf(":")?.line()?.indent(|f| {
 			f.kw("pos")?.val(I::Pos3(&lp.pos))?.line()?;
 			f.kw("radius")?.val(I::u32(&lp.radius))?.line()?;
 			f.kw("bubble_pos")?.val(I::Pos3(&lp.bubble_pos))?.line()?;
@@ -615,6 +615,7 @@ fn val(f: &mut Context, a: I) -> Result<()> {
 		I::MenuId(v)   => write!(f, "MenuId({v})")?,
 		I::SelectId(v) => write!(f, "SelectId({v})")?,
 		I::ObjectId(v) => write!(f, "ObjectId({v})")?,
+		I::LookPointId(v) => write!(f, "LookPointId({v})")?,
 		I::VisId(v)    => write!(f, "VisId({v})")?,
 		I::EffId(v)    => write!(f, "EffId({v})")?,
 		I::ChcpId(v)   => write!(f, "ChcpId({v})")?,

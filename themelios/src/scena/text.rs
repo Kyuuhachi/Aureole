@@ -206,7 +206,7 @@ pub fn dump(f: &mut Context, scena: &Scena) {
 
 	for (n, Object { pos, radius, bubble_pos, flags, func, _1 }) in objects.iter().enumerate() {
 		f.write("object ");
-		val(f, I::ObjectId(&(n as u16)));
+		val(f, I::LookPointId(&(n as u16)));
 		object(f, &[
 			("pos", I::Pos3(pos)),
 			("radius", I::u32(radius)),
@@ -411,6 +411,7 @@ fn val(f: &mut Context, a: I) {
 		I::MenuId(v)   => f.write(&format!("MenuId({v})")),
 		I::SelectId(v) => f.write(&format!("SelectId({v})")),
 		I::ObjectId(v) => f.write(&format!("ObjectId({v})")),
+		I::LookPointId(v) => f.write(&format!("LookPointId({v})")),
 		I::VisId(v)    => f.write(&format!("VisId({v})")),
 		I::EffId(v)    => f.write(&format!("EffId({v})")),
 		I::ChcpId(v)   => f.write(&format!("ChcpId({v})")),

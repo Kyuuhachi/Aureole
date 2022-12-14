@@ -55,7 +55,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 		f.line()?;
 	}
 
-	if let Some(entry) = entry {
+	for entry in entry {
 		f.kw("entry")?.suf(":")?.line()?.indent(|f| {
 			f.kw("pos")?.val(I::Pos3(&entry.pos))?.line()?;
 			f.kw("unk1")?.val(I::u32(&entry.unk1))?.line()?;
@@ -75,7 +75,6 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 		}).strict()?;
 		f.line()?;
 	}
-	f.line()?;
 
 	for (i, chcp) in chcp.iter().enumerate() {
 		f.kw("chcp")?.val(I::ChcpId(&(i as u16)))?;
@@ -108,9 +107,6 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 		n += 1;
 		f.line()?;
 	}
-	if !npcs.is_empty() {
-		f.line()?;
-	}
 
 	for monster in monsters {
 		f.kw("monster")?.val(I::CharId(&CharId(n)))?.suf(":")?.line()?.indent(|f| {
@@ -126,9 +122,6 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 			Ok(())
 		}).strict()?;
 		n += 1;
-		f.line()?;
-	}
-	if !monsters.is_empty() {
 		f.line()?;
 	}
 
@@ -161,10 +154,6 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 
 			Ok(())
 		}).strict()?;
-		n += 1;
-		f.line()?;
-	}
-	if !triggers.is_empty() {
 		f.line()?;
 	}
 
@@ -180,10 +169,6 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 			f.kw("unk4")?.val(I::u16(&lp.unk4))?.line()?;
 			Ok(())
 		}).strict()?;
-		n += 1;
-		f.line()?;
-	}
-	if !look_points.is_empty() {
 		f.line()?;
 	}
 
@@ -201,7 +186,6 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 
 				Ok(())
 			}).strict()?;
-			n += 1;
 			f.line()?;
 		}
 		if !labels.is_empty() {
@@ -223,8 +207,6 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 	if !animations.is_empty() {
 		f.line()?;
 	}
-
-	f.line()?;
 
 	let junk_sepith = matches!(field_sepith.as_slice(), &[
 		[100, 1, 2, 3, 70, 89, 99, 0],
@@ -322,12 +304,8 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 		f.line()?;
 	}
 
-	f.line()?;
-
 	for (i, func) in functions.iter().enumerate() {
-		if i != 0 {
-			f.line()?;
-		}
+		f.line()?;
 		common::func(&mut f, FuncRef(0, i as u16), func)?;
 	}
 

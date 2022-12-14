@@ -169,6 +169,7 @@ fn val(f: &mut Context, a: I) -> Result<()> {
 		I::CharFlags(v)   => write!(f, "0x{:04X}", v.0)?,
 		I::QuestFlags(v)  => write!(f, "0x{:02X}", v.0)?,
 		I::ObjectFlags(v) => write!(f, "0x{:04X}", v.0)?,
+		I::LookPointFlags(v) => write!(f, "0x{:04X}", v.0)?,
 		I::Color(v)       => write!(f, "#{:08X}", v.0)?,
 
 		I::Member(v)   => write!(f, "{v:?}")?,

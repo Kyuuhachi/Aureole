@@ -3,7 +3,6 @@ use hamu::write::le::*;
 use crate::util::*;
 
 pub mod code;
-pub mod text;
 pub mod ed6;
 pub mod ed7;
 

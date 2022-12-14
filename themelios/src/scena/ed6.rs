@@ -455,23 +455,23 @@ mod test {
 				let recomp = super::code::decompile::recompile(&decomp).map_err(|e| format!("{name}:{i}: {e}"))?;
 				if &recomp != func {
 					println!("{name}:{i}: incorrect recompile");
-
-					let mut ctx = super::text::Context::new().blind();
-					ctx.indent += 1;
-					super::text::flat_func(&mut ctx, func);
-					print!("{}", ctx.output);
-					println!("\n======\n");
-
-					let mut ctx = super::text::Context::new().blind();
-					ctx.indent += 1;
-					super::text::tree_func(&mut ctx, &decomp);
-					print!("{}", ctx.output);
-					println!("\n======\n");
-
-					let mut ctx = super::text::Context::new().blind();
-					ctx.indent += 1;
-					super::text::flat_func(&mut ctx, &recomp);
-					println!("{}", ctx.output);
+					//
+					// let mut ctx = super::text::Context::new().blind();
+					// ctx.indent += 1;
+					// super::text::flat_func(&mut ctx, func);
+					// print!("{}", ctx.output);
+					// println!("\n======\n");
+					//
+					// let mut ctx = super::text::Context::new().blind();
+					// ctx.indent += 1;
+					// super::text::tree_func(&mut ctx, &decomp);
+					// print!("{}", ctx.output);
+					// println!("\n======\n");
+					//
+					// let mut ctx = super::text::Context::new().blind();
+					// ctx.indent += 1;
+					// super::text::flat_func(&mut ctx, &recomp);
+					// println!("{}", ctx.output);
 
 					failed = true;
 				}
@@ -524,22 +524,22 @@ mod test {
 						Ok(d) => d,
 						Err(e) => {
 							println!("{name}:{i}: failed to decompile: {e}");
-							let mut ctx = super::text::Context::new().blind();
-							ctx.indent += 1;
-							super::text::flat_func(&mut ctx, func);
-							print!("{}", ctx.output);
-							println!("\n======\n");
-
-							let mut ctx = super::text::Context::new().blind();
-							ctx.indent += 1;
-							super::text::flat_func(&mut ctx, vfunc);
-							print!("{}", ctx.output);
-							println!("\n======\n");
-
-							let mut ctx = super::text::Context::new().blind();
-							ctx.indent += 1;
-							super::text::flat_func(&mut ctx, &vfunc2);
-							print!("{}", ctx.output);
+							// let mut ctx = super::text::Context::new().blind();
+							// ctx.indent += 1;
+							// super::text::flat_func(&mut ctx, func);
+							// print!("{}", ctx.output);
+							// println!("\n======\n");
+							//
+							// let mut ctx = super::text::Context::new().blind();
+							// ctx.indent += 1;
+							// super::text::flat_func(&mut ctx, vfunc);
+							// print!("{}", ctx.output);
+							// println!("\n======\n");
+							//
+							// let mut ctx = super::text::Context::new().blind();
+							// ctx.indent += 1;
+							// super::text::flat_func(&mut ctx, &vfunc2);
+							// print!("{}", ctx.output);
 							continue
 						}
 					};
@@ -547,22 +547,22 @@ mod test {
 					if recomp != vfunc2 {
 						println!("{name}:{i}: incorrect recompile");
 
-						let mut ctx = super::text::Context::new().blind();
-						ctx.indent += 1;
-						super::text::flat_func(&mut ctx, func);
-						print!("{}", ctx.output);
-						println!("\n======\n");
-
-						let mut ctx = super::text::Context::new().blind();
-						ctx.indent += 1;
-						super::text::flat_func(&mut ctx, &vfunc2);
-						print!("{}", ctx.output);
-						println!("\n======\n");
-
-						let mut ctx = super::text::Context::new().blind();
-						ctx.indent += 1;
-						super::text::flat_func(&mut ctx, &recomp);
-						println!("{}", ctx.output);
+						// let mut ctx = super::text::Context::new().blind();
+						// ctx.indent += 1;
+						// super::text::flat_func(&mut ctx, func);
+						// print!("{}", ctx.output);
+						// println!("\n======\n");
+						//
+						// let mut ctx = super::text::Context::new().blind();
+						// ctx.indent += 1;
+						// super::text::flat_func(&mut ctx, &vfunc2);
+						// print!("{}", ctx.output);
+						// println!("\n======\n");
+						//
+						// let mut ctx = super::text::Context::new().blind();
+						// ctx.indent += 1;
+						// super::text::flat_func(&mut ctx, &recomp);
+						// println!("{}", ctx.output);
 
 						failed = true;
 					}

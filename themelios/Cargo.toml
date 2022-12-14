@@ -4,20 +4,4 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-hamu = { git = "https://github.com/Kyuuhachi/hamu", features = ["beryl"] }
-themelios-macros = { path = "../themelios-macros" }
-cp932 = { path = "../cp932" }
-mapr = "0.8.0"
-strict_result = "1.1.0"
-
-thiserror = "1.0.0"
-bitmatch = "0.1.1" # for decompress algorithm 2
-num_enum = "0.5.7"
-enumflags2 = { version = "0.7.5", features = ["std"] }
-extend = "1.1.2"
-derive_more = { version = "0.99.17", default-features = false, features = ["deref", "deref_mut", "display", "from", "into"] }
-
-[dev-dependencies]
-test-case = "2.2.1"
-lazy_static = "1.4.0"
-similar = "2.2.0"
+themelios-scena = { path = "../themelios-scena" }

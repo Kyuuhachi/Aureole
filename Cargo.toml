@@ -4,6 +4,7 @@ members = [
 	"cp932",
 
 	"themelios-macros",
+	"themelios-scena",
 	"themelios",
 	"calmare",
 	"tools",

@@ -734,6 +734,25 @@ checksum = "b1141d4d61095b28419e22cb0bbf02755f5e54e0526f97f1e3d1d160e60885fb"
 name = "themelios"
 version = "0.1.0"
 dependencies = [
+ "themelios-scena",
+]
+
+[[package]]
+name = "themelios-macros"
+version = "0.1.0"
+dependencies = [
+ "choubun",
+ "convert_case",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "syn_derive",
+]
+
+[[package]]
+name = "themelios-scena"
+version = "0.1.0"
+dependencies = [
  "bitmatch",
  "cp932",
  "derive_more",
@@ -748,18 +767,6 @@ dependencies = [
  "test-case",
  "themelios-macros",
  "thiserror",
-]
-
-[[package]]
-name = "themelios-macros"
-version = "0.1.0"
-dependencies = [
- "choubun",
- "convert_case",
- "proc-macro2",
- "quote",
- "syn",
- "syn_derive",
 ]
 
 [[package]]

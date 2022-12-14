@@ -2,7 +2,7 @@ use themelios::scena::{Pos2, Pos3, FuncRef};
 use themelios::scena::code::{InsnArg as I, Expr, ExprBinop, ExprUnop, FlatInsn, Label, Insn};
 use themelios::scena::code::decompile::{decompile, TreeInsn};
 use themelios::text::{Text, TextSegment};
-use strict_result::ResultAsStrict;
+use strict_result::Strict;
 use crate::writer::Context;
 
 pub type Result<T, E = std::io::Error> = std::result::Result<T, E>;

@@ -9,7 +9,7 @@ pub mod write;
 pub use read::*;
 pub use write::*;
 
-pub use strict_result::ResultAsStrict;
+pub use strict_result::Strict;
 
 pub type Backtrace = Box<std::backtrace::Backtrace>;
 

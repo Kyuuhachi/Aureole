@@ -1,7 +1,7 @@
 use themelios::scena::{FuncRef, CharId};
 use themelios::scena::ed6;
 use themelios::scena::code::InsnArg as I;
-use strict_result::ResultAsStrict;
+use strict_result::Strict;
 use crate::writer::Context;
 use crate::common::{self, Result, ContextExt};
 

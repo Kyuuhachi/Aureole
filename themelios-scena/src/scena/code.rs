@@ -9,14 +9,14 @@ use crate::gamedata::GameData;
 use crate::tables::bgmtbl::BgmId;
 use crate::tables::btlset::BattleId;
 use crate::tables::item::ItemId;
-use crate::tables::quest::QuestId;
+use crate::types::{QuestId, Flag};
 use crate::tables::se::SoundId;
 use crate::tables::town::TownId;
 use crate::util::*;
 use crate::text::Text;
 
 use super::{
-	Attr, CharAttr, CharFlags, CharId, Color, Emote, Flag, SystemFlags, FuncRef, InExt2, MagicId,
+	Attr, CharAttr, CharFlags, CharId, Color, Emote, SystemFlags, FuncRef, InExt2, MagicId,
 	Member, MemberAttr, OutExt2, Pos2, Pos3, QuestFlags, ShopId, Var, ObjectFlags, Global, LookPointFlags,
 };
 

@@ -21,8 +21,6 @@ pub struct Pos2(pub i32, pub i32);
 #[debug(fmt = "Pos3({_0}, {_1}, {_2})")]
 pub struct Pos3(pub i32, pub i32, pub i32);
 
-newtype!(Flag, u16);
-
 newtype!(Color, u32);
 newtype!(ShopId, u8);
 newtype!(Member, u8);

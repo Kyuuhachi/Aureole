@@ -7,21 +7,21 @@ mod ed6 {
 
 	macro_rules! test {
 		($a:item) => {
-			#[test_case::test_case(InstructionSet::Fc,    &*FC, true, "../data/fc.extract/01/", "._sn"; "fc")]
-			#[test_case::test_case(InstructionSet::FcEvo, &*FC, true, "../data/vita/extract/fc/gamedata/data/data/scenario/0/", ".bin"; "fc_evo")]
-			#[test_case::test_case(InstructionSet::Sc,    &*SC, true, "../data/sc.extract/21/", "._sn"; "sc")]
-			#[test_case::test_case(InstructionSet::ScEvo, &*SC, true, "../data/vita/extract/sc/gamedata/data/data_sc/scenario/1/", ".bin"; "sc_evo")]
-			#[test_case::test_case(InstructionSet::Tc,    &*TC, true, "../data/3rd.extract/21/", "._sn"; "tc")]
-			#[test_case::test_case(InstructionSet::TcEvo, &*TC, true, "../data/vita/extract/3rd/gamedata/data/data_3rd/scenario/2/", ".bin"; "tc_evo")]
+			#[test_case::test_case(InstructionSet::Fc,    &*FC, Strict, "../data/fc.extract/01/", "._sn"; "fc")]
+			#[test_case::test_case(InstructionSet::FcEvo, &*FC, Strict, "../data/vita/extract/fc/gamedata/data/data/scenario/0/", ".bin"; "fc_evo")]
+			#[test_case::test_case(InstructionSet::Sc,    &*SC, Strict, "../data/sc.extract/21/", "._sn"; "sc")]
+			#[test_case::test_case(InstructionSet::ScEvo, &*SC, Strict, "../data/vita/extract/sc/gamedata/data/data_sc/scenario/1/", ".bin"; "sc_evo")]
+			#[test_case::test_case(InstructionSet::Tc,    &*TC, Strict, "../data/3rd.extract/21/", "._sn"; "tc")]
+			#[test_case::test_case(InstructionSet::TcEvo, &*TC, Strict, "../data/vita/extract/3rd/gamedata/data/data_3rd/scenario/2/", ".bin"; "tc_evo")]
 			$a
 		}
 	}
 
 	test! {
-	#[test_case::test_case(InstructionSet::Fc,    &*FC, false, "../data/fc-voice/scena/", "._SN"; "fc_voice")]
-	#[test_case::test_case(InstructionSet::Sc,    &*SC, false, "../data/sc-voice/scena/", "._SN"; "sc_voice")]
-	#[test_case::test_case(InstructionSet::Tc,    &*TC, false, "../data/3rd-voice/scena/", "._SN"; "tc_voice")]
-	fn roundtrip(iset: InstructionSet, lookup: &dyn Lookup, strict: bool, scenapath: &str, suffix: &str) -> Result<(), Error> {
+	#[test_case::test_case(InstructionSet::Fc,    &*FC, Lenient, "../data/fc-voice/scena/", "._SN"; "fc_voice")]
+	#[test_case::test_case(InstructionSet::Sc,    &*SC, Lenient, "../data/sc-voice/scena/", "._SN"; "sc_voice")]
+	#[test_case::test_case(InstructionSet::Tc,    &*TC, Lenient, "../data/3rd-voice/scena/", "._SN"; "tc_voice")]
+	fn roundtrip(iset: InstructionSet, lookup: &dyn Lookup, strict: Strictness, scenapath: &str, suffix: &str) -> Result<(), Error> {
 		let game = GameData { iset, lookup, kai: false };
 		let mut failed = false;
 
@@ -39,7 +39,7 @@ mod ed6 {
 
 			let data = std::fs::read(&path)?;
 
-			if let Err(err) = check_roundtrip_flex(strict, &data, |a| themelios::scena::ed6::read(&game, a), |a| themelios::scena::ed6::write(&game, a)) {
+			if let Err(err) = check_roundtrip(strict, &data, |a| themelios::scena::ed6::read(&game, a), |a| themelios::scena::ed6::write(&game, a)) {
 				println!("{name}: {err:?}");
 				failed = true;
 			};
@@ -51,7 +51,7 @@ mod ed6 {
 	}
 
 	test! {
-	fn decompile(iset: InstructionSet, lookup: &dyn Lookup, _strict: bool, scenapath: &str, suffix: &str) -> Result<(), Error> {
+	fn decompile(iset: InstructionSet, lookup: &dyn Lookup, _strict: Strictness, scenapath: &str, suffix: &str) -> Result<(), Error> {
 		let game = GameData { iset, lookup, kai: false };
 		let mut failed = false;
 
@@ -202,20 +202,20 @@ mod ed7 {
 
 	macro_rules! test {
 		($a:item) => {
-			#[test_case::test_case(&GameData::ZERO, false, &[], "../data/zero-gf/data/scena", ".bin"; "zero_gf_jp")]
-			#[test_case::test_case(&GameData::ZERO, false, &[], "../data/zero-gf/data_en/scena", ".bin"; "zero_gf_en")]
-			#[test_case::test_case(&GameData::ZERO_KAI, true, &["c1440.bin"], "../data/zero/data/scena", ".bin"; "zero_nisa_jp")]
-			#[test_case::test_case(&GameData::ZERO_KAI, true, &[], "../data/zero/data/scena_us", ".bin"; "zero_nisa_en")]
-			#[test_case::test_case(&GameData::ZERO_EVO, true, &["c1440.bin"], "../data/vita/extract/zero/data1/data/scena", ".bin"; "zero_evo")]
-			#[test_case::test_case(&GameData::AO, true, &[], "../data/ao-psp/PSP_GAME/USRDIR/data/scena", ".bin"; "ao_psp")]
-			#[test_case::test_case(&GameData::AO_EVO, true, &[], "../data/vita/extract/ao/data1/data/scena", ".bin"; "ao_evo")]
-			#[test_case::test_case(&GameData::AO, false, &[], "../data/ao-gf/data_en/scena", ".bin"; "ao_gf_en")]
+			#[test_case::test_case(&GameData::ZERO, Lenient, &[], "../data/zero-gf/data/scena", ".bin"; "zero_gf_jp")]
+			#[test_case::test_case(&GameData::ZERO, Strict, &[], "../data/zero-gf/data_en/scena", ".bin"; "zero_gf_en")]
+			#[test_case::test_case(&GameData::ZERO_KAI, Strict, &["c1440.bin"], "../data/zero/data/scena", ".bin"; "zero_nisa_jp")]
+			#[test_case::test_case(&GameData::ZERO_KAI, Strict, &[], "../data/zero/data/scena_us", ".bin"; "zero_nisa_en")]
+			#[test_case::test_case(&GameData::ZERO_EVO, Strict, &["c1440.bin"], "../data/vita/extract/zero/data1/data/scena", ".bin"; "zero_evo")]
+			#[test_case::test_case(&GameData::AO, Strict, &[], "../data/ao-psp/PSP_GAME/USRDIR/data/scena", ".bin"; "ao_psp")]
+			#[test_case::test_case(&GameData::AO_EVO, Strict, &[], "../data/vita/extract/ao/data1/data/scena", ".bin"; "ao_evo")]
+			#[test_case::test_case(&GameData::AO, Lenient, &[], "../data/ao-gf/data_en/scena", ".bin"; "ao_gf_en")]
 			$a
 		}
 	}
 
 	test! {
-	fn roundtrip(game: &GameData, strict: bool, except: &[&str], scenapath: &str, suffix: &str) -> Result<(), Error> {
+	fn roundtrip(game: &GameData, strict: Strictness, except: &[&str], scenapath: &str, suffix: &str) -> Result<(), Error> {
 		let mut failed = false;
 
 		let mut paths = std::fs::read_dir(scenapath)?
@@ -232,9 +232,13 @@ mod ed7 {
 
 			let data = std::fs::read(&path)?;
 
-			let strict = strict ^ (except.iter().any(|a| *a == name));
+			let strict = match (strict, except.iter().any(|a| *a == name)) {
+				(Strict, true) => Lenient,
+				(Lenient, true) => Strict,
+				(a, _) => a,
+			};
 
-			if let Err(err) = check_roundtrip_flex(strict, &data, |a| themelios::scena::ed7::read(game, a), |a| themelios::scena::ed7::write(game, a)) {
+			if let Err(err) = check_roundtrip(strict, &data, |a| themelios::scena::ed7::read(game, a), |a| themelios::scena::ed7::write(game, a)) {
 				println!("{name}: {err:?}");
 				failed = true;
 			}

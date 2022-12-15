@@ -5,6 +5,7 @@ members = [
 
 	"themelios-macros",
 	"themelios-scena",
+	"themelios-tables",
 	"themelios",
 
 	"roundtrip",

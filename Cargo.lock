@@ -746,6 +746,7 @@ name = "themelios"
 version = "0.1.0"
 dependencies = [
  "themelios-scena",
+ "themelios-tables",
 ]
 
 [[package]]
@@ -777,6 +778,19 @@ dependencies = [
  "strict_result 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "test-case",
  "themelios-macros",
+ "thiserror",
+]
+
+[[package]]
+name = "themelios-tables"
+version = "0.1.0"
+dependencies = [
+ "derive_more",
+ "enumflags2",
+ "hamu",
+ "num_enum",
+ "strict_result 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "themelios-scena",
  "thiserror",
 ]
 

@@ -14,7 +14,6 @@ pub mod item; // t_item, t_item2
 pub mod name;
 pub mod orb;
 // t_quartz
-pub mod quest;
 pub mod se;
 // t_shop
 // t_sltget

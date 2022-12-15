@@ -9,3 +9,4 @@ pub mod tables;
 pub mod util;
 pub mod scena;
 pub mod text;
+pub mod types;

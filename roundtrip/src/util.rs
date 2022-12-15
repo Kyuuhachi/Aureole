@@ -1,4 +1,6 @@
-use themelios::archive::Archives;
+use std::time::{Instant, Duration};
+
+use themelios::{archive::Archives, gamedata::GameData, scena::code::InstructionSet};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -27,10 +29,32 @@ impl std::convert::From<String> for Error {
 	}
 }
 
+// Sync wrapper. It's not safe at all.
+pub struct SW<T>(T);
+
+impl <T> std::ops::Deref for SW<T> {
+	type Target = T;
+
+	fn deref(&self) -> &T {
+		&self.0
+	}
+}
+
+// SAFETY: None.
+unsafe impl <T> Sync for SW<T> {}
+
 lazy_static::lazy_static! {
 	pub static ref FC: Archives = Archives::new("../data/fc").unwrap();
 	pub static ref SC: Archives = Archives::new("../data/sc").unwrap();
 	pub static ref TC: Archives = Archives::new("../data/3rd").unwrap();
+
+	pub static ref GD_FC: SW<GameData<'static>> = SW(GameData { iset: InstructionSet::Fc, lookup: &*FC, kai: false });
+	pub static ref GD_SC: SW<GameData<'static>> = SW(GameData { iset: InstructionSet::Sc, lookup: &*SC, kai: false });
+	pub static ref GD_TC: SW<GameData<'static>> = SW(GameData { iset: InstructionSet::Tc, lookup: &*TC, kai: false });
+
+	pub static ref GD_FC_EVO: SW<GameData<'static>> = SW(GameData { iset: InstructionSet::FcEvo, lookup: &*FC, kai: false });
+	pub static ref GD_SC_EVO: SW<GameData<'static>> = SW(GameData { iset: InstructionSet::ScEvo, lookup: &*SC, kai: false });
+	pub static ref GD_TC_EVO: SW<GameData<'static>> = SW(GameData { iset: InstructionSet::TcEvo, lookup: &*TC, kai: false });
 }
 
 pub fn check_equal<T: PartialEq + std::fmt::Debug>(a: &T, b: &T) -> Result<(), Error> {
@@ -56,37 +80,15 @@ pub fn check_equal<T: PartialEq + std::fmt::Debug>(a: &T, b: &T) -> Result<(), E
 	Ok(())
 }
 
-pub fn check_roundtrip_flex<T>(
-	strict: bool,
-	data: &[u8],
-	read: impl Fn(&[u8]) -> Result<T, themelios::util::ReadError>,
-	write: impl Fn(&T) -> Result<Vec<u8>, themelios::util::WriteError>,
-) -> Result<T, Error> where
-	T: PartialEq + std::fmt::Debug,
-{
-	if strict {
-		check_roundtrip_strict(data, read, write)
-	} else {
-		check_roundtrip(data, read, write)
-	}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Strictness {
+	Lenient,
+	Strict,
 }
-
+pub use Strictness::*;
 
 pub fn check_roundtrip<T>(
-	data: &[u8],
-	read: impl Fn(&[u8]) -> Result<T, themelios::util::ReadError>,
-	write: impl Fn(&T) -> Result<Vec<u8>, themelios::util::WriteError>,
-) -> Result<T, Error> where
-	T: PartialEq + std::fmt::Debug,
-{
-	let val = read(data)?;
-	let data2 = write(&val)?;
-	let val2 = read(&data2)?;
-	check_equal(&val, &val2)?;
-	Ok(val)
-}
-
-pub fn check_roundtrip_strict<T>(
+	strict: Strictness,
 	data: &[u8],
 	read: impl Fn(&[u8]) -> Result<T, themelios::util::ReadError>,
 	write: impl Fn(&T) -> Result<Vec<u8>, themelios::util::WriteError>,
@@ -96,11 +98,14 @@ pub fn check_roundtrip_strict<T>(
 	let val = read(data)?;
 	let data2 = write(&val)?;
 	if data != data2 {
-		println!("differs! rereading");
 		let val2 = read(&data2)?;
 		check_equal(&val, &val2)?;
+		if strict == Lenient {
+			return Ok(val)
+		}
 
-		let diff = similar::capture_diff_slices(similar::Algorithm::Patience, data, &data2);
+		let deadline = Instant::now() + Duration::from_secs(1);
+		let diff = similar::capture_diff_slices_deadline(similar::Algorithm::Patience, data, &data2, Some(deadline));
 
 		for chunk in diff {
 			match chunk {
@@ -113,7 +118,7 @@ pub fn check_roundtrip_strict<T>(
 				}
 				similar::DiffOp::Delete { old_index, old_len, new_index } => {
 					println!(
-						"{:04X?} ⇒ {:04X?} ({:02X?} ⇒ [])",
+						"{:04X?} ⇒ {:04X?}..---- ({:02X?} ⇒ [])",
 						old_index..old_index+old_len,
 						new_index,
 						&data[old_index..old_index+old_len],
@@ -121,7 +126,7 @@ pub fn check_roundtrip_strict<T>(
 				}
 				similar::DiffOp::Insert { old_index, new_index, new_len } => {
 					println!(
-						"{:04X?} ⇐ {:04X?} ([] ⇐ {:02X?})",
+						"{:04X?}..---- ⇐ {:04X?} ([] ⇐ {:02X?})",
 						old_index,
 						new_index..new_index+new_len,
 						&data2[new_index..new_index+new_len],

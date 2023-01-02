@@ -15,7 +15,7 @@ impl std::fmt::Debug for Text {
 	}
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum TextSegment {
 	String(String),
 	Line,
@@ -25,6 +25,21 @@ pub enum TextSegment {
 	Color(u8),
 	Item(ItemId),
 	Byte(u8), // other byte of unknown meaning
+}
+
+impl std::fmt::Debug for TextSegment {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::String(v) => v.fmt(f),
+			Self::Line => write!(f, "Line"),
+			Self::Line2 => write!(f, "Line2"),
+			Self::Wait => write!(f, "Wait"),
+			Self::Page => write!(f, "Page"),
+			Self::Color(v) => f.debug_tuple("Color").field(v).finish(),
+			Self::Item(v) => f.debug_tuple("Item").field(v).finish(),
+			Self::Byte(v) => f.debug_tuple("Byte").field(v).finish(),
+		}
+	}
 }
 
 impl Text {

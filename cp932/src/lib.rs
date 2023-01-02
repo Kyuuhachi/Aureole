@@ -86,14 +86,14 @@ pub fn encode(text: &str) -> Result<Vec<u8>, usize> {
 				}
 
 				if let Some([c1, c2]) = enc::jisxcommon(ch as u16) {
-					if c2 & 0x80 != 0 {
+					if c1 & 0x80 != 0 {
 						return Err(pos) // MSB set: JIS X 0212
 					}
 
 					let (c1, c2) = (c1 - 0x21, c2 - 0x21);
 					let c2 = (c1 & 1) * 0x5E + c2;
 					let c1 = (c1 >> 1) + 1;
-					out.push(if c1 < 0x20 { c1 + 0x80 } else { c1 + 0xC0 });
+					out.push(if c1 < 0x20 { c1 + 0x80 } else { c1.wrapping_add(0xC0) });
 					out.push(if c2 < 0x3F { c2 + 0x40 } else { c2 + 0x41 });
 				} else if (0xE000..0xE000+1880).contains(&ch) {
 					let c1 = ((ch - 0xE000) / 188) as u8;

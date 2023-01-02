@@ -165,7 +165,7 @@ themelios_macros::bytecode! {
 		BgmStop(u32 alias Time), // [stop_bgm]
 		BgmWait(), // [wait_bgm]
 
-		SoundPlay({ i if i.is_ed7() && game.kai => u32, _ => u16 as u32 } as SoundId, u8, { i if i.is_ed7() => u16, _ => u8 as u16 }), // [sound]
+		SoundPlay({ i if i.is_ed7() && game.kai => u32, _ => u16 as u32 } as SoundId, u8, { i if i.is_ed7() => u8, _ => const 0u8 }, u8), // [sound]
 		SoundStop({ IS::Ao|IS::AoEvo if game.kai => u32, _ => u16 as u32 } as SoundId),
 		SoundLoop(u16 as u32 as SoundId, u8),
 		_Sound25(u16 as u32 as SoundId, Pos3, u32, u32, u8, u32),
@@ -356,7 +356,7 @@ themelios_macros::bytecode! {
 
 		CharSetBase    (u16 as CharId, { i if i.is_ed7() => u8 as u16, _ => u16 } alias ChcpId), // [set_chr_base]
 		CharSetPattern (u16 as CharId, { i if i.is_ed7() => u8 as u16, _ => u16 }), // [set_chr_ptn]
-		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7CharSetName (u16 as CharId, String), // debug script only
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7CharSetName (u16 as CharId, String alias TextTitle), // debug script only
 		CharSetPos     (u16 as CharId, Pos3, i16 alias Angle), // [set_pos]
 		CharSetPos2    (u16 as CharId, Pos3, i16 alias Angle),
 		CharLookAtChar (u16 as CharId, u16 as CharId, u16 as u32 alias Time), // [look_to]

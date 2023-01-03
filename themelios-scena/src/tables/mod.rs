@@ -11,7 +11,6 @@ pub mod item; // t_item, t_item2
 // t_magic
 // t_magqrt
 // t_memo
-pub mod name;
 pub mod orb;
 // t_quartz
 pub mod se;

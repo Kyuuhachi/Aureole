@@ -172,7 +172,7 @@ fn val(f: &mut Context, a: I) -> Result<()> {
 		I::LookPointFlags(v) => write!(f, "0x{:04X}", v.0)?,
 		I::Color(v)       => write!(f, "#{:08X}", v.0)?,
 
-		I::Member(v)   => write!(f, "{v:?}")?,
+		I::NameId(v)   => write!(f, "member[{}]", v.0)?,
 		I::CharId(v)   => write!(f, "char[{}]", v.0)?,
 		I::BattleId(v) => write!(f, "{v:?}")?,
 		I::BgmId(v)    => write!(f, "{v:?}")?,

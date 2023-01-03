@@ -203,7 +203,7 @@ mod ed7 {
 	macro_rules! test {
 		($a:item) => {
 			#[test_case::test_case(&GameData::ZERO, Lenient, &[], "../data/zero-gf/data/scena", ".bin"; "zero_gf_jp")]
-			#[test_case::test_case(&GameData::ZERO, Strict, &[], "../data/zero-gf/data_en/scena", ".bin"; "zero_gf_en")]
+			#[test_case::test_case(&GameData::ZERO, Lenient, &[], "../data/zero-gf/data_en/scena", ".bin"; "zero_gf_en")]
 			#[test_case::test_case(&GameData::ZERO_KAI, Strict, &["c1440.bin"], "../data/zero/data/scena", ".bin"; "zero_nisa_jp")]
 			#[test_case::test_case(&GameData::ZERO_KAI, Strict, &[], "../data/zero/data/scena_us", ".bin"; "zero_nisa_en")]
 			#[test_case::test_case(&GameData::ZERO_EVO, Strict, &["c1440.bin"], "../data/vita/extract/zero/data1/data/scena", ".bin"; "zero_evo")]

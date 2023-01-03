@@ -132,8 +132,8 @@ mod todo {
 
 #[test_case::test_case(&GD_FC_EVO, "../data/vita/extract/fc/gamedata/data/data/text/t_quest._dt"; "fc_evo")]
 #[test_case::test_case(&GD_SC_EVO, "../data/vita/extract/sc/gamedata/data/data_sc/text/t_quest._dt"; "sc_evo")]
-#[test_case::test_case(&GD_SC_EVO, "../data/vita/extract/sc/gamedata/data/data_sc/text/t_quest1._dt"; "sc1_evo")]
-#[test_case::test_case(&GD_SC_EVO, "../data/vita/extract/sc/gamedata/data/data_sc/text/t_quest2._dt"; "sc2_evo")]
+#[test_case::test_case(&GD_SC_EVO, "../data/vita/extract/sc/gamedata/data/data_sc/text/t_quest1._dt"; "sc_evo1")]
+#[test_case::test_case(&GD_SC_EVO, "../data/vita/extract/sc/gamedata/data/data_sc/text/t_quest2._dt"; "sc_evo2")]
 #[test_case::test_case(&GD_TC_EVO, "../data/vita/extract/3rd/gamedata/data/data_3rd/text/t_quest._dt"; "tc_evo")]
 
 fn quest_ed6(game: &GameData, path: impl AsRef<Path>) -> Result<(), Error> {
@@ -163,6 +163,28 @@ fn quest_ed7(game: &GameData, path: impl AsRef<Path>) -> Result<(), Error> {
 		&std::fs::read(path)?,
 		|a| tables::quest::read_ed7(game, a),
 		|a| tables::quest::write_ed7(game, a),
+	)?;
+	Ok(())
+}
+
+
+#[test_case::test_case(GameData::ZERO,     Lenient, "../data/zero-gf/data/text/t_name._dt"; "zero_gf_jp")]
+#[test_case::test_case(GameData::ZERO,     Strict, "../data/zero-gf/data_en/text/t_name._dt"; "zero_gf_en")]
+#[test_case::test_case(GameData::ZERO_KAI, Strict, "../data/zero/data/text/t_name._dt"; "zero_nisa_jp")]
+#[test_case::test_case(GameData::ZERO_KAI, Strict, "../data/zero/data/text_us/t_name._dt"; "zero_nisa_en")]
+#[test_case::test_case(GameData::ZERO_EVO, Strict, "../data/vita/extract/zero/data/data/text/t_name._dt"; "zero_evo")]
+
+#[test_case::test_case(GameData::AO,     Strict, "../data/ao-psp/PSP_GAME/USRDIR/data/text/t_name._dt"; "ao_psp")]
+// #[test_case::test_case(GameData::AO,     Strict, "../data/ao-gf/data/text/t_name._dt"; "ao_gf_cn")]
+#[test_case::test_case(GameData::AO,     Strict, "../data/ao-gf/data_en/text/t_name._dt"; "ao_gf_en")]
+#[test_case::test_case(GameData::AO_EVO, Strict, "../data/vita/extract/ao/data/data/text/t_name._dt"; "ao_evo")]
+
+fn name_ed7(game: &GameData, strict: Strictness, path: impl AsRef<Path>) -> Result<(), Error> {
+	check_roundtrip(
+		strict,
+		&std::fs::read(path)?,
+		|a| tables::name::read_ed7(game, a),
+		|a| tables::name::write_ed7(game, a),
 	)?;
 	Ok(())
 }

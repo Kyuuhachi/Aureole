@@ -9,7 +9,7 @@ use crate::gamedata::GameData;
 use crate::tables::bgmtbl::BgmId;
 use crate::tables::btlset::BattleId;
 use crate::tables::item::ItemId;
-use crate::types::{QuestId, Flag};
+use crate::types::*;
 use crate::tables::se::SoundId;
 use crate::tables::town::TownId;
 use crate::util::*;

@@ -188,18 +188,18 @@ themelios_macros::bytecode! {
 		QuestBonusBp(u16 as QuestId, u16),
 		QuestBonusMira(u16 as QuestId, u16),
 
-		PartyAdd(u8 as Member, u8, { IS::Fc|IS::FcEvo => const 0u8, _ => u8 }), // [join_party]
-		PartyRemove(u8 as Member, u8), // [separate_party]
+		PartyAdd(u8 as u16 as NameId, u8, { IS::Fc|IS::FcEvo => const 0u8, _ => u8 }), // [join_party]
+		PartyRemove(u8 as u16 as NameId, u8), // [separate_party]
 		ScPartyClear(),
-		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] _Party30(u8 as Member),
+		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] _Party30(u8 as u16 as NameId),
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_31(u8),
-		PartySetAttr(u8 as Member, u8 as MemberAttr, u16), // [set_status]
+		PartySetAttr(u8 as u16 as NameId, u8 as MemberAttr, u16), // [set_status]
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo,Zero,Ao)] skip!(2),
-		PartyAddArt(u8 as Member, u16 as MagicId),
-		PartyAddCraft(u8 as Member, u16 as MagicId),
-		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] PartyAddSCraft(u8 as Member, u16 as MagicId),
+		PartyAddArt(u8 as u16 as NameId, u16 as MagicId),
+		PartyAddCraft(u8 as u16 as NameId, u16 as MagicId),
+		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] PartyAddSCraft(u8 as u16 as NameId, u16 as MagicId),
 		#[game(Zero, ZeroEvo,Ao, AoEvo)] ED7_37(),
-		PartySetSlot(u8 as Member, u8, {
+		PartySetSlot(u8 as u16 as NameId, u8, {
 			IS::Fc|IS::FcEvo => u8,
 			_ if (0x7F..=0xFE).contains(_1) => u8,
 			_ => const 0u8
@@ -215,11 +215,11 @@ themelios_macros::bytecode! {
 		ItemRemove(u16 as ItemId, u16), // [release_item]
 		ItemHas(u16 as ItemId, { IS::Fc|IS::FcEvo => const 0u8, _ => u8 }), // or is it ItemGetCount?
 
-		PartyEquip(u8 as Member, u16 as ItemId, {
+		PartyEquip(u8 as u16 as NameId, u16 as ItemId, {
 			IS::Fc|IS::FcEvo if !(600..=799).contains(&_1.0) => const 0u8,
 			_ => u8,
 		}),
-		PartyPosition(u8 as Member),
+		PartyPosition(u8 as u16 as NameId),
 
 		ForkFunc(u16 as CharId, u8 as u16 alias ForkId, func_ref(game) -> FuncRef), // [execute]
 		ForkQuit(u16 as CharId, u8 as u16 alias ForkId), // [terminate]
@@ -486,16 +486,16 @@ themelios_macros::bytecode! {
 		/// Unlocks a character's orbment slot.
 		///
 		/// In SC onward, this is merged into PartySetSlot.
-		#[game(Fc, FcEvo)] PartyUnlockSlot(u16 as u8 as Member, u8),
+		#[game(Fc, FcEvo)] PartyUnlockSlot(u16 as NameId, u8),
 
 		/// The argument is always zero in the scripts. According to the asm something else happens if it is nonzero, but it is unknown what.
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _B6(u8),
 
 		/// This is related to [`PartyAdd`](Self::PartyAdd), but what it actually does is unknown.
-		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _B7(u16 as u8 as Member, u8),
+		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _B7(u16 as NameId, u8),
 
 		/// This is related to [`PartyRemove`](Self::PartyRemove) and [`_B7`](Self::_B7), but as with that one, the details are unknown.
-		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _B8(u8 as Member),
+		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _B8(u8 as u16 as NameId),
 
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_B8(u16, u16),
 		#[game(Zero, ZeroEvo, Ao)] skip!(1),
@@ -510,14 +510,14 @@ themelios_macros::bytecode! {
 		/// Returns whether the given member has a particular orbal art.
 		///
 		/// Does not work on crafts.
-		PartyHasSpell(u8 as Member, u16 as MagicId),
+		PartyHasSpell(u8 as u16 as NameId, u16 as MagicId),
 
 		/// Checks whether the given member has this orbment slot unlocked.
-		PartyHasSlot(u8 as Member, u8),
+		PartyHasSlot(u8 as u16 as NameId, u8),
 
 		#[game(Fc, FcEvo)] skip!(10),
 
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] ScSetPortrait(u8 as Member, u8, u8, u8, u8, u8),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] ScSetPortrait(u8 as u16 as NameId, u8, u8, u8, u8, u8),
 		// This instruction is only used a single time throughout FC..=3rd, but this is its signature according to the asm
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, Ao)] Sc_BC(u8, match {
 			0 => _0(u16),
@@ -572,7 +572,7 @@ themelios_macros::bytecode! {
 		}),
 		#[game(ZeroEvo)] skip!(1),
 
-		#[game(Sc, ScEvo, Tc, TcEvo)] ScPartySelect(u16, sc_party_select_mandatory() -> [Option<Member>; 4] alias MandatoryMembers, sc_party_select_optional() -> Vec<Member> alias OptionalMembers),
+		#[game(Sc, ScEvo, Tc, TcEvo)] ScPartySelect(u16, sc_party_select_mandatory() -> [Option<NameId>; 4] alias MandatoryMembers, sc_party_select_optional() -> Vec<NameId> alias OptionalMembers),
 		#[game(Sc, ScEvo)] Sc_CA(u8 as u16 alias ObjectId, u8, u32),
 		#[game(Tc, TcEvo)] Tc_CA(u8 as u16 alias ObjectId, u8, i32, u32),
 		#[game(Sc, ScEvo)] ScCharInSlot(u8), // clearly related to CharId, but not the same
@@ -600,8 +600,8 @@ themelios_macros::bytecode! {
 		#[game(Sc, ScEvo, Tc, TcEvo)] ED6LoadChcp(file_ref(game) -> String, file_ref(game) -> String, u8 as u16 alias ChcpId),
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7LoadChcp(file_ref(game) -> String, u8 as u16 alias ChcpId),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] UnloadChcp(u8 as u16 alias ChcpId),
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] PartyGetAttr(u8 as Member, u8),
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] PartyGetEquipped(u8 as Member, u8),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] PartyGetAttr(u8 as u16 as NameId, u8),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] PartyGetEquipped(u8 as u16 as NameId, u8),
 
 		#[game(Sc, ScEvo, Tc, TcEvo)] Sc_D6(u8), // bool
 		#[game(Sc, ScEvo, Tc, TcEvo)] Sc_D7(u8, u32, u16 as CharId),
@@ -641,17 +641,17 @@ themelios_macros::bytecode! {
 
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_DA(), // Something to do with menus
 
-		#[game(Tc, TcEvo)] Tc_DB(u8, u8 as Member),
+		#[game(Tc, TcEvo)] Tc_DB(u8, u8 as u16 as NameId),
 		#[game(Tc, TcEvo)] TcTeam(match {
 			0 => Use(u8),
-			1 => AddMember(u8, u8 as Member),
+			1 => AddMember(u8, u8 as u16 as NameId),
 			2 => Clear(u8),
 		}),
 		#[game(Tc, TcEvo)] TcOrganizeTeams(u8, u8, u8, u32 alias TcMembers, u32 alias TcMembers, u32 alias TcMembers, u32 alias TcMembers),
 		#[game(Tc, TcEvo)] Tc_DE(u8, u32),
 		#[game(Tc, TcEvo)] Tc_DF(u8, u16),
 		#[game(Tc, TcEvo)] Tc_E0(u16 as CharId, u8, u8),
-		#[game(Tc, TcEvo)] TcIndexInTeam(u8 as Member, u8),
+		#[game(Tc, TcEvo)] TcIndexInTeam(u8 as u16 as NameId, u8),
 		#[game(Tc, TcEvo)] Tc_E2(match {
 			0 => _0(u8),
 			1 => _1(),
@@ -671,9 +671,9 @@ themelios_macros::bytecode! {
 		}),
 		#[game(Tc, TcEvo)] skip!(1),
 		#[game(Tc, TcEvo)] Tc_E5(match {
-			0 => _0(u8 as u16 alias ObjectId, u8 as Member, u16, u16),
+			0 => _0(u8 as u16 alias ObjectId, u8 as u16 as NameId, u16, u16),
 			1 => _1(u8, u8, u16, u16),
-			2 => _2(u8 as u16 alias ObjectId, u8 as Member, u32),
+			2 => _2(u8 as u16 alias ObjectId, u8 as u16 as NameId, u32),
 		}),
 		#[game(Tc, TcEvo)] Tc_E6(match {
 			0 => _0(u8),
@@ -1016,29 +1016,29 @@ mod text {
 
 mod sc_party_select_mandatory {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>) -> Result<[Option<Member>; 4], ReadError> {
-		f.multiple_loose::<4, _>(&[0xFF,0], |g| Ok(Member(cast(g.u16()?)?)))
+	pub(super) fn read<'a>(f: &mut impl In<'a>) -> Result<[Option<NameId>; 4], ReadError> {
+		f.multiple_loose::<4, _>(&[0xFF,0], |g| Ok(NameId(cast(g.u16()?)?)))
 	}
 
-	pub(super) fn write(f: &mut impl Out, v: &[Option<Member>; 4]) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Out, v: &[Option<NameId>; 4]) -> Result<(), WriteError> {
 		f.multiple_loose::<4, _>(&[0xFF,0], v, |g, a| { g.u16(a.0.into()); Ok(()) })
 	}
 }
 
 mod sc_party_select_optional {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>) -> Result<Vec<Member>, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl In<'a>) -> Result<Vec<NameId>, ReadError> {
 		let mut quests = Vec::new();
 		loop {
 			match f.u16()? {
 				0xFFFF => break,
-				q => quests.push(Member(cast(q)?))
+				q => quests.push(NameId(cast(q)?))
 			}
 		}
 		Ok(quests)
 	}
 
-	pub(super) fn write(f: &mut impl Out, v: &Vec<Member>) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Out, v: &Vec<NameId>) -> Result<(), WriteError> {
 		for &i in v {
 			f.u16(i.0.into());
 		}

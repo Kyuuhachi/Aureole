@@ -1,9 +1,7 @@
-
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
 use themelios_scena::gamedata::GameData;
-use themelios_scena::scena::code::InstructionSet;
 use themelios_scena::types::NameId;
 use themelios_scena::util::*;
 

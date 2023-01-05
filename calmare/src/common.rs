@@ -173,7 +173,15 @@ fn val(f: &mut Context, a: I) -> Result<()> {
 		I::Color(v)       => write!(f, "#{:08X}", v.0)?,
 
 		I::NameId(v)   => write!(f, "member[{}]", v.0)?,
-		I::CharId(v)   => write!(f, "char[{}]", v.0)?,
+		I::CharId(v)   => match v.0 {
+			0..=7   => write!(f, "party[{}]", v.0)?,
+			8..=253 => write!(f, "char[{}]", v.0 - 8)?,
+			254     => write!(f, "self")?,
+			255     => write!(f, "null")?,
+			256     => write!(f, "(ERROR)")?,
+			257..   => write!(f, "member[{}]", v.0 - 257)?,
+		},
+
 		I::BattleId(v) => write!(f, "{v:?}")?,
 		I::BgmId(v)    => write!(f, "{v:?}")?,
 		I::ItemId(v)   => write!(f, "{v:?}")?,

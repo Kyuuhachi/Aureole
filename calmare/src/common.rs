@@ -1,5 +1,5 @@
 use themelios::scena::{Pos2, Pos3, FuncRef};
-use themelios::scena::code::{InsnArg as I, Expr, ExprBinop, ExprUnop, FlatInsn, Label, Insn};
+use themelios::scena::code::{InstructionSet, InsnArg as I, Expr, ExprBinop, ExprUnop, FlatInsn, Label, Insn};
 use themelios::scena::code::decompile::{decompile, TreeInsn};
 use themelios::text::{Text, TextSegment};
 use strict_result::Strict;
@@ -172,14 +172,18 @@ fn val(f: &mut Context, a: I) -> Result<()> {
 		I::LookPointFlags(v) => write!(f, "0x{:04X}", v.0)?,
 		I::Color(v)       => write!(f, "#{:08X}", v.0)?,
 
-		I::NameId(v)   => write!(f, "member[{}]", v.0)?,
-		I::CharId(v)   => match v.0 {
-			0..=7   => write!(f, "party[{}]", v.0)?,
-			8..=253 => write!(f, "char[{}]", v.0 - 8)?,
-			254     => write!(f, "self")?,
-			255     => write!(f, "null")?,
-			256     => write!(f, "(ERROR)")?,
-			257..   => write!(f, "member[{}]", v.0 - 257)?,
+		I::NameId(v) => write!(f, "member[{}]", v.0)?,
+		I::CharId(v) => match v.0 {
+			257.. => write!(f, "member[{}]", v.0 - 257)?,
+			256   => write!(f, "(ERROR)")?,
+			255   => write!(f, "null")?,
+			254   => write!(f, "self")?,
+			238.. if matches!(f.game.iset, InstructionSet::Tc|InstructionSet::TcEvo)
+			      => write!(f, "tc_party[{}, {}]", (v.0-238)/4, (v.0-238)%4)?,
+			248.. if matches!(f.game.iset, InstructionSet::Sc|InstructionSet::ScEvo)
+			      => write!(f, "sc_party[{}]", v.0-248)?,
+			8..   => write!(f, "char[{}]", v.0 - 8)?,
+			0..   => write!(f, "party[{}]", v.0)?,
 		},
 
 		I::BattleId(v) => write!(f, "{v:?}")?,

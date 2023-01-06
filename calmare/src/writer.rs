@@ -1,5 +1,7 @@
 use std::io::{Write, Result};
 
+use themelios::gamedata::GameData;
+
 #[derive(Clone, Copy, Debug)]
 enum Space {
 	None,
@@ -8,6 +10,7 @@ enum Space {
 }
 
 pub struct Context<'a> {
+	pub game: &'a GameData<'a>,
 	pub blind: bool, // These two might belong in a different type,
 	pub decompile: bool, //  but then I'd have to reexport all the writing functions and that's a pain
 	indent: usize,
@@ -16,8 +19,9 @@ pub struct Context<'a> {
 }
 
 impl<'a> Context<'a> {
-	pub fn new(out: impl Write + 'a) -> Self {
+	pub fn new(game: &'a GameData<'a>, out: impl Write + 'a) -> Self {
 		Self {
+			game,
 			blind: false,
 			decompile: true,
 			indent: 0,

@@ -311,13 +311,3 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 
 	Ok(())
 }
-
-#[test]
-fn test() {
-	use themelios::gamedata::GameData;
-	let path = "../data/zero/data/scena/r0100.bin";
-	let data = std::fs::read(path).unwrap();
-	let scena = themelios::scena::ed7::read(GameData::ZERO_KAI, &data).unwrap();
-	let c = Context::new(std::io::stdout());
-	write(c, &scena).unwrap();
-}

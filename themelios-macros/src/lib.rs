@@ -46,8 +46,8 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		}
 	}).collect();
 	let read: ItemFn = pq!{_=>
-		pub fn read<'a>(__f: &mut impl In<'a>, #func_args) -> Result<Self, ReadError> {
-			fn run<'a, I: In<'a>, A>(__f: &mut I, fun: impl FnOnce(&mut I) -> Result<A, ReadError>) -> Result<A, ReadError> {
+		pub fn read<'a>(__f: &mut impl Read<'a>, #func_args) -> Result<Self, ReadError> {
+			fn run<'a, I: Read<'a>, A>(__f: &mut I, fun: impl FnOnce(&mut I) -> Result<A, ReadError>) -> Result<A, ReadError> {
 				fun(__f)
 			}
 			type IS = #game_ty;
@@ -73,8 +73,8 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		}
 	}).collect();
 	let write: ItemFn = pq!{_=>
-		pub fn write(__f: &mut impl OutDelay, #func_args, __insn: &Insn) -> Result<(), WriteError> {
-			fn run<O: OutDelay>(__f: &mut O, fun: impl FnOnce(&mut O) -> Result<(), WriteError>) -> Result<(), WriteError> {
+		pub fn write(__f: &mut impl Write, #func_args, __insn: &Insn) -> Result<(), WriteError> {
+			fn run<O: Write>(__f: &mut O, fun: impl FnOnce(&mut O) -> Result<(), WriteError>) -> Result<(), WriteError> {
 				fun(__f)
 			}
 			type IS = #game_ty;

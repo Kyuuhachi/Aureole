@@ -30,7 +30,7 @@ pub struct Recipe {
 }
 
 pub fn read(data: &[u8]) -> Result<BTreeMap<RecipeId, Recipe>, ReadError> {
-	let mut f = Coverage::new(Bytes::new(data));
+	let mut f = Coverage::new(Reader::new(data));
 	let n = f.clone().u16()? / 2;
 	let mut table = BTreeMap::new();
 
@@ -53,8 +53,8 @@ pub fn read(data: &[u8]) -> Result<BTreeMap<RecipeId, Recipe>, ReadError> {
 }
 
 pub fn write(table: &BTreeMap<RecipeId, Recipe>) -> Result<Vec<u8>, WriteError> {
-	let mut f = OutBytes::new();
-	let mut g = OutBytes::new();
+	let mut f = Writer::new();
+	let mut g = Writer::new();
 
 	for (&id, &Recipe { ref name_desc, ref ingredients, flags, result, heal }) in table {
 		f.delay_u16(g.here());
@@ -67,5 +67,6 @@ pub fn write(table: &BTreeMap<RecipeId, Recipe>) -> Result<Vec<u8>, WriteError> 
 		g.u16(heal);
 		g.name_desc(name_desc)?;
 	}
-	Ok(f.concat(g).finish()?)
+	f.append(g);
+	Ok(f.finish()?)
 }

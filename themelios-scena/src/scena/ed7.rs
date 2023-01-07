@@ -156,7 +156,7 @@ pub struct BattleSetup {
 }
 
 pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
-	let mut f = Bytes::new(data);
+	let mut f = Reader::new(data);
 
 	let name1 = f.sized_string::<10>()?;
 	let name2 = f.sized_string::<10>()?;
@@ -451,7 +451,7 @@ struct BattleRead {
 }
 
 impl BattleRead {
-	fn get_sepith<'a, T: In<'a> + Clone>(&mut self, f: &mut T) -> Result<u16, ReadError> {
+	fn get_sepith<'a, T: Read<'a> + Clone>(&mut self, f: &mut T) -> Result<u16, ReadError> {
 		match self.field_sepith_pos.entry(f.pos()) {
 			std::collections::hash_map::Entry::Occupied(e) => Ok(*e.get()),
 			std::collections::hash_map::Entry::Vacant(e) => {
@@ -462,7 +462,7 @@ impl BattleRead {
 		}
 	}
 
-	fn get_at_roll<'a, T: In<'a> + Clone>(&mut self, f: &mut T) -> Result<u16, ReadError> {
+	fn get_at_roll<'a, T: Read<'a> + Clone>(&mut self, f: &mut T) -> Result<u16, ReadError> {
 		match self.at_roll_pos.entry(f.pos()) {
 			std::collections::hash_map::Entry::Occupied(e) => Ok(*e.get()),
 			std::collections::hash_map::Entry::Vacant(e) => {
@@ -473,7 +473,7 @@ impl BattleRead {
 		}
 	}
 
-	fn get_placement<'a, T: In<'a> + Clone>(&mut self, f: &mut T) -> Result<u16, ReadError> {
+	fn get_placement<'a, T: Read<'a> + Clone>(&mut self, f: &mut T) -> Result<u16, ReadError> {
 		match self.placement_pos.entry(f.pos()) {
 			std::collections::hash_map::Entry::Occupied(e) => Ok(*e.get()),
 			std::collections::hash_map::Entry::Vacant(e) => {
@@ -484,7 +484,7 @@ impl BattleRead {
 		}
 	}
 
-	fn get_battle<'a, T: In<'a> + Clone>(&mut self, game: &GameData, f: &mut T) -> Result<u32, ReadError> {
+	fn get_battle<'a, T: Read<'a> + Clone>(&mut self, game: &GameData, f: &mut T) -> Result<u32, ReadError> {
 		match self.battle_pos.entry(f.pos()) {
 			std::collections::hash_map::Entry::Occupied(e) => Ok(*e.get()),
 			std::collections::hash_map::Entry::Vacant(e) => {
@@ -533,7 +533,7 @@ impl BattleRead {
 }
 
 pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
-	let mut f = OutBytes::new();
+	let mut f = Writer::new();
 	f.sized_string::<10>(&scena.name1)?;
 	f.sized_string::<10>(&scena.name2)?;
 	f.u16(scena.town.0);
@@ -554,7 +554,7 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	f.u16(cast(scena.functions.len() * 4)?);
 	let mut animations = f.ptr();
 
-	let mut labels = OutBytes::new();
+	let mut labels = Writer::new();
 	if let Some(l) = &scena.labels {
 		f.delay_u16(labels.here());
 		f.u8(cast(l.len())?);
@@ -572,12 +572,12 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	f.u8(scena.unk1);
 	f.u16(scena.unk2);
 
-	let mut entry = OutBytes::new();
-	let mut functions = OutBytes::new();
-	let mut field_sepith = OutBytes::new();
-	let mut at_rolls = OutBytes::new();
-	let mut placements = OutBytes::new();
-	let mut battles = OutBytes::new();
+	let mut entry = Writer::new();
+	let mut functions = Writer::new();
+	let mut field_sepith = Writer::new();
+	let mut at_rolls = Writer::new();
+	let mut placements = Writer::new();
+	let mut battles = Writer::new();
 
 	let g = &mut chcp;
 	for chcp in &scena.chcp {
@@ -727,7 +727,7 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 			g.u32(0);
 		}
 		let mut weights = [0u8; 4];
-		let mut h = OutBytes::new();
+		let mut h = Writer::new();
 		ensure!(battle.setups.len() <= 4, "too many setups");
 		for (i, setup) in battle.setups.iter().enumerate() {
 			weights[i] = setup.weight;

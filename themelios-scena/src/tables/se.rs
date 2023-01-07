@@ -17,7 +17,7 @@ pub struct Sound {
 }
 
 pub fn read(lookup: &dyn Lookup, data: &[u8]) -> Result<BTreeMap<SoundId, Sound>, ReadError> {
-	let mut f = Coverage::new(Bytes::new(data));
+	let mut f = Coverage::new(Reader::new(data));
 	let mut table = BTreeMap::new();
 	while f.remaining() > 12 {
 		let id = SoundId(cast(f.u16()?)?);
@@ -39,7 +39,7 @@ pub fn read(lookup: &dyn Lookup, data: &[u8]) -> Result<BTreeMap<SoundId, Sound>
 }
 
 pub fn write(lookup: &dyn Lookup, table: &BTreeMap<SoundId, Sound>) -> Result<Vec<u8>, WriteError> {
-	let mut out = OutBytes::new();
+	let mut out = Writer::new();
 	for (&id, &Sound { unk, ref file, flag1, flag2 }) in table {
 		out.u16(cast(id.0)?);
 		out.u16(unk);

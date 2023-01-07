@@ -15,7 +15,7 @@ pub struct Bgm {
 
 // I'm throwing away the record order in the file here, hope that doesn't matter.
 pub fn read(t_town: &[u8]) -> Result<BTreeMap<BgmId, Bgm>, ReadError> {
-	let mut f = Coverage::new(Bytes::new(t_town));
+	let mut f = Coverage::new(Reader::new(t_town));
 	let mut table = BTreeMap::new();
 	while f.remaining() > 0 {
 		let id = BgmId(f.u16()?);
@@ -30,7 +30,7 @@ pub fn read(t_town: &[u8]) -> Result<BTreeMap<BgmId, Bgm>, ReadError> {
 }
 
 pub fn write(table: &BTreeMap<BgmId, Bgm>) -> Result<Vec<u8>, WriteError> {
-	let mut f = OutBytes::new();
+	let mut f = Writer::new();
 	for (&id, &Bgm { ref name, loops }) in table {
 		f.u16(id.0);
 		f.u16(0);

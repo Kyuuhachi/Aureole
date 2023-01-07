@@ -35,8 +35,8 @@ pub struct Item {
 }
 
 pub fn read(t_item: &[u8], t_item2: &[u8]) -> Result<BTreeMap<ItemId, Item>, ReadError> {
-	let mut f1 = Coverage::new(Bytes::new(t_item));
-	let mut f2 = Coverage::new(Bytes::new(t_item2));
+	let mut f1 = Coverage::new(Reader::new(t_item));
+	let mut f2 = Coverage::new(Reader::new(t_item2));
 	let n = f1.clone().u16()? / 2;
 	let n2 = f2.clone().u16()? / 2;
 	ensure!(n == n2, "mismatched item/item2");
@@ -71,10 +71,10 @@ pub fn read(t_item: &[u8], t_item2: &[u8]) -> Result<BTreeMap<ItemId, Item>, Rea
 }
 
 pub fn write(table: &BTreeMap<ItemId, Item>) -> Result<(Vec<u8>, Vec<u8>), WriteError> {
-	let mut f1 = OutBytes::new();
-	let mut g1 = OutBytes::new();
-	let mut f2 = OutBytes::new();
-	let mut g2 = OutBytes::new();
+	let mut f1 = Writer::new();
+	let mut g1 = Writer::new();
+	let mut f2 = Writer::new();
+	let mut g2 = Writer::new();
 
 	for (&id, &Item { ref name_desc, flags, usable_by, ty, _unk1, stats, limit, price }) in table {
 		f1.delay_u16(g1.here());
@@ -92,5 +92,7 @@ pub fn write(table: &BTreeMap<ItemId, Item>) -> Result<(Vec<u8>, Vec<u8>), Write
 
 		g2.name_desc(name_desc)?;
 	}
-	Ok((f1.concat(g1).finish()?, f2.concat(g2).finish()?))
+	f1.append(g1);
+	f2.append(g2);
+	Ok((f1.finish()?, f2.finish()?))
 }

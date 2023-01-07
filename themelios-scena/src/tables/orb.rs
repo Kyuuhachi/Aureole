@@ -11,7 +11,7 @@ pub struct Orbment {
 }
 
 pub fn read(data: &[u8]) -> Result<Vec<Orbment>, ReadError> {
-	let mut f = Coverage::new(Bytes::new(data));
+	let mut f = Coverage::new(Reader::new(data));
 	let n = f.clone().u16()? / 2;
 	let mut table = Vec::with_capacity(n as usize);
 
@@ -42,8 +42,8 @@ pub fn read(data: &[u8]) -> Result<Vec<Orbment>, ReadError> {
 }
 
 pub fn write(table: &[Orbment]) -> Result<Vec<u8>, WriteError> {
-	let mut f = OutBytes::new();
-	let mut g = OutBytes::new();
+	let mut f = Writer::new();
+	let mut g = Writer::new();
 
 	let nslots = 6; // 7 in sc/3rd
 	let npad = 1; // 2 in sc/3rd
@@ -63,5 +63,6 @@ pub fn write(table: &[Orbment]) -> Result<Vec<u8>, WriteError> {
 		}
 		g.array([0xFF; 2]);
 	}
-	Ok(f.concat(g).finish()?)
+	f.append(g);
+	Ok(f.finish()?)
 }

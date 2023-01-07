@@ -82,8 +82,8 @@ impl Archive {
 		let mut entries = Vec::new();
 
 		{
-			let mut dir = Coverage::new(Bytes::new(&dir));
-			let mut dat = Coverage::new(Bytes::new(&dat));
+			let mut dir = Coverage::new(Reader::new(&dir));
+			let mut dat = Coverage::new(Reader::new(&dat));
 			dir.check(b"LB DIR\x1A\0")?;
 			dat.check(b"LB DAT\x1A\0")?;
 			let count = dir.u64()?;

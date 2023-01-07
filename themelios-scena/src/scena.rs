@@ -95,18 +95,18 @@ pub struct CharAttr(pub CharId, pub u8);
 #[debug(fmt = "Emote({_0:?}, {_1})")]
 pub struct Emote(pub u8, pub u8, pub u32);
 
-pub trait InExt2<'a>: In<'a> {
-	fn pos2(&mut self) -> Result<Pos2, ReadError> {
+pub trait ReadStreamExt2: ReadStream {
+	fn pos2(&mut self) -> Result<Pos2, Self::Error> {
 		Ok(Pos2(self.i32()?, self.i32()?))
 	}
 
-	fn pos3(&mut self) -> Result<Pos3, ReadError> {
+	fn pos3(&mut self) -> Result<Pos3, Self::Error> {
 		Ok(Pos3(self.i32()?, self.i32()?, self.i32()?))
 	}
 }
-impl<'a, T: In<'a>> InExt2<'a> for T {}
+impl<'a, T: ReadStream> ReadStreamExt2 for T {}
 
-pub trait OutExt2: Out {
+pub trait WriteStreamExt2: WriteStream {
 	fn pos2(&mut self, p: Pos2) {
 		self.i32(p.0);
 		self.i32(p.1);
@@ -118,4 +118,4 @@ pub trait OutExt2: Out {
 		self.i32(p.2);
 	}
 }
-impl<T: Out> OutExt2 for T {}
+impl<T: WriteStream> WriteStreamExt2 for T {}

@@ -24,7 +24,7 @@ pub enum TownType {
 }
 
 pub fn read(t_town: &[u8]) -> Result<Vec<Town>, ReadError> {
-	let mut f = Coverage::new(Bytes::new(t_town));
+	let mut f = Coverage::new(Reader::new(t_town));
 	let n = f.u16()?;
 	let mut names = Vec::with_capacity(n as usize);
 	for _ in 0..n {
@@ -43,8 +43,8 @@ pub fn read(t_town: &[u8]) -> Result<Vec<Town>, ReadError> {
 }
 
 pub fn write(towns: &[Town]) -> Result<Vec<u8>, WriteError> {
-	let mut f = OutBytes::new();
-	let mut g = OutBytes::new();
+	let mut f = Writer::new();
+	let mut g = Writer::new();
 	f.u16(cast(towns.len())?);
 	for &Town(ref name, kind) in towns {
 		f.delay_u16(g.here());
@@ -55,5 +55,6 @@ pub fn write(towns: &[Town]) -> Result<Vec<u8>, WriteError> {
 			g.u8(kind.into());
 		}
 	}
-	Ok(f.concat(g).finish()?)
+	f.append(g);
+	Ok(f.finish()?)
 }

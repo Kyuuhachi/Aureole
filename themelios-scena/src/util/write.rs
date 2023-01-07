@@ -50,7 +50,7 @@ pub fn encode(text: &str) -> Result<Vec<u8>, EncodeError> {
 	cp932::encode(text).map_err(|_| EncodeError { text: text.to_owned() })
 }
 
-pub trait OutExt1: Out {
+pub trait WriteStreamExt1: WriteStream {
 	fn string(&mut self, s: &str) -> Result<(), WriteError> {
 		let s = encode(s)?;
 		self.slice(&s);
@@ -100,7 +100,8 @@ pub trait OutExt1: Out {
 		Ok(())
 	}
 
-	fn name_desc(&mut self, nd: &super::NameDesc) -> Result<(), WriteError> where Self: OutDelay {
+	#[deprecated]
+	fn name_desc(&mut self, nd: &super::NameDesc) -> Result<(), WriteError> where Self: Write {
 		let super::NameDesc { name, desc } = nd;
 		let (l1, l1_) = Label::new();
 		let (l2, l2_) = Label::new();
@@ -113,18 +114,18 @@ pub trait OutExt1: Out {
 		Ok(())
 	}
 }
-impl<T: Out + ?Sized> OutExt1 for T {}
+impl<T: WriteStream + ?Sized> WriteStreamExt1 for T {}
 
 #[extend::ext]
-pub impl OutBytes {
-	fn ptr(&mut self) -> OutBytes {
-		let mut g = OutBytes::new();
+pub impl Writer {
+	fn ptr(&mut self) -> Writer {
+		let mut g = Writer::new();
 		self.delay_u16(g.here());
 		g
 	}
 
-	fn ptr32(&mut self) -> OutBytes {
-		let mut g = OutBytes::new();
+	fn ptr32(&mut self) -> Writer {
+		let mut g = Writer::new();
 		self.delay_u32(g.here());
 		g
 	}

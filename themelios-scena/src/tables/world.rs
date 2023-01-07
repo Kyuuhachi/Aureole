@@ -8,7 +8,7 @@ use crate::util::*;
 pub struct World { scena: String, x: u32, y: u32 }
 
 pub fn read(lookup: &dyn Lookup, data: &[u8]) -> Result<Vec<World>, ReadError> {
-	let mut f = Coverage::new(Bytes::new(data));
+	let mut f = Coverage::new(Reader::new(data));
 	let mut table = Vec::with_capacity(f.remaining() / 4);
 	while f.remaining() > 12 {
 		let scena = lookup.name(f.u32()?)?.to_owned();
@@ -24,7 +24,7 @@ pub fn read(lookup: &dyn Lookup, data: &[u8]) -> Result<Vec<World>, ReadError> {
 }
 
 pub fn write(lookup: &dyn Lookup, table: &Vec<World>) -> Result<Vec<u8>, WriteError> {
-	let mut out = OutBytes::new();
+	let mut out = Writer::new();
 	for &World { ref scena, x, y } in table {
 		out.u32(lookup.index(scena).unwrap());
 		out.u32(x);

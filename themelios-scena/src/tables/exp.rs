@@ -4,7 +4,7 @@ use hamu::write::le::*;
 use crate::util::*;
 
 pub fn read(data: &[u8]) -> Result<Vec<u32>, ReadError> {
-	let mut f = Coverage::new(Bytes::new(data));
+	let mut f = Coverage::new(Reader::new(data));
 	let mut table = Vec::with_capacity(f.remaining() / 4);
 	while f.remaining() > 0 {
 		table.push(f.u32()?);
@@ -14,7 +14,7 @@ pub fn read(data: &[u8]) -> Result<Vec<u32>, ReadError> {
 }
 
 pub fn write(table: &[u32]) -> Result<Vec<u8>, WriteError> {
-	let mut out = OutBytes::new();
+	let mut out = Writer::new();
 	for &item in table {
 		out.u32(item);
 	}

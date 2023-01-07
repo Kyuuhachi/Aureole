@@ -793,14 +793,14 @@ themelios_macros::bytecode! {
 
 mod color24 {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>) -> Result<Color, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl Read<'a>) -> Result<Color, ReadError> {
 		let a = f.u8()?;
 		let b = f.u8()?;
 		let c = f.u8()?;
 		Ok(Color(u32::from_le_bytes([a, b, c, 0])))
 	}
 
-	pub(super) fn write(f: &mut impl Out, v: &Color) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Write, v: &Color) -> Result<(), WriteError> {
 		let [a, b, c, _] = u32::to_le_bytes(v.0);
 		f.u8(a);
 		f.u8(b);
@@ -811,7 +811,7 @@ mod color24 {
 
 mod quest_list {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>) -> Result<Vec<QuestId>, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl Read<'a>) -> Result<Vec<QuestId>, ReadError> {
 		let mut quests = Vec::new();
 		loop {
 			match f.u16()? {
@@ -822,7 +822,7 @@ mod quest_list {
 		Ok(quests)
 	}
 
-	pub(super) fn write(f: &mut impl Out, v: &Vec<QuestId>) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Write, v: &Vec<QuestId>) -> Result<(), WriteError> {
 		for &i in v {
 			f.u16(i.0);
 		}
@@ -833,7 +833,7 @@ mod quest_list {
 
 mod fork {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>, game: &GameData) -> Result<Vec<Insn>, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl Read<'a>, game: &GameData) -> Result<Vec<Insn>, ReadError> {
 		let len = f.u8()? as usize;
 		let pos = f.pos();
 		let mut insns = Vec::new();
@@ -847,7 +847,7 @@ mod fork {
 		Ok(insns)
 	}
 
-	pub(super) fn write(f: &mut impl OutDelay, game: &GameData, v: &[Insn]) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Write, game: &GameData, v: &[Insn]) -> Result<(), WriteError> {
 		let (l1, l1_) = HLabel::new();
 		let (l2, l2_) = HLabel::new();
 		f.delay(move |l| Ok(u8::to_le_bytes(hamu::write::cast_usize(l(l2)? - l(l1)?)?)));
@@ -865,7 +865,7 @@ mod fork {
 
 mod fork_loop {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>, game: &GameData) -> Result<Vec<Insn>, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl Read<'a>, game: &GameData) -> Result<Vec<Insn>, ReadError> {
 		let len = f.u8()? as usize;
 		let pos = f.pos();
 		let mut insns = Vec::new();
@@ -883,7 +883,7 @@ mod fork_loop {
 		Ok(insns)
 	}
 
-	pub(super) fn write(f: &mut impl OutDelay, game: &GameData, v: &[Insn]) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Write, game: &GameData, v: &[Insn]) -> Result<(), WriteError> {
 		let (l1, l1_) = HLabel::new();
 		let (l2, l2_) = HLabel::new();
 		let l1c = l1.clone();
@@ -906,11 +906,11 @@ mod fork_loop {
 
 mod menu {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>) -> Result<Vec<String>, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl Read<'a>) -> Result<Vec<String>, ReadError> {
 		Ok(f.string()?.split_terminator('\x01').map(|a| a.to_owned()).collect())
 	}
 
-	pub(super) fn write(f: &mut impl Out, v: &[String]) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Write, v: &[String]) -> Result<(), WriteError> {
 		let mut s = String::new();
 		for line in v {
 			s.push_str(line.as_str());
@@ -923,14 +923,14 @@ mod menu {
 
 mod emote {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>) -> Result<Emote, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl Read<'a>) -> Result<Emote, ReadError> {
 		let a = f.u8()?;
 		let b = f.u8()?;
 		let c = f.u32()?;
 		Ok(Emote(a, b, c))
 	}
 
-	pub(super) fn write(f: &mut impl Out, &Emote(a, b, c): &Emote) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Write, &Emote(a, b, c): &Emote) -> Result<(), WriteError> {
 		f.u8(a);
 		f.u8(b);
 		f.u32(c);
@@ -940,13 +940,13 @@ mod emote {
 
 pub(super) mod char_attr {
 	use super::*;
-	pub fn read<'a>(f: &mut impl In<'a>) -> Result<CharAttr, ReadError> {
+	pub fn read<'a>(f: &mut impl Read<'a>) -> Result<CharAttr, ReadError> {
 		let a = CharId(f.u16()?);
 		let b = f.u8()?;
 		Ok(CharAttr(a, b))
 	}
 
-	pub fn write(f: &mut impl Out, &CharAttr(a, b): &CharAttr) -> Result<(), WriteError> {
+	pub fn write(f: &mut impl Write, &CharAttr(a, b): &CharAttr) -> Result<(), WriteError> {
 		f.u16(a.0);
 		f.u8(b);
 		Ok(())
@@ -955,11 +955,11 @@ pub(super) mod char_attr {
 
 mod file_ref {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>, game: &GameData) -> Result<String, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl Read<'a>, game: &GameData) -> Result<String, ReadError> {
 		Ok(game.lookup.name(f.u32()?)?)
 	}
 
-	pub(super) fn write(f: &mut impl Out, game: &GameData, v: &str) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Write, game: &GameData, v: &str) -> Result<(), WriteError> {
 		f.u32(game.lookup.index(v)?);
 		Ok(())
 	}
@@ -967,7 +967,7 @@ mod file_ref {
 
 mod func_ref {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>, game: &GameData) -> Result<FuncRef, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl Read<'a>, game: &GameData) -> Result<FuncRef, ReadError> {
 		let a = f.u8()? as u16;
 		let b = if game.iset.is_ed7() {
 			f.u8()? as u16
@@ -977,7 +977,7 @@ mod func_ref {
 		Ok(FuncRef(a, b))
 	}
 
-	pub(super) fn write(f: &mut impl Out, game: &GameData, &FuncRef(a, b): &FuncRef) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Write, game: &GameData, &FuncRef(a, b): &FuncRef) -> Result<(), WriteError> {
 		f.u8(cast(a)?);
 		if game.iset.is_ed7() {
 			f.u8(cast(b)?)
@@ -990,13 +990,13 @@ mod func_ref {
 
 mod func_ref_u8_u16 {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>) -> Result<FuncRef, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl Read<'a>) -> Result<FuncRef, ReadError> {
 		let a = f.u8()? as u16;
 		let b = f.u16()?;
 		Ok(FuncRef(a, b))
 	}
 
-	pub(super) fn write(f: &mut impl Out, &FuncRef(a, b): &FuncRef) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Write, &FuncRef(a, b): &FuncRef) -> Result<(), WriteError> {
 		f.u8(cast(a)?);
 		f.u16(b);
 		Ok(())
@@ -1005,29 +1005,29 @@ mod func_ref_u8_u16 {
 
 mod text {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>) -> Result<Text, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl Read<'a>) -> Result<Text, ReadError> {
 		crate::text::Text::read(f)
 	}
 
-	pub(super) fn write(f: &mut impl Out, v: &Text) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Write, v: &Text) -> Result<(), WriteError> {
 		crate::text::Text::write(f, v)
 	}
 }
 
 mod sc_party_select_mandatory {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>) -> Result<[Option<NameId>; 4], ReadError> {
+	pub(super) fn read<'a>(f: &mut impl Read<'a>) -> Result<[Option<NameId>; 4], ReadError> {
 		f.multiple_loose::<4, _>(&[0xFF,0], |g| Ok(NameId(cast(g.u16()?)?)))
 	}
 
-	pub(super) fn write(f: &mut impl Out, v: &[Option<NameId>; 4]) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Write, v: &[Option<NameId>; 4]) -> Result<(), WriteError> {
 		f.multiple_loose::<4, _>(&[0xFF,0], v, |g, a| { g.u16(a.0.into()); Ok(()) })
 	}
 }
 
 mod sc_party_select_optional {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>) -> Result<Vec<NameId>, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl Read<'a>) -> Result<Vec<NameId>, ReadError> {
 		let mut quests = Vec::new();
 		loop {
 			match f.u16()? {
@@ -1038,7 +1038,7 @@ mod sc_party_select_optional {
 		Ok(quests)
 	}
 
-	pub(super) fn write(f: &mut impl Out, v: &Vec<NameId>) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Write, v: &Vec<NameId>) -> Result<(), WriteError> {
 		for &i in v {
 			f.u16(i.0.into());
 		}
@@ -1049,7 +1049,7 @@ mod sc_party_select_optional {
 
 mod char_animation {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>) -> Result<Vec<u8>, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl Read<'a>) -> Result<Vec<u8>, ReadError> {
 		let n = f.u8()?;
 		let mut a = Vec::with_capacity(n as usize);
 		if n == 0 {
@@ -1061,7 +1061,7 @@ mod char_animation {
 		Ok(a)
 	}
 
-	pub(super) fn write(f: &mut impl Out, v: &Vec<u8>) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Write, v: &Vec<u8>) -> Result<(), WriteError> {
 		f.u8(cast(v.len())?);
 		if v.is_empty() {
 			f.u8(0)

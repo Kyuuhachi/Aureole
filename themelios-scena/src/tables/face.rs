@@ -7,7 +7,7 @@ use crate::util::*;
 newtype!(FaceId, u16);
 
 pub fn read(lookup: &dyn Lookup, t_face: &[u8]) -> Result<Vec<String>, ReadError> {
-	let mut f = Coverage::new(Bytes::new(t_face));
+	let mut f = Coverage::new(Reader::new(t_face));
 	let mut faces = Vec::with_capacity(f.remaining() / 4);
 	while f.remaining() > 0 {
 		faces.push(lookup.name(f.u32()?)?.to_owned())
@@ -17,7 +17,7 @@ pub fn read(lookup: &dyn Lookup, t_face: &[u8]) -> Result<Vec<String>, ReadError
 }
 
 pub fn write(lookup: &dyn Lookup, names: &Vec<String>) -> Result<Vec<u8>, WriteError> {
-	let mut out = OutBytes::new();
+	let mut out = Writer::new();
 	for name in names {
 		out.u32(lookup.index(name.as_ref()).unwrap())
 	}

@@ -16,7 +16,7 @@ pub struct ED7Name {
 }
 
 pub fn read_ed7(game: &GameData, data: &[u8]) -> Result<Vec<ED7Name>, ReadError> {
-	let mut f = Coverage::new(Bytes::new(data));
+	let mut f = Coverage::new(Reader::new(data));
 	let mut table = Vec::new();
 	let fileref = |a| if a == 0 { Ok(None) } else { game.lookup.name(a).map(Some) };
 	loop {
@@ -33,8 +33,8 @@ pub fn read_ed7(game: &GameData, data: &[u8]) -> Result<Vec<ED7Name>, ReadError>
 }
 
 pub fn write_ed7(game: &GameData, table: &[ED7Name]) -> Result<Vec<u8>, WriteError> {
-	let mut f = OutBytes::new();
-	let mut g = OutBytes::new();
+	let mut f = Writer::new();
+	let mut g = Writer::new();
 	let fileref = |a| Option::map_or(a, Ok(0), |a| game.lookup.index(a));
 	for name in table {
 		f.u16(name.id.0);

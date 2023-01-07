@@ -22,7 +22,7 @@ pub struct ED6Quest {
 }
 
 pub fn read_ed6(_game: &GameData, data: &[u8]) -> Result<Vec<ED6Quest>, ReadError> {
-	let mut f = Bytes::new(data);
+	let mut f = Reader::new(data);
 	let n = f.clone().u16()? / 2;
 	let mut table = Vec::new();
 
@@ -52,8 +52,8 @@ pub fn read_ed6(_game: &GameData, data: &[u8]) -> Result<Vec<ED6Quest>, ReadErro
 }
 
 pub fn write_ed6(_game: &GameData, table: &[ED6Quest]) -> Result<Vec<u8>, WriteError> {
-	let mut f = OutBytes::new();
-	let mut g = OutBytes::new();
+	let mut f = Writer::new();
+	let mut g = Writer::new();
 
 	for &ED6Quest { id, section, index, bp, mira, flags, ref name, ref desc, ref steps } in table {
 		f.delay_u16(g.here());
@@ -68,7 +68,7 @@ pub fn write_ed6(_game: &GameData, table: &[ED6Quest]) -> Result<Vec<u8>, WriteE
 		g.u16(flags[1].0);
 		g.u16(flags[2].0);
 
-		let mut h = OutBytes::new();
+		let mut h = Writer::new();
 
 		g.delay_u16(h.here());
 		h.string(name)?;
@@ -101,7 +101,7 @@ pub struct ED7Quest {
 }
 
 pub fn read_ed7(_game: &GameData, data: &[u8]) -> Result<Vec<ED7Quest>, ReadError> {
-	let mut f = Coverage::new(Bytes::new(data));
+	let mut f = Coverage::new(Reader::new(data));
 	let mut table = Vec::new();
 	let mut step_ptrs = Vec::new();
 
@@ -151,9 +151,9 @@ pub fn read_ed7(_game: &GameData, data: &[u8]) -> Result<Vec<ED7Quest>, ReadErro
 }
 
 pub fn write_ed7(_game: &GameData, table: &[ED7Quest]) -> Result<Vec<u8>, WriteError> {
-	let mut f = OutBytes::new();
-	let mut g = OutBytes::new();
-	let mut h = OutBytes::new();
+	let mut f = Writer::new();
+	let mut g = Writer::new();
+	let mut h = Writer::new();
 	for q in table {
 		f.u8(cast(q.id.0)?);
 		f.u8(q.section);

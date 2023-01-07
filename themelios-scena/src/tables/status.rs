@@ -18,7 +18,7 @@ pub struct Status {
 }
 
 pub fn read(data: &[u8]) -> Result<Vec<Vec<Status>>, ReadError> {
-	let mut f = Coverage::new(Bytes::new(data));
+	let mut f = Coverage::new(Reader::new(data));
 	let n = f.clone().u16()? / 2;
 	let m = (f.clone().at(2)?.u16()? - f.clone().u16()?)/22;
 	let mut table = Vec::with_capacity(n as usize);
@@ -47,8 +47,8 @@ pub fn read(data: &[u8]) -> Result<Vec<Vec<Status>>, ReadError> {
 }
 
 pub fn write(table: &[Vec<Status>]) -> Result<Vec<u8>, WriteError> {
-	let mut f = OutBytes::new();
-	let mut g = OutBytes::new();
+	let mut f = Writer::new();
+	let mut g = Writer::new();
 	for char in table {
 		f.delay_u16(g.here());
 		for status in char {
@@ -64,5 +64,6 @@ pub fn write(table: &[Vec<Status>]) -> Result<Vec<u8>, WriteError> {
 			g.u16(status.spd);
 		}
 	}
-	Ok(f.concat(g).finish()?)
+	f.append(g);
+	Ok(f.finish()?)
 }

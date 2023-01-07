@@ -100,7 +100,7 @@ pub struct LookPoint { // [LookPoint]
 }
 
 pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
-	let mut f = Coverage::new(Bytes::new(data));
+	let mut f = Coverage::new(Reader::new(data));
 
 	let path = f.sized_string::<10>()?;
 	let map = f.sized_string::<14>()?;
@@ -245,10 +245,10 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		ref entries,
 		ref functions,
 	} = scena;
-	let mut f = OutBytes::new();
-	let mut g = OutBytes::new();
-	let mut func_table = OutBytes::new();
-	let mut strings = OutBytes::new();
+	let mut f = Writer::new();
+	let mut g = Writer::new();
+	let mut func_table = Writer::new();
+	let mut strings = Writer::new();
 
 	f.sized_string::<10>(path)?;
 	f.sized_string::<14>(map)?;
@@ -375,5 +375,8 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		f.u16(reinit.0); f.u16(reinit.1);
 	}
 
-	Ok(f.concat(g).concat(func_table).concat(strings).finish()?)
+	f.append(g);
+	f.append(func_table);
+	f.append(strings);
+	Ok(f.finish()?)
 }

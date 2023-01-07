@@ -92,7 +92,7 @@ fn read_rc<K: Ord + PartialEq, T>(
 }
 
 fn read_placement<'a>(
-	f: &mut (impl In<'a> + Clone),
+	f: &mut (impl Read<'a> + Clone),
 	placements: &mut BTreeMap<u16, Rc<Placement>>,
 ) -> Result<Rc<Placement>, ReadError> {
 	read_rc(placements, f.u16()?, |&o| {
@@ -103,7 +103,7 @@ fn read_placement<'a>(
 }
 
 fn read_battlefield<'a>(
-	f: &mut (impl In<'a> + Clone),
+	f: &mut (impl Read<'a> + Clone),
 	battlefields: &mut BTreeMap<u16, Rc<Battlefield>>,
 ) -> Result<Rc<Battlefield>, ReadError> {
 	read_rc(battlefields, f.u16()?, |&o| {
@@ -118,7 +118,7 @@ fn read_battlefield<'a>(
 
 fn read_battles<'a>(
 	lookup: &dyn Lookup,
-	mut f: impl In<'a> + Clone,
+	mut f: impl Read<'a> + Clone,
 ) -> Result<BTreeMap<BattleId, Battle>, ReadError> {
 	let mut placements = BTreeMap::new();
 	let mut battlefields = BTreeMap::new();
@@ -195,7 +195,7 @@ fn read_battles<'a>(
 
 fn read_auto_battles<'a>(
 	lookup: &dyn Lookup,
-	mut f: impl In<'a> + Clone,
+	mut f: impl Read<'a> + Clone,
 ) -> Result<BTreeMap<BattleId, AutoBattle>, ReadError> {
 	let mut battlefields = BTreeMap::new();
 
@@ -236,7 +236,7 @@ fn read_auto_battles<'a>(
 
 #[allow(clippy::type_complexity)]
 pub fn read(lookup: &dyn Lookup, data: &[u8]) -> Result<(BTreeMap<BattleId, Battle>, BTreeMap<BattleId, AutoBattle>), ReadError> {
-	let mut f = Coverage::new(Bytes::new(data));
+	let mut f = Coverage::new(Reader::new(data));
 
 	let battles = read_battles(lookup, f.ptr()?)?;
 	let auto_battles = read_auto_battles(lookup, f.ptr()?)?;

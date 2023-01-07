@@ -16,8 +16,8 @@ use crate::util::*;
 use crate::text::Text;
 
 use super::{
-	Attr, CharAttr, CharFlags, CharId, Color, Emote, SystemFlags, FuncRef, InExt2, MagicId,
-	Member, MemberAttr, OutExt2, Pos2, Pos3, QuestFlags, ShopId, Var, ObjectFlags, Global, LookPointFlags,
+	Attr, CharAttr, CharFlags, CharId, Color, Emote, SystemFlags, FuncRef, ReadStreamExt2, MagicId,
+	MemberAttr, WriteStreamExt2, Pos2, Pos3, QuestFlags, ShopId, Var, ObjectFlags, Global, LookPointFlags,
 };
 
 mod insn;
@@ -75,7 +75,7 @@ enum RawOInsn<'a> {
 	Label(HLabelDef),
 }
 
-pub fn read<'a>(f: &mut (impl In<'a> + Dump), game: &GameData, end: Option<usize>) -> Result<Vec<FlatInsn>, ReadError> {
+pub fn read<'a>(f: &mut (impl Read<'a> + Dump), game: &GameData, end: Option<usize>) -> Result<Vec<FlatInsn>, ReadError> {
 	let mut insns = Vec::new();
 	let mut extent = f.pos();
 	loop {
@@ -154,9 +154,9 @@ pub fn read<'a>(f: &mut (impl In<'a> + Dump), game: &GameData, end: Option<usize
 	Ok(insns2)
 }
 
-fn read_raw_insn<'a>(f: &mut impl In<'a>, game: &GameData) -> Result<RawIInsn, ReadError> {
+fn read_raw_insn<'a>(f: &mut impl Read<'a>, game: &GameData) -> Result<RawIInsn, ReadError> {
 	let pos = f.pos();
-	fn addr<'a>(f: &mut impl In<'a>, game: &GameData) -> Result<usize, ReadError> {
+	fn addr<'a>(f: &mut impl Read<'a>, game: &GameData) -> Result<usize, ReadError> {
 		if game.iset.is_ed7() {
 			Ok(f.u32()? as usize)
 		} else {
@@ -196,7 +196,7 @@ fn read_raw_insn<'a>(f: &mut impl In<'a>, game: &GameData) -> Result<RawIInsn, R
 	Ok(insn)
 }
 
-pub fn write(f: &mut impl OutDelay, game: &GameData, insns: &[FlatInsn]) -> Result<(), WriteError> {
+pub fn write(f: &mut impl Write, game: &GameData, insns: &[FlatInsn]) -> Result<(), WriteError> {
 	let mut labels = HashMap::new();
 	let mut labeldefs = HashMap::new();
 	let mut label = |k| {
@@ -241,8 +241,8 @@ pub fn write(f: &mut impl OutDelay, game: &GameData, insns: &[FlatInsn]) -> Resu
 	Ok(())
 }
 
-fn write_raw_insn(f: &mut impl OutDelay, game: &GameData, insn: RawOInsn) -> Result<(), WriteError> {
-	fn addr(f: &mut impl OutDelay, game: &GameData, l: HLabel) {
+fn write_raw_insn(f: &mut impl Write, game: &GameData, insn: RawOInsn) -> Result<(), WriteError> {
+	fn addr(f: &mut impl Write, game: &GameData, l: HLabel) {
 		if game.iset.is_ed7() {
 			f.delay_u32(l)
 		} else {
@@ -345,7 +345,7 @@ pub enum Expr {
 
 mod expr {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl In<'a>, game: &GameData) -> Result<Expr, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl Read<'a>, game: &GameData) -> Result<Expr, ReadError> {
 		let mut stack = Vec::new();
 		loop {
 			let op = f.u8()?;
@@ -376,8 +376,8 @@ mod expr {
 		Ok(stack.pop().unwrap())
 	}
 
-	pub(super) fn write(f: &mut impl OutDelay, game: &GameData, v: &Expr) -> Result<(), WriteError> {
-		fn write_node(f: &mut impl OutDelay, game: &GameData, v: &Expr) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Write, game: &GameData, v: &Expr) -> Result<(), WriteError> {
+		fn write_node(f: &mut impl Write, game: &GameData, v: &Expr) -> Result<(), WriteError> {
 			match *v {
 				Expr::Binop(op, ref a, ref b) => {
 					write_node(f, game, a)?;

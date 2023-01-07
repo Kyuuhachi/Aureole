@@ -2,7 +2,6 @@
 #![feature(array_try_map, try_trait_v2, never_type, try_trait_v2_residual)]
 #![feature(let_chains)]
 
-pub mod decompress;
 pub mod gamedata;
 pub mod archive;
 pub mod tables;

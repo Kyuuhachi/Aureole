@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 themelios = { path = "../themelios" }
+decompress = { path = "../decompress" }
 eyre = "0.6.8"
 color-eyre = { version = "0.6.2", default-features = false }
 clap = { version = "3.1.15", features = ["derive"] }

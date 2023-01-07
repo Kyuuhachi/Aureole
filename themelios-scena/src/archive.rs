@@ -9,7 +9,6 @@ use mapr::Mmap;
 use hamu::read::coverage::*;
 use hamu::read::le::*;
 
-use crate::decompress;
 use crate::util;
 
 type Backtrace = Box<std::backtrace::Backtrace>;

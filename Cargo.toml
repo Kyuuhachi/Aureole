@@ -3,6 +3,7 @@ members = [
 	"choubun",
 	"cp932",
 
+	"decompress",
 	"themelios-macros",
 	"themelios-scena",
 	"themelios-tables",

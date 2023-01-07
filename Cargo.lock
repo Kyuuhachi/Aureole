@@ -241,6 +241,14 @@ name = "cp932"
 version = "0.1.0"
 
 [[package]]
+name = "decompress"
+version = "0.1.0"
+dependencies = [
+ "bitmatch",
+ "derive_more",
+]
+
+[[package]]
 name = "derive_more"
 version = "0.99.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -765,8 +773,8 @@ dependencies = [
 name = "themelios-scena"
 version = "0.1.0"
 dependencies = [
- "bitmatch",
  "cp932",
+ "decompress",
  "derive_more",
  "enumflags2",
  "extend",
@@ -841,6 +849,7 @@ dependencies = [
  "chrono",
  "clap",
  "color-eyre",
+ "decompress",
  "eyre",
  "filetime",
  "indicatif",

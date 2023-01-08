@@ -14,6 +14,9 @@ members = [
 	"tools",
 ]
 
+[workspace.dependencies]
+hamu = { git = "https://github.com/Kyuuhachi/hamu", features = ["beryl"] }
+
 [profile.dev]
 package.hamu.opt-level = 3
 package.choubun.opt-level = 3

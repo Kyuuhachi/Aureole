@@ -9,14 +9,14 @@ pub struct Command {
 
 pub fn run(Command {path}: Command) -> Result<(), io::Error> {
 	let path = path.as_deref().unwrap_or_else(|| Path::new("-"));
-	let mut input: Box<dyn io::Read> = if path == Path::new("-") {
+	let input: Box<dyn io::Read> = if path == Path::new("-") {
 		Box::new(io::stdin().lock())
 	} else {
 		Box::new(std::fs::File::open(path)?)
 	};
 
 	let mut output = io::stdout().lock();
-	for chunk in decompress::decompress_stream(&mut input) {
+	for chunk in decompress::decompress_stream(&mut hamu::read::Io::new(input)) {
 		output.write_all(&chunk?)?;
 	}
 	Ok(())

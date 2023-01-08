@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-hamu = { git = "https://github.com/Kyuuhachi/hamu", features = ["beryl"] }
+hamu.workspace = true
 themelios-macros = { path = "../themelios-macros" }
 decompress = { path = "../decompress" }
 cp932 = { path = "../cp932" }

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-hamu = { git = "https://github.com/Kyuuhachi/hamu", features = ["beryl"] }
+hamu.workspace = true
 themelios-scena = { path = "../themelios-scena/" }
 strict_result = "1.1.0"
 derive_more = { version = "0.99.17", default-features = false, features = ["deref", "deref_mut", "display", "from", "into"] }

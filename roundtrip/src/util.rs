@@ -2,32 +2,7 @@ use std::time::{Instant, Duration};
 
 use themelios::{archive::Archives, gamedata::GameData, scena::code::InstructionSet};
 
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-	#[error("{source}")]
-	Io { #[from] source: std::io::Error, backtrace: std::backtrace::Backtrace },
-
-	#[error("{source}")]
-	Lookup { #[from] source: themelios::gamedata::LookupError, backtrace: std::backtrace::Backtrace },
-
-	#[error(transparent)]
-	Read { #[from] #[backtrace] source: themelios::util::ReadError },
-
-	#[error(transparent)]
-	Write { #[from] #[backtrace] source: themelios::util::WriteError },
-
-	#[error("{assertion}")]
-	Assert { assertion: Box<str>, backtrace: Box<std::backtrace::Backtrace> },
-}
-
-impl std::convert::From<String> for Error {
-	fn from(assertion: String) -> Self {
-		Self::Assert {
-			assertion: assertion.into(),
-			backtrace: std::backtrace::Backtrace::capture().into(),
-		}
-	}
-}
+pub use anyhow::Error;
 
 // Sync wrapper. It's not safe at all.
 pub struct SW<T>(T);
@@ -75,7 +50,7 @@ pub fn check_equal<T: PartialEq + std::fmt::Debug>(a: &T, b: &T) -> Result<(), E
 				};
 			}
 		}
-		return Err(format!("{} differs", std::any::type_name::<T>()).into())
+		return Err(anyhow::anyhow!("{} differs", std::any::type_name::<T>()))
 	}
 	Ok(())
 }
@@ -87,13 +62,15 @@ pub enum Strictness {
 }
 pub use Strictness::*;
 
-pub fn check_roundtrip<T>(
+pub fn check_roundtrip<T, RE, WE>(
 	strict: Strictness,
 	data: &[u8],
-	read: impl Fn(&[u8]) -> Result<T, themelios::util::ReadError>,
-	write: impl Fn(&T) -> Result<Vec<u8>, themelios::util::WriteError>,
-) -> Result<T, Error> where
+	read: impl Fn(&[u8]) -> Result<T, RE>,
+	write: impl Fn(&T) -> Result<Vec<u8>, WE>,
+) -> Result<T, anyhow::Error> where
 	T: PartialEq + std::fmt::Debug,
+	anyhow::Error: From<RE>,
+	anyhow::Error: From<WE>,
 {
 	let val = read(data)?;
 	let data2 = write(&val)?;
@@ -143,7 +120,7 @@ pub fn check_roundtrip<T>(
 				}
 			}
 		}
-		return Err(format!("{} bytes differ", std::any::type_name::<T>()).into())
+		return Err(anyhow::anyhow!("{} bytes differ", std::any::type_name::<T>()).into())
 	}
 	Ok(val)
 }

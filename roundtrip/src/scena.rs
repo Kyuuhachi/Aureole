@@ -71,8 +71,8 @@ mod ed6 {
 
 			let scena = themelios::scena::ed6::read(&game, &data)?;
 			for (i, func) in scena.functions.iter().enumerate() {
-				let decomp = themelios::scena::code::decompile::decompile(func).map_err(|e| format!("{name}:{i}: {e}"))?;
-				let recomp = themelios::scena::code::decompile::recompile(&decomp).map_err(|e| format!("{name}:{i}: {e}"))?;
+				let decomp = themelios::scena::code::decompile::decompile(func).map_err(|e| anyhow::anyhow!("{name}:{i}: {e}"))?;
+				let recomp = themelios::scena::code::decompile::recompile(&decomp).map_err(|e| anyhow::anyhow!("{name}:{i}: {e}"))?;
 				if &recomp != func {
 					println!("{name}:{i}: incorrect recompile");
 					//
@@ -139,7 +139,7 @@ mod ed6 {
 
 			for (i, (func, vfunc)) in scena.functions.iter().zip(vscena.functions.iter()).enumerate() {
 				if let Some(vfunc2) = fixup_eddec(func, vfunc) {
-					let decomp = themelios::scena::code::decompile::decompile(&vfunc2).map_err(|e| format!("{name}:{i}: {e}"));
+					let decomp = themelios::scena::code::decompile::decompile(&vfunc2).map_err(|e| anyhow::anyhow!("{name}:{i}: {e}"));
 					let decomp = match decomp {
 						Ok(d) => d,
 						Err(e) => {
@@ -163,7 +163,7 @@ mod ed6 {
 							continue
 						}
 					};
-					let recomp = themelios::scena::code::decompile::recompile(&decomp).map_err(|e| format!("{name}:{i}: {e}"))?;
+					let recomp = themelios::scena::code::decompile::recompile(&decomp).map_err(|e| anyhow::anyhow!("{name}:{i}: {e}"))?;
 					if recomp != vfunc2 {
 						println!("{name}:{i}: incorrect recompile");
 

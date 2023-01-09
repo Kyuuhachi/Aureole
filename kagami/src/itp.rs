@@ -3,6 +3,8 @@ use std::{backtrace::Backtrace, borrow::Cow};
 use hamu::read::le::*;
 use ndarray::prelude::*;
 
+use decompress::decompress_ed7 as decompress;
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
 	#[error("{source}")]
@@ -10,10 +12,6 @@ pub enum Error {
 	#[error("bad itp type {val:?}")]
 	BadType { val: u32, backtrace: Backtrace },
 }
-
-#[derive(Debug, thiserror::Error)]
-#[error("error in decompression {0}")]
-pub struct DecompressError(u32);
 
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
@@ -57,28 +55,6 @@ impl PaletteImage {
 		w.finish()?;
 		Ok(())
 	}
-}
-
-// TODO move this to decompress module
-fn decompress(f: &mut Reader) -> Result<Vec<u8>, hamu::read::Error> {
-	let csize = f.u32()? as usize;
-	let start = f.pos();
-	let usize = f.u32()? as usize;
-	let mut out = Vec::with_capacity(usize);
-	for _ in 0..f.u32()?-1 {
-		let len = f.u16()? as usize;
-		out.extend(decompress::decompress_chunk(f.slice(len - 2)?)?);
-		f.check_u8(1)?;
-	}
-
-	f.check_u32(0x06000006)?;
-	f.u8()?; // unknown
-	f.u8()?;
-	f.u8()?;
-
-	assert_eq!(f.pos(), csize+start);
-	assert_eq!(out.len(), usize);
-	Ok(out)
 }
 
 pub fn read(data: &[u8]) -> Result<Itp, Error> {

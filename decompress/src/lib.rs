@@ -4,12 +4,22 @@ use hamu::read::Error;
 #[derive(Debug, thiserror::Error)]
 enum DecompressError {
 	#[error("invalid chunk length")]
-	BadChunk,
+	BadChunkLength,
 	#[error("attempted to repeat {count} bytes from offset -{offset}, but only have {len} bytes")]
 	BadRepeat {
 		count: usize,
 		offset: usize,
 		len: usize,
+	},
+	#[error("wrong compresed len: got {size}, expected {expected_size}")]
+	WrongCompressedLen {
+		size: usize,
+		expected_size: usize,
+	},
+	#[error("wrong uncompresed len: got {size}, expected {expected_size}")]
+	WrongUncompressedLen {
+		size: usize,
+		expected_size: usize,
 	},
 }
 
@@ -187,12 +197,14 @@ pub fn decompress_chunk(data: &[u8]) -> Result<Vec<u8>, Error> {
 
 pub fn decompress(data: &[u8]) -> Result<Vec<u8>, Error> {
 	let mut out = Vec::new();
+	#[allow(deprecated)]
 	for chunk in decompress_stream(&mut Reader::new(data)) {
 		out.append(&mut chunk?);
 	}
 	Ok(out)
 }
 
+#[deprecated]
 pub fn decompress_stream<T: ReadStream>(data: &mut T) -> impl Iterator<Item=Result<Vec<u8>, T::Error>> + '_ {
 	let mut has_next = true;
 	let mut buf = Vec::new();
@@ -200,7 +212,7 @@ pub fn decompress_stream<T: ReadStream>(data: &mut T) -> impl Iterator<Item=Resu
 		let pos = data.error_state();
 		let chunklen = data.u16()? as usize;
 		let Some(chunklen) = chunklen.checked_sub(2) else {
-			return Err(T::to_error(pos, DecompressError::BadChunk.into()))
+			return Err(T::to_error(pos, DecompressError::BadChunkLength.into()))
 		};
 		if chunklen > buf.len() {
 			buf = vec![0; chunklen];
@@ -211,4 +223,39 @@ pub fn decompress_stream<T: ReadStream>(data: &mut T) -> impl Iterator<Item=Resu
 		has_next = data.u8()? != 0;
 		Ok(chunk)
 	}))
+}
+
+pub fn decompress_ed7(f: &mut Reader) -> Result<Vec<u8>, hamu::read::Error> {
+	let csize = f.u32()? as usize;
+	let start = f.pos();
+	let usize = f.u32()? as usize;
+	let mut out = Vec::with_capacity(usize);
+	for _ in 0..f.u32()?-1 {
+		let pos = f.error_state();
+		let chunklen = f.u16()? as usize;
+		let Some(chunklen) = chunklen.checked_sub(2) else {
+			return Err(Reader::to_error(pos, DecompressError::BadChunkLength.into()))
+		};
+		out.extend(decompress_chunk(f.slice(chunklen)?)?);
+		f.check_u8(1)?;
+	}
+
+	f.check_u32(0x06000006)?;
+	f.slice(3)?; // unknown
+
+	if f.pos() != csize+start {
+		return Err(Reader::to_error(f.pos(), DecompressError::WrongCompressedLen {
+			size: f.pos() - start,
+			expected_size: csize,
+		}.into()))
+	}
+
+	if out.len() != usize {
+		return Err(Reader::to_error(f.pos(), DecompressError::WrongUncompressedLen {
+			size: out.len(),
+			expected_size: usize,
+		}.into()))
+	}
+
+	Ok(out)
 }

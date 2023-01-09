@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 themelios = { path = "../themelios" }
+kagami = { path = "../kagami" }
 thiserror = "1.0.0"
 test-case = "2.2.1"
 lazy_static = "1.4.0"

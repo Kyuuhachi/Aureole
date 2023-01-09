@@ -1,0 +1,16 @@
+[package]
+name = "kagami"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+hamu.workspace = true
+decompress = { path = "../decompress" }
+strict_result = "1.1.0"
+thiserror = "1.0.0"
+png = "0.17.7"
+bytemuck = { version = "1.12.3", default-features = false }
+csv = "1.1.6"
+serde = { version = "1", features = ["derive"] }

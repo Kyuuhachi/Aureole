@@ -188,3 +188,37 @@ fn name_ed7(game: &GameData, strict: Strictness, path: impl AsRef<Path>) -> Resu
 	)?;
 	Ok(())
 }
+
+#[test_case::test_case(GameData::AO_EVO, "../data/ao-evo/data/chr/"; "ao_evo_chr")]
+#[test_case::test_case(GameData::AO_EVO, "../data/ao-evo/data/apl/"; "ao_evo_apl")]
+#[test_case::test_case(GameData::AO_EVO, "../data/ao-evo/data/monster/"; "ao_evo_monster")]
+fn itc(_game: &GameData, path: impl AsRef<Path>) -> Result<(), anyhow::Error> {
+	let mut failed = false;
+
+	let mut paths = std::fs::read_dir(path)?
+		.map(|r| r.unwrap())
+		.collect::<Vec<_>>();
+	paths.sort_by_key(|dir| dir.path());
+
+	for file in paths {
+		let path = file.path();
+		let name = path.file_name().unwrap().to_str().unwrap();
+		if !name.ends_with(".itc") {
+			continue
+		}
+
+		let data = std::fs::read(&path)?;
+		println!("{:?}", path.file_name());
+		if let Err(err) = kagami::itc::read(&data) {
+			println!("{name}: fail. {err}");
+			failed = true;
+		}
+		// if let Err(err) = check_roundtrip(Strict, &data, |a| kagami::itc::read(a), |a| kagami::itc::write(a)) {
+		// 	println!("{name}: fail. {err}");
+		// 	failed = true;
+		// }
+		// println!();
+	}
+	assert!(!failed);
+	Ok(())
+}

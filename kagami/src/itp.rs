@@ -1,6 +1,7 @@
 use std::{backtrace::Backtrace, borrow::Cow};
 
 use hamu::read::le::*;
+use ndarray::{Array2, Array, Axis};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -22,24 +23,22 @@ pub enum Itp {
 
 #[derive(Clone, PartialEq)]
 pub struct PaletteImage {
-	pub width: u32,
-	pub height: u32,
 	pub palette: Vec<u32>,
-	pub pixels: Vec<u8>,
+	pub pixels: Array2<u8>,
 }
 
 impl std::fmt::Debug for PaletteImage {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("PaletteImage")
-			.field("width", &self.width)
-			.field("height", &self.height)
+			.field("width", &self.pixels.dim().0)
+			.field("height", &self.pixels.dim().1)
 			.finish_non_exhaustive()
 	}
 }
 
 impl PaletteImage {
 	pub fn save(&self, f: impl std::io::Write) -> Result<(), png::EncodingError> {
-		let mut png = png::Encoder::new(f, self.width, self.height);
+		let mut png = png::Encoder::new(f, self.pixels.dim().1 as u32, self.pixels.dim().0 as u32);
 		let mut pal = Vec::with_capacity(3*self.palette.len());
 		let mut alp = Vec::with_capacity(self.palette.len());
 		for i in &self.palette {
@@ -54,7 +53,7 @@ impl PaletteImage {
 		png.set_palette(pal);
 		png.set_trns(alp);
 		let mut w = png.write_header()?;
-		w.write_image_data(&self.pixels)?;
+		w.write_image_data(&self.pixels.iter().copied().collect::<Vec<u8>>())?;
 		w.finish()?;
 		Ok(())
 	}
@@ -101,20 +100,21 @@ pub(crate) fn read0(f: &mut Reader) -> Result<Itp, Error> {
 }
 
 fn read1000(f: &mut Reader) -> Result<PaletteImage, Error> {
-	let width = f.u32()?;
-	let height = f.u32()?;
+	let w = f.u32()? as usize;
+	let h = f.u32()? as usize;
 	let palette = read_palette(256, f)?;
-	let pixels = f.slice((width * height) as usize)?.to_owned();
-	Ok(PaletteImage { width, height, palette, pixels })
+	let pixels = f.slice(w * h)?.to_owned();
+	let pixels = Array::from_vec(pixels).into_shape((h, w)).unwrap();
+	Ok(PaletteImage { palette, pixels })
 }
 
 fn read1002(f: &mut Reader) -> Result<PaletteImage, Error> {
-	let width = f.u32()?;
-	let height = f.u32()?;
+	let w = f.u32()? as usize;
+	let h = f.u32()? as usize;
 	let palette = read_palette(256, &mut Reader::new(&decompress(f)?))?;
 	let pixels = decompress(f)?;
-	assert_eq!(pixels.len(), (width * height) as usize);
-	Ok(PaletteImage { width, height, palette, pixels })
+	let pixels = Array::from_vec(pixels).into_shape((h, w)).unwrap();
+	Ok(PaletteImage { palette, pixels })
 }
 
 fn read1004(f: &mut Reader) -> Result<PaletteImage, Error> {
@@ -123,17 +123,11 @@ fn read1004(f: &mut Reader) -> Result<PaletteImage, Error> {
 	let palette = read_palette(f.u32()?, &mut Reader::new(&decompress(f)?))?;
 	let data = decompress(f)?;
 
-	let chunks = bytemuck::cast_slice::<_, [[u8;16];8]>(&data);
-	let mut pixels = vec![0; w*h];
-	for (c, chunk) in chunks.iter().enumerate() {
-		let cx = c%(w/16);
-		let cy = c/(w/16);
-		for (y, row) in chunk.iter().enumerate() {
-			pixels[(cy*8+y)*w+cx*16..][..16].copy_from_slice(row);
-		}
-	}
+	let mut chunks = Array::from_vec(data).into_shape((h/8, w/16, 8, 16)).unwrap();
+	chunks.swap_axes(1, 2);
+	let pixels = chunks.as_standard_layout().into_owned().into_shape((h, w)).unwrap();
 
-	Ok(PaletteImage { width: w as u32, height: h as u32, palette, pixels })
+	Ok(PaletteImage { palette, pixels })
 }
 
 fn read1006(f: &mut Reader) -> Result<PaletteImage, Error> {
@@ -213,7 +207,9 @@ fn read1006(f: &mut Reader) -> Result<PaletteImage, Error> {
 		}
 	}
 
-	Ok(PaletteImage { width: w as u32, height: h as u32, palette, pixels })
+	todo!()
+
+	// Ok(PaletteImage { width: w as u32, height: h as u32, palette, pixels })
 }
 
 pub(crate) fn read_palette(pal_size: u32, g: &mut Reader) -> Result<Vec<u32>, Error> {

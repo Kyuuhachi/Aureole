@@ -11,6 +11,6 @@ decompress = { path = "../decompress" }
 strict_result = "1.1.0"
 thiserror = "1.0.0"
 png = "0.17.7"
-bytemuck = { version = "1.12.3", default-features = false }
+ndarray = "0.15.6"
 csv = "1.1.6"
 serde = { version = "1", features = ["derive"] }

@@ -1,7 +1,6 @@
 use clap::StructOpt;
 
 mod extract;
-mod decompress;
 
 #[derive(Debug, Clone, clap::Parser)]
 struct Cli {
@@ -12,7 +11,6 @@ struct Cli {
 #[derive(Debug, Clone, clap::Subcommand)]
 enum Command {
 	Extract(extract::Command),
-	Decompress(decompress::Command),
 }
 
 fn main() -> Result<(), eyre::Report> {
@@ -26,7 +24,6 @@ fn main() -> Result<(), eyre::Report> {
 	let cli = Cli::parse();
 	match cli.command {
 		Command::Extract(command) => extract::run(command)?,
-		Command::Decompress(command) => decompress::run(command)?,
 	}
 	Ok(())
 }

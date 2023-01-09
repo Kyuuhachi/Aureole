@@ -1,7 +1,7 @@
 use std::{backtrace::Backtrace, borrow::Cow};
 
 use hamu::read::le::*;
-use ndarray::{Array2, Array, Axis};
+use ndarray::prelude::*;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -133,7 +133,6 @@ fn read1004(f: &mut Reader) -> Result<PaletteImage, Error> {
 }
 
 fn read1006(f: &mut Reader) -> Result<PaletteImage, Error> {
-	f.dump().oneline().to_stdout();
 	let size = f.u32()? as usize;
 	f.check(b"CCPI")?;
 	f.check_u16(7)?;
@@ -144,6 +143,9 @@ fn read1006(f: &mut Reader) -> Result<PaletteImage, Error> {
 	let h = f.u16()? as usize;
 	let flags = f.u16()?;
 
+	assert_eq!(w%cw, 0);
+	assert_eq!(h%ch, 0);
+
 	let data = if flags & 0x8000 != 0 {
 		let d = decompress(f)?;
 		assert_eq!(d.len(), size-16);
@@ -153,65 +155,55 @@ fn read1006(f: &mut Reader) -> Result<PaletteImage, Error> {
 	};
 	let mut g = Reader::new(&data);
 
+	// These two bits seem to always be used together
 	let palette = if flags & 0x0300 == 0 {
 		read_palette(pal_size as u32, &mut g)?
 	} else {
-		while g.u8()? != 0 { }
+		while g.u8()? != 0 { } // String containing the containing itc's filename
 		Vec::new()
 	};
 
-	// print!("{w}×{h} {cw}×{ch} {wh} {size} {flags:04X} ", wh=w*h);
-	// g.dump().oneline().to_stdout();
+	let mut pixels = Array::zeros(((h/ch)*(w/cw), (ch/2)*(cw/2), 2*2));
 
-	let mut pixels = vec![0; w*h];
+	let mut tileset = Vec::with_capacity(256);
+	let mut tiles = Vec::with_capacity(pixels.dim().1);
+	for mut chunk in pixels.outer_iter_mut() {
+		tileset.clear();
+		for _ in 0..g.u8()? {
+			tileset.push(g.array::<4>()?);
+		}
+		for i in 0..256-tileset.len() {
+			let [a,b,c,d] = tileset[i];
+			tileset.push([b,a,d,c])
+		}
+		for i in 0..256-tileset.len() {
+			let [a,b,c,d] = tileset[i];
+			tileset.push([c,d,a,b])
+		}
 
-	let mut xs = Vec::with_capacity(256);
-	let mut chunk = Vec::with_capacity(cw*ch/4);
-	for cx in 0..w/cw {
-		for cy in 0..h/ch {
-			for _ in 0..g.u8()? {
-				xs.push(g.array::<4>()?);
+		tiles.clear();
+		while tiles.len() < chunk.dim().0 {
+			match g.u8()? {
+				0xFF => for _ in 0..g.u8()? {
+					tiles.push(*tiles.last().unwrap());
+				},
+				v => tiles.push(v),
 			}
-			for i in 0..256-xs.len() {
-				let [a,b,c,d] = xs[i];
-				xs.push([c,d,a,b])
-			}
-			for i in 0..256-xs.len() {
-				let [a,b,c,d] = xs[i];
-				xs.push([b,a,d,c])
-			}
+		}
+		assert_eq!(tiles.len(), chunk.dim().0);
 
-			while chunk.len() < cw*ch/4 {
-				match g.u8()? {
-					0xFF => for _ in 0..g.u8()? {
-						chunk.push(*chunk.last().unwrap());
-					},
-					v => chunk.push(v),
-				}
-			}
-
-			for y in 0..cw/2 {
-				for x in 0..ch/2 {
-					let c = chunk[y*2+x];
-					let [a,b,c,d] = xs[c as usize];
-					let x = cx*cw+x;
-					let y = cy*ch+y;
-					let p = y*w+x;
-					pixels[p] = a;
-					pixels[p+1] = b;
-					pixels[p+w] = c;
-					pixels[p+1+w] = d;
-				}
-			}
-
-			xs.clear();
-			chunk.clear();
+		for (mut c, t) in chunk.outer_iter_mut().zip(&tiles) {
+			c.assign(&ArrayView::from(&tileset[*t as usize]));
 		}
 	}
 
-	todo!()
+	let pixels = pixels
+		.into_shape((h/ch, w/cw, ch/2, cw/2, 2, 2)).unwrap()
+		.permuted_axes((0,2,4,1,3,5))
+		.as_standard_layout().into_owned()
+		.into_shape((h, w)).unwrap();
 
-	// Ok(PaletteImage { width: w as u32, height: h as u32, palette, pixels })
+	Ok(PaletteImage { palette, pixels })
 }
 
 pub(crate) fn read_palette(pal_size: u32, g: &mut Reader) -> Result<Vec<u32>, Error> {

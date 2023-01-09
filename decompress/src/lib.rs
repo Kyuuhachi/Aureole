@@ -195,46 +195,30 @@ pub fn decompress_chunk(data: &[u8]) -> Result<Vec<u8>, Error> {
 	}
 }
 
-pub fn decompress(data: &[u8]) -> Result<Vec<u8>, Error> {
+pub fn decompress_ed6<'a, T: Read<'a>>(f: &mut T) -> Result<Vec<u8>, T::Error> {
 	let mut out = Vec::new();
-	#[allow(deprecated)]
-	for chunk in decompress_stream(&mut Reader::new(data)) {
-		out.append(&mut chunk?);
+	loop {
+		let pos = f.error_state();
+		let Some(chunklen) = (f.u16()? as usize).checked_sub(2) else {
+			return Err(T::to_error(pos, DecompressError::BadChunkLength.into()))
+		};
+		out.extend(decompress_chunk(f.slice(chunklen)?)?);
+		if f.u8()? == 0 {
+			break
+		}
 	}
 	Ok(out)
 }
 
-#[deprecated]
-pub fn decompress_stream<T: ReadStream>(data: &mut T) -> impl Iterator<Item=Result<Vec<u8>, T::Error>> + '_ {
-	let mut has_next = true;
-	let mut buf = Vec::new();
-	std::iter::from_fn(move || has_next.then(|| {
-		let pos = data.error_state();
-		let chunklen = data.u16()? as usize;
-		let Some(chunklen) = chunklen.checked_sub(2) else {
-			return Err(T::to_error(pos, DecompressError::BadChunkLength.into()))
-		};
-		if chunklen > buf.len() {
-			buf = vec![0; chunklen];
-		}
-		let buf = &mut buf[..chunklen];
-		data.fill(buf)?;
-		let chunk = decompress_chunk(buf).map_err(|e| T::to_error(pos, Box::new(e)))?;
-		has_next = data.u8()? != 0;
-		Ok(chunk)
-	}))
-}
-
-pub fn decompress_ed7(f: &mut Reader) -> Result<Vec<u8>, hamu::read::Error> {
+pub fn decompress_ed7<'a, T: Read<'a>>(f: &mut T) -> Result<Vec<u8>, T::Error> {
 	let csize = f.u32()? as usize;
 	let start = f.pos();
 	let usize = f.u32()? as usize;
 	let mut out = Vec::with_capacity(usize);
-	for _ in 0..f.u32()?-1 {
+	for _ in 1..f.u32()? {
 		let pos = f.error_state();
-		let chunklen = f.u16()? as usize;
-		let Some(chunklen) = chunklen.checked_sub(2) else {
-			return Err(Reader::to_error(pos, DecompressError::BadChunkLength.into()))
+		let Some(chunklen) = (f.u16()? as usize).checked_sub(2) else {
+			return Err(T::to_error(pos, DecompressError::BadChunkLength.into()))
 		};
 		out.extend(decompress_chunk(f.slice(chunklen)?)?);
 		f.check_u8(1)?;

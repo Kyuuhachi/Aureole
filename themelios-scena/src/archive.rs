@@ -199,7 +199,7 @@ impl Archives {
 	}
 
 	pub fn get_decomp(&self, name: &str) -> Option<Vec<u8>> {
-		self.get(name).and_then(|a| decompress::decompress(a).ok())
+		self.get(name).and_then(|a| decompress::decompress_ed6(&mut Reader::new(a)).ok())
 	}
 
 	pub fn list(&self) -> Box<dyn Iterator<Item=&str> + '_> {

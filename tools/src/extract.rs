@@ -114,7 +114,7 @@ fn extract(force: bool, arc: &Archive, outdir: &Path, bar: ProgressBar, outerbar
 			filetime::set_file_mtime(&outfile, filetime::FileTime::from_unix_time(e.timestamp as i64, 0))
 				.with_context(|| format!("failed to set mtime on {}", outfile.display()))?;
 
-			let decomp = decompress::decompress(raw).ok();
+			let decomp = decompress::decompress_ed6(&mut hamu::read::Reader::new(raw)).ok();
 			if let Some(decomp) = &decomp {
 				let outfile2 = outdir.join(format!("{}.dec", e.name));
 				fs::write(&outfile2, decomp)

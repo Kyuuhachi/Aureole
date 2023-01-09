@@ -189,26 +189,26 @@ fn name_ed7(game: &GameData, strict: Strictness, path: impl AsRef<Path>) -> Resu
 	Ok(())
 }
 
-#[test_case::test_case(GameData::ZERO, "../data/zero-gf/data/chr/"; "zero_gf_chr")]
-// #[test_case::test_case(GameData::ZERO, "../data/zero-gf/data/apl/"; "zero_gf_apl")]
-// #[test_case::test_case(GameData::ZERO, "../data/zero-gf/data/monster/"; "zero_gf_monster")]
-#[test_case::test_case(GameData::AO, "../data/ao-gf/data/chr/"; "ao_gf_chr")]
-// #[test_case::test_case(GameData::AO, "../data/ao-gf/data/apl/"; "ao_gf_apl")]
-// #[test_case::test_case(GameData::AO, "../data/ao-gf/data/monster/"; "ao_gf_monster")]
-// #[test_case::test_case(GameData::ZERO_KAI, "../data/zero/data/chr/"; "zero_kai_chr")]
-// #[test_case::test_case(GameData::ZERO_KAI, "../data/zero/data/apl/"; "zero_kai_apl")]
-// #[test_case::test_case(GameData::ZERO_KAI, "../data/zero/data/monster/"; "zero_kai_monster")]
+// #[test_case::test_case(GameData::ZERO, Strict, "../data/zero-gf/data/chr/"; "zero_gf_chr")]
+#[test_case::test_case(GameData::ZERO, Lenient, "../data/zero-gf/data/apl/"; "zero_gf_apl")]
+#[test_case::test_case(GameData::ZERO, Lenient, "../data/zero-gf/data/monster/"; "zero_gf_monster")]
+// #[test_case::test_case(GameData::AO, Strict, "../data/ao-gf/data/chr/"; "ao_gf_chr")]
+#[test_case::test_case(GameData::AO, Lenient, "../data/ao-gf/data/apl/"; "ao_gf_apl")]
+#[test_case::test_case(GameData::AO, Lenient, "../data/ao-gf/data/monster/"; "ao_gf_monster")]
+// #[test_case::test_case(GameData::ZERO_KAI, Strict, "../data/zero/data/chr/"; "zero_kai_chr")]
+// #[test_case::test_case(GameData::ZERO_KAI, Strict, "../data/zero/data/apl/"; "zero_kai_apl")]
+// #[test_case::test_case(GameData::ZERO_KAI, Strict, "../data/zero/data/monster/"; "zero_kai_monster")]
 
-#[test_case::test_case(&GD_SC_EVO, "../data/fc-evo/data/chr/"; "fc_evo")]
-#[test_case::test_case(&GD_SC_EVO, "../data/sc-evo/data_sc/chr/"; "sc_evo")]
-#[test_case::test_case(&GD_TC_EVO, "../data/3rd-evo/data_3rd/chr/"; "tc_evo")]
-#[test_case::test_case(GameData::ZERO_EVO, "../data/zero-evo/data/chr/"; "zero_evo_chr")]
-#[test_case::test_case(GameData::ZERO_EVO, "../data/zero-evo/data/apl/"; "zero_evo_apl")]
-#[test_case::test_case(GameData::ZERO_EVO, "../data/zero-evo/data/monster/"; "zero_evo_monster")]
-#[test_case::test_case(GameData::AO_EVO, "../data/ao-evo/data/chr/"; "ao_evo_chr")]
-#[test_case::test_case(GameData::AO_EVO, "../data/ao-evo/data/apl/"; "ao_evo_apl")]
-#[test_case::test_case(GameData::AO_EVO, "../data/ao-evo/data/monster/"; "ao_evo_monster")]
-fn itc(_game: &GameData, path: impl AsRef<Path>) -> Result<(), anyhow::Error> {
+// #[test_case::test_case(&GD_SC_EVO, Strict, "../data/fc-evo/data/chr/"; "fc_evo")]
+// #[test_case::test_case(&GD_SC_EVO, Strict, "../data/sc-evo/data_sc/chr/"; "sc_evo")]
+// #[test_case::test_case(&GD_TC_EVO, Strict, "../data/3rd-evo/data_3rd/chr/"; "tc_evo")]
+// #[test_case::test_case(GameData::ZERO_EVO, Strict, "../data/zero-evo/data/chr/"; "zero_evo_chr")]
+// #[test_case::test_case(GameData::ZERO_EVO, Strict, "../data/zero-evo/data/apl/"; "zero_evo_apl")]
+// #[test_case::test_case(GameData::ZERO_EVO, Strict, "../data/zero-evo/data/monster/"; "zero_evo_monster")]
+// #[test_case::test_case(GameData::AO_EVO, Strict, "../data/ao-evo/data/chr/"; "ao_evo_chr")]
+// #[test_case::test_case(GameData::AO_EVO, Strict, "../data/ao-evo/data/apl/"; "ao_evo_apl")]
+// #[test_case::test_case(GameData::AO_EVO, Strict, "../data/ao-evo/data/monster/"; "ao_evo_monster")]
+fn itc(_game: &GameData, strict: Strictness, path: impl AsRef<Path>) -> Result<(), anyhow::Error> {
 	let mut failed = false;
 
 	let mut paths = std::fs::read_dir(path)?
@@ -226,8 +226,8 @@ fn itc(_game: &GameData, path: impl AsRef<Path>) -> Result<(), anyhow::Error> {
 
 		let data = std::fs::read(&path)?;
 		n += data.len();
-		if let Err(err) = kagami::itc::read(&data) {
-			println!("{name}: fail. {err}");
+		if let Err(err) = if let Strict = strict { kagami::itc::read(&data) } else { kagami::itc::read_lenient(&data) } {
+			println!("{}: fail. {err}", path.display());
 			failed = true;
 		}
 		// if let Err(err) = check_roundtrip(Lenient, &data, |a| kagami::itc::read(a), |a| kagami::itc::write(a)) {

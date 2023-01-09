@@ -71,9 +71,6 @@ fn decompress(f: &mut Reader) -> Result<Vec<u8>, hamu::read::Error> {
 		f.check_u8(1)?;
 	}
 
-	// println!("{:?}", (csize, usize));
-	// f.dump().oneline().to_stdout();
-
 	f.check_u32(0x06000006)?;
 	f.u8()?; // unknown
 	f.u8()?;

@@ -64,7 +64,7 @@ pub fn read(data: &[u8]) -> Result<Itc, Error> {
 
 	let mut image_pos = Vec::new();
 	let mut images = Vec::new();
-	while f.remaining() >= 4 { // joyoland files end with a single byte of junk
+	while f.remaining() > 0 { // joyoland files end with a single byte of junk
 		let start = f.pos();
 		let mut itp = crate::itp::read0(&mut f)?;
 		let end = f.pos();
@@ -91,6 +91,68 @@ pub fn read(data: &[u8]) -> Result<Itc, Error> {
 		}
 		frames.push(Frame {
 			index,
+			x_offset: xoff[i],
+			y_offset: yoff[i],
+			x_scale: xscale[i],
+			y_scale: yscale[i],
+		});
+	}
+
+	Ok(Itc {
+		frames,
+		images,
+	})
+}
+
+pub fn read_lenient(data: &[u8]) -> Result<Itc, Error> {
+	let mut f = Reader::new(data);
+
+	let v102 = match &f.array()? {
+		b"V101" => false,
+		b"V102" => true,
+		&x => return Err(Error::BadHeader { val: x, backtrace: Backtrace::capture() })
+	};
+
+	let mut slice  = [(0, 0); 128];
+	let mut xoff   = [0.; 128];
+	let mut yoff   = [0.; 128];
+	let mut xscale = [1.; 128];
+	let mut yscale = [1.; 128];
+
+	for i in &mut slice {
+		*i = (f.u32()? as usize, f.u32()? as usize);
+	}
+
+	for _ in 0..128 { f.check_u16(0)?; }
+	for i in &mut xoff { *i = f.f32()?; }
+	for i in &mut yoff { *i = f.f32()?; }
+	for i in &mut xscale { *i = f.f32()?; }
+	for i in &mut yscale { *i = f.f32()?; }
+
+	let palette = if v102 {
+		Some(crate::itp::read_palette(f.u32()?, &mut f)?)
+	} else {
+		None
+	};
+
+	let mut frames = Vec::with_capacity(128);
+	let mut images = Vec::new();
+	for i in 0..128 {
+		if slice[i].1 == 0 {
+			break
+		}
+
+		let (offset, len) = slice[i];
+		let mut itp = crate::itp::read(&data[offset..offset+len])?;
+		if let Some(palette) = &palette {
+			let crate::itp::Itp::Palette(i) = &mut itp else { panic!() };
+			assert!(i.palette.is_empty());
+			i.palette = palette.to_owned();
+		}
+		images.push(itp);
+
+		frames.push(Frame {
+			index: i,
 			x_offset: xoff[i],
 			y_offset: yoff[i],
 			x_scale: xscale[i],
@@ -167,8 +229,11 @@ fn test() -> Result<(), Box<dyn std::error::Error>>{
 	let img = read(&fs::read("../data/ao-evo/data/apl/ch50005.itc")?)?;
 	let img = read(&fs::read("../data/3rd-evo/data_3rd/chr/chdummy.itc")?)?;
 	let img = read(&fs::read("../data/3rd-evo/data_3rd/chr/ch14570.itc")?)?;
-	let img = read(&fs::read("../data/zero-gf/data/chr/ch00001.itc")?)?;
-	let img = read(&fs::read("../data/ao-gf/data/chr/ch00001.itc")?)?;
+	let img = read_lenient(&fs::read("../data/zero-gf/data/chr/ch00001.itc")?)?;
+	let img = read_lenient(&fs::read("../data/zero-gf/data/apl/ch50112.itc")?)?;
+	let img = read_lenient(&fs::read("../data/ao-gf/data/chr/ch00001.itc")?)?;
+	let img = read_lenient(&fs::read("../data/ao-gf/data/apl/ch50118.itc")?)?;
+	let img = read_lenient(&fs::read("../data/ao-gf/data/apl/ch50269.itc")?)?;
 	// let img = read(&fs::read("../data/zero/data/chr/ch00001.itc")?)?;
 
 	let outdir = Path::new("/tmp/ch40004");

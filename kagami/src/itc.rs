@@ -161,8 +161,10 @@ pub fn read(data: &[u8]) -> Result<Itc, Error> {
 fn test() -> Result<(), Box<dyn std::error::Error>>{
 	use std::{fs, path::Path};
 
-	// let img = read(&fs::read("../data/ao-evo/data/apl/ch51211.itc")?)?;
+	let img = read(&fs::read("../data/ao-evo/data/apl/ch51211.itc")?)?;
 	let img = read(&fs::read("../data/ao-evo/data/chr/ch40004.itc")?)?;
+	let img = read(&fs::read("../data/ao-evo/data/monster/ch87953.itc")?)?;
+	let img = read(&fs::read("../data/ao-evo/data/apl/ch50005.itc")?)?;
 
 	let outdir = Path::new("/tmp/ch40004");
 	if outdir.exists() {

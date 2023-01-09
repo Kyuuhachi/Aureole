@@ -93,6 +93,7 @@ pub(crate) fn read0(f: &mut Reader) -> Result<Itp, Error> {
 		1000 => Ok(Itp::Palette(read1000(f)?)),
 		1002 => Ok(Itp::Palette(read1002(f)?)),
 		1004 => Ok(Itp::Palette(read1004(f)?)),
+		1005 => Ok(Itp::Palette(read1005(f)?)),
 		1006 => Ok(Itp::Palette(read1006(f)?)),
 
 		i => Err(Error::BadType { val: i, backtrace: Backtrace::capture() })
@@ -132,6 +133,53 @@ fn read1004(f: &mut Reader) -> Result<PaletteImage, Error> {
 	Ok(PaletteImage { palette, pixels })
 }
 
+fn read1005(f: &mut Reader) -> Result<PaletteImage, Error> {
+	fn nibbles(f: &mut Reader, n: usize) -> Result<Array1<u8>, hamu::read::Error> {
+		let mut b = Array::zeros((n/2, 2));
+		for mut b in b.outer_iter_mut() {
+			let x = f.u8()?;
+			b[0] = x >> 4;
+			b[1] = x & 15;
+		}
+		Ok(b.into_shape(n).unwrap())
+	}
+
+	let w = f.u32()? as usize;
+	let h = f.u32()? as usize;
+	let mut palette = read_palette(f.u32()?, &mut Reader::new(&decompress(f)?))?;
+	for i in 1..palette.len() {
+		palette[i] = palette[i].wrapping_add(palette[i-1]);
+	}
+
+	let size = f.u32()? as usize;
+	let d = decompress(f)?;
+	assert_eq!(d.len(), size);
+	let mut g = Reader::new(&d);
+
+	let mut ncolors = nibbles(&mut g, (h/8)*(w/16))?;
+	ncolors.map_inplace(|a| if *a != 0 { *a += 1 });
+
+	let totalcolors = ncolors.fold(1, |a, b| a + *b as usize);
+	let mut c = Reader::new(g.slice(totalcolors)?);
+
+	let mut chunks = Array::zeros(((h/8)*(w/16), 8*16));
+	for (mut chunk, ncolors) in chunks.outer_iter_mut().zip(ncolors) {
+		if ncolors != 0 {
+			let colors = c.slice(ncolors as usize)?;
+			let idx = nibbles(&mut g, 8*16)?;
+			chunk.zip_mut_with(&idx, |a, b| *a = colors[*b as usize]);
+		}
+	}
+
+	let pixels = chunks
+		.into_shape((h/8, w/16, 8, 16)).unwrap()
+		.permuted_axes((0,2,1,3))
+		.as_standard_layout().into_owned()
+		.into_shape((h, w)).unwrap();
+
+	Ok(PaletteImage { palette, pixels })
+}
+
 fn read1006(f: &mut Reader) -> Result<PaletteImage, Error> {
 	let size = f.u32()? as usize;
 	f.check(b"CCPI")?;
@@ -163,11 +211,11 @@ fn read1006(f: &mut Reader) -> Result<PaletteImage, Error> {
 		Vec::new()
 	};
 
-	let mut pixels = Array::zeros(((h/ch)*(w/cw), (ch/2)*(cw/2), 2*2));
+	let mut chunks = Array::zeros(((h/ch)*(w/cw), (ch/2)*(cw/2), 2*2));
 
 	let mut tileset = Vec::with_capacity(256);
-	let mut tiles = Vec::with_capacity(pixels.dim().1);
-	for mut chunk in pixels.outer_iter_mut() {
+	let mut tiles = Vec::with_capacity(chunks.dim().1);
+	for mut chunk in chunks.outer_iter_mut() {
 		tileset.clear();
 		for _ in 0..g.u8()? {
 			tileset.push(g.array::<4>()?);
@@ -197,7 +245,7 @@ fn read1006(f: &mut Reader) -> Result<PaletteImage, Error> {
 		}
 	}
 
-	let pixels = pixels
+	let pixels = chunks
 		.into_shape((h/ch, w/cw, ch/2, cw/2, 2, 2)).unwrap()
 		.permuted_axes((0,2,4,1,3,5))
 		.as_standard_layout().into_owned()

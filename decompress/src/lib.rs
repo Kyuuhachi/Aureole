@@ -23,14 +23,16 @@ enum DecompressError {
 	},
 }
 
-struct Ctx {
-	out: Vec<u8>,
+struct Ctx<'a> {
+	start: usize,
+	out: &'a mut Vec<u8>,
 }
 
-impl Ctx {
-	fn new() -> Self {
+impl<'a> Ctx<'a> {
+	fn new(out: &'a mut Vec<u8>) -> Self {
 		Ctx {
-			out: Vec::with_capacity(0xFFF0), // TODO I am not sure allocating here is good. Probably more performant to do it outside.
+			start: out.len(),
+			out,
 		}
 	}
 
@@ -51,7 +53,7 @@ impl Ctx {
 	}
 
 	fn repeat<T: ReadStream>(&mut self, n: usize, o: usize, f: &mut T) -> Result<(), T::Error> {
-		if !(1..=self.out.len()).contains(&o) {
+		if !(1..=self.out.len()-self.start).contains(&o) {
 			return Err(T::to_error(f.error_state(), DecompressError::BadRepeat { count: n, offset: o, len: self.out.len() }.into()))
 		}
 		for _ in 0..n {
@@ -114,10 +116,9 @@ impl ByteCtx {
 	}
 }
 
-fn decompress1(data: &[u8]) -> Result<Vec<u8>, Error> {
+fn decompress1(data: &[u8], w: &mut Ctx) -> Result<(), Error> {
 	let f = &mut Reader::new(data);
 	let mut c = ByteCtx::new();
-	let mut w = Ctx::new();
 	c.renew_bits(f)?;
 	c.nextbit <<= 8;
 
@@ -146,14 +147,12 @@ fn decompress1(data: &[u8]) -> Result<Vec<u8>, Error> {
 			}
 		}
 	}
-
-	Ok(w.out)
+	Ok(())
 }
 
 #[bitmatch::bitmatch]
-fn decompress2(data: &[u8]) -> Result<Vec<u8>, Error> {
+fn decompress2(data: &[u8], w: &mut Ctx) -> Result<(), Error> {
 	let f = &mut Reader::new(data);
-	let mut w = Ctx::new();
 
 	let mut last_o = 0;
 	while f.remaining() > 0 {
@@ -175,15 +174,14 @@ fn decompress2(data: &[u8]) -> Result<Vec<u8>, Error> {
 			},
 		}
 	}
-
-	Ok(w.out)
+	Ok(())
 }
 
-pub fn decompress_chunk(data: &[u8]) -> Result<Vec<u8>, Error> {
+fn decompress_chunk(data: &[u8], w: &mut Ctx) -> Result<(), Error> {
 	if data.first() == Some(&0) {
-		Ok(decompress1(data)?)
+		decompress1(data, w)
 	} else {
-		Ok(decompress2(data)?)
+		decompress2(data, w)
 	}
 }
 
@@ -195,7 +193,7 @@ pub fn decompress_ed6<'a, T: Read<'a>>(f: &mut T) -> Result<Vec<u8>, T::Error> {
 		let Some(chunklen) = checked_sub else {
 			return Err(T::to_error(pos, DecompressError::BadChunkLength.into()))
 		};
-		out.extend(decompress_chunk(f.slice(chunklen)?)?);
+		decompress_chunk(f.slice(chunklen)?, &mut Ctx::new(&mut out))?;
 		if f.u8()? == 0 {
 			break
 		}
@@ -213,7 +211,7 @@ pub fn decompress_ed7<'a, T: Read<'a>>(f: &mut T) -> Result<Vec<u8>, T::Error> {
 		let Some(chunklen) = (f.u16()? as usize).checked_sub(2) else {
 			return Err(T::to_error(pos, DecompressError::BadChunkLength.into()))
 		};
-		out.extend(decompress_chunk(f.slice(chunklen)?)?);
+		decompress_chunk(f.slice(chunklen)?, &mut Ctx::new(&mut out))?;
 		f.check_u8(1)?;
 	}
 

@@ -171,6 +171,8 @@ fn read1005(f: &mut Reader) -> Result<PaletteImage, Error> {
 		}
 	}
 
+	assert_eq!(g.remaining(), 0);
+
 	let pixels = chunks
 		.into_shape((h/8, w/16, 8, 16)).unwrap()
 		.permuted_axes((0,2,1,3))
@@ -183,7 +185,9 @@ fn read1005(f: &mut Reader) -> Result<PaletteImage, Error> {
 fn read1006(f: &mut Reader) -> Result<PaletteImage, Error> {
 	let size = f.u32()? as usize;
 	f.check(b"CCPI")?;
-	f.check_u16(7)?;
+	// usually 7, but 6 in a few of 3rd Evo's.
+	// Those files all seem to be single-colored squares, so they're not very interesting.
+	let _unk1 = f.u16()?;
 	let pal_size = f.u16()?;
 	let cw = 1 << f.u8()? as usize;
 	let ch = 1 << f.u8()? as usize;
@@ -217,16 +221,17 @@ fn read1006(f: &mut Reader) -> Result<PaletteImage, Error> {
 	let mut tiles = Vec::with_capacity(chunks.dim().1);
 	for mut chunk in chunks.outer_iter_mut() {
 		tileset.clear();
-		for _ in 0..g.u8()? {
+		let n = g.u8()? as usize;
+		for _ in 0..n {
 			tileset.push(g.array::<4>()?);
 		}
-		for i in 0..256-tileset.len() {
-			let [a,b,c,d] = tileset[i];
-			tileset.push([b,a,d,c])
+		for i in n..(n*2).min(256) {
+			let [a,b,c,d] = tileset[i-n];
+			tileset.push([b,a,d,c]); // x-flip
 		}
-		for i in 0..256-tileset.len() {
-			let [a,b,c,d] = tileset[i];
-			tileset.push([c,d,a,b])
+		for i in n*2..(n*4).min(256) {
+			let [a,b,c,d] = tileset[i-n*2];
+			tileset.push([c,d,a,b]); // y-flip
 		}
 
 		tiles.clear();
@@ -244,6 +249,8 @@ fn read1006(f: &mut Reader) -> Result<PaletteImage, Error> {
 			c.assign(&ArrayView::from(&tileset[*t as usize]));
 		}
 	}
+
+	assert_eq!(g.remaining(), 0);
 
 	let pixels = chunks
 		.into_shape((h/ch, w/cw, ch/2, cw/2, 2, 2)).unwrap()

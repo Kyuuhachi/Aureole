@@ -189,6 +189,22 @@ fn name_ed7(game: &GameData, strict: Strictness, path: impl AsRef<Path>) -> Resu
 	Ok(())
 }
 
+#[test_case::test_case(GameData::ZERO, "../data/zero-gf/data/chr/"; "zero_gf_chr")]
+// #[test_case::test_case(GameData::ZERO, "../data/zero-gf/data/apl/"; "zero_gf_apl")]
+// #[test_case::test_case(GameData::ZERO, "../data/zero-gf/data/monster/"; "zero_gf_monster")]
+#[test_case::test_case(GameData::AO, "../data/ao-gf/data/chr/"; "ao_gf_chr")]
+// #[test_case::test_case(GameData::AO, "../data/ao-gf/data/apl/"; "ao_gf_apl")]
+// #[test_case::test_case(GameData::AO, "../data/ao-gf/data/monster/"; "ao_gf_monster")]
+// #[test_case::test_case(GameData::ZERO_KAI, "../data/zero/data/chr/"; "zero_kai_chr")]
+// #[test_case::test_case(GameData::ZERO_KAI, "../data/zero/data/apl/"; "zero_kai_apl")]
+// #[test_case::test_case(GameData::ZERO_KAI, "../data/zero/data/monster/"; "zero_kai_monster")]
+
+#[test_case::test_case(&GD_SC_EVO, "../data/fc-evo/data/chr/"; "fc_evo")]
+#[test_case::test_case(&GD_SC_EVO, "../data/sc-evo/data_sc/chr/"; "sc_evo")]
+#[test_case::test_case(&GD_TC_EVO, "../data/3rd-evo/data_3rd/chr/"; "tc_evo")]
+#[test_case::test_case(GameData::ZERO_EVO, "../data/zero-evo/data/chr/"; "zero_evo_chr")]
+#[test_case::test_case(GameData::ZERO_EVO, "../data/zero-evo/data/apl/"; "zero_evo_apl")]
+#[test_case::test_case(GameData::ZERO_EVO, "../data/zero-evo/data/monster/"; "zero_evo_monster")]
 #[test_case::test_case(GameData::AO_EVO, "../data/ao-evo/data/chr/"; "ao_evo_chr")]
 #[test_case::test_case(GameData::AO_EVO, "../data/ao-evo/data/apl/"; "ao_evo_apl")]
 #[test_case::test_case(GameData::AO_EVO, "../data/ao-evo/data/monster/"; "ao_evo_monster")]
@@ -199,6 +215,7 @@ fn itc(_game: &GameData, path: impl AsRef<Path>) -> Result<(), anyhow::Error> {
 		.map(|r| r.unwrap())
 		.collect::<Vec<_>>();
 	paths.sort_by_key(|dir| dir.path());
+	let mut n = 0;
 
 	for file in paths {
 		let path = file.path();
@@ -208,17 +225,18 @@ fn itc(_game: &GameData, path: impl AsRef<Path>) -> Result<(), anyhow::Error> {
 		}
 
 		let data = std::fs::read(&path)?;
-		println!("{:?}", path.file_name());
+		n += data.len();
 		if let Err(err) = kagami::itc::read(&data) {
 			println!("{name}: fail. {err}");
 			failed = true;
 		}
-		// if let Err(err) = check_roundtrip(Strict, &data, |a| kagami::itc::read(a), |a| kagami::itc::write(a)) {
+		// if let Err(err) = check_roundtrip(Lenient, &data, |a| kagami::itc::read(a), |a| kagami::itc::write(a)) {
 		// 	println!("{name}: fail. {err}");
 		// 	failed = true;
 		// }
 		// println!();
 	}
+	println!("{n} bytes");
 	assert!(!failed);
 	Ok(())
 }

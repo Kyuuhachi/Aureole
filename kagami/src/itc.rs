@@ -64,7 +64,7 @@ pub fn read(data: &[u8]) -> Result<Itc, Error> {
 
 	let mut image_pos = Vec::new();
 	let mut images = Vec::new();
-	while f.remaining() > 0 {
+	while f.remaining() >= 4 { // joyoland files end with a single byte of junk
 		let start = f.pos();
 		let mut itp = crate::itp::read0(&mut f)?;
 		let end = f.pos();
@@ -165,6 +165,11 @@ fn test() -> Result<(), Box<dyn std::error::Error>>{
 	let img = read(&fs::read("../data/ao-evo/data/chr/ch40004.itc")?)?;
 	let img = read(&fs::read("../data/ao-evo/data/monster/ch87953.itc")?)?;
 	let img = read(&fs::read("../data/ao-evo/data/apl/ch50005.itc")?)?;
+	let img = read(&fs::read("../data/3rd-evo/data_3rd/chr/chdummy.itc")?)?;
+	let img = read(&fs::read("../data/3rd-evo/data_3rd/chr/ch14570.itc")?)?;
+	let img = read(&fs::read("../data/zero-gf/data/chr/ch00001.itc")?)?;
+	let img = read(&fs::read("../data/ao-gf/data/chr/ch00001.itc")?)?;
+	// let img = read(&fs::read("../data/zero/data/chr/ch00001.itc")?)?;
 
 	let outdir = Path::new("/tmp/ch40004");
 	if outdir.exists() {

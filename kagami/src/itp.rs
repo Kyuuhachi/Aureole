@@ -123,9 +123,11 @@ fn read1004(f: &mut Reader) -> Result<PaletteImage, Error> {
 	let palette = read_palette(f.u32()?, &mut Reader::new(&decompress(f)?))?;
 	let data = decompress(f)?;
 
-	let mut chunks = Array::from_vec(data).into_shape((h/8, w/16, 8, 16)).unwrap();
-	chunks.swap_axes(1, 2);
-	let pixels = chunks.as_standard_layout().into_owned().into_shape((h, w)).unwrap();
+	let pixels = Array::from_vec(data)
+		.into_shape((h/8, w/16, 8, 16)).unwrap()
+		.permuted_axes((0,2,1,3))
+		.as_standard_layout().into_owned()
+		.into_shape((h, w)).unwrap();
 
 	Ok(PaletteImage { palette, pixels })
 }

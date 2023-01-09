@@ -23,42 +23,36 @@ enum DecompressError {
 	},
 }
 
-struct Ctx<'b> {
+struct Ctx {
 	out: Vec<u8>,
-	r: Reader<'b>,
 }
 
-impl<'a> Ctx<'a> {
-	fn new(r: Reader<'a>) -> Self {
+impl Ctx {
+	fn new() -> Self {
 		Ctx {
 			out: Vec::with_capacity(0xFFF0), // TODO I am not sure allocating here is good. Probably more performant to do it outside.
-			r,
 		}
 	}
 
-	fn extend(&mut self, b: usize) -> Result<usize, Error> {
-		Ok(b << 8 | self.r.u8()? as usize)
-	}
-
-	fn constant(&mut self, n: usize) -> Result<(), Error> {
-		let b = self.r.u8()?;
+	fn constant<T: ReadStream>(&mut self, n: usize, f: &mut T) -> Result<(), T::Error> {
+		let b = f.u8()?;
 		for _ in 0..n {
 			self.out.push(b);
 		}
 		Ok(())
 	}
 
-	fn verbatim(&mut self, n: usize) -> Result<(), Error> {
+	fn verbatim<T: ReadStream>(&mut self, n: usize, f: &mut T) -> Result<(), T::Error> {
 		for _ in 0..n {
-			let b = self.r.u8()?;
+			let b = f.u8()?;
 			self.out.push(b);
 		}
 		Ok(())
 	}
 
-	fn repeat(&mut self, n: usize, o: usize) -> Result<(), Error> {
+	fn repeat<T: ReadStream>(&mut self, n: usize, o: usize, f: &mut T) -> Result<(), T::Error> {
 		if !(1..=self.out.len()).contains(&o) {
-			return Err(Reader::to_error(self.r.pos(), DecompressError::BadRepeat { count: n, offset: o, len: self.out.len() }.into()))
+			return Err(T::to_error(f.error_state(), DecompressError::BadRepeat { count: n, offset: o, len: self.out.len() }.into()))
 		}
 		for _ in 0..n {
 			self.out.push(self.out[self.out.len()-o]);
@@ -67,124 +61,122 @@ impl<'a> Ctx<'a> {
 	}
 }
 
-#[derive(derive_more::Deref, derive_more::DerefMut)]
-struct ByteCtx<'b> {
-	#[deref]
-	#[deref_mut]
-	ctx: Ctx<'b>,
+struct ByteCtx {
 	bits: u16,
 	// Zero's decompressor counts number of remaining bits instead,
 	// but this method is simpler.
 	nextbit: u16,
 }
 
-impl <'a> ByteCtx<'a> {
-	fn new(data: Reader<'a>) -> Self {
+impl ByteCtx {
+	fn new() -> Self {
 		ByteCtx {
-			ctx: Ctx::new(data),
 			bits: 0,
 			nextbit: 0,
 		}
 	}
 
-	fn bit(&mut self) -> Result<bool, Error> {
+	fn bit<T: ReadStream>(&mut self, f: &mut T) -> Result<bool, T::Error> {
 		if self.nextbit == 0 {
-			self.renew_bits()?;
+			self.renew_bits(f)?;
 		}
 		let v = self.bits & self.nextbit != 0;
 		self.nextbit <<= 1;
 		Ok(v)
 	}
 
-	fn renew_bits(&mut self) -> Result<(), Error> {
-		self.bits = self.ctx.r.u16()?;
+	fn renew_bits<T: ReadStream>(&mut self, f: &mut T) -> Result<(), T::Error> {
+		self.bits = f.u16()?;
 		self.nextbit = 1;
 		Ok(())
 	}
 
-	fn bits(&mut self, n: usize) -> Result<usize, Error> {
+	fn bits<T: ReadStream>(&mut self, n: usize, f: &mut T) -> Result<usize, T::Error> {
 		let mut x = 0;
 		for _ in 0..n%8 {
-			x = x << 1 | usize::from(self.bit()?);
+			x = x << 1 | usize::from(self.bit(f)?);
 		}
 		for _ in 0..n/8 {
-			x = self.extend(x)?;
+			x = x << 8 | f.u8()? as usize;
 		}
 		Ok(x)
 	}
 
-	fn read_count(&mut self) -> Result<usize, Error> {
+	fn read_count<T: ReadStream>(&mut self, f: &mut T) -> Result<usize, T::Error> {
 		Ok(
-			if      self.bit()? {  2 }
-			else if self.bit()? {  3 }
-			else if self.bit()? {  4 }
-			else if self.bit()? {  5 }
-			else if self.bit()? {  6 + self.bits(3)? } //  6..=13
-			else                { 14 + self.bits(8)? } // 14..=269
+			if      self.bit(f)? {  2 }
+			else if self.bit(f)? {  3 }
+			else if self.bit(f)? {  4 }
+			else if self.bit(f)? {  5 }
+			else if self.bit(f)? {  6 + self.bits(3, f)? } //  6..=13
+			else                 { 14 + self.bits(8, f)? } // 14..=269
 		)
 	}
 }
 
 fn decompress1(data: &[u8]) -> Result<Vec<u8>, Error> {
-	let mut c = ByteCtx::new(Reader::new(data));
-	c.renew_bits()?;
+	let f = &mut Reader::new(data);
+	let mut c = ByteCtx::new();
+	let mut w = Ctx::new();
+	c.renew_bits(f)?;
 	c.nextbit <<= 8;
 
 	loop {
-		if !c.bit()? {
-			c.verbatim(1)?
-		} else if !c.bit()? {
-			let o = c.bits(8)?;
-			let n = c.read_count()?;
-			c.repeat(n, o)?
+		if !c.bit(f)? {
+			w.verbatim(1, f)?
+		} else if !c.bit(f)? {
+			let o = c.bits(8, f)?;
+			let n = c.read_count(f)?;
+			w.repeat(n, o, f)?
 		} else {
-			match c.bits(13)? {
+			match c.bits(13, f)? {
 				0 => break,
 				1 => {
-					let n = if c.bit()? {
-						c.bits(12)?
+					let n = if c.bit(f)? {
+						c.bits(12, f)?
 					} else {
-						c.bits(4)?
+						c.bits(4, f)?
 					};
-					c.constant(14 + n)?;
+					w.constant(14 + n, f)?;
 				}
 				o => {
-					let n = c.read_count()?;
-					c.repeat(n, o)?;
+					let n = c.read_count(f)?;
+					w.repeat(n, o, f)?;
 				}
 			}
 		}
 	}
 
-	Ok(c.ctx.out)
+	Ok(w.out)
 }
 
 #[bitmatch::bitmatch]
 fn decompress2(data: &[u8]) -> Result<Vec<u8>, Error> {
-	let mut c = Ctx::new(Reader::new(data));
+	let f = &mut Reader::new(data);
+	let mut w = Ctx::new();
 
 	let mut last_o = 0;
-	while c.r.remaining() > 0 {
-		#[bitmatch] match c.r.u8()? as usize {
+	while f.remaining() > 0 {
+		#[bitmatch] match f.u8()? as usize {
 			"00xnnnnn" => {
-				let n = if x == 1 { c.extend(n)? } else { n };
-				c.verbatim(n)?;
+				let n = if x == 1 { n << 8 | f.u8()? as usize } else { n };
+				w.verbatim(n, f)?;
 			}
 			"010xnnnn" => {
-				let n = if x == 1 { c.extend(n)? } else { n };
-				c.constant(4 + n)?;
+				let n = if x == 1 { n << 8 | f.u8()? as usize } else { n };
+				w.constant(4 + n, f)?;
 			}
 			"011nnnnn" => {
-				c.repeat(n, last_o)?;
+				w.repeat(n, last_o, f)?;
 			}
 			"1nnooooo" => {
-				last_o = c.extend(o)?;
-				c.repeat(4 + n, last_o)?;
+				last_o = o << 8 | f.u8()? as usize;
+				w.repeat(4 + n, last_o, f)?;
 			},
 		}
 	}
 
-	Ok(c.out)
+	Ok(w.out)
 }
 
 pub fn decompress_chunk(data: &[u8]) -> Result<Vec<u8>, Error> {
@@ -199,7 +191,8 @@ pub fn decompress_ed6<'a, T: Read<'a>>(f: &mut T) -> Result<Vec<u8>, T::Error> {
 	let mut out = Vec::new();
 	loop {
 		let pos = f.error_state();
-		let Some(chunklen) = (f.u16()? as usize).checked_sub(2) else {
+		let checked_sub = (f.u16()? as usize).checked_sub(2);
+		let Some(chunklen) = checked_sub else {
 			return Err(T::to_error(pos, DecompressError::BadChunkLength.into()))
 		};
 		out.extend(decompress_chunk(f.slice(chunklen)?)?);

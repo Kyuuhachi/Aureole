@@ -1,4 +1,5 @@
 use hamu::read::le::*;
+use hamu::write::le::*;
 use hamu::read::Error;
 
 #[derive(Debug, thiserror::Error)]
@@ -233,4 +234,66 @@ pub fn decompress_ed7<'a, T: Read<'a>>(f: &mut T) -> Result<Vec<u8>, T::Error> {
 	}
 
 	Ok(out)
+}
+
+pub fn compress_chunk(data: &[u8]) -> Vec<u8> {
+	let mut f = Writer::new();
+	for c in data.chunks(1<<13) {
+		f.u8(0x20 | (c.len() >> 8) as u8);
+		f.u8(c.len() as u8);
+		f.slice(c);
+	}
+	f.finish().unwrap()
+}
+
+pub fn compress_ed6(data: &[u8]) -> Vec<u8> {
+	let mut f = Writer::new();
+	for chunk in data.chunks(0xFFF0) {
+		let data = compress_chunk(chunk);
+		f.u16(data.len() as u16 + 2);
+		f.slice(&data);
+		f.u8((chunk.as_ptr_range().end == data.as_ptr_range().end).into());
+	}
+	f.finish().unwrap()
+}
+
+pub fn compress_ed7(data: &[u8]) -> Vec<u8> {
+	let mut f = Writer::new();
+	let (csize_r, csize_w) = Label::new();
+	f.delay(|l| Ok(u32::to_le_bytes(hamu::write::cast_usize::<u32>(l(csize_r)?)? - 4)));
+	f.u32(data.len() as u32);
+	f.u32(1+data.chunks(0xFFF0).count() as u32);
+	for chunk in data.chunks(0xFFF0) {
+		let data = compress_chunk(chunk);
+		f.u16(data.len() as u16 + 2);
+		f.slice(&data);
+		f.u8(1);
+	}
+	f.u32(0x06000006);
+	f.slice(&[0,0,0]);
+	f.label(csize_w);
+	f.finish().unwrap()
+}
+
+#[cfg(test)]
+mod test {
+	const DATA: &[u8] = "The Legend of Heroes: Trails in the Sky[c] is a 2004 role-playing video game developed by Nihon Falcom. The game is the first in what later became known as the Trails series, itself a part of the larger The Legend of Heroes series. Trails in the Sky was first released in Japan for Windows and was later ported to the PlayStation Portable in 2006. North American video game publisher Xseed Games acquired the rights from Falcom, but did not release it until 2011 due to the game's large amount of text necessary to translate and localize. A high-definition port to the PlayStation 3 was released in 2012, while a remaster for the PlayStation Vita was released in 2015; both were only released in Japan. A direct sequel, Trails in the Sky SC, was released in 2006.".as_bytes();
+
+	#[test]
+	fn ed6() {
+		let c = super::compress_ed6(DATA);
+		println!("{:?}", c);
+		let d = super::decompress_ed6(&mut super::Reader::new(&c)).unwrap();
+		println!("{:?}", String::from_utf8_lossy(&d));
+		assert_eq!(DATA, d);
+	}
+
+	#[test]
+	fn ed7() {
+		let c = super::compress_ed7(DATA);
+		println!("{:?}", c);
+		let d = super::decompress_ed7(&mut super::Reader::new(&c)).unwrap();
+		println!("{:?}", String::from_utf8_lossy(&d));
+		assert_eq!(DATA, d);
+	}
 }

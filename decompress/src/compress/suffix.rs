@@ -159,24 +159,14 @@ pub struct SuffixArray<'a, 'b, T: ?Sized> {
 	sa: Cow<'b, [usize]>,
 }
 
+pub type ByteSuffixArray<'a> = SuffixArray<'a, 'static, [u8]>;
+pub type StrSuffixArray<'a> = SuffixArray<'a, 'static, str>;
+
 impl<'a, 'b> SuffixArray<'a, 'b, [u8]> {
 	pub fn new(text: &'a [u8]) -> Self {
 		let mut sa = vec![0; text.len()+1];
 		make_array(text, &mut [0; 256], &mut sa);
 		SuffixArray { text, sa: Cow::Owned(sa) }
-	}
-
-	pub fn find(&'b self, needle: &[u8]) -> Self {
-		let start = self.sa.partition_point(|a| &self.text[*a..] < needle);
-		let len = self.sa[start..].partition_point(|a| self.text[*a..].starts_with(needle));
-		SuffixArray {
-			text: self.text,
-			sa: Cow::Borrowed(&self.sa[start..start+len])
-		}
-	}
-
-	pub fn slices(&self) -> impl Iterator<Item=&[u8]> {
-		self.sa.iter().map(|a| &self.text[*a..])
 	}
 }
 
@@ -184,25 +174,12 @@ impl<'a, 'b> SuffixArray<'a, 'b, str> {
 	pub fn new_str(text: &'a str) -> Self {
 		let mut sa = vec![0; text.len()+1];
 		make_array(text.as_bytes(), &mut [0; 256], &mut sa);
-		sa.retain_mut(|a| text.is_char_boundary(*a));
+		sa.retain(|a| text.is_char_boundary(*a));
 		SuffixArray { text, sa: Cow::Owned(sa) }
-	}
-
-	pub fn find_str(&'b self, needle: &str) -> Self {
-		let start = self.sa.partition_point(|a| &self.text[*a..] < needle);
-		let len = self.sa[start..].partition_point(|a| self.text[*a..].starts_with(needle));
-		SuffixArray {
-			text: self.text,
-			sa: Cow::Borrowed(&self.sa[start..start+len])
-		}
-	}
-
-	pub fn slices_str(&self) -> impl Iterator<Item=&str> {
-		self.sa.iter().map(|a| &self.text[*a..])
 	}
 }
 
-impl<'a, 'b, T> SuffixArray<'a, 'b, T> {
+impl<'a, 'b, T: Text + ?Sized> SuffixArray<'a, 'b, T> {
 	pub fn text(&self) -> &T {
 		self.text
 	}
@@ -217,6 +194,51 @@ impl<'a, 'b, T> SuffixArray<'a, 'b, T> {
 
 	pub fn is_empty(&self) -> bool {
 		self.len() == 0
+	}
+
+	pub fn find(&'b self, needle: &T) -> Self {
+		let start = self.sa.partition_point(|a| self.text.suffix(*a) < needle);
+		let len = self.sa[start..].partition_point(|a| self.text.suffix(*a).starts_with(needle));
+		SuffixArray {
+			text: self.text,
+			sa: Cow::Borrowed(&self.sa[start..start+len])
+		}
+	}
+
+	pub fn slices(&self) -> impl Iterator<Item=&T> {
+		self.sa.iter().map(|a| self.text.suffix(*a))
+	}
+
+	pub fn retain(&mut self, mut p: impl FnMut(usize, &T) -> bool) {
+		self.sa.to_mut().retain(|a| p(*a, self.text.suffix(*a)));
+	}
+}
+
+mod text_trait {
+	pub trait Text: Ord {
+		fn suffix(&self, offset: usize) -> &Self;
+		fn starts_with(&self, other: &Self) -> bool;
+	}
+}
+use text_trait::Text;
+
+impl Text for [u8] {
+	fn suffix(&self, offset: usize) -> &Self {
+		&self[offset..]
+	}
+
+	fn starts_with(&self, other: &Self) -> bool {
+		self.starts_with(other)
+	}
+}
+
+impl Text for str {
+	fn suffix(&self, offset: usize) -> &Self {
+		&self[offset..]
+	}
+
+	fn starts_with(&self, other: &Self) -> bool {
+		self.starts_with(other)
 	}
 }
 
@@ -239,8 +261,8 @@ mod test {
 	#[test]
 	fn str() {
 		let sa = super::SuffixArray::new_str("カタカナ");
-		assert_eq!(sa.slices_str().collect::<Vec<_>>(), ["", "カタカナ", "カナ", "タカナ", "ナ"]);
-		assert_eq!(sa.find_str("カ").slices_str().collect::<Vec<_>>(), ["カタカナ", "カナ"]);
+		assert_eq!(sa.slices().collect::<Vec<_>>(), ["", "カタカナ", "カナ", "タカナ", "ナ"]);
+		assert_eq!(sa.find("カ").slices().collect::<Vec<_>>(), ["カタカナ", "カナ"]);
 	}
 
 	#[test]

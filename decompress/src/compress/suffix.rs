@@ -72,18 +72,21 @@ pub fn make_suffix_array(data: &[u8]) -> Vec<usize> {
 
 fn make_array(data: &[impl Value], count: usize) -> Vec<usize> {
 	let scratch = &mut vec![0; count];
+	let mut result_ = vec![0; data.len()+1];
+	let result = &mut result_;
+
 	let types = &types(data);
-	let mut guess = guess_lms_sort(data, types, scratch);
-	induce_sort(data, types, &mut guess, scratch);
-	let (summary, summary_size, summary_offsets) = summarize_array(data, types, &guess);
+
+	let guess = guess_lms_sort(data, types, scratch, result);
+	induce_sort(data, types, scratch, guess);
+	let (summary, summary_size, summary_offsets) = summarize_array(data, types, guess);
 	let summary_array = make_summary_array(&summary, summary_size);
 	let mut result = accurate_lms_sort(data, scratch, &summary_array, &summary_offsets);
-	induce_sort(data, types, &mut result, scratch);
+	induce_sort(data, types, scratch, &mut result);
 	result
 }
 
-fn guess_lms_sort(data: &[impl Value], types: &[Type], scratch: &mut [usize]) -> Vec<usize> {
-	let mut result = vec![usize::MAX; data.len()+1];
+fn guess_lms_sort<'a>(data: &[impl Value], types: &[Type], scratch: &mut [usize], result: &'a mut [usize]) -> &'a mut [usize] {
 	result[0] = data.len();
 	let tails = tails(data, scratch);
 	for (i, c) in data.iter().enumerate() {
@@ -96,24 +99,24 @@ fn guess_lms_sort(data: &[impl Value], types: &[Type], scratch: &mut [usize]) ->
 	result
 }
 
-fn induce_sort(data: &[impl Value], types: &[Type], guess: &mut [usize], scratch: &mut [usize]) {
+fn induce_sort(data: &[impl Value], types: &[Type], scratch: &mut [usize], result: &mut [usize]) {
 	let heads = heads(data, scratch);
-	for i in 0..guess.len() {
-		if guess[i] != usize::MAX && guess[i] != 0 && types[guess[i]-1] == Type::L {
-			let v = &mut heads[data[guess[i]-1].i()];
+	for i in 0..result.len() {
+		if result[i] != usize::MAX && result[i] != 0 && types[result[i]-1] == Type::L {
+			let v = &mut heads[data[result[i]-1].i()];
 			debug_assert!(*v > i);
-			guess[*v] = guess[i] - 1;
+			result[*v] = result[i] - 1;
 			*v += 1;
 		}
 	}
 
 	let tails = tails(data, scratch);
-	for i in (0..guess.len()).rev() {
-		if guess[i] != usize::MAX && guess[i] != 0 && types[guess[i]-1] == Type::S {
-			let v = &mut tails[data[guess[i]-1].i()];
+	for i in (0..result.len()).rev() {
+		if result[i] != usize::MAX && result[i] != 0 && types[result[i]-1] == Type::S {
+			let v = &mut tails[data[result[i]-1].i()];
 			debug_assert!(*v <= i);
 			*v -= 1;
-			guess[*v] = guess[i] - 1;
+			result[*v] = result[i] - 1;
 		}
 	}
 }

@@ -49,24 +49,52 @@ fn buckets<'a, const TAIL: bool>(t: &[impl Value], buckets: &'a mut [usize]) -> 
 }
 
 pub fn make_suffix_array(t: &[u8]) -> Vec<usize> {
-	make_array(t, &mut [0; 256])
+	let mut sa = vec![0; t.len()+1];
+	make_array(t, &mut [0; 256], &mut sa);
+	sa
 }
 
-fn make_array(t: &[impl Value], scratch: &mut [usize]) -> Vec<usize> {
-	let mut result_ = vec![0; t.len()+1];
-	let sa = &mut result_;
+fn make_array(t: &[impl Value], scratch: &mut [usize], sa: &mut [usize]) {
 
 	let types = &types(t);
 
 	lms_sort(t, types, scratch, sa,
 		(0..t.len()).filter(|&i| is_lms(types, i))
 	);
-	let (summary, summary_size, summary_offsets) = summarize_array(t, types, sa);
-	let summary_array = make_summary_array(&summary, summary_size);
+
+	let mut names = vec![usize::MAX; t.len()+1];
+	let mut cur_name = 0;
+	names[sa[0]] = cur_name;
+	let mut last_offset = sa[0];
+	for &offset in &sa[1..] {
+		if is_lms(types, offset) {
+			if !lms_equal(t, types, last_offset, offset) {
+				cur_name += 1
+			}
+			last_offset = offset;
+			names[offset] = cur_name;
+		}
+	}
+
+	let (summary_offsets, t1): (Vec<_>, Vec<_>) = names.into_iter()
+		.enumerate()
+		.filter(|a| a.1 != usize::MAX)
+		.unzip();
+	let (t1, k1, summary_offsets) = (t1, cur_name + 1, summary_offsets);
+
+	let mut sa1 = vec![usize::MAX; t1.len()+1];
+	if t1.len() == k1 {
+		sa1[0] = t1.len();
+		for (i, &c) in t1.iter().enumerate() {
+			sa1[c+1] = i
+		}
+	} else {
+		make_array(&t1, &mut vec![0; k1], &mut sa1);
+	};
+
 	lms_sort(t, types, scratch, sa,
-		summary_array[2..].iter().map(|&i| summary_offsets[i])
+		sa1[2..].iter().map(|&i| summary_offsets[i])
 	);
-	result_
 }
 
 fn lms_sort(
@@ -108,28 +136,6 @@ fn lms_sort(
 	}
 }
 
-fn summarize_array(t: &[impl Value], types: &[Type], sa: &[usize]) -> (Vec<usize>, usize, Vec<usize>) {
-	let mut names = vec![usize::MAX; t.len()+1];
-	let mut cur_name = 0;
-	names[sa[0]] = cur_name;
-	let mut last_offset = sa[0];
-	for &offset in &sa[1..] {
-		if is_lms(types, offset) {
-			if !lms_equal(t, types, last_offset, offset) {
-				cur_name += 1
-			}
-			last_offset = offset;
-			names[offset] = cur_name;
-		}
-	}
-
-	let (summary_offsets, summary) = names.into_iter()
-		.enumerate()
-		.filter(|a| a.1 != usize::MAX)
-		.unzip();
-	(summary, cur_name + 1, summary_offsets)
-}
-
 fn lms_equal(t: &[impl Value], types: &[Type], a: usize, b: usize) -> bool {
 	if a == t.len() || b == t.len() {
 		return a == b
@@ -151,22 +157,8 @@ fn lms_equal(t: &[impl Value], types: &[Type], a: usize, b: usize) -> bool {
 	}
 }
 
-fn make_summary_array(summary: &[usize], summary_size: usize) -> Vec<usize> {
-	if summary.len() == summary_size {
-		let mut array = vec![usize::MAX; summary.len()+1];
-		array[0] = summary.len();
-		for (i, &c) in summary.iter().enumerate() {
-			array[c+1] = i
-		}
-		array
-	} else {
-		make_array(summary, &mut vec![0; summary_size])
-	}
-}
-
 #[test]
 fn a() {
 	assert_eq!(make_suffix_array("cabbage".as_bytes()), [7, 1, 4, 3, 2, 0, 6, 5]);
 	assert_eq!(make_suffix_array("baabaabac".as_bytes()), [9, 1, 4, 2, 5, 7, 0, 3, 6, 8]);
 }
-

@@ -58,36 +58,34 @@ fn make_array(data: &[impl Value], scratch: &mut [usize]) -> Vec<usize> {
 
 	let types = &types(data);
 
-	lms_sort(data, scratch, result,
+	lms_sort(data, types, scratch, result,
 		(0..data.len()).filter(|&i| is_lms(types, i))
 	);
-	induce_sort(data, types, scratch, result);
 	let (summary, summary_size, summary_offsets) = summarize_array(data, types, result);
 	let summary_array = make_summary_array(&summary, summary_size);
-	lms_sort(data, scratch, result,
+	lms_sort(data, types, scratch, result,
 		summary_array[2..].iter().map(|&i| summary_offsets[i])
 	);
-	induce_sort(data, types, scratch, result);
 	result_
 }
 
 fn lms_sort(
 	data: &[impl Value],
+	types: &[Type],
 	scratch: &mut [usize],
 	result: &mut [usize],
 	ix: impl DoubleEndedIterator<Item=usize>,
 ) {
 	result.fill(usize::MAX);
 	result[0] = data.len();
+
 	let tails = buckets::<true>(data, scratch);
 	for i in ix.rev() {
 		let v = &mut tails[data[i].i()];
 		*v -= 1;
 		result[*v] = i;
 	}
-}
 
-fn induce_sort(data: &[impl Value], types: &[Type], scratch: &mut [usize], result: &mut [usize]) {
 	let heads = buckets::<false>(data, scratch);
 	for i in 0..result.len() {
 		if result[i] != usize::MAX && result[i] != 0 && types[result[i]-1] == Type::L {

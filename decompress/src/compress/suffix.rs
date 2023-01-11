@@ -96,6 +96,7 @@ fn induce_sort(data: &[impl Value], guess: &mut [usize], buckets: &[usize], type
 	for i in 0..guess.len() {
 		if guess[i] != usize::MAX && guess[i] != 0 && types[guess[i]-1] == Type::L {
 			let v = &mut heads[data[guess[i]-1].i()];
+			debug_assert!(*v > i);
 			guess[*v] = guess[i] - 1;
 			*v += 1;
 		}
@@ -105,6 +106,7 @@ fn induce_sort(data: &[impl Value], guess: &mut [usize], buckets: &[usize], type
 	for i in (0..guess.len()).rev() {
 		if guess[i] != usize::MAX && guess[i] != 0 && types[guess[i]-1] == Type::S {
 			let v = &mut tails[data[guess[i]-1].i()];
+			debug_assert!(*v <= i);
 			*v -= 1;
 			guess[*v] = guess[i] - 1;
 		}

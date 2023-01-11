@@ -35,32 +35,15 @@ fn is_lms(types: &[Type], pos: usize) -> bool {
 }
 
 #[inline]
-fn bucket_sizes<'a>(data: &[impl Value], res: &'a mut [usize]) -> &'a mut [usize] {
-	res.fill(0);
+fn buckets<'a, const TAIL: bool>(data: &[impl Value], buckets: &'a mut [usize]) -> &'a mut [usize] {
+	buckets.fill(0);
 	for b in data {
-		res[b.i()] += 1;
+		buckets[b.i()] += 1;
 	}
-	res
-}
-
-#[inline]
-fn heads<'a>(data: &[impl Value], scratch: &'a mut [usize]) -> &'a mut [usize] {
-	let buckets = bucket_sizes(data, scratch);
 	let mut o = 1;
 	for b in buckets.iter_mut() {
 		o += *b;
-		*b = o - *b;
-	}
-	buckets
-}
-
-#[inline]
-fn tails<'a>(data: &[impl Value], scratch: &'a mut [usize]) -> &'a mut [usize] {
-	let buckets = bucket_sizes(data, scratch);
-	let mut o = 1;
-	for b in buckets.iter_mut() {
-		o += *b;
-		*b = o;
+		*b = o - if TAIL { 0 } else { *b };
 	}
 	buckets
 }
@@ -92,7 +75,7 @@ fn guess_lms_sort<'a>(
 ) -> &'a mut [usize] {
 	result.fill(usize::MAX);
 	result[0] = data.len();
-	let tails = tails(data, scratch);
+	let tails = buckets::<true>(data, scratch);
 	for (i, c) in data.iter().enumerate().rev() {
 		if is_lms(types, i) {
 			let v = &mut tails[c.i()];
@@ -112,7 +95,7 @@ fn accurate_lms_sort<'a>(
 ) -> &'a mut [usize] {
 	result.fill(usize::MAX);
 	result[0] = data.len();
-	let tails = tails(data, scratch);
+	let tails = buckets::<true>(data, scratch);
 	for i in summary_array[2..].iter().rev() {
 		let si = summary_offsets[*i];
 		let v = &mut tails[data[si].i()];
@@ -123,7 +106,7 @@ fn accurate_lms_sort<'a>(
 }
 
 fn induce_sort(data: &[impl Value], types: &[Type], scratch: &mut [usize], result: &mut [usize]) {
-	let heads = heads(data, scratch);
+	let heads = buckets::<false>(data, scratch);
 	for i in 0..result.len() {
 		if result[i] != usize::MAX && result[i] != 0 && types[result[i]-1] == Type::L {
 			let v = &mut heads[data[result[i]-1].i()];
@@ -133,7 +116,7 @@ fn induce_sort(data: &[impl Value], types: &[Type], scratch: &mut [usize], resul
 		}
 	}
 
-	let tails = tails(data, scratch);
+	let tails = buckets::<true>(data, scratch);
 	for i in (0..result.len()).rev() {
 		if result[i] != usize::MAX && result[i] != 0 && types[result[i]-1] == Type::S {
 			let v = &mut tails[data[result[i]-1].i()];

@@ -14,12 +14,12 @@ enum Type {
 	L, // larger
 }
 
-fn types(data: &[impl Ord]) -> Vec<Type> { // TODO use bitvec?
-	let mut res = vec![Type::S; data.len() + 1];
+fn types(t: &[impl Ord]) -> Vec<Type> { // TODO use bitvec?
+	let mut res = vec![Type::S; t.len() + 1];
 	if res.len() > 1 {
-		res[data.len()-1] = Type::L;
+		res[t.len()-1] = Type::L;
 		for i in (0..res.len()-2).rev() {
-			res[i] = match data[i].cmp(&data[i+1]) {
+			res[i] = match t[i].cmp(&t[i+1]) {
 				Ordering::Less => Type::S,
 				Ordering::Equal => res[i+1],
 				Ordering::Greater => Type::L,
@@ -35,9 +35,9 @@ fn is_lms(types: &[Type], pos: usize) -> bool {
 }
 
 #[inline]
-fn buckets<'a, const TAIL: bool>(data: &[impl Value], buckets: &'a mut [usize]) -> &'a mut [usize] {
+fn buckets<'a, const TAIL: bool>(t: &[impl Value], buckets: &'a mut [usize]) -> &'a mut [usize] {
 	buckets.fill(0);
-	for b in data {
+	for b in t {
 		buckets[b.i()] += 1;
 	}
 	let mut o = 1;
@@ -48,58 +48,59 @@ fn buckets<'a, const TAIL: bool>(data: &[impl Value], buckets: &'a mut [usize]) 
 	buckets
 }
 
-pub fn make_suffix_array(data: &[u8]) -> Vec<usize> {
-	make_array(data, &mut [0; 256])
+pub fn make_suffix_array(t: &[u8]) -> Vec<usize> {
+	make_array(t, &mut [0; 256])
 }
 
-fn make_array(data: &[impl Value], scratch: &mut [usize]) -> Vec<usize> {
-	let mut result_ = vec![0; data.len()+1];
+fn make_array(t: &[impl Value], scratch: &mut [usize]) -> Vec<usize> {
+	let mut result_ = vec![0; t.len()+1];
 	let sa = &mut result_;
 
-	let types = &types(data);
+	let types = &types(t);
 
-	lms_sort(data, types, scratch, sa,
-		(0..data.len()).filter(|&i| is_lms(types, i))
+	lms_sort(t, types, scratch, sa,
+		(0..t.len()).filter(|&i| is_lms(types, i))
 	);
-	let (summary, summary_size, summary_offsets) = summarize_array(data, types, sa);
+	let (summary, summary_size, summary_offsets) = summarize_array(t, types, sa);
 	let summary_array = make_summary_array(&summary, summary_size);
-	lms_sort(data, types, scratch, sa,
+	lms_sort(t, types, scratch, sa,
 		summary_array[2..].iter().map(|&i| summary_offsets[i])
 	);
 	result_
 }
 
 fn lms_sort(
-	data: &[impl Value],
+	t: &[impl Value],
 	types: &[Type],
 	scratch: &mut [usize],
 	sa: &mut [usize],
 	ix: impl DoubleEndedIterator<Item=usize>,
 ) {
 	sa.fill(usize::MAX);
-	sa[0] = data.len();
+	sa[0] = t.len();
 
-	let tails = buckets::<true>(data, scratch);
+	let tails = buckets::<true>(t, scratch);
 	for i in ix.rev() {
-		let v = &mut tails[data[i].i()];
+		debug_assert!(i > 0);
+		let v = &mut tails[t[i].i()];
 		*v -= 1;
 		sa[*v] = i;
 	}
 
-	let heads = buckets::<false>(data, scratch);
+	let heads = buckets::<false>(t, scratch);
 	for i in 0..sa.len() {
 		if sa[i] != usize::MAX && sa[i] != 0 && types[sa[i]-1] == Type::L {
-			let v = &mut heads[data[sa[i]-1].i()];
+			let v = &mut heads[t[sa[i]-1].i()];
 			debug_assert!(*v > i);
 			sa[*v] = sa[i] - 1;
 			*v += 1;
 		}
 	}
 
-	let tails = buckets::<true>(data, scratch);
+	let tails = buckets::<true>(t, scratch);
 	for i in (0..sa.len()).rev() {
 		if sa[i] != usize::MAX && sa[i] != 0 && types[sa[i]-1] == Type::S {
-			let v = &mut tails[data[sa[i]-1].i()];
+			let v = &mut tails[t[sa[i]-1].i()];
 			debug_assert!(*v <= i);
 			*v -= 1;
 			sa[*v] = sa[i] - 1;
@@ -107,14 +108,14 @@ fn lms_sort(
 	}
 }
 
-fn summarize_array(data: &[impl Value], types: &[Type], sa: &[usize]) -> (Vec<usize>, usize, Vec<usize>) {
-	let mut names = vec![usize::MAX; data.len()+1];
+fn summarize_array(t: &[impl Value], types: &[Type], sa: &[usize]) -> (Vec<usize>, usize, Vec<usize>) {
+	let mut names = vec![usize::MAX; t.len()+1];
 	let mut cur_name = 0;
 	names[sa[0]] = cur_name;
 	let mut last_offset = sa[0];
 	for &offset in &sa[1..] {
 		if is_lms(types, offset) {
-			if !lms_equal(data, types, last_offset, offset) {
+			if !lms_equal(t, types, last_offset, offset) {
 				cur_name += 1
 			}
 			last_offset = offset;
@@ -129,8 +130,8 @@ fn summarize_array(data: &[impl Value], types: &[Type], sa: &[usize]) -> (Vec<us
 	(summary, cur_name + 1, summary_offsets)
 }
 
-fn lms_equal(data: &[impl Value], types: &[Type], a: usize, b: usize) -> bool {
-	if a == data.len() || b == data.len() {
+fn lms_equal(t: &[impl Value], types: &[Type], a: usize, b: usize) -> bool {
+	if a == t.len() || b == t.len() {
 		return a == b
 	}
 	let mut i = 0;
@@ -143,13 +144,12 @@ fn lms_equal(data: &[impl Value], types: &[Type], a: usize, b: usize) -> bool {
 		if al != bl {
 			return false
 		}
-		if data[a+i] != data[b+i] {
+		if t[a+i] != t[b+i] {
 			return false
 		}
 		i += 1
 	}
 }
-
 
 fn make_summary_array(summary: &[usize], summary_size: usize) -> Vec<usize> {
 	if summary.len() == summary_size {

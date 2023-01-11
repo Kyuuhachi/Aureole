@@ -58,51 +58,33 @@ fn make_array(data: &[impl Value], scratch: &mut [usize]) -> Vec<usize> {
 
 	let types = &types(data);
 
-	let guess = guess_lms_sort(data, types, scratch, result);
-	induce_sort(data, types, scratch, guess);
-	let (summary, summary_size, summary_offsets) = summarize_array(data, types, guess);
+	lms_sort(data, scratch, result,
+		(0..data.len()).filter(|&i| is_lms(types, i))
+	);
+	induce_sort(data, types, scratch, result);
+	let (summary, summary_size, summary_offsets) = summarize_array(data, types, result);
 	let summary_array = make_summary_array(&summary, summary_size);
-	accurate_lms_sort(data, scratch, &summary_array, &summary_offsets, result);
+	lms_sort(data, scratch, result,
+		summary_array[2..].iter().map(|&i| summary_offsets[i])
+	);
 	induce_sort(data, types, scratch, result);
 	result_
 }
 
-fn guess_lms_sort<'a>(
+fn lms_sort(
 	data: &[impl Value],
-	types: &[Type],
 	scratch: &mut [usize],
-	result: &'a mut [usize],
-) -> &'a mut [usize] {
+	result: &mut [usize],
+	ix: impl DoubleEndedIterator<Item=usize>,
+) {
 	result.fill(usize::MAX);
 	result[0] = data.len();
 	let tails = buckets::<true>(data, scratch);
-	for (i, c) in data.iter().enumerate().rev() {
-		if is_lms(types, i) {
-			let v = &mut tails[c.i()];
-			*v -= 1;
-			result[*v] = i;
-		}
-	}
-	result
-}
-
-fn accurate_lms_sort<'a>(
-	data: &[impl Value],
-	scratch: &mut [usize],
-	summary_array: &[usize],
-	summary_offsets: &[usize],
-	result: &'a mut [usize],
-) -> &'a mut [usize] {
-	result.fill(usize::MAX);
-	result[0] = data.len();
-	let tails = buckets::<true>(data, scratch);
-	for i in summary_array[2..].iter().rev() {
-		let si = summary_offsets[*i];
-		let v = &mut tails[data[si].i()];
+	for i in ix.rev() {
+		let v = &mut tails[data[i].i()];
 		*v -= 1;
-		result[*v] = si;
+		result[*v] = i;
 	}
-	result
 }
 
 fn induce_sort(data: &[impl Value], types: &[Type], scratch: &mut [usize], result: &mut [usize]) {

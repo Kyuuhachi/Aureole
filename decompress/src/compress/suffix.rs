@@ -67,11 +67,10 @@ fn tails<'a>(data: &[impl Value], scratch: &'a mut [usize]) -> &'a mut [usize] {
 }
 
 pub fn make_suffix_array(data: &[u8]) -> Vec<usize> {
-	make_array(data, 256)
+	make_array(data, &mut [0; 256])
 }
 
-fn make_array(data: &[impl Value], count: usize) -> Vec<usize> {
-	let scratch = &mut vec![0; count];
+fn make_array(data: &[impl Value], scratch: &mut [usize]) -> Vec<usize> {
 	let mut result_ = vec![0; data.len()+1];
 	let result = &mut result_;
 
@@ -174,7 +173,7 @@ fn make_summary_array(summary: &[usize], summary_size: usize) -> Vec<usize> {
 		}
 		array
 	} else {
-		make_array(summary, summary_size)
+		make_array(summary, &mut vec![0; summary_size])
 	}
 }
 

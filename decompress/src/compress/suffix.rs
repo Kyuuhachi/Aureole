@@ -71,18 +71,18 @@ pub fn make_suffix_array(data: &[u8]) -> Vec<usize> {
 }
 
 fn make_array(data: &[impl Value], count: usize) -> Vec<usize> {
-	let mut buckets = vec![0; count];
-	let types = types(data);
-	let mut guess = guess_lms_sort(data, &mut buckets, &types);
-	induce_sort(data, &mut guess, &mut buckets, &types);
-	let (summary, summary_size, summary_offsets) = summarize_array(data, &guess, &types);
+	let mut scratch = vec![0; count];
+	let types = &types(data);
+	let mut guess = guess_lms_sort(data, types, &mut scratch);
+	induce_sort(data, types, &mut guess, &mut scratch);
+	let (summary, summary_size, summary_offsets) = summarize_array(data, types, &guess);
 	let summary_array = make_summary_array(&summary, summary_size);
-	let mut result = accurate_lms_sort(data, &mut buckets, &summary_array, &summary_offsets);
-	induce_sort(data, &mut result, &mut buckets, &types);
+	let mut result = accurate_lms_sort(data, &mut scratch, &summary_array, &summary_offsets);
+	induce_sort(data, types, &mut result, &mut scratch);
 	result
 }
 
-fn guess_lms_sort(data: &[impl Value], scratch: &mut [usize], types: &[Type]) -> Vec<usize> {
+fn guess_lms_sort(data: &[impl Value], types: &[Type], scratch: &mut [usize]) -> Vec<usize> {
 	let mut result = vec![usize::MAX; data.len()+1];
 	result[0] = data.len();
 	let tails = tails(data, scratch);
@@ -96,7 +96,7 @@ fn guess_lms_sort(data: &[impl Value], scratch: &mut [usize], types: &[Type]) ->
 	result
 }
 
-fn induce_sort(data: &[impl Value], guess: &mut [usize], scratch: &mut [usize], types: &[Type]) {
+fn induce_sort(data: &[impl Value], types: &[Type], guess: &mut [usize], scratch: &mut [usize]) {
 	let heads = heads(data, scratch);
 	for i in 0..guess.len() {
 		if guess[i] != usize::MAX && guess[i] != 0 && types[guess[i]-1] == Type::L {
@@ -118,7 +118,7 @@ fn induce_sort(data: &[impl Value], guess: &mut [usize], scratch: &mut [usize], 
 	}
 }
 
-fn summarize_array(data: &[impl Value], guess: &[usize], types: &[Type]) -> (Vec<usize>, usize, Vec<usize>) {
+fn summarize_array(data: &[impl Value], types: &[Type], guess: &[usize]) -> (Vec<usize>, usize, Vec<usize>) {
 	let mut names = vec![usize::MAX; data.len()+1];
 	let mut cur_name = 0;
 	names[guess[0]] = cur_name;

@@ -8,7 +8,6 @@ trait Value: Ord + Clone + Into<usize> {
 }
 impl<T: Ord + Clone + Into<usize>> Value for T {}
 
-// I will probably rename these to L and G later
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Type {
 	S, // smaller
@@ -80,20 +79,45 @@ fn make_array(data: &[impl Value], scratch: &mut [usize]) -> Vec<usize> {
 	induce_sort(data, types, scratch, guess);
 	let (summary, summary_size, summary_offsets) = summarize_array(data, types, guess);
 	let summary_array = make_summary_array(&summary, summary_size);
-	let mut result = accurate_lms_sort(data, scratch, &summary_array, &summary_offsets);
-	induce_sort(data, types, scratch, &mut result);
-	result
+	accurate_lms_sort(data, scratch, &summary_array, &summary_offsets, result);
+	induce_sort(data, types, scratch, result);
+	result_
 }
 
-fn guess_lms_sort<'a>(data: &[impl Value], types: &[Type], scratch: &mut [usize], result: &'a mut [usize]) -> &'a mut [usize] {
+fn guess_lms_sort<'a>(
+	data: &[impl Value],
+	types: &[Type],
+	scratch: &mut [usize],
+	result: &'a mut [usize],
+) -> &'a mut [usize] {
+	result.fill(usize::MAX);
 	result[0] = data.len();
 	let tails = tails(data, scratch);
-	for (i, c) in data.iter().enumerate() {
+	for (i, c) in data.iter().enumerate().rev() {
 		if is_lms(types, i) {
 			let v = &mut tails[c.i()];
 			*v -= 1;
 			result[*v] = i;
 		}
+	}
+	result
+}
+
+fn accurate_lms_sort<'a>(
+	data: &[impl Value],
+	scratch: &mut [usize],
+	summary_array: &[usize],
+	summary_offsets: &[usize],
+	result: &'a mut [usize],
+) -> &'a mut [usize] {
+	result.fill(usize::MAX);
+	result[0] = data.len();
+	let tails = tails(data, scratch);
+	for i in summary_array[2..].iter().rev() {
+		let si = summary_offsets[*i];
+		let v = &mut tails[data[si].i()];
+		*v -= 1;
+		result[*v] = si;
 	}
 	result
 }
@@ -175,24 +199,6 @@ fn make_summary_array(summary: &[usize], summary_size: usize) -> Vec<usize> {
 	} else {
 		make_array(summary, &mut vec![0; summary_size])
 	}
-}
-
-fn accurate_lms_sort(
-	data: &[impl Value],
-	scratch: &mut [usize],
-	summary_array: &[usize],
-	summary_offsets: &[usize],
-) -> Vec<usize> {
-	let mut array = vec![usize::MAX; data.len()+1];
-	array[0] = data.len();
-	let tails = tails(data, scratch);
-	for i in summary_array[2..].iter().rev() {
-		let si = summary_offsets[*i];
-		let v = &mut tails[data[si].i()];
-		*v -= 1;
-		array[*v] = si;
-	}
-	array
 }
 
 #[test]

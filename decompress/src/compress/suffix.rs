@@ -6,9 +6,11 @@ trait Value: Ord + Clone + Into<usize> {
 		self.clone().into()
 	}
 }
-impl<T: Ord + Clone + Into<usize>> Value for T {}
+impl Value for u8 {}
+impl Value for usize {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(u8)]
 enum Type {
 	S, // smaller
 	L, // larger
@@ -55,7 +57,6 @@ pub fn make_suffix_array(t: &[u8]) -> Vec<usize> {
 }
 
 fn make_array(t: &[impl Value], scratch: &mut [usize], sa: &mut [usize]) {
-
 	let types = &types(t);
 
 	lms_sort(t, types, scratch, sa,
@@ -80,16 +81,15 @@ fn make_array(t: &[impl Value], scratch: &mut [usize], sa: &mut [usize]) {
 		.enumerate()
 		.filter(|a| a.1 != usize::MAX)
 		.unzip();
-	let (t1, k1, summary_offsets) = (t1, cur_name + 1, summary_offsets);
 
 	let mut sa1 = vec![usize::MAX; t1.len()+1];
-	if t1.len() == k1 {
+	if t1.len() == cur_name+1 {
 		sa1[0] = t1.len();
 		for (i, &c) in t1.iter().enumerate() {
 			sa1[c+1] = i
 		}
 	} else {
-		make_array(&t1, &mut vec![0; k1], &mut sa1);
+		make_array(&t1, &mut vec![0; cur_name+1], &mut sa1);
 	};
 
 	lms_sort(t, types, scratch, sa,
@@ -142,18 +142,15 @@ fn lms_equal(t: &[impl Value], types: &[Type], a: usize, b: usize) -> bool {
 	}
 	let mut i = 0;
 	loop {
-		let al = is_lms(types, a+i);
-		let bl = is_lms(types, b+i);
-		if i > 0 && al && bl {
-			return true
-		}
-		if al != bl {
-			return false
-		}
 		if t[a+i] != t[b+i] {
 			return false
 		}
-		i += 1
+		i += 1;
+		let al = is_lms(types, a+i);
+		let bl = is_lms(types, b+i);
+		if al || bl {
+			return al && bl
+		}
 	}
 }
 
@@ -195,9 +192,10 @@ mod test {
 	}
 
 	fn check(arg: &[u8]) {
-		let b = super::make_suffix_array(arg);
-		for i in 1..b.len() {
-			assert!(arg[b[i-1]..] < arg[b[i]..]);
+		let sa = super::make_suffix_array(arg);
+		assert_eq!(sa.len(), arg.len()+1);
+		for i in 1..sa.len() {
+			assert!(arg[sa[i-1]..] < arg[sa[i]..]);
 		}
 	}
 }

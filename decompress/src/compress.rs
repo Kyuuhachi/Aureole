@@ -1,4 +1,5 @@
 pub mod py;
+pub mod suffix;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CompressCommand {
@@ -29,6 +30,7 @@ impl Iterator for RepeatFinder<'_> {
 		}
 
 		let s = |x| &self.data[x..];
+		let s2 = |x| &self.data[x..][self.max_repeat.min(self.data.len()-x)];
 
 		let p = self.table.binary_search_by_key(&s(self.pos), |a| s(*a)).unwrap_err();
 

@@ -71,14 +71,14 @@ pub fn make_suffix_array(data: &[u8]) -> Vec<usize> {
 }
 
 fn make_array(data: &[impl Value], count: usize) -> Vec<usize> {
-	let mut scratch = vec![0; count];
+	let scratch = &mut vec![0; count];
 	let types = &types(data);
-	let mut guess = guess_lms_sort(data, types, &mut scratch);
-	induce_sort(data, types, &mut guess, &mut scratch);
+	let mut guess = guess_lms_sort(data, types, scratch);
+	induce_sort(data, types, &mut guess, scratch);
 	let (summary, summary_size, summary_offsets) = summarize_array(data, types, &guess);
 	let summary_array = make_summary_array(&summary, summary_size);
-	let mut result = accurate_lms_sort(data, &mut scratch, &summary_array, &summary_offsets);
-	induce_sort(data, types, &mut result, &mut scratch);
+	let mut result = accurate_lms_sort(data, scratch, &summary_array, &summary_offsets);
+	induce_sort(data, types, &mut result, scratch);
 	result
 }
 

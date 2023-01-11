@@ -30,33 +30,40 @@ fn types(data: &[impl Ord]) -> Vec<Type> { // TODO use bitvec?
 	res
 }
 
+#[inline]
 fn is_lms(types: &[Type], pos: usize) -> bool {
 	pos > 0 && types[pos] == Type::S && types[pos-1] == Type::L
 }
 
-fn bucket_sizes(data: &[impl Value], res: &mut [usize]) {
+#[inline]
+fn bucket_sizes<'a>(data: &[impl Value], res: &'a mut [usize]) -> &'a mut [usize] {
 	res.fill(0);
 	for b in data {
 		res[b.i()] += 1;
 	}
+	res
 }
 
-fn heads(data: &[impl Value], buckets: &mut [usize]) {
-	bucket_sizes(data, buckets);
+#[inline]
+fn heads<'a>(data: &[impl Value], scratch: &'a mut [usize]) -> &'a mut [usize] {
+	let buckets = bucket_sizes(data, scratch);
 	let mut o = 1;
 	for b in buckets.iter_mut() {
 		o += *b;
 		*b = o - *b;
 	}
+	buckets
 }
 
-fn tails(data: &[impl Value], buckets: &mut [usize]) {
-	bucket_sizes(data, buckets);
+#[inline]
+fn tails<'a>(data: &[impl Value], scratch: &'a mut [usize]) -> &'a mut [usize] {
+	let buckets = bucket_sizes(data, scratch);
 	let mut o = 1;
 	for b in buckets.iter_mut() {
 		o += *b;
 		*b = o;
 	}
+	buckets
 }
 
 pub fn make_suffix_array(data: &[u8]) -> Vec<usize> {
@@ -75,13 +82,13 @@ fn make_array(data: &[impl Value], count: usize) -> Vec<usize> {
 	result
 }
 
-fn guess_lms_sort(data: &[impl Value], buckets: &mut [usize], types: &[Type]) -> Vec<usize> {
+fn guess_lms_sort(data: &[impl Value], scratch: &mut [usize], types: &[Type]) -> Vec<usize> {
 	let mut result = vec![usize::MAX; data.len()+1];
 	result[0] = data.len();
-	tails(data, buckets);
+	let tails = tails(data, scratch);
 	for (i, c) in data.iter().enumerate() {
 		if is_lms(types, i) {
-			let v = &mut buckets[c.i()];
+			let v = &mut tails[c.i()];
 			*v -= 1;
 			result[*v] = i;
 		}
@@ -89,21 +96,21 @@ fn guess_lms_sort(data: &[impl Value], buckets: &mut [usize], types: &[Type]) ->
 	result
 }
 
-fn induce_sort(data: &[impl Value], guess: &mut [usize], buckets: &mut [usize], types: &[Type]) {
-	heads(data, buckets);
+fn induce_sort(data: &[impl Value], guess: &mut [usize], scratch: &mut [usize], types: &[Type]) {
+	let heads = heads(data, scratch);
 	for i in 0..guess.len() {
 		if guess[i] != usize::MAX && guess[i] != 0 && types[guess[i]-1] == Type::L {
-			let v = &mut buckets[data[guess[i]-1].i()];
+			let v = &mut heads[data[guess[i]-1].i()];
 			debug_assert!(*v > i);
 			guess[*v] = guess[i] - 1;
 			*v += 1;
 		}
 	}
 
-	tails(data, buckets);
+	let tails = tails(data, scratch);
 	for i in (0..guess.len()).rev() {
 		if guess[i] != usize::MAX && guess[i] != 0 && types[guess[i]-1] == Type::S {
-			let v = &mut buckets[data[guess[i]-1].i()];
+			let v = &mut tails[data[guess[i]-1].i()];
 			debug_assert!(*v <= i);
 			*v -= 1;
 			guess[*v] = guess[i] - 1;
@@ -170,16 +177,16 @@ fn make_summary_array(summary: &[usize], summary_size: usize) -> Vec<usize> {
 
 fn accurate_lms_sort(
 	data: &[impl Value],
-	buckets: &mut [usize],
+	scratch: &mut [usize],
 	summary_array: &[usize],
 	summary_offsets: &[usize],
 ) -> Vec<usize> {
 	let mut array = vec![usize::MAX; data.len()+1];
 	array[0] = data.len();
-	tails(data, buckets);
+	let tails = tails(data, scratch);
 	for i in (2..summary_array.len()).rev() {
 		let si = summary_offsets[summary_array[i]];
-		let v = &mut buckets[data[si].i()];
+		let v = &mut tails[data[si].i()];
 		*v -= 1;
 		array[*v] = si;
 	}

@@ -54,16 +54,16 @@ pub fn make_suffix_array(data: &[u8]) -> Vec<usize> {
 
 fn make_array(data: &[impl Value], scratch: &mut [usize]) -> Vec<usize> {
 	let mut result_ = vec![0; data.len()+1];
-	let result = &mut result_;
+	let sa = &mut result_;
 
 	let types = &types(data);
 
-	lms_sort(data, types, scratch, result,
+	lms_sort(data, types, scratch, sa,
 		(0..data.len()).filter(|&i| is_lms(types, i))
 	);
-	let (summary, summary_size, summary_offsets) = summarize_array(data, types, result);
+	let (summary, summary_size, summary_offsets) = summarize_array(data, types, sa);
 	let summary_array = make_summary_array(&summary, summary_size);
-	lms_sort(data, types, scratch, result,
+	lms_sort(data, types, scratch, sa,
 		summary_array[2..].iter().map(|&i| summary_offsets[i])
 	);
 	result_
@@ -73,46 +73,46 @@ fn lms_sort(
 	data: &[impl Value],
 	types: &[Type],
 	scratch: &mut [usize],
-	result: &mut [usize],
+	sa: &mut [usize],
 	ix: impl DoubleEndedIterator<Item=usize>,
 ) {
-	result.fill(usize::MAX);
-	result[0] = data.len();
+	sa.fill(usize::MAX);
+	sa[0] = data.len();
 
 	let tails = buckets::<true>(data, scratch);
 	for i in ix.rev() {
 		let v = &mut tails[data[i].i()];
 		*v -= 1;
-		result[*v] = i;
+		sa[*v] = i;
 	}
 
 	let heads = buckets::<false>(data, scratch);
-	for i in 0..result.len() {
-		if result[i] != usize::MAX && result[i] != 0 && types[result[i]-1] == Type::L {
-			let v = &mut heads[data[result[i]-1].i()];
+	for i in 0..sa.len() {
+		if sa[i] != usize::MAX && sa[i] != 0 && types[sa[i]-1] == Type::L {
+			let v = &mut heads[data[sa[i]-1].i()];
 			debug_assert!(*v > i);
-			result[*v] = result[i] - 1;
+			sa[*v] = sa[i] - 1;
 			*v += 1;
 		}
 	}
 
 	let tails = buckets::<true>(data, scratch);
-	for i in (0..result.len()).rev() {
-		if result[i] != usize::MAX && result[i] != 0 && types[result[i]-1] == Type::S {
-			let v = &mut tails[data[result[i]-1].i()];
+	for i in (0..sa.len()).rev() {
+		if sa[i] != usize::MAX && sa[i] != 0 && types[sa[i]-1] == Type::S {
+			let v = &mut tails[data[sa[i]-1].i()];
 			debug_assert!(*v <= i);
 			*v -= 1;
-			result[*v] = result[i] - 1;
+			sa[*v] = sa[i] - 1;
 		}
 	}
 }
 
-fn summarize_array(data: &[impl Value], types: &[Type], guess: &[usize]) -> (Vec<usize>, usize, Vec<usize>) {
+fn summarize_array(data: &[impl Value], types: &[Type], sa: &[usize]) -> (Vec<usize>, usize, Vec<usize>) {
 	let mut names = vec![usize::MAX; data.len()+1];
 	let mut cur_name = 0;
-	names[guess[0]] = cur_name;
-	let mut last_offset = guess[0];
-	for &offset in &guess[1..] {
+	names[sa[0]] = cur_name;
+	let mut last_offset = sa[0];
+	for &offset in &sa[1..] {
 		if is_lms(types, offset) {
 			if !lms_equal(data, types, last_offset, offset) {
 				cur_name += 1

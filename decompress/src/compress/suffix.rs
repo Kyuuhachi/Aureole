@@ -186,8 +186,8 @@ fn accurate_lms_sort(
 	let mut array = vec![usize::MAX; data.len()+1];
 	array[0] = data.len();
 	let tails = tails(data, scratch);
-	for i in (2..summary_array.len()).rev() {
-		let si = summary_offsets[summary_array[i]];
+	for i in summary_array[2..].iter().rev() {
+		let si = summary_offsets[*i];
 		let v = &mut tails[data[si].i()];
 		*v -= 1;
 		array[*v] = si;

@@ -34,32 +34,29 @@ fn is_lms(types: &[Type], pos: usize) -> bool {
 	pos > 0 && types[pos] == Type::S && types[pos-1] == Type::L
 }
 
-fn bucket_sizes(data: &[impl Value], count: usize) -> Vec<usize> {
-	let mut res = vec![0; count];
+fn bucket_sizes(data: &[impl Value], res: &mut [usize]) {
+	res.fill(0);
 	for b in data {
 		res[b.i()] += 1;
 	}
-	res
 }
 
-fn heads(buckets: &[usize]) -> Vec<usize> {
-	let mut r = Vec::with_capacity(buckets.len());
+fn heads(data: &[impl Value], buckets: &mut [usize]) {
+	bucket_sizes(data, buckets);
 	let mut o = 1;
-	for &b in buckets {
-		r.push(o);
-		o += b;
+	for b in buckets.iter_mut() {
+		o += *b;
+		*b = o - *b;
 	}
-	r
 }
 
-fn tails(buckets: &[usize]) -> Vec<usize> {
-	let mut r = Vec::with_capacity(buckets.len());
+fn tails(data: &[impl Value], buckets: &mut [usize]) {
+	bucket_sizes(data, buckets);
 	let mut o = 1;
-	for &b in buckets {
-		o += b;
-		r.push(o);
+	for b in buckets.iter_mut() {
+		o += *b;
+		*b = o;
 	}
-	r
 }
 
 pub fn make_suffix_array(data: &[u8]) -> Vec<usize> {
@@ -67,45 +64,46 @@ pub fn make_suffix_array(data: &[u8]) -> Vec<usize> {
 }
 
 fn make_array(data: &[impl Value], count: usize) -> Vec<usize> {
-	let buckets = bucket_sizes(data, count);
+	let mut buckets = vec![0; count];
 	let types = types(data);
-	let mut guess = guess_lms_sort(data, &buckets, &types);
-	induce_sort(data, &mut guess, &buckets, &types);
+	let mut guess = guess_lms_sort(data, &mut buckets, &types);
+	induce_sort(data, &mut guess, &mut buckets, &types);
 	let (summary, summary_size, summary_offsets) = summarize_array(data, &guess, &types);
 	let summary_array = make_summary_array(&summary, summary_size);
-	let mut result = accurate_lms_sort(data, &buckets, &summary_array, &summary_offsets);
-	induce_sort(data, &mut result, &buckets, &types);
+	let mut result = accurate_lms_sort(data, &mut buckets, &summary_array, &summary_offsets);
+	induce_sort(data, &mut result, &mut buckets, &types);
 	result
 }
 
-fn guess_lms_sort(data: &[impl Value], buckets: &[usize], types: &[Type]) -> Vec<usize> {
+fn guess_lms_sort(data: &[impl Value], buckets: &mut [usize], types: &[Type]) -> Vec<usize> {
 	let mut result = vec![usize::MAX; data.len()+1];
 	result[0] = data.len();
-	let mut tails = tails(buckets);
+	tails(data, buckets);
 	for (i, c) in data.iter().enumerate() {
 		if is_lms(types, i) {
-			tails[c.i()] -= 1;
-			result[tails[c.i()]] = i;
+			let v = &mut buckets[c.i()];
+			*v -= 1;
+			result[*v] = i;
 		}
 	}
 	result
 }
 
-fn induce_sort(data: &[impl Value], guess: &mut [usize], buckets: &[usize], types: &[Type]) {
-	let mut heads = heads(buckets);
+fn induce_sort(data: &[impl Value], guess: &mut [usize], buckets: &mut [usize], types: &[Type]) {
+	heads(data, buckets);
 	for i in 0..guess.len() {
 		if guess[i] != usize::MAX && guess[i] != 0 && types[guess[i]-1] == Type::L {
-			let v = &mut heads[data[guess[i]-1].i()];
+			let v = &mut buckets[data[guess[i]-1].i()];
 			debug_assert!(*v > i);
 			guess[*v] = guess[i] - 1;
 			*v += 1;
 		}
 	}
 
-	let mut tails = tails(buckets);
+	tails(data, buckets);
 	for i in (0..guess.len()).rev() {
 		if guess[i] != usize::MAX && guess[i] != 0 && types[guess[i]-1] == Type::S {
-			let v = &mut tails[data[guess[i]-1].i()];
+			let v = &mut buckets[data[guess[i]-1].i()];
 			debug_assert!(*v <= i);
 			*v -= 1;
 			guess[*v] = guess[i] - 1;
@@ -172,16 +170,16 @@ fn make_summary_array(summary: &[usize], summary_size: usize) -> Vec<usize> {
 
 fn accurate_lms_sort(
 	data: &[impl Value],
-	buckets: &[usize],
+	buckets: &mut [usize],
 	summary_array: &[usize],
 	summary_offsets: &[usize],
 ) -> Vec<usize> {
 	let mut array = vec![usize::MAX; data.len()+1];
 	array[0] = data.len();
-	let mut tails = tails(buckets);
+	tails(data, buckets);
 	for i in (2..summary_array.len()).rev() {
 		let si = summary_offsets[summary_array[i]];
-		let v = &mut tails[data[si].i()];
+		let v = &mut buckets[data[si].i()];
 		*v -= 1;
 		array[*v] = si;
 	}
@@ -190,11 +188,7 @@ fn accurate_lms_sort(
 
 #[test]
 fn a() {
-	fn show(a: &[usize]) {
-		let a: &[isize] = unsafe { std::mem::transmute(a) };
-		println!("{:02?}", a);
-	}
-	show(&make_array("cabbage".as_bytes(), 256));
-	show(&make_array("baabaabac".as_bytes(), 256));
+	assert_eq!(make_suffix_array("cabbage".as_bytes()), [7, 1, 4, 3, 2, 0, 6, 5]);
+	assert_eq!(make_suffix_array("baabaabac".as_bytes()), [9, 1, 4, 2, 5, 7, 0, 3, 6, 8]);
 }
 

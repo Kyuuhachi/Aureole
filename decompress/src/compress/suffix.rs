@@ -63,19 +63,7 @@ fn make_array(t: &[impl Value], scratch: &mut [usize], sa: &mut [usize]) {
 		(0..t.len()).filter(|&i| is_lms(types, i))
 	);
 
-	let mut names = vec![usize::MAX; t.len()+1];
-	let mut cur_name = 0;
-	names[sa[0]] = cur_name;
-	let mut last_offset = sa[0];
-	for &offset in &sa[1..] {
-		if is_lms(types, offset) {
-			if !lms_equal(t, types, last_offset, offset) {
-				cur_name += 1
-			}
-			last_offset = offset;
-			names[offset] = cur_name;
-		}
-	}
+	let (names, n_names) = get_names(t, types, sa);
 
 	let (summary_offsets, t1): (Vec<_>, Vec<_>) = names.into_iter()
 		.enumerate()
@@ -83,13 +71,13 @@ fn make_array(t: &[impl Value], scratch: &mut [usize], sa: &mut [usize]) {
 		.unzip();
 
 	let mut sa1 = vec![usize::MAX; t1.len()+1];
-	if t1.len() == cur_name+1 {
+	if t1.len() == n_names {
 		sa1[0] = t1.len();
 		for (i, &c) in t1.iter().enumerate() {
 			sa1[c+1] = i
 		}
 	} else {
-		make_array(&t1, &mut vec![0; cur_name+1], &mut sa1);
+		make_array(&t1, &mut vec![0; n_names], &mut sa1);
 	};
 
 	lms_sort(t, types, scratch, sa,
@@ -134,6 +122,23 @@ fn lms_sort(
 			sa[*v] = sa[i] - 1;
 		}
 	}
+}
+
+fn get_names(t: &[impl Value], types: &[Type], sa: &[usize]) -> (Vec<usize>, usize) {
+	let mut names = vec![usize::MAX; t.len()+1];
+	let mut cur_name = 0;
+	names[sa[0]] = cur_name;
+	let mut last_offset = sa[0];
+	for &offset in &sa[1..] {
+		if is_lms(types, offset) {
+			if !lms_equal(t, types, last_offset, offset) {
+				cur_name += 1
+			}
+			last_offset = offset;
+			names[offset] = cur_name;
+		}
+	}
+	(names, cur_name+1)
 }
 
 fn lms_equal(t: &[impl Value], types: &[Type], a: usize, b: usize) -> bool {

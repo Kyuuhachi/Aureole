@@ -1,5 +1,5 @@
 // Made according to this guide https://zork.net/~st/jottings/sais.html
-use std::{cmp::Ordering, borrow::Cow};
+use std::{cmp::Ordering, marker::PhantomData};
 
 trait Value: Ord + Clone + Into<usize> {
 	fn i(&self) -> usize {
@@ -153,92 +153,240 @@ fn lms_equal(t: &[impl Value], types: &[Type], a: usize, b: usize) -> bool {
 	}
 }
 
-#[derive(Debug, Clone)]
-pub struct SuffixArray<'a, 'b, T: ?Sized> {
-	text: &'a T,
-	sa: Cow<'b, [usize]>,
+#[derive(Debug)]
+pub struct SuffixArray<'a, T: ?Sized> {
+	text: &'a [u8],
+	sa: Vec<usize>,
+	_ph: PhantomData<T>,
 }
 
-pub type ByteSuffixArray<'a> = SuffixArray<'a, 'static, [u8]>;
-pub type StrSuffixArray<'a> = SuffixArray<'a, 'static, str>;
+#[derive(Debug)]
+pub struct SuffixArrayRef<'a, 'b, T: ?Sized> {
+	text: &'a [u8],
+	sa: &'b [usize],
+	offset: usize,
+	_ph: PhantomData<T>,
+}
 
-impl<'a, 'b> SuffixArray<'a, 'b, [u8]> {
-	pub fn new(text: &'a [u8]) -> Self {
+// Need manual impl here or it will require `T: Clone`
+impl<'a, T: ?Sized> Clone for SuffixArray<'a, T> {
+	fn clone(&self) -> Self {
+		Self { text: self.text, sa: self.sa.clone(), _ph: PhantomData }
+	}
+}
+
+impl<'a, 'b, T: ?Sized> Clone for SuffixArrayRef<'a, 'b, T> {
+	fn clone(&self) -> Self {
+		*self
+	}
+}
+
+impl<'a, 'b, T: ?Sized> Copy for SuffixArrayRef<'a, 'b, T> {}
+
+pub type ByteSuffixArray<'a> = SuffixArray<'a, [u8]>;
+pub type StrSuffixArray<'a> = SuffixArray<'a, str>;
+
+macro_rules! common {
+	() => {
+		pub fn text(&self) -> &T {
+			T::from_bytes(self.text, 0)
+		}
+
+		pub fn len(&self) -> usize {
+			self.sa.len()
+		}
+
+		pub fn is_empty(&self) -> bool {
+			self.len() == 0
+		}
+
+		pub fn first_index(&self) -> Option<usize> {
+			self.sa.first().map(|a| self.offset() + *a)
+		}
+
+		pub fn last_index(&self) -> Option<usize> {
+			self.sa.last().map(|a| self.offset() + *a)
+		}
+
+		pub fn indices<'c>(&'c self) -> impl Iterator<Item=usize> + 'c {
+			self.sa.iter().map(|a| self.offset() + *a)
+		}
+
+		pub fn first_suffix(&self) -> Option<&'a T> {
+			self.sa.first().map(|a| self.get_t(*a))
+		}
+
+		pub fn last_suffix(&self) -> Option<&'a T> {
+			self.sa.last().map(|a| self.get_t(*a))
+		}
+
+		pub fn suffixes<'c>(&'c self) -> impl Iterator<Item=&'a T> + 'c {
+			self.sa.iter().map(|a| self.get_t(*a))
+		}
+
+		fn get(&self, n: usize) -> &'a [u8] {
+			unsafe { &self.text.get_unchecked(self.offset()+n..) }
+		}
+
+		fn get_t(&self, n: usize) -> &'a T {
+			T::from_bytes(self.text, self.offset()+n)
+		}
+	}
+}
+
+impl<'a, T: Text + ?Sized> SuffixArray<'a, T> {
+	pub fn new(text: &'a T) -> Self {
+		let text = T::as_bytes(text);
 		let mut sa = vec![0; text.len()+1];
 		make_array(text, &mut [0; 256], &mut sa);
-		SuffixArray { text, sa: Cow::Owned(sa) }
-	}
-}
-
-impl<'a, 'b> SuffixArray<'a, 'b, str> {
-	pub fn new_str(text: &'a str) -> Self {
-		let mut sa = vec![0; text.len()+1];
-		make_array(text.as_bytes(), &mut [0; 256], &mut sa);
-		sa.retain(|a| text.is_char_boundary(*a));
-		SuffixArray { text, sa: Cow::Owned(sa) }
-	}
-}
-
-impl<'a, 'b, T: Text + ?Sized> SuffixArray<'a, 'b, T> {
-	pub fn text(&self) -> &T {
-		self.text
+		sa.retain(|a| T::is_index(text, *a));
+		SuffixArray { text, sa, _ph: PhantomData }
 	}
 
-	pub fn indices(&self) -> &[usize] {
-		&self.sa
+	common!();
+
+	fn offset(&self) -> usize {
+		0
 	}
 
-	pub fn len(&self) -> usize {
-		self.sa.len()
-	}
-
-	pub fn is_empty(&self) -> bool {
-		self.len() == 0
-	}
-
-	pub fn find(&'b self, needle: &T) -> Self {
-		let start = self.sa.partition_point(|a| self.text.suffix(*a) < needle);
-		let len = self.sa[start..].partition_point(|a| self.text.suffix(*a).starts_with(needle));
-		SuffixArray {
+	pub fn as_ref<'b>(&'b self) -> SuffixArrayRef<'a, 'b, T> {
+		SuffixArrayRef {
 			text: self.text,
-			sa: Cow::Borrowed(&self.sa[start..start+len])
+			sa: &self.sa,
+			offset: self.offset(),
+			_ph: PhantomData,
 		}
 	}
 
-	pub fn slices(&self) -> impl Iterator<Item=&T> {
-		self.sa.iter().map(|a| self.text.suffix(*a))
+	pub fn find<'b>(&'b self, needle: &T) -> SuffixArrayRef<'a, 'b, T> {
+		self.as_ref().find(needle)
 	}
 
 	pub fn retain(&mut self, mut p: impl FnMut(usize, &T) -> bool) {
-		self.sa.to_mut().retain(|a| p(*a, self.text.suffix(*a)));
+		self.sa.retain(|a| p(*a, T::from_bytes(self.text, *a)));
 	}
 }
 
-mod text_trait {
-	pub trait Text: Ord {
-		fn suffix(&self, offset: usize) -> &Self;
-		fn starts_with(&self, other: &Self) -> bool;
+impl<'a, 'b, T: Text + ?Sized> SuffixArrayRef<'a, 'b, T> {
+	common!();
+
+	pub fn offset(&self) -> usize {
+		self.offset
+	}
+
+	pub fn back(&self, n: usize) -> Self {
+		assert!(T::is_index(self.text, self.offset() - n));
+		SuffixArrayRef {
+			text: self.text,
+			sa: self.sa,
+			offset: self.offset() - n,
+			_ph: PhantomData,
+		}
+	}
+
+	pub fn advance(&self, n: usize) -> Self {
+		if self.is_empty() {
+			return *self
+		}
+		let first = self.get(*self.sa.first().unwrap());
+		let last = self.get(*self.sa.last().unwrap());
+		let n = first.iter().zip(last.iter())
+			.take(n).take_while(|a| a.0 == a.1).count();
+		SuffixArrayRef {
+			text: self.text,
+			sa: self.sa,
+			offset: self.offset() + n,
+			_ph: PhantomData,
+		}
+	}
+
+	pub fn advance_on(&self, text: &T) -> Self {
+		if self.is_empty() {
+			return *self
+		}
+		let text = T::as_bytes(text);
+		let first = self.get(*self.sa.first().unwrap());
+		let last = self.get(*self.sa.last().unwrap());
+		let n = first.iter().zip(last.iter()).zip(text.iter())
+			.take_while(|a| a.0.0 == a.1 && a.0.1 == a.1).count();
+		SuffixArrayRef {
+			text: self.text,
+			sa: self.sa,
+			offset: self.offset() + n,
+			_ph: PhantomData,
+		}
+	}
+
+	pub fn full(&self) -> Self {
+		self.back(self.offset())
+	}
+
+	pub fn to_owned(&self) -> SuffixArray<'a, T> {
+		SuffixArray {
+			text: self.text,
+			sa: self.sa.iter().map(|a| *a + self.offset()).collect(),
+			_ph: PhantomData,
+		}
+	}
+
+	pub fn find(&self, needle: &T) -> Self {
+		let needle = T::as_bytes(needle);
+		let start = self.sa.partition_point(|a| self.get(*a) < needle);
+		let len = self.sa[start..].partition_point(|a| self.get(*a).starts_with(needle));
+		SuffixArrayRef {
+			text: self.text,
+			sa: &self.sa[start..start+len],
+			offset: self.offset() + needle.len(),
+			_ph: PhantomData,
+		}
 	}
 }
-use text_trait::Text;
+
+mod private {
+	pub trait Text: Ord {
+		fn is_index(v: &[u8], pos: usize) -> bool;
+		fn as_bytes(v: &Self) -> &[u8];
+		fn from_bytes(v: &[u8], start: usize) -> &Self;
+	}
+}
+use private::Text;
 
 impl Text for [u8] {
-	fn suffix(&self, offset: usize) -> &Self {
-		&self[offset..]
+	fn is_index(_v: &[u8], _pos: usize) -> bool {
+		true
 	}
 
-	fn starts_with(&self, other: &Self) -> bool {
-		self.starts_with(other)
+	fn as_bytes(v: &Self) -> &[u8] {
+		v
+	}
+
+	fn from_bytes(v: &[u8], start: usize) -> &Self {
+		unsafe { v.get_unchecked(start..) }
 	}
 }
 
 impl Text for str {
-	fn suffix(&self, offset: usize) -> &Self {
-		&self[offset..]
+	fn is_index(v: &[u8], pos: usize) -> bool {
+		// Copied from str::is_char_boundary, but works directly on the [u8]
+		if pos == 0 {
+			return true;
+		}
+
+		match v.get(pos) {
+			None => pos == v.len(),
+			Some(&b) => (b as i8) >= -0x40,
+		}
 	}
 
-	fn starts_with(&self, other: &Self) -> bool {
-		self.starts_with(other)
+	fn as_bytes(v: &Self) -> &[u8] {
+		v.as_bytes()
+	}
+
+	fn from_bytes(v: &[u8], start: usize) -> &Self {
+		debug_assert!(Self::is_index(v, start));
+		unsafe {
+			std::str::from_utf8_unchecked(v.get_unchecked(start..))
+		}
 	}
 }
 
@@ -254,15 +402,17 @@ mod test {
 
 	#[test]
 	fn find() {
-		let sa = super::SuffixArray::new(b"mississippi");
-		assert_eq!(sa.find(b"i").slices().collect::<Vec<_>>(), [b"i" as &[u8], b"ippi", b"issippi", b"ississippi"]);
+		let sa = super::SuffixArray::new(b"mississippi" as &[u8]);
+		assert_eq!(sa.find(b"i").suffixes().collect::<Vec<_>>(), [b"" as &[u8], b"ppi", b"ssippi", b"ssissippi"]);
+		assert_eq!(sa.find(b"i").full().suffixes().collect::<Vec<_>>(), [b"i" as &[u8], b"ippi", b"issippi", b"ississippi"]);
 	}
 
 	#[test]
 	fn str() {
-		let sa = super::SuffixArray::new_str("カタカナ");
-		assert_eq!(sa.slices().collect::<Vec<_>>(), ["", "カタカナ", "カナ", "タカナ", "ナ"]);
-		assert_eq!(sa.find("カ").slices().collect::<Vec<_>>(), ["カタカナ", "カナ"]);
+		let sa = super::SuffixArray::new("カタカナ");
+		assert_eq!(sa.suffixes().collect::<Vec<_>>(), ["", "カタカナ", "カナ", "タカナ", "ナ"]);
+		assert_eq!(sa.find("カ").suffixes().collect::<Vec<_>>(), ["タカナ", "ナ"]);
+		assert_eq!(sa.find("カ").full().suffixes().collect::<Vec<_>>(), ["カタカナ", "カナ"]);
 	}
 
 	#[test]
@@ -294,8 +444,8 @@ mod test {
 
 	fn check(arg: &[u8]) {
 		let sa = super::SuffixArray::new(arg);
-		for (a, b) in sa.slices().zip(sa.slices().skip(1)) {
-			assert!(a < b);
+		for (a, b) in sa.suffixes().zip(sa.suffixes().skip(1)) {
+			assert!(a < b, "{a:?} < {b:?}");
 		}
 	}
 }

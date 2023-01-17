@@ -1,3 +1,5 @@
+#![feature(test)]
+
 use hamu::read::le::*;
 use hamu::write::le::*;
 
@@ -76,8 +78,6 @@ pub fn decompress_ed7<'a, T: Read<'a>>(f: &mut T) -> Result<Vec<u8>, T::Error> {
 	Ok(out)
 }
 
-
-
 pub fn compress_ed6(data: &[u8]) -> Vec<u8> {
 	let mut f = Writer::new();
 	for chunk in data.chunks(0xFFF0) {
@@ -109,31 +109,19 @@ pub fn compress_ed7(data: &[u8]) -> Vec<u8> {
 
 #[cfg(test)]
 mod test {
-	const DATA: &[u8] = include_bytes!("/tmp/bee_movie.txt");
+	const DATA: &[u8] = include_bytes!("lib.rs");
 
 	#[test]
-	fn big() {
-		// let c = super::compress_chunk(&std::fs::read("/home/large/kiseki/fc/Config.exe").unwrap());
-		// let c = super::py::compress_chunk(&std::fs::read("/home/large/kiseki/fc/Config.exe").unwrap());
-		let c = super::compress::py::compress_chunk(&std::fs::read("/tmp/bee_movie.txt").unwrap());
-		println!("{}", c.len() as f32 / DATA.len() as f32);
-	}
-
-	#[test]
-	fn ed6() {
-		let c = super::compress::py::compress_chunk(DATA);
-		println!("{}", c.len() as f32 / DATA.len() as f32);
-		// let d = super::decompress_ed6(&mut super::Reader::new(&c)).unwrap();
-		// println!("{:?}", String::from_utf8_lossy(&d));
-		// assert!(DATA == d);
+	fn compress_ed6() {
+		let c = super::compress_ed6(DATA);
+		let d = super::decompress_ed6(&mut super::Reader::new(&c)).unwrap();
+		assert!(d == DATA);
 	}
 
 	#[test]
 	fn ed7() {
 		let c = super::compress_ed7(DATA);
-		println!("{}", c.len() as f32 / DATA.len() as f32);
 		let d = super::decompress_ed7(&mut super::Reader::new(&c)).unwrap();
-		// println!("{:?}", String::from_utf8_lossy(&d));
-		assert!(DATA == d);
+		assert!(d == DATA);
 	}
 }

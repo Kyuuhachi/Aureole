@@ -29,3 +29,6 @@ package.themelios-macros.opt-level = 3
 package.syn.opt-level = 3
 package.quote.opt-level = 3
 package.proc-macro2.opt-level = 3
+
+[profile.release]
+debug = true

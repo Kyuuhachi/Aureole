@@ -294,6 +294,7 @@ name = "decompress"
 version = "0.1.0"
 dependencies = [
  "bitmatch",
+ "divsufsort",
  "hamu",
  "memchr",
  "thiserror",
@@ -308,6 +309,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "divsufsort"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4e57e36c45fe0b4ef9bc690e53cce2f46dc193f7be3bc93bb7d23ca6dc1be820"
+dependencies = [
+ "sacabase",
 ]
 
 [[package]]
@@ -798,6 +808,15 @@ name = "ryu"
 version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b4b9743ed687d4b4bcedf9ff5eaa7398495ae14e61cba0a295704edbc7decde"
+
+[[package]]
+name = "sacabase"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9883fc3d6ce3d78bb54d908602f8bc1f7b5f983afe601dabe083009d86267a84"
+dependencies = [
+ "num-traits",
+]
 
 [[package]]
 name = "serde"

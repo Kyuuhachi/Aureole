@@ -641,7 +641,11 @@ themelios_macros::bytecode! {
 
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_DA(), // Something to do with menus
 
-		#[game(Tc, TcEvo)] Tc_DB(u8, u8 as u16 as NameId),
+		#[game(Tc, TcEvo)] TcTeamMember(match {
+			0 => Enable(u8 as u16 as NameId),
+			1 => Disable(u8 as u16 as NameId),
+			2 => _2(u8),
+		}),
 		#[game(Tc, TcEvo)] TcTeam(match {
 			0 => Use(u8),
 			1 => AddMember(u8, u8 as u16 as NameId),
@@ -652,6 +656,7 @@ themelios_macros::bytecode! {
 		#[game(Tc, TcEvo)] Tc_DF(u8, u16),
 		#[game(Tc, TcEvo)] Tc_E0(u16 as CharId, u8, u8),
 		#[game(Tc, TcEvo)] TcIndexInTeam(u8 as u16 as NameId, u8),
+		/// Only used in a0028. Possibly related to minigames?
 		#[game(Tc, TcEvo)] Tc_E2(match {
 			0 => _0(u8),
 			1 => _1(),
@@ -671,9 +676,9 @@ themelios_macros::bytecode! {
 		}),
 		#[game(Tc, TcEvo)] skip!(1),
 		#[game(Tc, TcEvo)] Tc_E5(match {
-			0 => _0(u8 as u16 alias ObjectId, u8 as u16 as NameId, u16, u16),
-			1 => _1(u8, u8, u16, u16),
-			2 => _2(u8 as u16 alias ObjectId, u8 as u16 as NameId, u32),
+			0 => _0(u8, u8 as u16 as NameId, u16, u16),
+			1 => _1(u8, u8 as u16 as NameId, u16, u16),
+			2 => _2(u8, u8 as u16 as NameId, u32),
 		}),
 		#[game(Tc, TcEvo)] Tc_E6(match {
 			0 => _0(u8),
@@ -684,10 +689,10 @@ themelios_macros::bytecode! {
 
 		#[game(Fc)] skip!(2),
 		/// A no-op. Always paired with [`Sc_DC`](Self::Sc_DC).
-		#[game(FcEvo, Sc, ScEvo, TcEvo, Zero, ZeroEvo, Ao)] Sc_DB(),
+		#[game(FcEvo, Sc, ScEvo, TcEvo)] Sc_DB(),
 		/// A no-op. Always paired with [`Sc_DB`](Self::Sc_DB).
-		#[game(FcEvo, Sc, ScEvo, TcEvo, Zero, ZeroEvo, Ao)] Sc_DC(),
-		#[game(AoEvo)] AoEvo_D8(),
+		#[game(FcEvo, Sc, ScEvo, TcEvo)] Sc_DC(),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] AoEvo_D8(),
 		#[game(Tc)] skip!(2),
 
 		/// Opens the save menu in order to save clear data.
@@ -752,6 +757,7 @@ themelios_macros::bytecode! {
 		#[game(Tc)] skip!(8),
 		#[game(TcEvo)] skip!(0),
 
+		#[game(Zero, ZeroEvo, Ao)] skip!(1),
 		#[game(Zero, Ao)] skip!(5),
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_EE(u8, u16),
 		#[game(Zero, ZeroEvo)] skip!(3),

@@ -144,8 +144,9 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 	let InsnArg_types = arg_types.values().collect::<Vec<_>>();
 
 	let name_body: Vec<Arm> = ctx.defs.iter().map(|Insn { span, ident, .. }| {
+		let name = ident.to_string();
 		pq!{span=>
-			Self::#ident(..) => stringify!(#ident),
+			Self::#ident(..) => #name,
 		}
 	}).collect();
 
@@ -159,16 +160,18 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 
 	let arg_types_body: Vec<Arm> = ctx.defs.iter().map(|Insn { span, ident, args, .. }| {
 		let aliases = args.iter().map(|a| a.alias());
+		let name = ident.to_string();
 		pq!{span=>
-			stringify!(#ident) => Box::new([#(Arg::#aliases),*]),
+			#name => Box::new([#(Arg::#aliases),*]),
 		}
 	}).collect();
 
 	let from_args_body: Vec<Arm> = ctx.defs.iter().map(|Insn { span, ident, args, .. }| {
 		let arg_names = args.iter().enumerate().map(|(i, _)| format_ident!("_{i}")).collect::<Vec<_>>();
 		let aliases = args.iter().map(|a| a.alias());
+		let name = ident.to_string();
 		pq!{span=>
-			stringify!(#ident) => {
+			#name => {
 				#(let Some(Arg::#aliases(#arg_names)) = it.next() else { return None; };)*
 				Self::#ident(#(#arg_names),*)
 			},
@@ -644,11 +647,11 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 					arms.push(pq!{span=> #key => #body });
 				}
 
-				let name = &ictx.ident;
+				let name = &ictx.ident.to_string();
 				read.push(Stmt::Expr(pq!{span=>
 					match __f.u8()? {
 						#(#arms)*
-						_v => Err(format!("invalid Insn::{}*: 0x{:02X}", stringify!(#name), _v).into())
+						_v => Err(format!("invalid Insn::{}*: 0x{:02X}", #name, _v).into())
 					}
 				}));
 				return Block {

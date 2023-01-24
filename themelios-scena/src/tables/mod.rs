@@ -1,4 +1,3 @@
-pub mod bgmtbl;
 pub mod book;
 pub mod btlset;
 // t_cook // seems unimportant, it's the same 36-byte file in both fc and sc

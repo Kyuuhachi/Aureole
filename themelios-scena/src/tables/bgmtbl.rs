@@ -5,8 +5,6 @@ use hamu::read::le::*;
 use hamu::write::le::*;
 use crate::util::*;
 
-newtype!(BgmId, u16);
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Bgm {
 	pub name: String,

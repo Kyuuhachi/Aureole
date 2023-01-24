@@ -5,7 +5,7 @@ use enumflags2::*;
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use crate::gamedata::Lookup;
-use crate::tables::bgmtbl::BgmId;
+use crate::types::BgmId;
 use crate::util::*;
 
 newtype!(BattleId, u32);

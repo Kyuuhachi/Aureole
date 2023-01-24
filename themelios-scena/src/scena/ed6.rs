@@ -2,10 +2,9 @@ use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
 use crate::gamedata::GameData;
-use crate::tables::bgmtbl::BgmId;
 use crate::tables::btlset::BattleId;
 use crate::tables::town::TownId;
-use crate::types::Flag;
+use crate::types::{Flag, BgmId};
 use crate::util::*;
 
 use super::*;

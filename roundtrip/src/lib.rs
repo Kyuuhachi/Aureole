@@ -240,3 +240,21 @@ fn itc(_game: &GameData, strict: Strictness, path: impl AsRef<Path>) -> Result<(
 	assert!(!failed);
 	Ok(())
 }
+
+#[test_case::test_case(GameData::ZERO,     Strict, "../data/zero-gf/data/text/t_se._dt"; "zero_gf")]
+#[test_case::test_case(GameData::ZERO_KAI, Strict, "../data/zero/data/text/t_se._dt"; "zero_nisa")]
+#[test_case::test_case(GameData::ZERO_EVO, Strict, "../data/zero-evo/data/text/t_se._dt"; "zero_evo")]
+
+#[test_case::test_case(GameData::AO,     Strict, "../data/ao-psp/PSP_GAME/USRDIR/data/text/t_se._dt"; "ao_psp")]
+#[test_case::test_case(GameData::AO,     Strict, "../data/ao-gf/data/text/t_se._dt"; "ao_gf")]
+#[test_case::test_case(GameData::AO_EVO, Strict, "../data/ao-evo/data/text/t_se._dt"; "ao_evo")]
+
+fn se_ed7(game: &GameData, strict: Strictness, path: impl AsRef<Path>) -> Result<(), Error> {
+	check_roundtrip(
+		strict,
+		&std::fs::read(path)?,
+		|a| tables::se::read_ed7(game, a),
+		|a| tables::se::write_ed7(game, a),
+	)?;
+	Ok(())
+}

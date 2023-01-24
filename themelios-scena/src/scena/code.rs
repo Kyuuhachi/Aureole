@@ -6,7 +6,6 @@ use hamu::write::le::*;
 use hamu::write::Label as HLabel;
 use hamu::write::LabelDef as HLabelDef;
 use crate::gamedata::GameData;
-use crate::tables::bgmtbl::BgmId;
 use crate::tables::btlset::BattleId;
 use crate::tables::item::ItemId;
 use crate::types::*;

@@ -150,13 +150,13 @@ themelios_macros::bytecode! {
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)]
 		_1C(u8, u8, u16),
 		#[game(Zero, Ao, AoEvo)]
-		ED7_1C(u8, u8, u8, u8, u8, u8, u16, u16),
+		ED7_1C(u8, u8, u8, u8, u8, u8, u16 as Flag, u16),
 
 		#[game(Zero, ZeroEvo, Ao, AoEvo)]
 		ED7_1D(match {
-			0 => _0(u16 as CharId, u8, Pos3, i32, i32, i32),
-			2 => _2(u16 as CharId),
-			3 => _3(u16 as CharId),
+			0 => _0(u8, u8, u8, Pos3, i32, i32, i32),
+			2 => _2(u8, u8),
+			3 => _3(u8, u8),
 		}),
 
 		BgmPlay({ i if i.is_ed7() => u16, _ => u8 as u16 } as BgmId, { i if i.is_ed7() => u8, _ => const 0u8 }), // [play_bgm]
@@ -167,8 +167,8 @@ themelios_macros::bytecode! {
 
 		SoundPlay({ i if i.is_ed7() && game.kai => u32, _ => u16 as u32 } as SoundId, u8, { i if i.is_ed7() => u8, _ => const 0u8 }, u8), // [sound]
 		SoundStop({ IS::Ao|IS::AoEvo if game.kai => u32, _ => u16 as u32 } as SoundId),
-		SoundLoop(u16 as u32 as SoundId, u8),
-		_Sound25(u16 as u32 as SoundId, Pos3, u32, u32, u8, u32),
+		SoundSetVolume(u16 as u32 as SoundId, u8),
+		SoundPlayContinuously(u16 as u32 as SoundId, Pos3, u32, u32, u8, u32),
 		SoundLoad({ IS::Ao|IS::AoEvo if game.kai => u32, _ => u16 as u32 } as SoundId), // [sound_load]
 
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] skip!(1),
@@ -188,10 +188,10 @@ themelios_macros::bytecode! {
 		QuestBonusBp(u16 as QuestId, u16),
 		QuestBonusMira(u16 as QuestId, u16),
 
-		PartyAdd(u8 as u16 as NameId, u8, { IS::Fc|IS::FcEvo => const 0u8, _ => u8 }), // [join_party]
+		PartyAdd(u8 as u16 as NameId, u8 as u16 as CharId, { IS::Fc|IS::FcEvo => const 0u8, _ => u8 }), // [join_party]
 		PartyRemove(u8 as u16 as NameId, u8), // [separate_party]
 		ScPartyClear(),
-		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] _Party30(u8 as u16 as NameId),
+		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] _30(u8),
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_31(u8),
 		PartySetAttr(u8 as u16 as NameId, u8 as MemberAttr, u16), // [set_status]
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo,Zero,Ao)] skip!(2),
@@ -316,8 +316,9 @@ themelios_macros::bytecode! {
 		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_77(u8, u16),
 		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_78(u8 as u16 alias ObjectId, u16 as CharId),
 		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_79(u16 alias ObjectId),
-		#[game(Zero,Ao,AoEvo)] EventSkip(u8, u32), // TODO this one will need label handling
-		#[game(Zero,Ao,AoEvo)] ED7_7B(u8),
+		#[game(Zero)] skip!(2),
+		#[game(Ao,AoEvo)] EventSkip(u8, u32), // TODO this one will need label handling
+		#[game(Ao,AoEvo)] ED7_7B(u8),
 		#[game(Zero,Ao)] skip!(1),
 		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_7D(u32 as Color, u32),
 		#[game(Zero,Ao)] skip!(4),
@@ -329,7 +330,7 @@ themelios_macros::bytecode! {
 			0 => _0(u16 as CharId, u16, u16),
 			1 => _1(u16 as CharId, u16, u16), // args always zero; always paired with a _0 except when the char is 254
 		}),
-		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _7E(i16, i16, u16, u8, u32),
+		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _7E(i16, i16, i16, u8, u32),
 
 		#[game(Zero, Ao, AoEvo)] ED7_84(u8, u8),
 		EffLoad(u8, String alias EffFileRef),
@@ -523,9 +524,9 @@ themelios_macros::bytecode! {
 			0 => _0(u16),
 			1 => _1(u16),
 		}),
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_BD(),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] ScSetPortraitFinish(),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_BE(u8,u8,u8,u8, u16, u16, u8, i32,i32,i32,i32,i32,i32),
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_BF(u8,u8,u8,u8, u16),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_BF(u8,u8,u8,u8, u16 as Flag),
 		/// ```text
 		///  1 ⇒ something about using items on the field
 		/// 11 ⇒ roulette
@@ -566,9 +567,8 @@ themelios_macros::bytecode! {
 
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_C8(u16, u16, String, u8, u16), // Something with C_PLATnn._CH
 		#[game(Zero, Ao, AoEvo)] ED7_CC(u8),
-		#[game(Zero, Ao, AoEvo)] ED7_CD(match {
-			0 => _0(u8),
-			1 => _1(u8, u8),
+		#[game(Zero, Ao, AoEvo)] CharId(match {
+			1 => Set(u8 as u16 as CharId, u8 as u16 as NameId),
 		}),
 		#[game(ZeroEvo)] skip!(1),
 

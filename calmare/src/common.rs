@@ -146,6 +146,7 @@ fn insn(f: &mut Context, i: &Insn) -> Result<()> {
 }
 
 fn val(f: &mut Context, a: I) -> Result<()> {
+	use InstructionSet::*;
 	match a {
 		// I::i8(v)  => write!(f, "{v}")),
 		I::i16(v) => write!(f, "{v}")?,
@@ -174,16 +175,21 @@ fn val(f: &mut Context, a: I) -> Result<()> {
 
 		I::NameId(v) => write!(f, "member[{}]", v.0)?,
 		I::CharId(v) => match v.0 {
-			257.. => write!(f, "member[{}]", v.0 - 257)?,
+			257.. => val(f, I::NameId(&(v.0 - 257).into()))?,
 			256   => write!(f, "(ERROR)")?,
 			255   => write!(f, "null")?,
 			254   => write!(f, "self")?,
-			238.. if matches!(f.game.iset, InstructionSet::Tc|InstructionSet::TcEvo)
-			      => write!(f, "tc_party[{}, {}]", (v.0-238)/4, (v.0-238)%4)?,
-			248.. if matches!(f.game.iset, InstructionSet::Sc|InstructionSet::ScEvo)
-			      => write!(f, "sc_party[{}]", v.0-248)?,
+			244.. if matches!(f.game.iset, Ao|AoEvo)
+			      => write!(f, "custom[{}]", v.0-244)?,
+
+			246.. if matches!(f.game.iset, Sc|ScEvo)
+			      => write!(f, "party[{}]", v.0-246)?,
+			238.. => write!(f, "party[{}]", v.0-238)?,
+
+			16..  if matches!(f.game.iset, Tc|TcEvo)
+			      => write!(f, "char[{}]", v.0 - 16)?,
 			8..   => write!(f, "char[{}]", v.0 - 8)?,
-			0..   => write!(f, "party[{}]", v.0)?,
+			0..   => write!(f, "field_party[{}]", v.0)?,
 		},
 
 		I::BattleId(v) => write!(f, "{v:?}")?,

@@ -1,6 +1,6 @@
 use themelios::scena::{FuncRef, CharId};
 use themelios::scena::ed6;
-use themelios::scena::code::InsnArg as I;
+use themelios::scena::code::{InsnArg as I, InstructionSet};
 use strict_result::Strict;
 use crate::writer::Context;
 use crate::common::{self, Result, ContextExt};
@@ -86,7 +86,7 @@ pub fn write(mut f: Context, scena: &ed6::Scena) -> Result<()> {
 		f.line()?;
 	}
 
-	let mut n = 8;
+	let mut n = if matches!(f.game.iset, InstructionSet::Tc|InstructionSet::TcEvo) { 16 } else { 8 };
 
 	for npc in npcs {
 		f.kw("npc")?.val(I::CharId(&CharId(n)))?.suf(":")?.line()?.indent(|f| {

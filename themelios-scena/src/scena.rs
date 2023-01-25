@@ -6,17 +6,17 @@ pub mod code;
 pub mod ed6;
 pub mod ed7;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[derive(derive_more::DebugCustom)]
 #[debug(fmt = "FuncRef({_0}, {_1})")]
 pub struct FuncRef(pub u16, pub u16);
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[derive(derive_more::DebugCustom)]
 #[debug(fmt = "Pos2({_0}, {_1})")]
 pub struct Pos2(pub i32, pub i32);
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[derive(derive_more::DebugCustom)]
 #[debug(fmt = "Pos3({_0}, {_1}, {_2})")]
 pub struct Pos3(pub i32, pub i32, pub i32);

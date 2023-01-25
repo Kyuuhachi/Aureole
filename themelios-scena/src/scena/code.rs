@@ -121,10 +121,10 @@ pub fn read<'a>(f: &mut (impl Read<'a> + Dump), game: &GameData, end: Option<usi
 		match insn {
 			RawIInsn::Unless(_, target) => {
 				labels.insert(*target);
-			},
+			}
 			RawIInsn::Goto(target) => {
 				labels.insert(*target);
-			},
+			}
 			RawIInsn::Switch(_, branches, default) => {
 				for (_, target) in branches {
 					labels.insert(*target);

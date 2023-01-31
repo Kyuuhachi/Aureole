@@ -171,7 +171,7 @@ fn val(f: &mut Context, a: I) -> Result<()> {
 		I::QuestFlags(v)  => write!(f, "0x{:02X}", v.0)?,
 		I::ObjectFlags(v) => write!(f, "0x{:04X}", v.0)?,
 		I::LookPointFlags(v) => write!(f, "0x{:04X}", v.0)?,
-		I::Color(v)       => write!(f, "#{:08X}", v.0)?,
+		I::Color(v)       => write!(f, "0x{:08X}", v.0)?,
 
 		I::NameId(v) => write!(f, "member[{}]", v.0)?,
 		I::CharId(v) => match v.0 {
@@ -213,13 +213,7 @@ fn val(f: &mut Context, a: I) -> Result<()> {
 
 		I::Expr(v) => expr(f, v)?,
 
-		I::FuncRef(v) => {
-			if v.0 != 0 {
-				write!(f, "{}", v.0)?;
-				f.no_space()?;
-			}
-			write!(f, ":{}", v.1)?;
-		}
+		I::FuncRef(v) => write!(f, "{}:{}", v.0, v.1)?,
 
 		I::Fork(a) => {
 			f.suf(":")?;

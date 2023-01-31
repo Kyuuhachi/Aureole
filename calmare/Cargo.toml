@@ -7,3 +7,5 @@ edition = "2021"
 themelios = { path = "../themelios" }
 strict_result = { path = "../../strict-result" }
 extend = "1.1.2"
+
+unicode-xid = "0.2.4"

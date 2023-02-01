@@ -361,7 +361,7 @@ fn parse_entry<'a>(p: &mut Parse<'a>) -> Result<(), Error<'a>> {
 		angle  => parse_angle(p)?,
 		cam_from => parse_pos(p)?,
 		cam_at => parse_pos(p)?,
-		cam_zoom => parse_pos(p)?,
+		cam_zoom => parse_int(p)?,
 		cam_pers => parse_int(p)?,
 		cam_deg => parse_angle(p)?,
 		cam_limit => (parse_angle(p)?, parse_angle(p)?),
@@ -388,10 +388,10 @@ pub fn parse_top<'a>(p: &mut Parse<'a>) -> Result<(), Error<'a>> {
 				"scp" => parse_scp(&mut p)?,
 				"entry" => parse_entry(&mut p)?,
 				_ => {
-					return Err(Error::Misc {
+					Err(Error::Misc {
 						span: t.0,
 						desc: "invalid declaration".to_owned(),
-					});
+					})?;
 				}
 			}
 		};

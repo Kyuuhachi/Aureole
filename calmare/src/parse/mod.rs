@@ -24,9 +24,9 @@ pub impl<A, B> Result<A, B> {
 pub struct Spanned<'a, T>(Span<'a>, T);
 
 impl<'a, T: std::fmt::Debug> std::fmt::Debug for Spanned<'a, T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("Spanned").field(&(..)).field(&self.1).finish()
-    }
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_tuple("Spanned").field(&self.1).finish()
+	}
 }
 
 #[inline]
@@ -179,6 +179,32 @@ impl<'a> Parse<'a> {
 	}
 }
 
+fn optional<'a, A>(
+	p: &mut Parse<'a>,
+	f: impl FnOnce(&mut Parse<'a>) -> Result<Spanned<'a, A>, Error<'a>>,
+) -> Result<Spanned<'a, Option<A>>, Error<'a>> {
+	if let Some(a) = p.test(&TokenKind::Minus) {
+		Ok(Spanned(a.span, None))
+	} else {
+		f(p).map(|Spanned(s, a)| Spanned(s, Some(a)))
+	}
+}
+
+fn parse_ident<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, &'a str>, Error<'a>> {
+	let t = p.next();
+	match &t.token {
+		TokenKind::Ident(i) => {
+			Ok(Spanned(t.span, i))
+		}
+		_ => {
+			Err(Error::Misc {
+				span: t.span,
+				desc: "expected an ident".to_owned(),
+			})
+		}
+	}
+}
+
 fn parse_string<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, &'a str>, Error<'a>> {
 	match p.next() {
 		Token { token: TokenKind::String(s), span, .. } => {
@@ -268,20 +294,32 @@ fn parse_pos<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, Pos3>, Error<'a>> {
 	Ok(Spanned(p.span(i0), Pos3(x, y, z)))
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CharId {
+	Char(u16),
+}
+
+fn parse_char_id<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, CharId>, Error<'a>> {
+	let i0 = p.next_span();
+	let i = parse_ident(p)?;
+	match i.1 {
+		"char" => {
+			p.require(&TokenKind::LBrack)?;
+			let v = parse_int(p)?;
+			p.require(&TokenKind::RBrack)?;
+			Ok(Spanned(p.span(i0), CharId::Char(v as u16)))
+		}
+		_ => Err(Error::Misc {
+			span: i.0,
+			desc: "invalid CharId".to_owned(),
+		})
+	}
+}
+
 fn ident_line<'a>(p: &mut Parse<'a>) -> Result<(Spanned<'a, &'a str>, Parse<'a>), Error<'a>> {
 	let mut p = p.indented(false);
-	let t = p.next();
-	match &t.token {
-		TokenKind::Ident(i) => {
-			Ok((Spanned(t.span, i), p))
-		}
-		_ => {
-			Err(Error::Misc {
-				span: t.span,
-				desc: "expected an ident".to_owned(),
-			})
-		}
-	}
+	let i = parse_ident(&mut p)?;
+	Ok((i, p))
 }
 
 macro parse_fields($p:ident $(, $name:ident => $f:expr)* $(,)?) {
@@ -315,19 +353,16 @@ macro parse_fields($p:ident $(, $name:ident => $f:expr)* $(,)?) {
 		e.consume_err(|e| p.emit(e));
 	}
 	let mut missing = Vec::new();
-	$(let $name = match $name {
-		Some(Spanned(_, v)) => v,
-		None => {
-			missing.push(concat!("'", stringify!($name), "'"));
-			None
-		}
-	};)*
+	$(if $name.is_none() {
+		missing.push(concat!("'", stringify!($name), "'"));
+	})*
 	if !missing.is_empty() {
-		$p.emit(Error::Misc {
+		Err(Error::Misc {
 			span: p.span(i0),
 			desc: format!("missing fields: {}", missing.join(", ")),
-		});
+		})?;
 	}
+	$(let $name = $name.unwrap();)*
 }
 
 fn parse_header<'a>(p: &mut Parse<'a>) -> Result<(), Error<'a>> {
@@ -377,6 +412,35 @@ fn parse_entry<'a>(p: &mut Parse<'a>) -> Result<(), Error<'a>> {
 	Ok(())
 }
 
+fn parse_chcp<'a>(p: &mut Parse<'a>) -> Result<(), Error<'a>> {
+	let n = parse_wrapped_int(p, "ChcpId")?;
+	let file1 = optional(p, parse_string)?;
+	let file2 = optional(p, parse_string)?;
+	println!("{:?}", (n, file1, file2));
+	Ok(())
+}
+
+fn parse_npc<'a>(p: &mut Parse<'a>) -> Result<(), Error<'a>> {
+	let id = parse_char_id(p)?;
+	p.require(&TokenKind::Colon)?;
+	parse_fields! { p,
+		name => parse_string(p)?,
+		pos => parse_pos(p)?,
+		angle  => parse_angle(p)?,
+		x => parse_int(p)?,
+		pt => parse_wrapped_int(p, "ChcpId")?,
+		no => parse_int(p)?,
+		bs => parse_wrapped_int(p, "ChcpId")?,
+		flags => parse_int(p)?,
+		init => parse_func_ref(p)?,
+		talk => parse_func_ref(p)?,
+	};
+	println!("{:?}", (id,name,pos,angle));
+	println!("{:?}", (x,pt,no,bs));
+	println!("{:?}", (flags,init,talk));
+	Ok(())
+}
+
 pub fn parse_top<'a>(p: &mut Parse<'a>) -> Result<(), Error<'a>> {
 	p.require(&TokenKind::Ident("scena"))?;
 	parse_header(p)?;
@@ -387,6 +451,8 @@ pub fn parse_top<'a>(p: &mut Parse<'a>) -> Result<(), Error<'a>> {
 			match t.1 {
 				"scp" => parse_scp(&mut p)?,
 				"entry" => parse_entry(&mut p)?,
+				"chcp" => parse_chcp(&mut p)?,
+				"npc" => parse_npc(&mut p)?,
 				_ => {
 					Err(Error::Misc {
 						span: t.0,

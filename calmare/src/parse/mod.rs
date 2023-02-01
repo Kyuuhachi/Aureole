@@ -1,5 +1,7 @@
 mod lex;
 
+use std::{cell::RefCell, rc::Rc};
+
 use lex::Lex;
 use themelios::scena::{FuncRef, Pos3};
 
@@ -18,101 +20,115 @@ pub impl<A, B> Result<A, B> {
 	}
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Spanned<'a, T>(Span<'a>, T);
+
+impl<'a, T: std::fmt::Debug> std::fmt::Debug for Spanned<'a, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Spanned").field(&(..)).field(&self.1).finish()
+    }
+}
 
 #[inline]
 fn is_indented(incl: bool, a: &str, b: &str) -> bool {
 	(b.len() > a.len() || incl && b.len() == a.len()) && b.starts_with(a)
 }
 
-struct Parse<'a> {
-	lex: Lex<'a>,
-	peek: Option<Token<'a>>,
+// pub struct Parse<'a> {
+// 	lex: Lex<'a>,
+// 	peek: Option<Token<'a>>,
+// 	indent: &'a str,
+// 	eof_token: Token<'a>,
+// }
+
+pub struct Parse<'a> {
+	src: &'a str,
 	indent: &'a str,
-	eof_token: Token<'a>,
+	tokens: &'a [Token<'a>],
+	eof: &'a Token<'a>,
+	errors: Rc<RefCell<Vec<Error<'a>>>>,
 }
 
 impl<'a> Parse<'a> {
-	pub fn new(src: &'a str) -> Self {
+	pub fn new(src: &'a str, tokens: &'a [Token<'a>], eof: &'a Token<'a>) -> Self {
+		let indent = tokens.first().map_or_else(|| eof.span.as_str(), |a| a.indent.expect("parser must start on a line"));
+		assert_eq!(eof.token, TokenKind::Eof);
 		Parse {
-			lex: Lex::new(src),
-			peek: None,
-			indent: &src[..0],
-			eof_token: Token {
-				trivia: &src[..0],
-				indent: Some(&src[..0]),
-				span: Span::from_prefix(src, src),
-				token: TokenKind::Eof,
-			}
+			src,
+			indent,
+			tokens,
+			eof,
+			errors: Default::default(),
 		}
 	}
 
-	// This will return an eof token if the peeked one is insufficiently indented.
-	fn peek_(&mut self) -> &Token<'a> {
-		self.peek.get_or_insert_with(|| lex::token(&mut self.lex))
+	fn peek(&self) -> &'a Token<'a> {
+		self.tokens.first().unwrap_or(self.eof)
 	}
 
-	fn peek(&mut self) -> &Token<'a> {
-		let tok = self.peek.get_or_insert_with(|| lex::token(&mut self.lex));
-
-		if !tok.indent.map_or(true, |ind| is_indented(false, self.indent, ind)) {
-			let span = tok.span.start();
-			self.eof_token = Token {
-				trivia: tok.trivia,
-				indent: Some(span.as_str()),
-				span,
-				token: TokenKind::Eof,
-			};
-			return &self.eof_token
+	fn next(&mut self) -> &'a Token<'a> {
+		if let Some((a, b)) = self.tokens.split_first() {
+			self.tokens = b;
+			a
+		} else {
+			// TODO the eof has wrong span
+			self.eof
 		}
-
-		tok
 	}
 
-	// This will return the next token regardless.
-	fn next(&mut self) -> Token<'a> {
-		self.peek_();
-		self.peek.take().unwrap()
-	}
-
-	fn next_if(&mut self, f: impl Fn(&Token<'a>) -> bool) -> Option<Token<'a>> {
+	fn next_if(&mut self, f: impl Fn(&Token<'a>) -> bool) -> Option<&Token<'a>> {
 		f(self.peek()).then(|| self.next())
 	}
 
-	fn test(&mut self, token: &TokenKind<'a>) -> Option<Token<'a>> {
+	fn test(&mut self, token: &TokenKind<'a>) -> Option<&Token<'a>> {
 		self.next_if(|a| &a.token == token)
 	}
 
-	fn require(&mut self, token: &TokenKind<'a>) -> Result<Token<'a>, Error<'a>> {
-		if let Some(token) = self.test(token) {
-			Ok(token)
-		} else {
-			let span = self.peek().span.start();
-			Err(Error::Missing {
-				span,
-				token: token.clone(),
-			})
+	fn require(&mut self, token: &TokenKind<'a>) -> Result<&Token<'a>, Error<'a>> {
+		let span = self.prev_span();
+		match self.test(token) {
+			Some(token) => Ok(token),
+			None => {
+				Err(Error::Missing {
+					span,
+					token: token.clone(),
+				})
+			}
 		}
 	}
 
-	fn skip_to_eol(&mut self) -> Result<(), Error<'a>> {
-		let ind = self.indent;
-		self.skip_while(|t| t.indent.map_or(true, |i| is_indented(false, ind, i)))
+	fn skip_line(&mut self) -> Result<(), Error<'a>> {
+		self.take_while(|t| t.indent.is_none())
+			.end()
 	}
 
-	fn skip_while(&mut self, f: impl Fn(&Token<'a>) -> bool) -> Result<(), Error<'a>> {
-		if f(self.peek()) {
-			let i0 = self.peek().span;
-			while f(self.peek()) {
-				self.next();
-			}
+	fn end(&self) -> Result<(), Error<'a>> {
+		if let Some((a, b)) = self.tokens.first().zip(self.tokens.last()) {
 			Err(Error::Misc {
-				span: self.span(i0),
-				desc: "unexpected data".to_owned(),
+				span: Span::join(self.src, a.span, b.span),
+				desc: "expected end of block".to_owned(),
 			})
 		} else {
 			Ok(())
+		}
+	}
+
+	fn take_while(&mut self, f: impl Fn(&Token<'a>) -> bool) -> Parse<'a> {
+		let mut i = 0;
+		while i < self.tokens.len() {
+			if !f(&self.tokens[i]) {
+				break
+			}
+			i += 1;
+		}
+		let (t1, t2) = self.tokens.split_at(i);
+		self.tokens = t2;
+		Parse {
+			src: self.src,
+			indent: self.indent,
+			tokens: t1,
+			eof: self.eof,
+			errors: Rc::clone(&self.errors),
 		}
 	}
 
@@ -128,82 +144,50 @@ impl<'a> Parse<'a> {
 		}
 	}
 
-	pub fn block(&mut self, body: impl FnOnce(&mut Self)) -> Span<'a> {
-		self.skip_while(|t| t.indent.is_none())
+	pub fn indented(&mut self, inclusive: bool) -> Parse<'a> {
+		self.take_while(|t| t.indent.is_none())
+			.end()
 			.consume_err(|e| self.emit(e));
-
-		let ind = self.peek().indent.unwrap();
-		let i0 = Span::from_str(ind).start();
-
-		if is_indented(false, self.indent, ind) {
-			let prev_ind = std::mem::replace(&mut self.indent, ind);
-			body(self);
-			self.skip_while(|t| t.token != TokenKind::Eof)
-				.consume_err(|e| self.emit(e));
-			self.indent = prev_ind;
+		let indent = self.peek().indent.unwrap();
+		if is_indented(true, self.indent, indent) {
+			let mut v = self.take_while(|t| t.indent.map_or(true, |i| std::ptr::eq(i, indent) || is_indented(inclusive, indent, i)));
+			v.indent = indent;
+			v
+		} else {
+			self.take_while(|_| false)
 		}
-
-		let ind = self.peek().indent.unwrap();
-		let i1 = Span::from_str(ind).start();
-
-		Span::join(self.lex.src, i0, i1)
 	}
 
-	pub fn is_eof(&mut self) -> bool {
-		self.peek().token == TokenKind::Eof
-	}
-
-	pub fn next_span(&mut self) -> Span<'a> {
+	pub fn next_span(&self) -> Span<'a> {
 		Span::from_str(self.peek().trivia).end()
 	}
 
-	pub fn prev_span(&mut self) -> Span<'a> {
+	pub fn prev_span(&self) -> Span<'a> {
 		Span::from_str(self.peek().trivia).start()
 	}
 
-	pub fn span(&mut self, start: Span<'a>) -> Span<'a> {
-		Span::join(self.lex.src, start, self.prev_span())
+	pub fn span(&self, start: Span<'a>) -> Span<'a> {
+		Span::join(self.src, start, self.prev_span())
 	}
 
 	fn emit(&mut self, e: Error<'a>) {
-		self.lex.errors.push(e);
+		self.errors.borrow_mut().push(e);
+	}
+
+	pub fn is_empty(&self) -> bool {
+		self.tokens.is_empty()
 	}
 }
 
-fn ident_or_skip_line<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, &'a str>, Error<'a>> {
+fn parse_string<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, &'a str>, Error<'a>> {
 	match p.next() {
-		Token { span, token: TokenKind::Ident(token), .. } => Ok(Spanned(span, token)),
-		Token { span, .. } => Err(Error::Misc {
-			span,
-			desc: "expected word".to_owned(),
-		})
-	}
-}
-
-fn ident_lines<'a>(
-	p: &mut Parse<'a>,
-	mut f: impl FnMut(&mut Parse<'a>, Spanned<'a, &'a str>) -> Result<(), Error<'a>>
-) {
-	while p.peek_().token != TokenKind::Eof && is_indented(true, p.indent, p.peek_().indent.unwrap()) {
-		match ident_or_skip_line(p).and_then(|t| f(p, t)) {
-			Ok(()) => {
-				let _ = p.skip_to_eol();
-			}
-			Err(e) => {
-				p.lex.errors.push(e);
-				p.skip_to_eol()
-					.consume_err(|e| p.emit(e));
-			}
+		Token { token: TokenKind::String(s), span, .. } => {
+			let s: &'a str = s;
+			Ok(Spanned(*span, s))
 		}
-	}
-}
-
-fn parse_string<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, String>, Error<'a>> {
-	match p.next() {
-		Token { token: TokenKind::String(s), span, .. } => Ok(Spanned(span, s)),
 		Token { span, .. } => {
 			Err(Error::Misc {
-				span,
+				span: *span,
 				desc: "expected a string".to_owned(),
 			})
 		}
@@ -215,7 +199,7 @@ fn parse_int<'a>(p: &mut Parse<'a>) -> Result<u64, Error<'a>> {
 		Token { token: TokenKind::Number(v), span, .. } => {
 			if v.dec.is_some() {
 				Err(Error::Misc {
-					span,
+					span: *span,
 					desc: "no decimals allowed".to_owned(),
 				})
 			} else {
@@ -223,7 +207,7 @@ fn parse_int<'a>(p: &mut Parse<'a>) -> Result<u64, Error<'a>> {
 			}
 		},
 		Token { span, .. } => Err(Error::Misc {
-			span,
+			span: *span,
 			desc: "expected an integer".to_owned(),
 		})
 	}
@@ -281,32 +265,55 @@ fn parse_pos<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, Pos3>, Error<'a>> {
 	p.require(&TokenKind::Comma)?;
 	let z = parse_length(p)?.1;
 	p.require(&TokenKind::RParen)?;
-	let b = parse_int(p)? as u16;
 	Ok(Spanned(p.span(i0), Pos3(x, y, z)))
+}
+
+fn ident_line<'a>(p: &mut Parse<'a>) -> Result<(Spanned<'a, &'a str>, Parse<'a>), Error<'a>> {
+	let mut p = p.indented(false);
+	let t = p.next();
+	match &t.token {
+		TokenKind::Ident(i) => {
+			Ok((Spanned(t.span, i), p))
+		}
+		_ => {
+			Err(Error::Misc {
+				span: t.span,
+				desc: "expected an ident".to_owned(),
+			})
+		}
+	}
 }
 
 macro parse_fields($p:ident $(, $name:ident => $f:expr)* $(,)?) {
 	$(let mut $name = None;)*
-	let span = $p.block(|$p| ident_lines($p, |$p, Spanned(span, token)| {
-		match token {
-			$(stringify!($name) => {
-				println!(stringify!($name));
-				let o = $name.replace(Spanned(span, None));
-				$name = Some(Spanned(span, Some($f)));
-				if let Some(Spanned(prev_span, _)) = o {
-					return Err(Error::Duplicate { span, prev_span })
+	let mut p = $p.indented(true);
+	let i0 = p.next_span();
+	while !p.is_empty() {
+		let e: Result<(), Error> = try {
+			let (t, mut p) = ident_line(&mut p)?;
+			match t.1 {
+				$(stringify!($name) => {
+					let o = $name.replace(Spanned(t.0, None));
+					$name = {
+						let $p = &mut p;
+						Some(Spanned(t.0, Some($f)))
+					};
+					if let Some(Spanned(prev_span, _)) = o {
+						Err(Error::Duplicate { span: t.0, prev_span })?;
+					}
+				})*
+				_ => {
+					const ALTS: &[&str] = &[$(concat!("'", stringify!($name), "'")),*];
+					Err(Error::Misc {
+						span: t.0,
+						desc: format!("unknown field, expected {}", ALTS.join(", ")),
+					})?;
 				}
-			})*
-			_ => {
-				const ALTS: &[&str] = &[$(concat!("'", stringify!($name), "'")),*];
-				return Err(Error::Misc {
-					span,
-					desc: format!("unknown field, expected {}", ALTS.join(", ")),
-				});
 			}
-		}
-		Ok(())
-	}));
+			p.end()?;
+		};
+		e.consume_err(|e| p.emit(e));
+	}
 	let mut missing = Vec::new();
 	$(let $name = match $name {
 		Some(Spanned(_, v)) => v,
@@ -317,7 +324,7 @@ macro parse_fields($p:ident $(, $name:ident => $f:expr)* $(,)?) {
 	};)*
 	if !missing.is_empty() {
 		$p.emit(Error::Misc {
-			span,
+			span: p.span(i0),
 			desc: format!("missing fields: {}", missing.join(", ")),
 		});
 	}
@@ -334,12 +341,15 @@ fn parse_header<'a>(p: &mut Parse<'a>) -> Result<(), Error<'a>> {
 		item => parse_func_ref(p)?,
 	};
 
+	println!("{:?}", (name,town,bgm,item));
+
 	Ok(())
 }
 
 fn parse_scp<'a>(p: &mut Parse<'a>) -> Result<(), Error<'a>> {
 	let n = parse_int(p)?;
 	let file = parse_string(p)?;
+	println!("{:?}", (n, file));
 	Ok(())
 }
 
@@ -361,6 +371,9 @@ fn parse_entry<'a>(p: &mut Parse<'a>) -> Result<(), Error<'a>> {
 		init => parse_func_ref(p)?,
 		reinit => parse_func_ref(p)?,
 	};
+	println!("{:?}", (pos,chr,angle));
+	println!("{:?}", (cam_from,cam_at,cam_zoom,cam_pers,cam_deg,cam_limit,north));
+	println!("{:?}", (north,flags,town,init,reinit));
 	Ok(())
 }
 
@@ -368,29 +381,37 @@ pub fn parse_top<'a>(p: &mut Parse<'a>) -> Result<(), Error<'a>> {
 	p.require(&TokenKind::Ident("scena"))?;
 	parse_header(p)?;
 
-	ident_lines(p, |p, t| {
-		println!("{:?}", t);
-		match t.1 {
-			"scp" => parse_scp(p)?,
-			"entry" => parse_entry(p)?,
-			_ => {
-				return Err(Error::Misc {
-					span: t.0,
-					desc: "invalid declaration".to_owned(),
-				});
+	while !p.is_empty() {
+		let e: Result<(), Error> = try {
+			let (t, mut p) = ident_line(p)?;
+			match t.1 {
+				"scp" => parse_scp(&mut p)?,
+				"entry" => parse_entry(&mut p)?,
+				_ => {
+					return Err(Error::Misc {
+						span: t.0,
+						desc: "invalid declaration".to_owned(),
+					});
+				}
 			}
-		}
-		Ok(())
-	});
+		};
+		e.consume_err(|e| p.emit(e));
+	}
 
 	Ok(())
 }
 
 pub fn parse(src: &str) {
-	let mut p = Parse::new(src);
-	parse_top(&mut p);
+	let mut l = Lex::new(src);
+	let tokens = lex::tokens(&mut l);
+	let (eof, tokens) = tokens.split_last().unwrap();
+	let mut errors = l.errors;
 
-	for e in &p.lex.errors {
+	let mut p = Parse::new(src, tokens, eof);
+	parse_top(&mut p).consume_err(|e| p.emit(e));
+	errors.extend(p.errors.take());
+
+	for e in &errors {
 		println!("{:?} {:?}", e.span().position_in(src).unwrap(), e);
 	}
 }

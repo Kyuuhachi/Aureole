@@ -7,7 +7,7 @@ use unicode_xid::UnicodeXID;
 pub struct Span<'a>(&'a str);
 
 // from https://github.com/rust-lang/rfcs/pull/2796
-fn range_of<T>(slice: &[T], subslice: &[T]) -> Option<Range<usize>> {
+pub fn range_of<T>(slice: &[T], subslice: &[T]) -> Option<Range<usize>> {
 	let range = slice.as_ptr_range();
 	let subrange = subslice.as_ptr_range();
 	if subrange.start >= range.start && subrange.end <= range.end {
@@ -361,6 +361,18 @@ pub fn token<'a>(i: &mut Lex<'a>) -> Token<'a> {
 			token: TokenKind::Error
 		}
 	}
+}
+
+pub fn tokens<'a>(i: &mut Lex<'a>) -> Vec<Token<'a>> {
+	let mut tokens = Vec::new();
+	loop {
+		tokens.push(token(i));
+		if tokens.last().unwrap().token == TokenKind::Eof {
+			break
+		}
+	}
+	tokens[0].indent = Some(&i.src[..0]);
+	tokens
 }
 
 #[test]

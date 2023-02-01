@@ -411,8 +411,44 @@ pub fn parse(src: &str) {
 	parse_top(&mut p).consume_err(|e| p.emit(e));
 	errors.extend(p.errors.take());
 
+	use codespan_reporting::diagnostic::{Diagnostic, Label};
+	use codespan_reporting::files::SimpleFiles;
+	use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
+
+	errors.sort_by_key(|a| a.span().as_str() as *const str);
+
+	let writer = StandardStream::stderr(ColorChoice::Always);
+	let config = codespan_reporting::term::Config::default();
+	let mut files = SimpleFiles::new();
+	let file_id = files.add("<input>", src);
+
 	for e in &errors {
-		println!("{:?} {:?}", e.span().position_in(src).unwrap(), e);
+		let d = match e {
+			Error::Missing { span, token } =>
+				Diagnostic::error()
+				.with_message(format!("missing {:?}", token))
+				.with_labels(vec![
+					Label::primary(file_id, span.position_in(src).unwrap())
+						.with_message(format!("missing {:?}", token)),
+				]),
+			Error::Misc { span, desc } =>
+				Diagnostic::error()
+				.with_message(desc)
+				.with_labels(vec![
+					Label::primary(file_id, span.position_in(src).unwrap())
+						.with_message(desc),
+				]),
+			Error::Duplicate { span, prev_span } =>
+				Diagnostic::error()
+				.with_message("duplicate field")
+				.with_labels(vec![
+					Label::primary(file_id, span.position_in(src).unwrap())
+						.with_message("this field..."),
+					Label::secondary(file_id, prev_span.position_in(src).unwrap())
+						.with_message("...was already declared here"),
+				]),
+		};
+		codespan_reporting::term::emit(&mut writer.lock(), &config, &files, &d).unwrap();
 	}
 }
 

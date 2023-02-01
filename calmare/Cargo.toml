@@ -9,3 +9,4 @@ strict_result = { path = "../../strict-result" }
 extend = "1.1.2"
 
 unicode-xid = "0.2.4"
+codespan-reporting = "0.11.1"

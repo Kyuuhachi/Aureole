@@ -283,9 +283,9 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	let triggers = list(n_triggers, || Ok(Trigger {
 		pos: (g.f32()?, g.f32()?, g.f32()?),
 		radius: g.f32()?,
-		transform: array(|| {
+		transform: transpose(array(|| {
 			array(|| Ok(g.f32()?))
-		}).strict()?,
+		}).strict()?),
 		unk1: g.u8()?,
 		unk2: g.u16()?,
 		function: FuncRef(g.u8()? as u16, g.u8()? as u16),
@@ -617,7 +617,7 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		g.f32(trigger.pos.1);
 		g.f32(trigger.pos.2);
 		g.f32(trigger.radius);
-		for row in trigger.transform {
+		for row in transpose(trigger.transform) {
 			for col in row {
 				g.f32(col)
 			}
@@ -779,4 +779,8 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	//   chcp, npcs, monsters, triggers, look_points, labels,
 	//   animations, func_table, functions, strings
 	Ok(f.finish()?)
+}
+
+fn transpose(x: [[f32; 4]; 4]) -> [[f32; 4]; 4] {
+	[0,1,2,3].map(|a| [0,1,2,3].map(|b| x[b][a]))
 }

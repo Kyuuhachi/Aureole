@@ -333,9 +333,9 @@ themelios_macros::bytecode! {
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _7E(i16, i16, i16, u8, u32),
 
 		#[game(Zero, Ao, AoEvo)] ED7_84(u8, u8),
-		EffLoad(u8, String alias EffFileRef),
+		EffLoad(u8 alias EffId, String alias EffFileRef),
 		EffPlay(
-			u8 alias EffId, u8,
+			u8 alias EffId, u8 /*alias EffInstanceId*/,
 			u16 as CharId, { i if i.is_ed7() => u16, _ => const 0u16 }, Pos3, // source
 			i16, i16, i16,
 			u32, u32, u32, // scale?
@@ -343,13 +343,13 @@ themelios_macros::bytecode! {
 			u32 alias Time, // period (0 if one-shot)
 		),
 		EffPlay2(
-			u8 alias EffId, u8,
+			u8 alias EffId, u8 /*alias EffInstanceId*/,
 			u8 as u16 alias ObjectId, String, { i if i.is_ed7() => u16, _ => const 0u16 }, Pos3, // source
 			i16, i16, i16,
 			u32, u32, u32, // scale
 			u32 alias Time, // period (0 if one-shot)
 		),
-		_82(u8 alias EffId, u8),
+		EffStop(u8 alias EffId /*alias EffInstanceId*/, u8),
 		#[game(Fc, FcEvo)] FcAchievement(u8, u8),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] _83(u8, u8), // might have to do with EffPlay
 		_84(u8),
@@ -670,7 +670,7 @@ themelios_macros::bytecode! {
 			11 => _11(u8),
 		}),
 		#[game(Tc, TcEvo)] TcEpisode(match {
-			0 => Start(u16, u32),
+			0 => Start(u8, u32, u8),
 			1 => End(u8),
 			4 => _4(u8),
 		}),

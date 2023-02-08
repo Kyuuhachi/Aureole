@@ -271,7 +271,6 @@ enum Term<'a> {
 
 	Text(),
 	Attr(Box<Term<'a>>, Spanned<'a, u64>),
-	Expr(Box<Expr<'a>>), // Not available via standard syntax
 
 	// Expr
 	Random,
@@ -315,7 +314,7 @@ enum Term<'a> {
 	Town(Spanned<'a, u64>),
 }
 
-fn parse_insn<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, Insn<'a>>, Error<'a>> {
+fn parse_nested_insn<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, Insn<'a>>, Error<'a>> {
 	let i0 = p.next_span();
 	let name = parse_ident(p)?;
 	let mut args = Vec::new();
@@ -330,6 +329,16 @@ fn parse_insn<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, Insn<'a>>, Error<'a>>
 				break
 			}
 		}
+	}
+	Ok(Spanned(p.span(i0), Insn { name, args }))
+}
+
+fn parse_insn<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, Insn<'a>>, Error<'a>> {
+	let i0 = p.next_span();
+	let name = parse_ident(p)?;
+	let mut args = Vec::new();
+	while !p.is_empty() {
+		args.push(parse_term(p)?);
 	}
 	Ok(Spanned(p.span(i0), Insn { name, args }))
 }
@@ -389,6 +398,7 @@ fn parse_term<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, Term<'a>>, Error<'a>>
 			while p.test(&TokenKind::RParen).is_none() {
 				terms.push(parse_term(p)?);
 				if p.test(&TokenKind::Comma).is_none() {
+					p.require(&TokenKind::RParen)?;
 					break
 				}
 			}
@@ -438,7 +448,7 @@ fn parse_term<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, Term<'a>>, Error<'a>>
 
 		_ => return Err(Error::Misc {
 			span: p.peek().span,
-			desc: "invalid term".to_owned(),
+			desc: "unexpected token".to_owned(),
 		})
 	};
 
@@ -565,13 +575,7 @@ fn parse_atom<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, Atom<'a>>, Error<'a>>
 			match parse_term(p) {
 				Ok(t) => Atom::Term(t.1),
 				Err(_) if p.tokens as *const _ == start => {
-					let Ok(insn) = parse_insn(p) else {
-						return Err(Error::Misc {
-							span: p.peek().span,
-							desc: "invalid term or insn".to_owned(),
-						})
-					};
-					Atom::Insn(insn.1)
+					Atom::Insn(parse_nested_insn(p)?.1)
 				}
 				Err(e) => return Err(e)
 			}

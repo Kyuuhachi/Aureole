@@ -1,11 +1,7 @@
 mod lex;
 
 use std::{cell::RefCell, rc::Rc};
-
-use lex::Lex;
-use themelios::scena::{FuncRef, Pos3};
-
-use self::lex::{Token, TokenKind, Span, Error};
+use lex::{Lex, Token, TokenKind, Span, Error};
 
 #[extend::ext]
 pub impl<A, B> Result<A, B> {
@@ -29,17 +25,16 @@ impl<'a, T: std::fmt::Debug> std::fmt::Debug for Spanned<'a, T> {
 	}
 }
 
+impl<'a, A> Spanned<'a, A> {
+	pub fn map<B>(self, f: impl FnOnce(A) -> B) -> Spanned<'a, B> {
+		Spanned(self.0, f(self.1))
+	}
+}
+
 #[inline]
 fn is_indented(incl: bool, a: &str, b: &str) -> bool {
 	(b.len() > a.len() || incl && b.len() == a.len()) && b.starts_with(a)
 }
-
-// pub struct Parse<'a> {
-// 	lex: Lex<'a>,
-// 	peek: Option<Token<'a>>,
-// 	indent: &'a str,
-// 	eof_token: Token<'a>,
-// }
 
 pub struct Parse<'a> {
 	src: &'a str,
@@ -179,17 +174,6 @@ impl<'a> Parse<'a> {
 	}
 }
 
-fn optional<'a, A>(
-	p: &mut Parse<'a>,
-	f: impl FnOnce(&mut Parse<'a>) -> Result<Spanned<'a, A>, Error<'a>>,
-) -> Result<Spanned<'a, Option<A>>, Error<'a>> {
-	if let Some(a) = p.test(&TokenKind::Minus) {
-		Ok(Spanned(a.span, None))
-	} else {
-		f(p).map(|Spanned(s, a)| Spanned(s, Some(a)))
-	}
-}
-
 fn parse_ident<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, &'a str>, Error<'a>> {
 	let t = p.next();
 	match &t.token {
@@ -220,7 +204,7 @@ fn parse_string<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, &'a str>, Error<'a>
 	}
 }
 
-fn parse_int<'a>(p: &mut Parse<'a>) -> Result<u64, Error<'a>> {
+fn parse_int<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, u64>, Error<'a>> {
 	match p.next() {
 		Token { token: TokenKind::Number(v), span, .. } => {
 			if v.dec.is_some() {
@@ -229,7 +213,7 @@ fn parse_int<'a>(p: &mut Parse<'a>) -> Result<u64, Error<'a>> {
 					desc: "no decimals allowed".to_owned(),
 				})
 			} else {
-				Ok(v.val)
+				Ok(Spanned(*span, v.val))
 			}
 		},
 		Token { span, .. } => Err(Error::Misc {
@@ -240,80 +224,19 @@ fn parse_int<'a>(p: &mut Parse<'a>) -> Result<u64, Error<'a>> {
 }
 
 fn parse_signed_int<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, i64>, Error<'a>> {
+	let pos = p.tokens;
 	let i0 = p.next_span();
 	let neg = p.test(&TokenKind::Minus).is_some();
-	let n = parse_int(p)?;
+	if neg {
+		if let Err(e) = p.tight() {
+			p.tokens = pos;
+			return Err(e)
+		}
+	}
+	let n = parse_int(p)?.1;
 	let v = n as i64;
 	let v = if neg { -v } else { v };
 	Ok(Spanned(p.span(i0), v))
-}
-
-type Milli = i32;
-
-fn parse_length<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, Milli>, Error<'a>> {
-	parse_signed_int(p).map(|Spanned(a, v)| Spanned(a, v as i32))
-}
-
-fn parse_angle<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, i64>, Error<'a>> {
-	let i0 = p.next_span();
-	let v = parse_signed_int(p)?;
-	p.tight()?;
-	p.require(&TokenKind::Ident("deg"))?;
-	Ok(Spanned(p.span(i0), v.1))
-}
-
-fn parse_wrapped_int<'a>(p: &mut Parse<'a>, s: &'a str) -> Result<Spanned<'a, u64>, Error<'a>> {
-	let i0 = p.next_span();
-	p.require(&TokenKind::Ident(s))?;
-	p.tight()?;
-	p.require(&TokenKind::LParen)?;
-	let v = parse_int(p)?;
-	p.require(&TokenKind::RParen)?;
-	Ok(Spanned(p.span(i0), v))
-}
-
-fn parse_func_ref<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, FuncRef>, Error<'a>> {
-	let i0 = p.next_span();
-	let a = parse_int(p)? as u16;
-	p.tight()?;
-	p.require(&TokenKind::Colon)?;
-	p.tight()?;
-	let b = parse_int(p)? as u16;
-	Ok(Spanned(p.span(i0), FuncRef(a, b)))
-}
-
-fn parse_pos<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, Pos3>, Error<'a>> {
-	let i0 = p.next_span();
-	p.require(&TokenKind::LParen)?;
-	let x = parse_length(p)?.1;
-	p.require(&TokenKind::Comma)?;
-	let y = parse_length(p)?.1;
-	p.require(&TokenKind::Comma)?;
-	let z = parse_length(p)?.1;
-	p.require(&TokenKind::RParen)?;
-	Ok(Spanned(p.span(i0), Pos3(x, y, z)))
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum CharId {
-	Char(u16),
-}
-
-fn parse_char_id<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, CharId>, Error<'a>> {
-	let i0 = p.next_span();
-	let i = parse_ident(p)?;
-	match i.1 {
-		"char" => {
-			p.require(&TokenKind::LBrack)?;
-			let v = parse_int(p)?;
-			p.require(&TokenKind::RBrack)?;
-			Ok(Spanned(p.span(i0), CharId::Char(v as u16)))
-		}
-		_ => Err(Error::Misc {
-			span: i.0,
-			desc: "invalid CharId".to_owned(),
-		})
-	}
 }
 
 fn ident_line<'a>(p: &mut Parse<'a>) -> Result<(Spanned<'a, &'a str>, Parse<'a>), Error<'a>> {
@@ -322,144 +245,445 @@ fn ident_line<'a>(p: &mut Parse<'a>) -> Result<(Spanned<'a, &'a str>, Parse<'a>)
 	Ok((i, p))
 }
 
-macro parse_fields($p:ident $(, $name:ident => $f:expr)* $(,)?) {
-	$(let mut $name = None;)*
-	let mut p = $p.indented(true);
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Insn<'a> {
+	name: Spanned<'a, &'a str>,
+	args: Vec<Spanned<'a, Term<'a>>>,
+}
+
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum Unit {
+	None,
+	Mm,
+	MmPerS,
+	Ms,
+	Deg,
+	MDeg,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Term<'a> {
+	// Basics
+	Number(Spanned<'a, i64>, Spanned<'a, Unit>),
+	String(&'a str),
+	Tuple(Vec<Spanned<'a, Term<'a>>>),
+
+	Text(),
+	Attr(Box<Term<'a>>, Spanned<'a, u64>),
+	Expr(Box<Expr<'a>>), // Not available via standard syntax
+
+	// Expr
+	Random,
+	Flag(Spanned<'a, u64>),
+	System(Spanned<'a, u64>),
+	Var(Spanned<'a, u64>),
+	Global(Spanned<'a, u64>),
+
+	// Mainly chars
+	Null, // Though null can be useful for other cases too
+	Self_,
+	Custom(Spanned<'a, u64>),
+	Party(Spanned<'a, u64>),
+	FieldParty(Spanned<'a, u64>),
+
+	// Scena specific
+	Fn(Spanned<'a, u64>, Spanned<'a, u64>),
+	Char(Spanned<'a, u64>),
+	Entrance(Spanned<'a, u64>), // defined externally
+	Object(Spanned<'a, u64>),   // defined externally
+	LookPoint(Spanned<'a, u64>),
+	Chcp(Spanned<'a, u64>),
+
+	// Script resource ids
+	Fork(Spanned<'a, u64>),
+	Menu(Spanned<'a, u64>),
+	Select(Spanned<'a, u64>),
+	Vis(Spanned<'a, u64>),
+	Eff(Spanned<'a, u64>),
+	EffInstance(Spanned<'a, u64>),
+
+	// Global tables
+	Name(Spanned<'a, u64>),
+	Battle(Spanned<'a, u64>), // This one is scena-specific in ed7, but whatever
+	Bgm(Spanned<'a, u64>),
+	Sound(Spanned<'a, u64>),
+	Item(Spanned<'a, u64>),
+	Magic(Spanned<'a, u64>),
+	Quest(Spanned<'a, u64>),
+	Shop(Spanned<'a, u64>),
+	Town(Spanned<'a, u64>),
+}
+
+fn parse_insn<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, Insn<'a>>, Error<'a>> {
+	let i0 = p.next_span();
+	let name = parse_ident(p)?;
+	let mut args = Vec::new();
+	while !p.is_empty() {
+		let start = p.tokens as *const _;
+		match parse_term(p) {
+			Ok(t) => args.push(t),
+			Err(e) => {
+				if p.tokens as *const _ != start {
+					p.emit(e);
+				}
+				break
+			}
+		}
+	}
+	Ok(Spanned(p.span(i0), Insn { name, args }))
+}
+
+fn parse_unit<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, Unit>, Error<'a>> {
+	let i0 = p.next_span();
+	if p.tight().is_ok() {
+		if let TokenKind::Ident(i) = p.peek().token {
+			let span = p.next().span;
+			let u = match i {
+				"mm" if p.tight().is_ok() && p.test(&TokenKind::Slash).is_some() => {
+					p.require(&TokenKind::Ident("s"))?;
+					Unit::MmPerS
+				}
+				"mm" => Unit::Mm,
+				"ms" => Unit::Ms,
+				"deg" => Unit::Deg,
+				"mdeg" => Unit::MDeg,
+				_ => return Err(Error::Misc {
+					span: p.peek().span,
+					desc: "invalid unit".to_owned(),
+				})
+			};
+			return Ok(Spanned(p.span(i0), u))
+		}
+	}
+	Ok(Spanned(p.prev_span(), Unit::None))
+}
+
+fn parse_term<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, Term<'a>>, Error<'a>> {
+	fn brack<'a>(p: &mut Parse<'a>, f: impl FnOnce(&mut Parse<'a>) -> Result<Term<'a>, Error<'a>>) -> Result<Term<'a>, Error<'a>> {
+		p.next(); // will be an ident, but that's checked outside
+		p.tight()?;
+		p.require(&TokenKind::LBrack)?;
+		let e = f(p)?;
+		p.require(&TokenKind::RBrack)?;
+		Ok(e)
+	}
+
+	fn brack_int<'a>(p: &mut Parse<'a>, f: impl FnOnce(Spanned<'a, u64>) -> Term<'a>) -> Result<Term<'a>, Error<'a>> {
+		brack(p, |p| parse_int(p).map(f))
+	}
+
+	let i0 = p.next_span();
+	let t = match p.peek().token {
+		TokenKind::String(_) => {
+			Term::String(parse_string(p)?.1)
+		}
+		TokenKind::Minus | TokenKind::Number(_) => {
+			let n = parse_signed_int(p)?;
+			let unit = parse_unit(p)?;
+			Term::Number(n, unit)
+		}
+		TokenKind::LParen => {
+			p.require(&TokenKind::LParen)?;
+			let mut terms = Vec::new();
+			while p.test(&TokenKind::RParen).is_none() {
+				terms.push(parse_term(p)?);
+				if p.test(&TokenKind::Comma).is_none() {
+					break
+				}
+			}
+			Term::Tuple(terms)
+		}
+
+		TokenKind::Ident("random") => { p.next(); Term::Random },
+		TokenKind::Ident("flag") => brack_int(p, Term::Flag)?,
+		TokenKind::Ident("system") => brack_int(p, Term::System)?,
+		TokenKind::Ident("var") => brack_int(p, Term::Var)?,
+		TokenKind::Ident("global") => brack_int(p, Term::Global)?,
+
+		TokenKind::Ident("null") => { p.next(); Term::Null },
+		TokenKind::Ident("self") => { p.next(); Term::Self_ },
+		TokenKind::Ident("custom") => brack_int(p, Term::Custom)?,
+		TokenKind::Ident("party") => brack_int(p, Term::Party)?,
+		TokenKind::Ident("field_party") => brack_int(p, Term::FieldParty)?,
+
+		TokenKind::Ident("fn") => brack(p, |p| {
+			let a = parse_int(p)?;
+			p.require(&TokenKind::Comma)?;
+			let b = parse_int(p)?;
+			Ok(Term::Fn(a, b))
+		})?,
+		TokenKind::Ident("char") => brack_int(p, Term::Char)?,
+		TokenKind::Ident("entrance") => brack_int(p, Term::Entrance)?,
+		TokenKind::Ident("object") => brack_int(p, Term::Object)?,
+		TokenKind::Ident("look_point") => brack_int(p, Term::LookPoint)?,
+		TokenKind::Ident("chcp") => brack_int(p, Term::Chcp)?,
+
+		TokenKind::Ident("fork") => brack_int(p, Term::Fork)?,
+		TokenKind::Ident("menu") => brack_int(p, Term::Menu)?,
+		TokenKind::Ident("select") => brack_int(p, Term::Select)?,
+		TokenKind::Ident("vis") => brack_int(p, Term::Vis)?,
+		TokenKind::Ident("eff") => brack_int(p, Term::Eff)?,
+		TokenKind::Ident("eff_instance") => brack_int(p, Term::EffInstance)?,
+
+		TokenKind::Ident("name") => brack_int(p, Term::Name)?,
+		TokenKind::Ident("battle") => brack_int(p, Term::Battle)?,
+		TokenKind::Ident("bgm") => brack_int(p, Term::Bgm)?,
+		TokenKind::Ident("sound") => brack_int(p, Term::Sound)?,
+		TokenKind::Ident("item") => brack_int(p, Term::Item)?,
+		TokenKind::Ident("magic") => brack_int(p, Term::Magic)?,
+		TokenKind::Ident("quest") => brack_int(p, Term::Quest)?,
+		TokenKind::Ident("shop") => brack_int(p, Term::Shop)?,
+		TokenKind::Ident("town") => brack_int(p, Term::Town)?,
+
+		_ => return Err(Error::Misc {
+			span: p.peek().span,
+			desc: "invalid term".to_owned(),
+		})
+	};
+
+	let mut t = t;
+	while p.tight().is_ok() && p.test(&TokenKind::Dot).is_some() {
+		p.tight()?;
+		let b = parse_int(p)?;
+		t = Term::Attr(Box::new(t), b)
+	}
+
+	println!("{:?}", t);
+	Ok(Spanned(p.span(i0), t))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Expr<'a> {
+	first: Spanned<'a, Atom<'a>>,
+	rest: Vec<(Spanned<'a, Binop>, Spanned<'a, Atom<'a>>)>,
+}
+
+fn parse_expr<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, Expr<'a>>, Error<'a>> {
+	let i0 = p.next_span();
+	let first = parse_atom(p)?;
+	let mut rest = Vec::new();
+	while let Some(op) = parse_binop(p) {
+		let next = parse_atom(p)?;
+		rest.push((op, next))
+	}
+	Ok(Spanned(p.span(i0), Expr { first, rest }))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Binop {
+	Eq, Ne,
+	Lt, Le,
+	Gt, Ge,
+	BoolAnd, BoolOr,
+	Add, Sub, Mul, Div, Mod,
+	Or, And, Xor,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Unop {
+	Not,
+	Neg,
+	Plus,
+	Inv,
+}
+
+fn parse_binop<'a>(p: &mut Parse<'a>) -> Option<Spanned<'a, Binop>> {
+	macro op($p:ident, $t1:ident $($t:ident)* => $op:ident) {
+		let i0 = p.next_span();
+		let pos = $p.tokens;
+		if let Ok::<(), Error>(()) = try {
+			p.require(&TokenKind::$t1)?;
+			$(p.tight()?; p.require(&TokenKind::$t)?;)*
+		} {
+			return Some(Spanned(p.span(i0), Binop::$op))
+		}
+		$p.tokens = pos;
+	}
+
+	op!(p, Eq Eq   => Eq);
+	op!(p, Excl Eq => Ne);
+	op!(p, Lt      => Lt);
+	op!(p, Lt Eq   => Le);
+	op!(p, Gt      => Gt);
+	op!(p, Gt Eq   => Ge);
+
+	op!(p, Pipe Pipe => BoolOr);
+	op!(p, Amp  Amp  => BoolAnd);
+
+	op!(p, Plus    => Add);
+	op!(p, Minus   => Sub);
+	op!(p, Star    => Mul);
+	op!(p, Slash   => Div);
+	op!(p, Percent => Mod);
+	op!(p, Pipe    => Or);
+	op!(p, Amp     => And);
+	op!(p, Caret   => Xor);
+
+	None
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Atom<'a> {
+	Term(Term<'a>),
+	Insn(Insn<'a>),
+	Unop(Unop, Box<Spanned<'a, Atom<'a>>>),
+	Paren(Box<Spanned<'a, Expr<'a>>>),
+}
+
+fn parse_atom<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, Atom<'a>>, Error<'a>> {
+	let i0 = p.next_span();
+	let v = match &p.peek().token {
+		TokenKind::LParen => {
+			p.require(&TokenKind::LParen)?;
+			let e = parse_expr(p)?;
+			p.require(&TokenKind::RParen)?;
+			Atom::Paren(Box::new(e))
+		}
+		TokenKind::Plus => {
+			p.require(&TokenKind::Plus)?;
+			let e = parse_atom(p)?;
+			Atom::Unop(Unop::Plus, Box::new(e))
+		}
+		TokenKind::Minus => {
+			p.require(&TokenKind::Minus)?;
+			let e = parse_atom(p)?;
+			Atom::Unop(Unop::Neg, Box::new(e))
+		}
+		TokenKind::Excl => {
+			p.require(&TokenKind::Excl)?;
+			let e = parse_atom(p)?;
+			Atom::Unop(Unop::Not, Box::new(e))
+		}
+		TokenKind::Tilde => {
+			p.require(&TokenKind::Tilde)?;
+			let e = parse_atom(p)?;
+			Atom::Unop(Unop::Inv, Box::new(e))
+		}
+		_ => {
+			let start = p.tokens as *const _;
+			match parse_term(p) {
+				Ok(t) => Atom::Term(t.1),
+				Err(_) if p.tokens as *const _ == start => {
+					let Ok(insn) = parse_insn(p) else {
+						return Err(Error::Misc {
+							span: p.peek().span,
+							desc: "invalid term or insn".to_owned(),
+						})
+					};
+					Atom::Insn(insn.1)
+				}
+				Err(e) => return Err(e)
+			}
+		}
+	};
+	Ok(Spanned(p.span(i0), v))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Data<'a> {
+	id: Spanned<'a, &'a str>,
+	args: Vec<Spanned<'a, Term<'a>>>,
+	body: Option<Vec<Spanned<'a, Data<'a>>>>,
+}
+
+fn parse_data<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, Data<'a>>, Error<'a>> {
+	let mut p = p.indented(false);
+	let p = &mut p;
+	let i0 = p.next_span();
+	let id = parse_ident(p)?;
+	let mut args = Vec::new();
+	let mut body = None;
+	while !p.is_empty() {
+		if p.test(&TokenKind::Colon).is_some() {
+			body = Some(parse_block(p, parse_data));
+			break
+		}
+		match parse_term(p) {
+			Ok(a) => args.push(a),
+			Err(e) => {
+				p.emit(e);
+				break
+			}
+		}
+	}
+	Ok(Spanned(p.span(i0), Data { id, args, body }))
+}
+
+fn parse_block<'a, T>(p: &mut Parse<'a>, mut f: impl FnMut(&mut Parse<'a>) -> Result<T, Error<'a>>) -> Vec<T> {
+	let mut p = p.indented(true);
+	let p = &mut p;
+	let mut items = Vec::new();
+	while !p.is_empty() {
+		match f(p) {
+			Ok(d) => items.push(d),
+			Err(e) => {
+				p.emit(e);
+				continue
+			}
+		}
+	}
+	items
+}
+
+fn parse_function<'a>(p: &mut Parse<'a>) -> Result<(), Error<'a>> {
+	p.require(&TokenKind::Ident("fn"))?;
+	let id = parse_term(p)?;
+	p.require(&TokenKind::Colon)?;
+	let b = parse_code_block(p)?;
+	Ok(())
+}
+
+fn parse_code_block<'a>(p: &mut Parse<'a>) -> Result<(), Error<'a>> {
+	let mut p = p.indented(true);
 	let i0 = p.next_span();
 	while !p.is_empty() {
 		let e: Result<(), Error> = try {
-			let (t, mut p) = ident_line(&mut p)?;
-			match t.1 {
-				$(stringify!($name) => {
-					let o = $name.replace(Spanned(t.0, None));
-					$name = {
-						let $p = &mut p;
-						Some(Spanned(t.0, Some($f)))
-					};
-					if let Some(Spanned(prev_span, _)) = o {
-						Err(Error::Duplicate { span: t.0, prev_span })?;
-					}
-				})*
+			let mut p = p.indented(false);
+			let p = &mut p;
+			match p.peek().token {
+				// TODO can I do better handling of malformed these?
+				TokenKind::Ident("if"|"elif"|"while"|"switch") => {
+					p.next();
+					let e = parse_expr(p)?;
+					p.require(&TokenKind::Colon)?;
+					let b = parse_code_block(p)?;
+				}
+				TokenKind::Ident("else") => {
+					p.next();
+					p.require(&TokenKind::Colon)?;
+					let b = parse_code_block(p)?;
+				}
+				TokenKind::Ident("break"|"continue") => {
+					p.next();
+				}
 				_ => {
-					const ALTS: &[&str] = &[$(concat!("'", stringify!($name), "'")),*];
-					Err(Error::Misc {
-						span: t.0,
-						desc: format!("unknown field, expected {}", ALTS.join(", ")),
-					})?;
+					parse_insn(p)?;
 				}
 			}
 			p.end()?;
 		};
 		e.consume_err(|e| p.emit(e));
 	}
-	let mut missing = Vec::new();
-	$(if $name.is_none() {
-		missing.push(concat!("'", stringify!($name), "'"));
-	})*
-	if !missing.is_empty() {
-		Err(Error::Misc {
-			span: p.span(i0),
-			desc: format!("missing fields: {}", missing.join(", ")),
-		})?;
-	}
-	$(let $name = $name.unwrap();)*
-}
-
-fn parse_header<'a>(p: &mut Parse<'a>) -> Result<(), Error<'a>> {
-	p.require(&TokenKind::Ident("ed6"))?;
-	p.require(&TokenKind::Colon)?;
-
-	parse_fields! { p,
-		name => (parse_string(p)?, parse_string(p)?),
-		town => parse_wrapped_int(p, "TownId")?,
-		bgm  => parse_wrapped_int(p, "BgmId")?,
-		item => parse_func_ref(p)?,
-	};
-
-	println!("{:?}", (name,town,bgm,item));
-
 	Ok(())
 }
 
-fn parse_scp<'a>(p: &mut Parse<'a>) -> Result<(), Error<'a>> {
-	let n = parse_int(p)?;
-	let file = parse_string(p)?;
-	println!("{:?}", (n, file));
-	Ok(())
-}
-
-fn parse_entry<'a>(p: &mut Parse<'a>) -> Result<(), Error<'a>> {
-	p.require(&TokenKind::Colon)?;
-	parse_fields! { p,
-		pos => parse_pos(p)?,
-		chr => parse_int(p)?,
-		angle  => parse_angle(p)?,
-		cam_from => parse_pos(p)?,
-		cam_at => parse_pos(p)?,
-		cam_zoom => parse_int(p)?,
-		cam_pers => parse_int(p)?,
-		cam_deg => parse_angle(p)?,
-		cam_limit => (parse_angle(p)?, parse_angle(p)?),
-		north => parse_angle(p)?,
-		flags => parse_int(p)?,
-		town => parse_wrapped_int(p, "TownId")?,
-		init => parse_func_ref(p)?,
-		reinit => parse_func_ref(p)?,
-	};
-	println!("{:?}", (pos,chr,angle));
-	println!("{:?}", (cam_from,cam_at,cam_zoom,cam_pers,cam_deg,cam_limit,north));
-	println!("{:?}", (north,flags,town,init,reinit));
-	Ok(())
-}
-
-fn parse_chcp<'a>(p: &mut Parse<'a>) -> Result<(), Error<'a>> {
-	let n = parse_wrapped_int(p, "ChcpId")?;
-	let file1 = optional(p, parse_string)?;
-	let file2 = optional(p, parse_string)?;
-	println!("{:?}", (n, file1, file2));
-	Ok(())
-}
-
-fn parse_npc<'a>(p: &mut Parse<'a>) -> Result<(), Error<'a>> {
-	let id = parse_char_id(p)?;
-	p.require(&TokenKind::Colon)?;
-	parse_fields! { p,
-		name => parse_string(p)?,
-		pos => parse_pos(p)?,
-		angle  => parse_angle(p)?,
-		x => parse_int(p)?,
-		pt => parse_wrapped_int(p, "ChcpId")?,
-		no => parse_int(p)?,
-		bs => parse_wrapped_int(p, "ChcpId")?,
-		flags => parse_int(p)?,
-		init => parse_func_ref(p)?,
-		talk => parse_func_ref(p)?,
-	};
-	println!("{:?}", (id,name,pos,angle));
-	println!("{:?}", (x,pt,no,bs));
-	println!("{:?}", (flags,init,talk));
-	Ok(())
-}
 
 pub fn parse_top<'a>(p: &mut Parse<'a>) -> Result<(), Error<'a>> {
-	p.require(&TokenKind::Ident("scena"))?;
-	parse_header(p)?;
-
 	while !p.is_empty() {
 		let e: Result<(), Error> = try {
-			let (t, mut p) = ident_line(p)?;
-			match t.1 {
-				"scp" => parse_scp(&mut p)?,
-				"entry" => parse_entry(&mut p)?,
-				"chcp" => parse_chcp(&mut p)?,
-				"npc" => parse_npc(&mut p)?,
+			let mut p = p.indented(false);
+			match p.peek().token {
+				TokenKind::Ident("fn") => {
+					parse_function(&mut p)?;
+				}
 				_ => {
-					Err(Error::Misc {
-						span: t.0,
-						desc: "invalid declaration".to_owned(),
-					})?;
+					println!("parsing data");
+					let d = parse_data(&mut p)?;
+					println!("{:?}", d);
 				}
 			}
+			p.end()?;
 		};
 		e.consume_err(|e| p.emit(e));
 	}

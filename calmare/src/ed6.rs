@@ -69,12 +69,12 @@ pub fn write(mut f: Context, scena: &ed6::Scena) -> Result<()> {
 		if let Some(ch) = ch {
 			f.val(I::String(ch))?;
 		} else {
-			f.kw("-")?;
+			f.kw("null")?;
 		}
 		if let Some(cp) = cp {
 			f.val(I::String(cp))?;
 		} else {
-			f.kw("-")?;
+			f.kw("null")?;
 		}
 		f.line()?;
 		chcp.2 += 1;

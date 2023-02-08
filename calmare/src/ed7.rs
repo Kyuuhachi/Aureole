@@ -128,21 +128,22 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 	for (i, tr) in triggers.iter().enumerate() {
 		f.kw("trigger")?.val(I::u16(&(i as u16)))?.suf(":")?.line()?.indent(|f| {
 			f.kw("pos")?;
-			write!(f, "({}, {}, {})", tr.pos.0, tr.pos.1, tr.pos.2)?;
+			write!(f, "({:?}, {:?}, {:?})", tr.pos.0, tr.pos.1, tr.pos.2)?;
 			f.line()?;
 
 			f.kw("radius")?;
-			write!(f, "{}", tr.radius)?;
+			write!(f, "{:?}", tr.radius)?;
 			f.line()?;
 
 			f.kw("transform")?;
 			f.line()?.indent(|f| {
 				for r in &tr.transform {
-					write!(f, "({}, {}, {}, {})", r[0], r[1], r[2], r[3])?;
+					write!(f, "{:?} {:?} {:?} {:?}", r[0], r[1], r[2], r[3])?;
 					f.line()?;
 				}
 				Ok(())
 			}).strict()?;
+			// TODO add a comment with decomposition
 
 			f.kw("unk1")?.val(I::u8(&tr.unk1))?.line()?;
 			f.kw("unk2")?.val(I::u16(&tr.unk2))?.line()?;

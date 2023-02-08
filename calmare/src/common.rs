@@ -109,10 +109,15 @@ pub fn tree_func(f: &mut Context, func: &[TreeInsn]) -> Result<()> {
 				f.indent(|f| {
 					for (v, body) in cs {
 						match v {
-							Some(v) => f.val(I::u16(v))?,
-							None => f.kw("default")?
+							Some(v) => {
+								f.kw("case")?;
+								f.val(I::u16(v))?;
+							}
+							None => {
+								f.kw("default")?;
+							}
 						};
-						f.kw("=>")?.line()?;
+						f.suf(":")?.line()?;
 						f.indent(|f| tree_func(f, body))?;
 					}
 					Ok(())
@@ -163,7 +168,7 @@ fn val(f: &mut Context, a: I) -> Result<()> {
 		I::CharAttr(v) => {
 			f.val(I::CharId(&v.0))?;
 			f.no_space()?;
-			write!(f, ":{}", v.1)?;
+			write!(f, ".{}", v.1)?;
 		},
 
 		I::SystemFlags(v) => write!(f, "0x{:08X}", v.0)?,
@@ -173,7 +178,6 @@ fn val(f: &mut Context, a: I) -> Result<()> {
 		I::LookPointFlags(v) => write!(f, "0x{:04X}", v.0)?,
 		I::Color(v)       => write!(f, "0x{:08X}", v.0)?,
 
-		I::NameId(v) => write!(f, "member[{}]", v.0)?,
 		I::CharId(v) => match v.0 {
 			257.. => val(f, I::NameId(&(v.0 - 257).into()))?,
 			256   => write!(f, "(ERROR)")?,
@@ -192,28 +196,29 @@ fn val(f: &mut Context, a: I) -> Result<()> {
 			0..   => write!(f, "field_party[{}]", v.0)?,
 		},
 
-		I::BattleId(v) => write!(f, "{v:?}")?,
-		I::BgmId(v)    => write!(f, "{v:?}")?,
-		I::ItemId(v)   => write!(f, "{v:?}")?,
-		I::MagicId(v)  => write!(f, "{v:?}")?,
-		I::QuestId(v)  => write!(f, "{v:?}")?,
-		I::ShopId(v)   => write!(f, "{v:?}")?,
-		I::SoundId(v)  => write!(f, "{v:?}")?,
-		I::TownId(v)   => write!(f, "{v:?}")?,
+		I::NameId(v)   => write!(f, "name[{}]", v.0)?,
+		I::BattleId(v) => write!(f, "battle[{}]", v.0)?,
+		I::BgmId(v)    => write!(f, "bgm[{}]", v.0)?,
+		I::ItemId(v)   => write!(f, "item[{}]", v.0)?,
+		I::MagicId(v)  => write!(f, "magic[{}]", v.0)?,
+		I::QuestId(v)  => write!(f, "quest[{}]", v.0)?,
+		I::ShopId(v)   => write!(f, "shop[{}]", v.0)?,
+		I::SoundId(v)  => write!(f, "sound[{}]", v.0)?,
+		I::TownId(v)   => write!(f, "town[{}]", v.0)?,
 
-		I::EntranceId(v) => write!(f, "EntranceId({v})")?,
-		I::ForkId(v)   => write!(f, "ForkId({v})")?,
-		I::MenuId(v)   => write!(f, "MenuId({v})")?,
-		I::SelectId(v) => write!(f, "SelectId({v})")?,
-		I::ObjectId(v) => write!(f, "ObjectId({v})")?,
-		I::LookPointId(v) => write!(f, "LookPointId({v})")?,
-		I::VisId(v)    => write!(f, "VisId({v})")?,
-		I::EffId(v)    => write!(f, "EffId({v})")?,
-		I::ChcpId(v)   => write!(f, "ChcpId({v})")?,
+		I::EntranceId(v) => write!(f, "entrance[{v}]")?,
+		I::ForkId(v)   => write!(f, "fork[{v}]")?,
+		I::MenuId(v)   => write!(f, "menu[{v}]")?,
+		I::SelectId(v) => write!(f, "select[{v}]")?,
+		I::ObjectId(v) => write!(f, "object[{v}]")?,
+		I::LookPointId(v) => write!(f, "look_point[{v}]")?,
+		I::VisId(v)    => write!(f, "vis[{v}]")?,
+		I::EffId(v)    => write!(f, "eff[{v}]")?,
+		I::ChcpId(v)   => write!(f, "chcp[{v}]")?,
 
 		I::Expr(v) => expr(f, v)?,
 
-		I::FuncRef(v) => write!(f, "{}:{}", v.0, v.1)?,
+		I::FuncRef(v) => write!(f, "fn[{},{}]", v.0, v.1)?,
 
 		I::Fork(a) => {
 			f.suf(":")?;
@@ -227,11 +232,11 @@ fn val(f: &mut Context, a: I) -> Result<()> {
 		}
 
 		I::Menu(a) => {
-			f.suf(":")?;
 			f.indent(|f| {
-				for line in a.iter() {
+				for (i, line) in a.iter().enumerate() {
 					f.line()?;
 					f.val(I::MenuItem(line))?;
+					write!(f, "// {i}")?;
 				}
 				Ok(())
 			}).strict()?;
@@ -250,12 +255,12 @@ fn val(f: &mut Context, a: I) -> Result<()> {
 		I::Text(v) if f.blind => text_blind(f, v)?,
 		I::Text(v) => text(f, v)?,
 
-		I::Angle(v)   => write!(f, "{v}°")?,
-		I::Angle32(v) => write!(f, "{v}°₃₂")?,
+		I::Angle(v)   => write!(f, "{v}deg")?,
+		I::Angle32(v) => write!(f, "{v}mdeg")?,
 		I::Speed(v)   => write!(f, "{v}mm/s")?,
 		I::Time(v)    => write!(f, "{v}ms")?,
 
-		I::Pos2(Pos2(x,z))   => write!(f, "({x}, -, {z})")?,
+		I::Pos2(Pos2(x,z))   => write!(f, "({x}, null, {z})")?,
 		I::Pos3(Pos3(x,y,z)) => write!(f, "({x}, {y}, {z})")?,
 
 		I::Emote(v) => write!(f, "{v:?}")?,
@@ -286,7 +291,7 @@ fn expr(f: &mut Context, e: &Expr) -> Result<()> {
 			Expr::Var(v)      => { f.val(I::Var(v))?; }
 			Expr::Attr(v)     => { f.val(I::Attr(v))?; }
 			Expr::CharAttr(v) => { f.val(I::CharAttr(v))?; }
-			Expr::Rand        => { f.kw("Rand")?; }
+			Expr::Rand        => { f.kw("random")?; }
 			Expr::Global(v)   => { f.val(I::Global(v))?; }
 
 			Expr::Binop(op, a, b) => {

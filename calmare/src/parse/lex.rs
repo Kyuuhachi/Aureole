@@ -268,6 +268,9 @@ pub enum TokenKind<'a> {
 	Amp,   // &
 	Pipe,  // |
 	Caret, // ^
+	Tilde, // ~
+	Dot,   // .
+	At,    // @
 
 	Eof,
 	Error,
@@ -334,6 +337,9 @@ pub fn token<'a>(i: &mut Lex<'a>) -> Token<'a> {
 		.or_else(|| pat(i, '&').map(|_| TokenKind::Amp))
 		.or_else(|| pat(i, '|').map(|_| TokenKind::Pipe))
 		.or_else(|| pat(i, '^').map(|_| TokenKind::Caret))
+		.or_else(|| pat(i, '~').map(|_| TokenKind::Tilde))
+		.or_else(|| pat(i, '.').map(|_| TokenKind::Dot))
+		.or_else(|| pat(i, '@').map(|_| TokenKind::At))
 	{
 		Token {
 			trivia,

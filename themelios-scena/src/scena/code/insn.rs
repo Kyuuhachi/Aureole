@@ -797,6 +797,61 @@ themelios_macros::bytecode! {
 	]
 }
 
+macro make_args(
+	// Names need to be passed from outside for hygiene. Ugh.
+	{ $name:ident $args:ident $args_mut:ident $into_parts:ident $arg_types:ident $from_parts:ident }
+	[$(($ident:ident $(($_n:ident $alias:ident))*))*]
+) {
+	impl Insn {
+		pub fn $name(&self) -> &'static str {
+			match self {
+				$(Self::$ident(..) => stringify!($ident),)*
+			}
+		}
+
+		pub fn $args(&self) -> Box<[InsnArg]> {
+			match self {
+				$(Self::$ident($($_n),*) => Box::new([$(InsnArg::$alias($_n)),*]),)*
+			}
+		}
+
+		pub fn $args_mut(&mut self) -> Box<[InsnArgMut]> {
+			match self {
+				$(Self::$ident($($_n),*) => Box::new([$(InsnArgMut::$alias($_n)),*]),)*
+			}
+		}
+
+		pub fn $into_parts(self) -> (&'static str, Box<[InsnArgOwned]>) {
+			let name = self.$name();
+			let args: Box<[InsnArgOwned]> = match self {
+				$(Self::$ident($($_n),*) => Box::new([$(InsnArgOwned::$alias($_n)),*]),)*
+			};
+			(name, args)
+		}
+
+		pub fn $arg_types(name: &str) -> Option<&'static [InsnArgType]> {
+			match name {
+				$(stringify!($ident) => Some(&[$(InsnArgType::$alias),*]),)*
+				_ => None
+			}
+		}
+
+		pub fn $from_parts(name: &str, args: impl IntoIterator<Item=InsnArgOwned>) -> Option<Self> {
+			let mut it = args.into_iter();
+			let v = match name {
+				$(stringify!($ident) => {
+					$(let Some(InsnArgOwned::$alias($_n)) = it.next() else { return None; };)*
+					Self::$ident($($_n),*)
+				})*
+				_ => return None
+			};
+			if let Some(_) = it.next() { return None; }
+			Some(v)
+		}
+	}
+}
+introspect!(make_args {name args args_mut into_parts arg_types from_parts});
+
 mod color24 {
 	use super::*;
 	pub(super) fn read<'a>(f: &mut impl Read<'a>) -> Result<Color, ReadError> {

@@ -143,42 +143,7 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 	let InsnArg_names = arg_types.keys().collect::<Vec<_>>();
 	let InsnArg_types = arg_types.values().collect::<Vec<_>>();
 
-	let name_body: Vec<Arm> = ctx.defs.iter().map(|Insn { span, ident, .. }| {
-		let name = ident.to_string();
-		pq!{span=>
-			Self::#ident(..) => #name,
-		}
-	}).collect();
-
-	let args_body: Vec<Arm> = ctx.defs.iter().map(|Insn { span, ident, args, .. }| {
-		let arg_names = args.iter().enumerate().map(|(i, _)| format_ident!("_{i}")).collect::<Vec<_>>();
-		let aliases = args.iter().map(|a| a.alias());
-		pq!{span=>
-			Self::#ident(#(#arg_names),*) => Box::new([#(Arg::#aliases(#arg_names)),*]),
-		}
-	}).collect();
-
-	let arg_types_body: Vec<Arm> = ctx.defs.iter().map(|Insn { span, ident, args, .. }| {
-		let aliases = args.iter().map(|a| a.alias());
-		let name = ident.to_string();
-		pq!{span=>
-			#name => Box::new([#(Arg::#aliases),*]),
-		}
-	}).collect();
-
-	let from_args_body: Vec<Arm> = ctx.defs.iter().map(|Insn { span, ident, args, .. }| {
-		let arg_names = args.iter().enumerate().map(|(i, _)| format_ident!("_{i}")).collect::<Vec<_>>();
-		let aliases = args.iter().map(|a| a.alias());
-		let name = ident.to_string();
-		pq!{span=>
-			#name => {
-				#(let Some(Arg::#aliases(#arg_names)) = it.next() else { return None; };)*
-				Self::#ident(#(#arg_names),*)
-			},
-		}
-	}).collect();
-
-	let introspection = quote! {
+	let insn_arg = quote! {
 		#[cfg(not(doc))]
 		#[allow(non_camel_case_types)]
 		#[derive(Debug, Clone)]
@@ -229,62 +194,24 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		#[cfg(doc)]
 		#[doc(inline, hidden)]
 		pub use InsnArg as InsnArgType;
+	};
 
-		impl Insn {
-			pub fn name(&self) -> &'static str {
-				match self {
-					#(#name_body)*
-				}
-			}
+	let introspect = ctx.defs.iter().map(|Insn { span, ident, args, .. }| {
+		let aliases = args.iter().map(|a| a.alias());
+		let arg_names = args.iter().enumerate().map(|(i, _)| format_ident!("_{i}")).collect::<Vec<_>>();
+		quote::quote_spanned!{*span=> (#ident #((#arg_names #aliases))*) }
+	});
 
-			pub fn args(&self) -> Box<[InsnArg]> {
-				use InsnArg as Arg;
-				match self {
-					#(#args_body)*
-				}
-			}
-
-			pub fn args_mut(&mut self) -> Box<[InsnArgMut]> {
-				use InsnArgMut as Arg;
-				match self {
-					#(#args_body)*
-				}
-			}
-
-			pub fn into_parts(self) -> (&'static str, Box<[InsnArgOwned]>) {
-				use InsnArgOwned as Arg;
-				let name = self.name();
-				let args: Box<[Arg]> = match self {
-					#(#args_body)*
-				};
-				(name, args)
-			}
-
-			pub fn arg_types(name: &str) -> Option<Box<[InsnArgType]>> {
-				use InsnArgType as Arg;
-				let types: Box<[Arg]> = match name {
-					#(#arg_types_body)*
-					_ => return None,
-				};
-				Some(types)
-			}
-
-			pub fn from_parts(name: &str, args: impl IntoIterator<Item=InsnArgOwned>) -> Option<Insn> {
-				use InsnArgOwned as Arg;
-				let mut it = args.into_iter();
-				let v = match name {
-					#(#from_args_body)*
-					_ => return None,
-				};
-				if let Some(_) = it.next() { return None; }
-				Some(v)
-			}
+	let introspect = quote! {
+		pub macro introspect($m:path $({$($arg:tt)*})?) {
+			$m!{ $({$($arg)*})? [#(#introspect)*] }
 		}
 	};
 
 	quote! {
 		#main
-		#introspection
+		#insn_arg
+		#introspect
 	}.into()
 }
 

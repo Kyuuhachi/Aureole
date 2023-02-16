@@ -1,4 +1,4 @@
-use themelios::scena::{Pos2, Pos3, FuncRef};
+use themelios::scena::{Pos2, Pos3, FuncRef, Emote};
 use themelios::scena::code::{InstructionSet, InsnArg as I, Expr, ExprBinop, ExprUnop, FlatInsn, Label, Insn};
 use themelios::scena::code::decompile::{decompile, TreeInsn};
 use themelios::text::{Text, TextSegment};
@@ -143,9 +143,17 @@ pub fn tree_func(f: &mut Context, func: &[TreeInsn]) -> Result<()> {
 }
 
 fn insn(f: &mut Context, i: &Insn) -> Result<()> {
-	f.kw(i.name())?;
-	for &a in i.args().iter() {
-		f.val(a)?;
+	match *i.args() {
+		[a, I::Expr(e)] => {
+			f.val(a)?;
+			f.val(I::Expr(e))?;
+		}
+		ref xs => {
+			f.kw(i.name())?;
+			for &a in xs.iter() {
+				f.val(a)?;
+			}
+		}
 	}
 	Ok(())
 }
@@ -263,7 +271,7 @@ fn val(f: &mut Context, a: I) -> Result<()> {
 		I::Pos2(Pos2(x,z))   => write!(f, "({x}, null, {z})")?,
 		I::Pos3(Pos3(x,y,z)) => write!(f, "({x}, {y}, {z})")?,
 
-		I::Emote(v) => write!(f, "{v:?}")?,
+		I::Emote(Emote(a,b,c)) => write!(f, "emote[{a},{b},{c}ms]")?,
 		I::MemberAttr(v) => write!(f, "{v:?}")?,
 		I::QuestTask(v) => write!(f, "{v:?}")?,
 		I::Animation(v) => write!(f, "{v:?}")?,
@@ -430,5 +438,3 @@ fn text_blind(f: &mut Context, v: &Text) -> Result<()> {
 	}
 	Ok(())
 }
-
-

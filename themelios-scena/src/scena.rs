@@ -92,7 +92,7 @@ pub struct CharAttr(pub CharId, pub u8);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[derive(derive_more::DebugCustom)]
-#[debug(fmt = "Emote({_0:?}, {_1})")]
+#[debug(fmt = "Emote({_0:?}, {_1}, {_2})")]
 pub struct Emote(pub u8, pub u8, pub u32);
 
 pub trait ReadStreamExt2: ReadStream {

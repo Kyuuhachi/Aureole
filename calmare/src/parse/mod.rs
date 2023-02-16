@@ -1,752 +1,550 @@
+mod diag;
 mod lex;
+mod ast;
 
-use std::{cell::RefCell, rc::Rc};
-use lex::{Lex, Token, TokenKind, Span, Error};
+use lex::*;
+use diag::*;
+use ast::*;
+use Spanned as S;
 
-#[extend::ext]
-pub impl<A, B> Result<A, B> {
-	fn consume_err(self, f: impl FnOnce(B)) -> Option<A> {
-		match self {
-			Ok(a) => Some(a),
-			Err(e) => {
-				f(e);
-				None
-			}
-		}
-	}
-}
+struct Error;
+type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub struct Spanned<'a, T>(Span<'a>, T);
-
-impl<'a, T: std::fmt::Debug> std::fmt::Debug for Spanned<'a, T> {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_tuple("Spanned").field(&self.1).finish()
-	}
-}
-
-impl<'a, A> Spanned<'a, A> {
-	pub fn map<B>(self, f: impl FnOnce(A) -> B) -> Spanned<'a, B> {
-		Spanned(self.0, f(self.1))
-	}
-}
-
-#[inline]
-fn is_indented(incl: bool, a: &str, b: &str) -> bool {
-	(b.len() > a.len() || incl && b.len() == a.len()) && b.starts_with(a)
-}
-
-pub struct Parse<'a> {
-	src: &'a str,
-	indent: &'a str,
-	tokens: &'a [Token<'a>],
-	eof: &'a Token<'a>,
-	errors: Rc<RefCell<Vec<Error<'a>>>>,
+#[derive(Clone, Debug)]
+struct Parse<'a> {
+	tokens: &'a [S<Token<'a>>],
+	eof: Span,
+	pos: usize,
 }
 
 impl<'a> Parse<'a> {
-	pub fn new(src: &'a str, tokens: &'a [Token<'a>], eof: &'a Token<'a>) -> Self {
-		let indent = tokens.first().map_or_else(|| eof.span.as_str(), |a| a.indent.expect("parser must start on a line"));
-		assert_eq!(eof.token, TokenKind::Eof);
-		Parse {
-			src,
-			indent,
-			tokens,
-			eof,
-			errors: Default::default(),
+	fn run<V>(
+		tokens: &'a [S<Token<'a>>],
+		eof: Span,
+		f: impl FnOnce(&mut Parse<'a>) -> Result<V>,
+	) -> Result<V> {
+		let mut p = Parse { tokens, eof, pos: 0 };
+		let v = f(&mut p);
+		if v.is_ok() && !p.is_empty() {
+			Diag::error(p.next_pos(), "expected end of data").emit();
 		}
+		v
 	}
 
-	fn peek(&self) -> &'a Token<'a> {
-		self.tokens.first().unwrap_or(self.eof)
+	fn next_span(&self) -> Span {
+		self.peek().map_or(self.eof, |a| a.0)
 	}
 
-	fn next(&mut self) -> &'a Token<'a> {
-		if let Some((a, b)) = self.tokens.split_first() {
-			self.tokens = b;
-			a
+	fn prev_span(&self) -> Span {
+		self.tokens[self.pos-1].0
+	}
+
+	fn next_pos(&self) -> Span {
+		self.next_span().at_start()
+	}
+
+	fn prev_pos(&self) -> Span {
+		self.prev_span().at_end()
+	}
+
+	fn next(&mut self) -> Result<S<&'a Token<'a>>> {
+		if let Some(t) = self.peek() {
+			self.pos += 1;
+			Ok(t)
 		} else {
-			// TODO the eof has wrong span
-			self.eof
+			Err(Error)
 		}
 	}
 
-	fn next_if(&mut self, f: impl Fn(&Token<'a>) -> bool) -> Option<&Token<'a>> {
-		f(self.peek()).then(|| self.next())
+	fn peek(&self) -> Option<S<&'a Token<'a>>> {
+		self.tokens.get(self.pos).map(|S(s, a)| S(*s, a))
 	}
 
-	fn test(&mut self, token: &TokenKind<'a>) -> Option<&Token<'a>> {
-		self.next_if(|a| &a.token == token)
-	}
-
-	fn require(&mut self, token: &TokenKind<'a>) -> Result<&Token<'a>, Error<'a>> {
-		let span = self.prev_span();
-		match self.test(token) {
-			Some(token) => Ok(token),
-			None => {
-				Err(Error::Missing {
-					span,
-					token: token.clone(),
-				})
-			}
-		}
-	}
-
-	fn skip_line(&mut self) -> Result<(), Error<'a>> {
-		self.take_while(|t| t.indent.is_none())
-			.end()
-	}
-
-	fn end(&self) -> Result<(), Error<'a>> {
-		if let Some((a, b)) = self.tokens.first().zip(self.tokens.last()) {
-			Err(Error::Misc {
-				span: Span::join(self.src, a.span, b.span),
-				desc: "expected end of block".to_owned(),
-			})
+	fn test(&mut self, t: &Token<'a>) -> bool {
+		if self.peek().map_or(false, |a| a.1 == t) {
+			self.pos += 1;
+			true
 		} else {
-			Ok(())
+			false
 		}
 	}
 
-	fn take_while(&mut self, f: impl Fn(&Token<'a>) -> bool) -> Parse<'a> {
-		let mut i = 0;
-		while i < self.tokens.len() {
-			if !f(&self.tokens[i]) {
-				break
-			}
-			i += 1;
-		}
-		let (t1, t2) = self.tokens.split_at(i);
-		self.tokens = t2;
-		Parse {
-			src: self.src,
-			indent: self.indent,
-			tokens: t1,
-			eof: self.eof,
-			errors: Rc::clone(&self.errors),
+	fn require(&mut self, t: &Token<'a>, name: &str) {
+		if !self.test(t) {
+			Diag::error(self.next_pos(), format_args!("expected {name}")).emit();
 		}
 	}
 
-	pub fn tight(&mut self) -> Result<(), Error<'a>> {
-		let trivia = self.peek().trivia;
-		if trivia.is_empty() {
-			Ok(())
-		} else {
-			Err(Error::Misc {
-				span: Span::from_str(trivia),
-				desc: "no space allowed here".to_owned(),
-			})
+	fn is_tight(&self) -> bool {
+		self.prev_pos().connects(self.next_pos())
+	}
+
+	fn require_tight(&self) {
+		if !self.is_tight() {
+			Diag::error(self.prev_pos() | self.next_pos(), "no space allowed here").emit();
 		}
 	}
 
-	pub fn indented(&mut self, inclusive: bool) -> Parse<'a> {
-		self.take_while(|t| t.indent.is_none())
-			.end()
-			.consume_err(|e| self.emit(e));
-		let indent = self.peek().indent.unwrap();
-		if is_indented(true, self.indent, indent) {
-			let mut v = self.take_while(|t| t.indent.map_or(true, |i| std::ptr::eq(i, indent) || is_indented(inclusive, indent, i)));
-			v.indent = indent;
+	fn rewind(&mut self) {
+		self.pos -= 1;
+	}
+
+	fn is_empty(&self) -> bool {
+		self.remaining().is_empty()
+	}
+
+	fn remaining(&self) -> &'a [S<Token<'a>>] {
+		&self.tokens[self.pos..]
+	}
+}
+
+fn parse_int(p: &mut Parse) -> Result<S<u64>> {
+	match p.next()? {
+		S(s, Token::Int(v)) => Ok(Spanned(s, *v)),
+		S(s, _) => {
+			Diag::error(s, "expected integer").emit();
+			Err(Error)
+		}
+	}
+}
+
+fn parse_ident(p: &mut Parse) -> Result<S<String>> {
+	match p.next()? {
+		S(s, Token::Ident(v)) => Ok(Spanned(s, (*v).to_owned())),
+		S(s, _) => {
+			Diag::error(s, "expected keyword").emit();
+			Err(Error)
+		}
+	}
+}
+
+fn parse_unit(p: &mut Parse) -> Result<S<Unit>> {
+	let s0 = p.prev_pos();
+	let (s, u1, u2) = match p.remaining() {
+		[S(s1, Token::Ident(u1)), S(s2, Token::Slash), S(s3, Token::Ident(u2)), ..]
+		if s0.connects(*s1) && s1.connects(*s2) && s2.connects(*s3) => {
+			let v = (*s1 | *s3, *u1, Some(*u2)); 
+			p.pos += 3;
 			v
-		} else {
-			self.take_while(|_| false)
 		}
-	}
-
-	pub fn next_span(&self) -> Span<'a> {
-		Span::from_str(self.peek().trivia).end()
-	}
-
-	pub fn prev_span(&self) -> Span<'a> {
-		Span::from_str(self.peek().trivia).start()
-	}
-
-	pub fn span(&self, start: Span<'a>) -> Span<'a> {
-		Span::join(self.src, start, self.prev_span())
-	}
-
-	fn emit(&mut self, e: Error<'a>) {
-		self.errors.borrow_mut().push(e);
-	}
-
-	pub fn is_empty(&self) -> bool {
-		self.tokens.is_empty()
-	}
-}
-
-fn parse_ident<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, &'a str>, Error<'a>> {
-	let t = p.next();
-	match &t.token {
-		TokenKind::Ident(i) => {
-			Ok(Spanned(t.span, i))
+		[S(s1, Token::Ident(u1)), ..]
+		if s0.connects(*s1) => {
+			let v = (*s1, *u1, None);
+			p.pos += 1;
+			v
 		}
+		_ => return Ok(Spanned(s0, Unit::None))
+	};
+	let u = match (u1, u2) {
+		("mm", None) => Unit::Mm,
+		("mm", Some("s")) => Unit::MmPerS,
+		("ms", None) => Unit::Ms,
+		("deg", None) => Unit::Deg,
+		("mdeg", None) => Unit::MDeg,
 		_ => {
-			Err(Error::Misc {
-				span: t.span,
-				desc: "expected an ident".to_owned(),
-			})
+			Diag::error(s, "invalid unit").emit();
+			return Err(Error)
 		}
+	};
+	Ok(Spanned(s, u))
+}
+
+fn parse_term(p: &mut Parse) -> Result<S<Term>> {
+	if let Some(a) = try_parse_term(p)? {
+		Ok(a)
+	} else {
+		Diag::error(p.next_span(), "expected term").emit();
+		Err(Error)
 	}
 }
 
-fn parse_string<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, &'a str>, Error<'a>> {
-	match p.next() {
-		Token { token: TokenKind::String(s), span, .. } => {
-			let s: &'a str = s;
-			Ok(Spanned(*span, s))
-		}
-		Token { span, .. } => {
-			Err(Error::Misc {
-				span: *span,
-				desc: "expected a string".to_owned(),
-			})
-		}
-	}
-}
-
-fn parse_int<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, u64>, Error<'a>> {
-	match p.next() {
-		Token { token: TokenKind::Number(v), span, .. } => {
-			if v.dec.is_some() {
-				Err(Error::Misc {
-					span: *span,
-					desc: "no decimals allowed".to_owned(),
-				})
-			} else {
-				Ok(Spanned(*span, v.val))
+fn try_parse_term(p: &mut Parse) -> Result<Option<S<Term>>> {
+	fn brack(p: &mut Parse, f: impl FnOnce(&mut Parse) -> Result<Term>) -> Result<Term> {
+		p.require_tight();
+		match p.next()? {
+			S(_, Token::Bracket(b)) => {
+				Parse::run(&b.tokens, b.close, f)
 			}
-		},
-		Token { span, .. } => Err(Error::Misc {
-			span: *span,
-			desc: "expected an integer".to_owned(),
-		})
-	}
-}
-
-fn parse_signed_int<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, i64>, Error<'a>> {
-	let pos = p.tokens;
-	let i0 = p.next_span();
-	let neg = p.test(&TokenKind::Minus).is_some();
-	if neg {
-		if let Err(e) = p.tight() {
-			p.tokens = pos;
-			return Err(e)
-		}
-	}
-	let n = parse_int(p)?.1;
-	let v = n as i64;
-	let v = if neg { -v } else { v };
-	Ok(Spanned(p.span(i0), v))
-}
-
-fn ident_line<'a>(p: &mut Parse<'a>) -> Result<(Spanned<'a, &'a str>, Parse<'a>), Error<'a>> {
-	let mut p = p.indented(false);
-	let i = parse_ident(&mut p)?;
-	Ok((i, p))
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct Insn<'a> {
-	name: Spanned<'a, &'a str>,
-	args: Vec<Spanned<'a, Term<'a>>>,
-}
-
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-enum Unit {
-	None,
-	Mm,
-	MmPerS,
-	Ms,
-	Deg,
-	MDeg,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum Term<'a> {
-	// Basics
-	Number(Spanned<'a, i64>, Spanned<'a, Unit>),
-	String(&'a str),
-	Tuple(Vec<Spanned<'a, Term<'a>>>),
-
-	Text(),
-	Attr(Box<Term<'a>>, Spanned<'a, u64>),
-
-	// Expr
-	Random,
-	Flag(Spanned<'a, u64>),
-	System(Spanned<'a, u64>),
-	Var(Spanned<'a, u64>),
-	Global(Spanned<'a, u64>),
-
-	// Mainly chars
-	Null, // Though null can be useful for other cases too
-	Self_,
-	Custom(Spanned<'a, u64>),
-	Party(Spanned<'a, u64>),
-	FieldParty(Spanned<'a, u64>),
-
-	// Scena specific
-	Fn(Spanned<'a, u64>, Spanned<'a, u64>),
-	Char(Spanned<'a, u64>),
-	Entrance(Spanned<'a, u64>), // defined externally
-	Object(Spanned<'a, u64>),   // defined externally
-	LookPoint(Spanned<'a, u64>),
-	Chcp(Spanned<'a, u64>),
-
-	// Script resource ids
-	Fork(Spanned<'a, u64>),
-	Menu(Spanned<'a, u64>),
-	Select(Spanned<'a, u64>),
-	Vis(Spanned<'a, u64>),
-	Eff(Spanned<'a, u64>),
-	EffInstance(Spanned<'a, u64>),
-
-	// Global tables
-	Name(Spanned<'a, u64>),
-	Battle(Spanned<'a, u64>), // This one is scena-specific in ed7, but whatever
-	Bgm(Spanned<'a, u64>),
-	Sound(Spanned<'a, u64>),
-	Item(Spanned<'a, u64>),
-	Magic(Spanned<'a, u64>),
-	Quest(Spanned<'a, u64>),
-	Shop(Spanned<'a, u64>),
-	Town(Spanned<'a, u64>),
-}
-
-fn parse_nested_insn<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, Insn<'a>>, Error<'a>> {
-	let i0 = p.next_span();
-	let name = parse_ident(p)?;
-	let mut args = Vec::new();
-	while !p.is_empty() {
-		let start = p.tokens as *const _;
-		match parse_term(p) {
-			Ok(t) => args.push(t),
-			Err(e) => {
-				if p.tokens as *const _ != start {
-					p.emit(e);
-				}
-				break
+			S(s, _) => {
+				Diag::error(s, "expected bracket").emit();
+				Err(Error)
 			}
 		}
 	}
-	Ok(Spanned(p.span(i0), Insn { name, args }))
-}
 
-fn parse_insn<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, Insn<'a>>, Error<'a>> {
-	let i0 = p.next_span();
-	let name = parse_ident(p)?;
-	let mut args = Vec::new();
-	while !p.is_empty() {
-		args.push(parse_term(p)?);
-	}
-	Ok(Spanned(p.span(i0), Insn { name, args }))
-}
-
-fn parse_unit<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, Unit>, Error<'a>> {
-	let i0 = p.next_span();
-	if p.tight().is_ok() {
-		if let TokenKind::Ident(i) = p.peek().token {
-			let span = p.next().span;
-			let u = match i {
-				"mm" if p.tight().is_ok() && p.test(&TokenKind::Slash).is_some() => {
-					p.require(&TokenKind::Ident("s"))?;
-					Unit::MmPerS
-				}
-				"mm" => Unit::Mm,
-				"ms" => Unit::Ms,
-				"deg" => Unit::Deg,
-				"mdeg" => Unit::MDeg,
-				_ => return Err(Error::Misc {
-					span: p.peek().span,
-					desc: "invalid unit".to_owned(),
-				})
-			};
-			return Ok(Spanned(p.span(i0), u))
-		}
-	}
-	Ok(Spanned(p.prev_span(), Unit::None))
-}
-
-fn parse_term<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, Term<'a>>, Error<'a>> {
-	fn brack<'a>(p: &mut Parse<'a>, f: impl FnOnce(&mut Parse<'a>) -> Result<Term<'a>, Error<'a>>) -> Result<Term<'a>, Error<'a>> {
-		p.next(); // will be an ident, but that's checked outside
-		p.tight()?;
-		p.require(&TokenKind::LBrack)?;
-		let e = f(p)?;
-		p.require(&TokenKind::RBrack)?;
-		Ok(e)
-	}
-
-	fn brack_int<'a>(p: &mut Parse<'a>, f: impl FnOnce(Spanned<'a, u64>) -> Term<'a>) -> Result<Term<'a>, Error<'a>> {
+	fn brack_int(p: &mut Parse, f: impl FnOnce(S<u64>) -> Term) -> Result<Term> {
 		brack(p, |p| parse_int(p).map(f))
 	}
 
-	let i0 = p.next_span();
-	let t = match p.peek().token {
-		TokenKind::String(_) => {
-			Term::String(parse_string(p)?.1)
+	let i0 = p.next_pos();
+
+	let t = match p.next()?.1 {
+		Token::String(s) => {
+			Term::String(s.clone())
 		}
-		TokenKind::Minus | TokenKind::Number(_) => {
-			let n = parse_signed_int(p)?;
+		Token::Int(_) => {
+			p.rewind();
+			let n = parse_int(p)?.map(|a| a as i64);
 			let unit = parse_unit(p)?;
-			Term::Number(n, unit)
+			Term::Int(n, unit)
 		}
-		TokenKind::LParen => {
-			p.require(&TokenKind::LParen)?;
+		Token::Minus if p.is_tight() && matches!(p.peek(), Some(S(_, Token::Int(_)))) => {
+			let n = parse_int(p)?.map(|a| -(a as i64));
+			let unit = parse_unit(p)?;
+			Term::Int(n, unit)
+		}
+
+		Token::Paren(d) => Parse::run(&d.tokens, d.close, |p| {
 			let mut terms = Vec::new();
-			while p.test(&TokenKind::RParen).is_none() {
+			while !p.is_empty() {
 				terms.push(parse_term(p)?);
-				if p.test(&TokenKind::Comma).is_none() {
-					p.require(&TokenKind::RParen)?;
+				if p.is_empty() {
 					break
 				}
+				if !p.test(&Token::Comma) {
+					Diag::error(p.next_span(), "expected comma or closing parenthesis")
+						.note(d.open, "opened here")
+						.emit();
+					return Err(Error)
+				}
 			}
-			Term::Tuple(terms)
+			Ok(Term::Tuple(terms))
+		})?,
+
+		Token::Brace(d) => {
+			let segs = d.tokens.iter().map(|t| Ok(Spanned(t.0, match &t.1 {
+				TextToken::Text(t) => TextSegment::Text(t.clone()),
+				TextToken::Newline(n) => TextSegment::Newline(*n),
+				TextToken::Hex(v) => TextSegment::Hex(*v),
+				TextToken::Brace(a) => TextSegment::Directive(Parse::run(&a.tokens, a.close, |p| key_val(true, p))?),
+			}))).collect::<Result<Vec<_>>>()?;
+			Term::Text(segs)
 		}
 
-		TokenKind::Ident("random") => { p.next(); Term::Random },
-		TokenKind::Ident("flag") => brack_int(p, Term::Flag)?,
-		TokenKind::Ident("system") => brack_int(p, Term::System)?,
-		TokenKind::Ident("var") => brack_int(p, Term::Var)?,
-		TokenKind::Ident("global") => brack_int(p, Term::Global)?,
+		Token::Ident("random") => Term::Random,
+		Token::Ident("flag") => brack_int(p, Term::Flag)?,
+		Token::Ident("system") => brack_int(p, Term::System)?,
+		Token::Ident("var") => brack_int(p, Term::Var)?,
+		Token::Ident("global") => brack_int(p, Term::Global)?,
 
-		TokenKind::Ident("null") => { p.next(); Term::Null },
-		TokenKind::Ident("self") => { p.next(); Term::Self_ },
-		TokenKind::Ident("custom") => brack_int(p, Term::Custom)?,
-		TokenKind::Ident("party") => brack_int(p, Term::Party)?,
-		TokenKind::Ident("field_party") => brack_int(p, Term::FieldParty)?,
-
-		TokenKind::Ident("fn") => brack(p, |p| {
+		Token::Ident("emote") => brack(p, |p| {
 			let a = parse_int(p)?;
-			p.require(&TokenKind::Comma)?;
+			p.require(&Token::Comma, "comma");
+			let b = parse_int(p)?;
+			p.require(&Token::Comma, "comma");
+			let c = parse_term(p)?;
+			Ok(Term::Emote(a,b,Box::new(c)))
+		})?,
+
+		Token::Ident("null") => Term::Null,
+		Token::Ident("self") => Term::Self_,
+		Token::Ident("custom") => brack_int(p, Term::Custom)?,
+		Token::Ident("party") => brack_int(p, Term::Party)?,
+		Token::Ident("field_party") => brack_int(p, Term::FieldParty)?,
+
+		Token::Ident("fn") => brack(p, |p| {
+			let a = parse_int(p)?;
+			p.require(&Token::Comma, "comma");
 			let b = parse_int(p)?;
 			Ok(Term::Fn(a, b))
 		})?,
-		TokenKind::Ident("char") => brack_int(p, Term::Char)?,
-		TokenKind::Ident("entrance") => brack_int(p, Term::Entrance)?,
-		TokenKind::Ident("object") => brack_int(p, Term::Object)?,
-		TokenKind::Ident("look_point") => brack_int(p, Term::LookPoint)?,
-		TokenKind::Ident("chcp") => brack_int(p, Term::Chcp)?,
+		Token::Ident("char") => brack_int(p, Term::Char)?,
+		Token::Ident("entrance") => brack_int(p, Term::Entrance)?,
+		Token::Ident("object") => brack_int(p, Term::Object)?,
+		Token::Ident("look_point") => brack_int(p, Term::LookPoint)?,
+		Token::Ident("chcp") => brack_int(p, Term::Chcp)?,
 
-		TokenKind::Ident("fork") => brack_int(p, Term::Fork)?,
-		TokenKind::Ident("menu") => brack_int(p, Term::Menu)?,
-		TokenKind::Ident("select") => brack_int(p, Term::Select)?,
-		TokenKind::Ident("vis") => brack_int(p, Term::Vis)?,
-		TokenKind::Ident("eff") => brack_int(p, Term::Eff)?,
-		TokenKind::Ident("eff_instance") => brack_int(p, Term::EffInstance)?,
+		Token::Ident("fork") => brack_int(p, Term::Fork)?,
+		Token::Ident("menu") => brack_int(p, Term::Menu)?,
+		Token::Ident("select") => brack_int(p, Term::Select)?,
+		Token::Ident("vis") => brack_int(p, Term::Vis)?,
+		Token::Ident("eff") => brack_int(p, Term::Eff)?,
+		Token::Ident("eff_instance") => brack_int(p, Term::EffInstance)?,
 
-		TokenKind::Ident("name") => brack_int(p, Term::Name)?,
-		TokenKind::Ident("battle") => brack_int(p, Term::Battle)?,
-		TokenKind::Ident("bgm") => brack_int(p, Term::Bgm)?,
-		TokenKind::Ident("sound") => brack_int(p, Term::Sound)?,
-		TokenKind::Ident("item") => brack_int(p, Term::Item)?,
-		TokenKind::Ident("magic") => brack_int(p, Term::Magic)?,
-		TokenKind::Ident("quest") => brack_int(p, Term::Quest)?,
-		TokenKind::Ident("shop") => brack_int(p, Term::Shop)?,
-		TokenKind::Ident("town") => brack_int(p, Term::Town)?,
+		Token::Ident("name") => brack_int(p, Term::Name)?,
+		Token::Ident("battle") => brack_int(p, Term::Battle)?,
+		Token::Ident("bgm") => brack_int(p, Term::Bgm)?,
+		Token::Ident("sound") => brack_int(p, Term::Sound)?,
+		Token::Ident("item") => brack_int(p, Term::Item)?,
+		Token::Ident("magic") => brack_int(p, Term::Magic)?,
+		Token::Ident("quest") => brack_int(p, Term::Quest)?,
+		Token::Ident("shop") => brack_int(p, Term::Shop)?,
+		Token::Ident("town") => brack_int(p, Term::Town)?,
 
-		_ => return Err(Error::Misc {
-			span: p.peek().span,
-			desc: "unexpected token".to_owned(),
-		})
+		_ => {
+			p.rewind();
+			return Ok(None)
+		}
 	};
 
 	let mut t = t;
-	while p.tight().is_ok() && p.test(&TokenKind::Dot).is_some() {
-		p.tight()?;
+	while p.is_tight() && p.test(&Token::Dot) {
+		p.require_tight();
 		let b = parse_int(p)?;
 		t = Term::Attr(Box::new(t), b)
 	}
 
-	println!("{:?}", t);
-	Ok(Spanned(p.span(i0), t))
+	Ok(Some(Spanned(i0 | p.prev_pos(), t)))
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct Expr<'a> {
-	first: Spanned<'a, Atom<'a>>,
-	rest: Vec<(Spanned<'a, Binop>, Spanned<'a, Atom<'a>>)>,
-}
-
-fn parse_expr<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, Expr<'a>>, Error<'a>> {
-	let i0 = p.next_span();
-	let first = parse_atom(p)?;
-	let mut rest = Vec::new();
-	while let Some(op) = parse_binop(p) {
-		let next = parse_atom(p)?;
-		rest.push((op, next))
+fn parse_top(line: &Line) -> Result<Decl> {
+	match line.head.first() {
+		Some(S(_, Token::Ident("fn"))) =>
+			Ok(Decl::Function(parse_fn(line)?)),
+		_ =>
+			Ok(Decl::Data(parse_data(true, line)?))
 	}
-	Ok(Spanned(p.span(i0), Expr { first, rest }))
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Binop {
-	Eq, Ne,
-	Lt, Le,
-	Gt, Ge,
-	BoolAnd, BoolOr,
-	Add, Sub, Mul, Div, Mod,
-	Or, And, Xor,
+fn key_val(abbrev: bool, p: &mut Parse) -> Result<KeyVal> {
+	let key = parse_ident(p)?;
+	// allow {item[413]} instead of {item item[413]}
+	if abbrev && matches!(p.peek(), Some(S(_, Token::Bracket(_)))) {
+		p.rewind()
+	}
+	let mut terms = Vec::new();
+	while !p.is_empty() {
+		terms.push(parse_term(p)?);
+	}
+	Ok(KeyVal { key, terms })
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Unop {
-	Not,
-	Neg,
-	Plus,
-	Inv,
+fn parse_data(top: bool, line: &Line) -> Result<Data> {
+	let head = Parse::run(&line.head, line.eol, |p| key_val(top, p))?;
+	let body = line.body.as_deref().map(|b| parse_lines(b, |p| parse_data(false, p)));
+	Ok(Data { head, body })
 }
 
-fn parse_binop<'a>(p: &mut Parse<'a>) -> Option<Spanned<'a, Binop>> {
-	macro op($p:ident, $t1:ident $($t:ident)* => $op:ident) {
-		let i0 = p.next_span();
-		let pos = $p.tokens;
-		if let Ok::<(), Error>(()) = try {
-			p.require(&TokenKind::$t1)?;
-			$(p.tight()?; p.require(&TokenKind::$t)?;)*
-		} {
-			return Some(Spanned(p.span(i0), Binop::$op))
+fn parse_fn(line: &Line) -> Result<Function> {
+	Parse::run(&line.head, line.eol, |p| {
+		assert_eq!(p.next()?.1, &Token::Ident("fn"));
+		if matches!(p.peek(), Some(S(_, Token::Bracket(_)))) {
+			p.rewind()
 		}
-		$p.tokens = pos;
+		let id = parse_term(p)?;
+		let asm = p.test(&Token::Ident("asm"));
+		let body = if asm {
+			todo!()
+		} else {
+			FnBody::Code(parse_body(line, parse_code)?)
+		};
+		Ok(Function { id, body })
+	})
+}
+
+fn parse_code(line: &Line) -> Result<Spanned<Code>> {
+	let a = Parse::run(&line.head, line.eol, |p| match p.next()?.1 {
+		Token::Ident("if") => {
+			let e = parse_expr(p);
+			let b = parse_body(line, parse_code);
+			Ok(Code::If(e?, b?))
+		}
+		Token::Ident("elif") => {
+			let e = parse_expr(p);
+			let b = parse_body(line, parse_code);
+			Ok(Code::Elif(e?, b?))
+		}
+		Token::Ident("else") => {
+			let b = parse_body(line, parse_code);
+			Ok(Code::Else(b?))
+		}
+		Token::Ident("while") => {
+			let e = parse_expr(p);
+			let b = parse_body(line, parse_code);
+			Ok(Code::While(e?, b?))
+		}
+		Token::Ident("switch") => {
+			let e = parse_expr(p);
+			let b = parse_body(line, |line| {
+				let head = Parse::run(&line.head, line.eol, |p| match p.next()?.1 {
+					Token::Ident("case") => Ok(SwitchCase::Case(parse_term(p)?)),
+					Token::Ident("default") => Ok(SwitchCase::Default),
+					_ => {
+						p.rewind();
+						Diag::error(p.next_span(), "invalid switch case").emit();
+						Err(Error)
+					}
+				});
+				let body = parse_body(line, parse_code);
+				Ok((S(line.head_span(), head?), body?))
+			});
+			Ok(Code::Switch(e?, b?))
+		}
+		Token::Ident("break") => {
+			no_body(line);
+			Ok(Code::Break)
+		}
+		Token::Ident("continue") => {
+			no_body(line);
+			Ok(Code::Continue)
+		}
+		_ => {
+			p.rewind();
+			if let Some(t) = try_parse_term(p)? {
+				let o = parse_assop(p).ok_or_else(|| {
+					Diag::error(p.next_pos(), "expected assignment operator").emit();
+					Error
+				})?;
+				let e = parse_expr(p)?;
+				Ok(Code::Assign(t, o, e))
+			} else {
+				Ok(Code::Insn(key_val(false, p)?))
+			}
+		}
+	})?;
+	Ok(S(line.head_span(), a))
+}
+
+fn parse_expr(p: &mut Parse) -> Result<S<Expr>> {
+	parse_expr0(p, 10)
+}
+
+fn parse_expr0(p: &mut Parse, prec: usize) -> Result<S<Expr>> {
+	let mut e = parse_atom(p)?;
+	while let Some(op) = parse_binop(p, prec) {
+		let e2 = parse_expr0(p, prec-1)?;
+		e = S(e.0 | e2.0, Expr::Binop(Box::new(e), op, Box::new(e2)));
 	}
+	Ok(e)
+}
 
-	op!(p, Eq Eq   => Eq);
-	op!(p, Excl Eq => Ne);
-	op!(p, Lt      => Lt);
-	op!(p, Lt Eq   => Le);
-	op!(p, Gt      => Gt);
-	op!(p, Gt Eq   => Ge);
+fn parse_atom(p: &mut Parse) -> Result<S<Expr>> {
+	let i0 = p.next_pos();
+	let e = match p.next()?.1 {
+		Token::Paren(d) => {
+			Parse::run(&d.tokens, d.close, parse_expr)?.1
+		}
+		Token::Minus => {
+			let e = parse_atom(p)?;
+			Expr::Unop(S(p.prev_span(), Unop::Neg), Box::new(e))
+		}
+		Token::Excl => {
+			let e = parse_atom(p)?;
+			Expr::Unop(S(p.prev_span(), Unop::Not), Box::new(e))
+		}
+		Token::Tilde => {
+			let e = parse_atom(p)?;
+			Expr::Unop(S(p.prev_span(), Unop::Inv), Box::new(e))
+		}
+		_ => {
+			p.rewind();
+			if let Some(t) = try_parse_term(p)? {
+				Expr::Term(t.1)
+			} else {
+				Expr::Insn(key_val(false, p)?)
+			}
+		}
+	};
+	Ok(S(i0 | p.prev_pos(), e))
+}
 
-	op!(p, Pipe Pipe => BoolOr);
-	op!(p, Amp  Amp  => BoolAnd);
+macro op($p:ident; $t1:ident $($t:ident)* => $op:expr) {
+	let i0 = $p.next_pos();
+	let pos = $p.pos;
+	if $p.test(&Token::$t1) $( && $p.is_tight() && $p.test(&Token::$t))* {
+		return Some(Spanned(i0 | $p.prev_pos(), $op))
+	}
+	$p.pos = pos;
+}
 
-	op!(p, Plus    => Add);
-	op!(p, Minus   => Sub);
-	op!(p, Star    => Mul);
-	op!(p, Slash   => Div);
-	op!(p, Percent => Mod);
-	op!(p, Pipe    => Or);
-	op!(p, Amp     => And);
-	op!(p, Caret   => Xor);
+fn parse_assop(p: &mut Parse) -> Option<S<Assop>> {
+	op!(p;         Eq => Assop::Assign);
+	op!(p; Plus    Eq => Assop::Add);
+	op!(p; Minus   Eq => Assop::Sub);
+	op!(p; Star    Eq => Assop::Mul);
+	op!(p; Slash   Eq => Assop::Div);
+	op!(p; Percent Eq => Assop::Mod);
+	op!(p; Pipe    Eq => Assop::Or);
+	op!(p; Amp     Eq => Assop::And);
+	op!(p; Caret   Eq => Assop::Xor);
 
 	None
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum Atom<'a> {
-	Term(Term<'a>),
-	Insn(Insn<'a>),
-	Unop(Unop, Box<Spanned<'a, Atom<'a>>>),
-	Paren(Box<Spanned<'a, Expr<'a>>>),
-}
-
-fn parse_atom<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, Atom<'a>>, Error<'a>> {
-	let i0 = p.next_span();
-	let v = match &p.peek().token {
-		TokenKind::LParen => {
-			p.require(&TokenKind::LParen)?;
-			let e = parse_expr(p)?;
-			p.require(&TokenKind::RParen)?;
-			Atom::Paren(Box::new(e))
-		}
-		TokenKind::Plus => {
-			p.require(&TokenKind::Plus)?;
-			let e = parse_atom(p)?;
-			Atom::Unop(Unop::Plus, Box::new(e))
-		}
-		TokenKind::Minus => {
-			p.require(&TokenKind::Minus)?;
-			let e = parse_atom(p)?;
-			Atom::Unop(Unop::Neg, Box::new(e))
-		}
-		TokenKind::Excl => {
-			p.require(&TokenKind::Excl)?;
-			let e = parse_atom(p)?;
-			Atom::Unop(Unop::Not, Box::new(e))
-		}
-		TokenKind::Tilde => {
-			p.require(&TokenKind::Tilde)?;
-			let e = parse_atom(p)?;
-			Atom::Unop(Unop::Inv, Box::new(e))
-		}
-		_ => {
-			let start = p.tokens as *const _;
-			match parse_term(p) {
-				Ok(t) => Atom::Term(t.1),
-				Err(_) if p.tokens as *const _ == start => {
-					Atom::Insn(parse_nested_insn(p)?.1)
-				}
-				Err(e) => return Err(e)
-			}
-		}
-	};
-	Ok(Spanned(p.span(i0), v))
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct Data<'a> {
-	id: Spanned<'a, &'a str>,
-	args: Vec<Spanned<'a, Term<'a>>>,
-	body: Option<Vec<Spanned<'a, Data<'a>>>>,
-}
-
-fn parse_data<'a>(p: &mut Parse<'a>) -> Result<Spanned<'a, Data<'a>>, Error<'a>> {
-	let mut p = p.indented(false);
-	let p = &mut p;
-	let i0 = p.next_span();
-	let id = parse_ident(p)?;
-	let mut args = Vec::new();
-	let mut body = None;
-	while !p.is_empty() {
-		if p.test(&TokenKind::Colon).is_some() {
-			body = Some(parse_block(p, parse_data));
-			break
-		}
-		match parse_term(p) {
-			Ok(a) => args.push(a),
-			Err(e) => {
-				p.emit(e);
-				break
-			}
+fn parse_binop(p: &mut Parse, prec: usize) -> Option<S<Binop>> {
+	macro prio($prio:literal, $p:stmt) {
+		if prec >= $prio {
+			$p
 		}
 	}
-	Ok(Spanned(p.span(i0), Data { id, args, body }))
+	prio!(4, op!(p; Eq Eq   => Binop::Eq));
+	prio!(4, op!(p; Excl Eq => Binop::Ne));
+	prio!(4, op!(p; Lt      => Binop::Lt));
+	prio!(4, op!(p; Lt Eq   => Binop::Le));
+	prio!(4, op!(p; Gt      => Binop::Gt));
+	prio!(4, op!(p; Gt Eq   => Binop::Ge));
+
+	prio!(1, op!(p; Pipe Pipe => Binop::BoolOr));
+	prio!(3, op!(p; Amp  Amp  => Binop::BoolAnd));
+
+	prio!(5, op!(p; Plus    => Binop::Add));
+	prio!(5, op!(p; Minus   => Binop::Sub));
+	prio!(6, op!(p; Star    => Binop::Mul));
+	prio!(6, op!(p; Slash   => Binop::Div));
+	prio!(6, op!(p; Percent => Binop::Mod));
+	prio!(1, op!(p; Pipe    => Binop::Or));
+	prio!(3, op!(p; Amp     => Binop::And));
+	prio!(2, op!(p; Caret   => Binop::Xor));
+
+	None
 }
 
-fn parse_block<'a, T>(p: &mut Parse<'a>, mut f: impl FnMut(&mut Parse<'a>) -> Result<T, Error<'a>>) -> Vec<T> {
-	let mut p = p.indented(true);
-	let p = &mut p;
-	let mut items = Vec::new();
-	while !p.is_empty() {
-		match f(p) {
-			Ok(d) => items.push(d),
-			Err(e) => {
-				p.emit(e);
-				continue
-			}
-		}
+fn parse_lines<'a, T>(
+	lines: &'a [Line],
+	mut f: impl FnMut(&'a Line) -> Result<T>
+) -> Vec<T> {
+	lines.iter().filter_map(|a| f(a).ok()).collect::<Vec<_>>()
+}
+
+fn no_body(line: &Line) {
+	if line.body.is_some() {
+		Diag::error(line.eol, "a body is not allowed here").emit();
 	}
-	items
 }
 
-fn parse_function<'a>(p: &mut Parse<'a>) -> Result<(), Error<'a>> {
-	p.require(&TokenKind::Ident("fn"))?;
-	let id = parse_term(p)?;
-	p.require(&TokenKind::Colon)?;
-	let b = parse_code_block(p)?;
-	Ok(())
-}
-
-fn parse_code_block<'a>(p: &mut Parse<'a>) -> Result<(), Error<'a>> {
-	let mut p = p.indented(true);
-	let i0 = p.next_span();
-	while !p.is_empty() {
-		let e: Result<(), Error> = try {
-			let mut p = p.indented(false);
-			let p = &mut p;
-			match p.peek().token {
-				// TODO can I do better handling of malformed these?
-				TokenKind::Ident("if"|"elif"|"while"|"switch") => {
-					p.next();
-					let e = parse_expr(p)?;
-					p.require(&TokenKind::Colon)?;
-					let b = parse_code_block(p)?;
-				}
-				TokenKind::Ident("else") => {
-					p.next();
-					p.require(&TokenKind::Colon)?;
-					let b = parse_code_block(p)?;
-				}
-				TokenKind::Ident("break"|"continue") => {
-					p.next();
-				}
-				_ => {
-					parse_insn(p)?;
-				}
-			}
-			p.end()?;
-		};
-		e.consume_err(|e| p.emit(e));
+fn parse_body<'a, T>(
+	line: &'a Line,
+	f: impl FnMut(&'a Line) -> Result<T>
+) -> Result<Vec<T>> {
+	if let Some(body) = &line.body {
+		Ok(parse_lines(body, f))
+	} else {
+		Diag::error(line.eol, "a body is required here").emit();
+		Err(Error)
 	}
-	Ok(())
 }
 
-
-pub fn parse_top<'a>(p: &mut Parse<'a>) -> Result<(), Error<'a>> {
-	while !p.is_empty() {
-		let e: Result<(), Error> = try {
-			let mut p = p.indented(false);
-			match p.peek().token {
-				TokenKind::Ident("fn") => {
-					parse_function(&mut p)?;
-				}
-				_ => {
-					println!("parsing data");
-					let d = parse_data(&mut p)?;
-					println!("{:?}", d);
-				}
-			}
-			p.end()?;
-		};
-		e.consume_err(|e| p.emit(e));
-	}
-
-	Ok(())
+#[allow(dead_code)]
+fn parse(lines: &[Line]) -> Vec<Decl> {
+	parse_lines(lines, parse_top)
 }
 
-pub fn parse(src: &str) {
-	let mut l = Lex::new(src);
-	let tokens = lex::tokens(&mut l);
-	let (eof, tokens) = tokens.split_last().unwrap();
-	let mut errors = l.errors;
-
-	let mut p = Parse::new(src, tokens, eof);
-	parse_top(&mut p).consume_err(|e| p.emit(e));
-	errors.extend(p.errors.take());
+#[test]
+fn main() {
+	let src = include_str!("/tmp/kiseki/tc/t1121");
+	let (v, diag) = diagnose(|| {
+		let tok = lex::lex(src);
+		parse(&tok)
+	});
+	println!("{:#?}", v);
 
 	use codespan_reporting::diagnostic::{Diagnostic, Label};
 	use codespan_reporting::files::SimpleFiles;
 	use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
-
-	errors.sort_by_key(|a| a.span().as_str() as *const str);
 
 	let writer = StandardStream::stderr(ColorChoice::Always);
 	let config = codespan_reporting::term::Config::default();
 	let mut files = SimpleFiles::new();
 	let file_id = files.add("<input>", src);
 
-	for e in &errors {
-		let d = match e {
-			Error::Missing { span, token } =>
-				Diagnostic::error()
-				.with_message(format!("missing {:?}", token))
-				.with_labels(vec![
-					Label::primary(file_id, span.position_in(src).unwrap())
-						.with_message(format!("missing {:?}", token)),
-				]),
-			Error::Misc { span, desc } =>
-				Diagnostic::error()
-				.with_message(desc)
-				.with_labels(vec![
-					Label::primary(file_id, span.position_in(src).unwrap())
-						.with_message(desc),
-				]),
-			Error::Duplicate { span, prev_span } =>
-				Diagnostic::error()
-				.with_message("duplicate field")
-				.with_labels(vec![
-					Label::primary(file_id, span.position_in(src).unwrap())
-						.with_message("this field..."),
-					Label::secondary(file_id, prev_span.position_in(src).unwrap())
-						.with_message("...was already declared here"),
-				]),
-		};
+	for d in diag {
+		let mut l = vec![
+			Label::primary(file_id, d.span.as_range()).with_message(d.text),
+		];
+		for (s, t) in d.notes {
+			l.push(Label::secondary(file_id, s.as_range()).with_message(t));
+		}
+		let d = Diagnostic::error().with_labels(l);
 		codespan_reporting::term::emit(&mut writer.lock(), &config, &files, &d).unwrap();
 	}
-}
-
-#[test]
-fn main() {
-	parse(include_str!("/tmp/kiseki/tc/t1121"));
 }

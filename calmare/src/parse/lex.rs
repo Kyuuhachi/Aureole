@@ -1,18 +1,15 @@
 use std::str::pattern::Pattern;
-use std::ops::Range;
+use super::diag::*;
 
 use unicode_xid::UnicodeXID;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Span<'a>(&'a str);
-
 // from https://github.com/rust-lang/rfcs/pull/2796
-pub fn range_of<T>(slice: &[T], subslice: &[T]) -> Option<Range<usize>> {
+pub fn range_of<T>(slice: &[T], subslice: &[T]) -> Option<std::ops::Range<usize>> {
 	let range = slice.as_ptr_range();
 	let subrange = subslice.as_ptr_range();
 	if subrange.start >= range.start && subrange.end <= range.end {
 		unsafe {
-			Some(Range {
+			Some(std::ops::Range {
 				start: subrange.start.offset_from(range.start) as usize,
 				end: subrange.end.offset_from(range.start) as usize,
 			})
@@ -22,186 +19,193 @@ pub fn range_of<T>(slice: &[T], subslice: &[T]) -> Option<Range<usize>> {
 	}
 }
 
-impl<'a> Span<'a> {
-	pub fn from_str(s: &'a str) -> Self {
-		Span(s)
-	}
+#[derive(Debug, Clone, Copy, Eq)]
+struct Indent<'a>(&'a str);
 
-	pub fn as_str(&self) -> &'a str {
-		self.0
-	}
-
-	pub fn start(&self) -> Self {
-		Span(&self.0[..0])
-	}
-
-	pub fn end(&self) -> Self {
-		Span(&self.0[self.0.len()..])
-	}
-
-	pub fn from_prefix(start: &'a str, end: &'a str) -> Self {
-		let range = range_of(start.as_bytes(), end.as_bytes()).expect("should be a subslice");
-		assert_eq!(range.end, start.len());
-		Span(&start[..range.start])
-	}
-
-	pub fn join(src: &'a str, a: Span<'a>, b: Span<'a>) -> Self {
-		let range1 = range_of(src.as_bytes(), a.0.as_bytes()).expect("`a` should be a subslice");
-		let range2 = range_of(src.as_bytes(), b.0.as_bytes()).expect("`b` should be a subslice");
-		assert!(range1.start <= range2.start);
-		assert!(range1.end <= range2.end);
-		Span(&src[range1.start..range2.end])
-	}
-
-	pub fn position_in(&self, o: &'a str) -> Option<Range<usize>> {
-		range_of(o.as_bytes(), self.0.as_bytes())
+impl<'a, 'b> PartialEq<Indent<'b>> for Indent<'a> {
+	fn eq(&self, other: &Indent<'b>) -> bool {
+		self.0 == other.0
 	}
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Error<'a> {
-	Missing {
-		span: Span<'a>,
-		token: TokenKind<'a>,
-	},
-	Misc {
-		span: Span<'a>,
-		desc: String,
-	},
-	Duplicate {
-		span: Span<'a>,
-		prev_span: Span<'a>,
-	},
-}
-
-impl<'a> Error<'a> {
-	pub fn span(&self) -> Span<'a> {
-		match self {
-			Error::Missing { span, .. } => *span,
-			Error::Misc { span, .. } => *span,
-			Error::Duplicate { span, .. } => *span,
+impl<'a, 'b> PartialOrd<Indent<'b>> for Indent<'a> {
+	fn partial_cmp(&self, other: &Indent<'b>) -> Option<std::cmp::Ordering> {
+		use std::cmp::Ordering::*;
+		let a = self.0;
+		let b = other.0;
+		if a == b {
+			Some(Equal)
+		} else if a.starts_with(b) {
+			Some(Greater)
+		} else if b.starts_with(a) {
+			Some(Less)
+		} else {
+			None
 		}
 	}
 }
 
-pub struct Lex<'a> {
-	pub src: &'a str,
-	pub pos: &'a str,
-	pub errors: Vec<Error<'a>>,
+impl<'a, 'b> PartialEq<Indent<'b>> for Option<Indent<'a>> {
+	fn eq(&self, other: &Indent<'b>) -> bool {
+		self.as_ref().map_or(false, |a| a == other)
+	}
+}
+
+impl<'a, 'b> PartialOrd<Indent<'b>> for Option<Indent<'a>> {
+	fn partial_cmp(&self, other: &Indent<'b>) -> Option<std::cmp::Ordering> {
+		use std::cmp::Ordering::*;
+		self.as_ref().map_or(Some(Greater), |a| a.partial_cmp(other))
+	}
+}
+
+#[derive(Clone)]
+struct Lex<'a> {
+	src: &'a str,
+	pos_: &'a str,
+	last_indent: Option<Indent<'a>>,
 }
 
 impl<'a> Lex<'a> {
-	pub fn new(src: &'a str) -> Self {
-		Lex {
+	fn new(src: &'a str) -> Self {
+		let mut new = Lex {
 			src,
-			pos: src,
-			errors: Vec::new(),
+			pos_: src,
+			last_indent: None,
+		};
+		new.space();
+		if new.last_indent.is_none() {
+			new.last_indent = Some(Indent(""));
 		}
+		new
 	}
 
-	fn emit<B: ToString>(&mut self, start: &'a str, e: B) {
-		self.errors.push(Error::Misc {
-			span: self.span(start),
-			desc: e.to_string(),
-		});
+	fn is_empty(&self) -> bool {
+		self.pos_.is_empty()
 	}
 
-	fn emit_result<A, B: ToString>(&mut self, start: &'a str, result: Result<A, B>) -> Option<A> {
-		match result {
-			Ok(v) => Some(v),
-			Err(e) => {
-				self.emit(start, e);
-				None
+	// TODO track some whitespace-aware positions too:
+	// - position before any space
+	// - position before indentation (i.e. start of line)
+	fn pos(&self) -> Span {
+		let r = range_of(self.src.as_bytes(), self.pos_.as_bytes()).unwrap();
+		Span::new_at(r.start)
+	}
+
+	fn pat_<P: Pattern<'a> + 'a>(&mut self, p: P) -> Option<Span> {
+		let i0 = self.pos();
+		self.pos_ = self.pos_.strip_prefix(p)?;
+		self.last_indent = None;
+		Some(i0 | self.pos())
+	}
+
+	fn pat<P: Pattern<'a> + 'a>(&mut self, p: P) -> Option<&'a str> {
+		self.pat_(p).map(|s| self.span_text(s))
+	}
+
+	fn pat_mul<P: Pattern<'a> + Clone + 'a>(&mut self, p: P) -> &'a str {
+		let mut s = self.pos();
+		while let Some(s1) = self.pat_(p.clone()) {
+			s |= s1;
+		}
+		self.span_text(s)
+	}
+
+	fn any(&mut self) -> Option<char> {
+		self.pat(|_| true).map(|a| a.chars().next().unwrap())
+	}
+
+	fn span_text(&self, s: Span) -> &'a str {
+		&self.src[s.as_range()]
+	}
+
+	fn space(&mut self) -> Option<Indent<'a>> {
+		if self.last_indent.is_none() {
+			self.space_inner();
+			while self.pat('\n').is_some() {
+				self.last_indent = Some(self.space_inner())
+			}
+			if self.is_empty() {
+				self.last_indent = Some(Indent(""))
 			}
 		}
+		self.last_indent
 	}
 
-	fn span(&self, start: &'a str) -> Span<'a> {
-		Span::from_prefix(start, self.pos)
+	fn space_inner(&mut self) -> Indent<'a> {
+		let i0 = self.pos();
+		self.pat_mul([' ', '\t']);
+		if self.pat("//").is_some() {
+			self.pat_mul(|c| c != '\n');
+		}
+		Indent(self.span_text(i0 | self.pos()))
+	}
+
+	fn clear_space(&mut self) {
+		self.last_indent = None;
 	}
 }
 
-fn pat<'a, P: Pattern<'a> + 'a>(i: &mut Lex<'a>, p: P) -> Option<&'a str> {
-	let i0 = i.pos;
-	i.pos = i.pos.strip_prefix(p)?;
-	Some(i.span(i0).as_str())
+enum Number<'a> {
+	Int(u64),
+	Float(&'a str),
 }
 
-fn pat_mul<'a, P: Pattern<'a> + Clone>(i: &mut Lex<'a>, p: P) -> &'a str {
-	let i0 = i.pos;
-	while let Some(j1) = i.pos.strip_prefix(p.clone()) {
-		i.pos = j1;
-	}
-	i.span(i0).as_str()
-}
+fn number<'a>(i: &mut Lex<'a>) -> Option<Number<'a>> {
+	i.clone().pat(|c| char::is_ascii_digit(&c))?;
+	let i0 = i.pos();
 
-fn hex_number(i: &mut Lex) -> Option<Number> {
-	let i0 = i.pos;
-	pat(i, "0x").or_else(|| pat(i, "0X"))?;
-	let s = pat_mul(i, UnicodeXID::is_xid_continue);
-	i.emit_result(i0, u64::from_str_radix(s, 16))
-		.map(|val| Number { val, dec: None })
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-pub struct Number {
-	pub val: u64,
-	pub dec: Option<u32>,
-}
-
-// 1 → Number(1, None)
-// 1. → Number(1, Some(0))
-// 11 → Number(11, None)
-// 1.1 → Number(11, Some(1))
-fn number(i: &mut Lex) -> Option<Number> {
-	let start = i.pos;
-	let int = pat_mul(i, |c| char::is_ascii_digit(&c));
-	if int.is_empty() {
-		return None
+	if i.pat("0x").is_some() {
+		let s = i.pat_mul(UnicodeXID::is_xid_continue);
+		let v = u64::from_str_radix(s, 16)
+			.consume_err(|e| Diag::error(i0 | i.pos(), e).emit())
+			.unwrap_or_default();
+		return Some(Number::Int(v))
 	}
 
-	let (result, dec) = if pat(i, '.').is_some() {
-		let frac = pat_mul(i, |c| char::is_ascii_digit(&c));
-		if frac.is_empty() {
-			(int.parse(), Some(0))
+	i.pat_mul(|a| char::is_ascii_digit(&a));
+	if i.pat('.').is_some() {
+		i.pat_mul(|a| char::is_ascii_digit(&a));
+		let s = i.span_text(i0|i.pos());
+		if let Err(e) = s.parse::<f64>() {
+			Diag::error(i0 | i.pos(), e).emit();
+			Some(Number::Float("0"))
 		} else {
-			(format!("{int}{frac}").parse(), Some(frac.len() as u32))
+			Some(Number::Float(s))
 		}
 	} else {
-		(int.parse(), None)
-	};
-
-	let val = i.emit_result(start, result).unwrap_or_default();
-	Some(Number { val, dec })
+		let s = i.span_text(i0|i.pos());
+		let v = s.parse::<u64>()
+			.consume_err(|e| Diag::error(i0 | i.pos(), e).emit())
+			.unwrap_or_default();
+		Some(Number::Int(v))
+	}
 }
 
 fn ident<'a>(i: &mut Lex<'a>) -> Option<&'a str> {
-	let j = i.pos;
-	pat(i, |c| UnicodeXID::is_xid_start(c) || c == '_')?;
-	i.pos = j;
-	Some(pat_mul(i, UnicodeXID::is_xid_continue))
+	i.clone().pat(|c| UnicodeXID::is_xid_start(c) || c == '_')?;
+	Some(i.pat_mul(UnicodeXID::is_xid_continue))
 }
 
 fn string(i: &mut Lex) -> Option<String> {
-	pat(i, '"')?;
+	let i0 = i.pos();
+	i.pat('"')?;
 	let mut s = String::new();
-	let i0 = i.pos;
 	loop {
-		let i1 = i.pos;
-		match symbol(i) {
+		let i1 = i.pos();
+		match i.any() {
 			None | Some('\n') => {
-				i.emit(i0, "unterminated string");
+				Diag::error(i0 | i.pos(), "unterminated string").emit();
 				break;
 			}
 			Some('"') => break,
-			Some('\\') => match symbol(i) {
+			Some('\\') => match i.any() {
 				None | Some('\n') => {
-					i.emit(i0, "unterminated string");
+					Diag::error(i0 | i.pos(), "unterminated string").emit();
 					break;
 				}
 				Some('"') => s.push('"'),
 				Some('\\') => s.push('\\'),
-				_ => i.emit(i1, "invalid escape sequence"),
+				_ => Diag::error(i1 | i.pos(), "invalid escape sequence").emit(),
 			},
 			Some(c) => s.push(c),
 		}
@@ -209,51 +213,80 @@ fn string(i: &mut Lex) -> Option<String> {
 	Some(s)
 }
 
-fn text<'a>(i: &mut Lex<'a>) -> Option<&'a str> {
-	pat(i, '{')?;
-	let i0 = i.pos;
-	let mut i1;
-	loop {
-		i1 = i.pos;
-		match symbol(i) {
-			None => {
-				i.emit(i0, "unterminated text");
-				break;
-			}
-			Some('}') => break,
-			Some('{') => loop {
-				match symbol(i) {
-					None | Some('\n') => {
-						i.emit(i1, "unterminated text directive");
-						break;
-					}
-					Some('}') => break,
-					_ => {}
-				}
-			},
-			_ => {}
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct Spanned<T>(pub Span, pub T);
+
+impl<T: std::fmt::Debug> std::fmt::Debug for Spanned<T> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		if f.alternate() {
+			self.0.fmt(f)?;
+		}
+		f.write_str("@")?;
+		self.1.fmt(f)
+	}
+}
+
+impl<A> Spanned<A> {
+	pub fn map<B>(self, f: impl FnOnce(A) -> B) -> Spanned<B> {
+		Spanned(self.0, f(self.1))
+	}
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Line<'a> {
+	pub span: Span,
+	pub head: Vec<Spanned<Token<'a>>>,
+	pub eol: Span, // points either to the colon or an empty span at the end of the line
+	pub body: Option<Vec<Line<'a>>>,
+}
+
+impl Line<'_> {
+	pub fn head_span(&self) -> Span {
+		if let Some(a) = self.head.first() {
+			a.0 | self.eol
+		} else {
+			self.eol
 		}
 	}
-	Some(Span::from_prefix(i0, i1).as_str())
 }
 
-fn symbol(i: &mut Lex) -> Option<char> {
-	pat(i, |_| true).map(|a| a.chars().next().unwrap())
+#[derive(Clone, PartialEq, Eq)]
+pub struct Delimited<T> {
+	pub open: Span,
+	pub tokens: Vec<Spanned<T>>,
+	pub close: Span,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum TokenKind<'a> {
+impl<T: std::fmt::Debug> std::fmt::Debug for Delimited<T> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		if f.alternate() {
+			self.open.fmt(f)?;
+		}
+		f.write_str("@")?;
+		self.tokens.fmt(f)?;
+		f.write_str("@")?;
+		if f.alternate() {
+			self.close.fmt(f)?;
+		}
+		Ok(())
+	}
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub enum Token<'a> {
 	Ident(&'a str),
-	Number(Number),
+	Int(u64),
+	Float(&'a str), // always represents a valid f64, so can just unwrap it
 	String(String),
-	Text(&'a str),
+	Var(&'a str),
 
-	Colon,  // :
-	Comma,  // ,
-	LParen, // (
-	RParen, // )
-	LBrack, // [
-	RBrack, // ]
+	Paren(Delimited<Token<'a>>),
+	Bracket(Delimited<Token<'a>>),
+	Brace(Delimited<TextToken<'a>>),
+
+	Comma,   // ,
+	Dot,     // .
+	At,      // @
 
 	Plus,    // +
 	Minus,   // -
@@ -261,160 +294,321 @@ pub enum TokenKind<'a> {
 	Slash,   // /
 	Percent, // %
 	Excl,    // !
-
-	Eq,    // =
-	Lt,    // <
-	Gt,    // >
-	Amp,   // &
-	Pipe,  // |
-	Caret, // ^
-	Tilde, // ~
-	Dot,   // .
-	At,    // @
-
-	Eof,
-	Error,
+	Eq,      // =
+	Lt,      // <
+	Gt,      // >
+	Amp,     // &
+	Pipe,    // |
+	Caret,   // ^
+	Tilde,   // ~
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Token<'a> {
-	pub trivia: &'a str,
-	pub indent: Option<&'a str>,
-	pub span: Span<'a>,
-	pub token: TokenKind<'a>,
+impl std::fmt::Debug for Token<'_> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::Ident(v)   => { write!(f, "Ident(")?;   v.fmt(f)?; write!(f, ")") }
+			Self::Int(v)     => { write!(f, "Int(")?;     v.fmt(f)?; write!(f, ")") }
+			Self::Float(v)   => { write!(f, "Float(")?;   v.fmt(f)?; write!(f, ")") }
+			Self::String(v)  => { write!(f, "String(")?;  v.fmt(f)?; write!(f, ")") }
+			Self::Var(v)     => { write!(f, "Var(")?;     v.fmt(f)?; write!(f, ")") }
+			Self::Paren(v)   => { write!(f, "Paren(")?;   v.fmt(f)?; write!(f, ")") }
+			Self::Bracket(v) => { write!(f, "Bracket(")?; v.fmt(f)?; write!(f, ")") }
+			Self::Brace(v)   => { write!(f, "Brace(")?;   v.fmt(f)?; write!(f, ")") }
+			Self::Comma   => write!(f, "Comma"),
+			Self::Dot     => write!(f, "Dot"),
+			Self::At      => write!(f, "At"),
+			Self::Plus    => write!(f, "Plus"),
+			Self::Minus   => write!(f, "Minus"),
+			Self::Star    => write!(f, "Star"),
+			Self::Slash   => write!(f, "Slash"),
+			Self::Percent => write!(f, "Percent"),
+			Self::Excl    => write!(f, "Excl"),
+			Self::Eq      => write!(f, "Eq"),
+			Self::Lt      => write!(f, "Lt"),
+			Self::Gt      => write!(f, "Gt"),
+			Self::Amp     => write!(f, "Amp"),
+			Self::Pipe    => write!(f, "Pipe"),
+			Self::Caret   => write!(f, "Caret"),
+			Self::Tilde   => write!(f, "Tilde"),
+		}
+	}
 }
 
-fn space<'a>(i: &mut Lex<'a>) -> &'a str {
-	let i0 = i.pos;
-	loop {
-		if pat(i, "//").is_some() {
-			pat_mul(i, |c| c != '\n');
-		} else if pat_mul(i, [' ', '\t']).is_empty() {
+#[derive(Clone, PartialEq, Eq)]
+pub enum TextToken<'a> {
+	Text(String),
+	// NISA's ed7 have two newlines (01 and 0D), which here are differentiated by a backslash.
+	Newline(bool),
+	Hex(u8),
+	Brace(Delimited<Token<'a>>),
+}
+
+fn tokens<'a>(indent: Indent, i: &mut Lex<'a>) -> Option<Vec<Spanned<Token<'a>>>> {
+	let mut out = Vec::new();
+
+	macro test($e:expr => $f:expr) {
+		let i0 = i.pos();
+		let x = $e;
+		if let Some(x) = x {
+			let f = $f;
+			out.push(Spanned(i0 | i.pos(), f(x)));
+			continue
+		} else if i.pos() != i0 {
+			return None
+		}
+	}
+
+	i.clear_space();
+	while continue_line(indent, i) {
+		test!(ident(i) => Token::Ident);
+		test!(number(i) => |s| match s {
+			Number::Int(x) => Token::Int(x),
+			Number::Float(x) => Token::Float(x),
+		});
+		test!(string(i) => Token::String);
+
+		test!(i.pat('$').and_then(|_| ident(i)) => Token::Var);
+
+		test!(delim(indent, i, '(', tokens, ')', "parenthesis") => Token::Paren);
+		test!(delim(indent, i, '[', tokens, ']', "bracket") => Token::Bracket);
+		test!(delim(indent, i, '{', text_tokens, '}', "brace") => Token::Brace);
+
+
+		test!(i.pat(',') => |_| Token::Comma);
+		test!(i.pat('.') => |_| Token::Dot);
+		test!(i.pat('@') => |_| Token::At);
+
+		test!(i.pat('+') => |_| Token::Plus);
+		test!(i.pat('-') => |_| Token::Minus);
+		test!(i.pat('*') => |_| Token::Star);
+		test!(i.pat('/') => |_| Token::Slash);
+		test!(i.pat('%') => |_| Token::Percent);
+		test!(i.pat('!') => |_| Token::Excl);
+
+		test!(i.pat('=') => |_| Token::Eq);
+		test!(i.pat('<') => |_| Token::Lt);
+		test!(i.pat('>') => |_| Token::Gt);
+		test!(i.pat('&') => |_| Token::Amp);
+		test!(i.pat('|') => |_| Token::Pipe);
+		test!(i.pat('^') => |_| Token::Caret);
+		test!(i.pat('~') => |_| Token::Tilde);
+
+		break
+	}
+	Some(out)
+}
+
+impl std::fmt::Debug for TextToken<'_> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::Text(v)    => { write!(f, "Text(")?;    v.fmt(f)?; write!(f, ")") }
+			Self::Newline(v) => { write!(f, "Newline(")?; v.fmt(f)?; write!(f, ")") }
+			Self::Hex(v)     => { write!(f, "Hex(")?;     v.fmt(f)?; write!(f, ")") }
+			Self::Brace(v)   => { write!(f, "Brace(")?;   v.fmt(f)?; write!(f, ")") }
+		}
+	}
+}
+
+fn text_tokens<'a>(indent: Indent, i: &mut Lex<'a>) -> Option<Vec<Spanned<TextToken<'a>>>> {
+	let mut out = Vec::new();
+
+	i.pat_mul([' ', '\t']);
+	i.pat('\n')?;
+	i.last_indent = Some(Indent(i.pat_mul([' ', '\t'])));
+
+	let mut i0 = i.pos();
+	let mut s = String::new();
+
+	macro push {
+		() => {
+			if !s.is_empty() {
+				out.push(Spanned(i0 | i.pos(), TextToken::Text(s)));
+				#[allow(unused_assignments)]
+				{
+					s = String::new();
+					i0 = i.pos();
+				}
+			}
+		},
+		($($tt:tt)*) => {
+			push!();
+			let i1 = i.pos();
+			let v = { $($tt)* };
+			out.push(Spanned(i1 | i.pos(), v));
+			i0 = i.pos();
+		}
+	}
+
+	while i.last_indent > indent {
+		if i.clone().pat('}').is_some() {
 			break
 		}
+
+		if i.clone().pat('{').is_some() {
+			push! {
+				let body = delim(Indent("-"), i, '{', tokens, '}', "brace")?;
+				TextToken::Brace(body)
+			};
+		}
+
+		if i.clone().pat_('\n').is_some() {
+			push! {
+				i.pat('\n');
+				TextToken::Newline(false)
+			};
+			i.last_indent = Some(Indent(i.pat_mul([' ', '\t'])));
+		}
+
+		if i.clone().pat_('\\').is_some() {
+			let i1 = i.pos();
+			i.pat('\\');
+
+			if let Some(s2) = i.pat(['\\', '{', '}']) {
+				s.push_str(s2)
+			} else if i.pat('\n').is_some() {
+				push!();
+				out.push(Spanned(i1 | i.pos(), TextToken::Newline(true)));
+				i0 = i.pos();
+			} else {
+				Diag::error(i1 | i.pos(), "invalid escape").emit();
+			}
+		}
+
+		s.push_str(i.pat_mul(|a| !"{}\\\n".contains(a)));
 	}
-	i.span(i0).as_str()
+	push!();
+	Some(out)
 }
 
-fn trivia<'a>(i: &mut Lex<'a>) -> (&'a str, Option<&'a str>) {
-	let i0 = i.pos;
-	space(i);
-	let mut indent = None;
-	while pat(i, '\n').is_some() {
-		indent = Some(space(i))
+fn delim<'a, T: 'a>(
+	indent: Indent,
+	i: &mut Lex<'a>,
+	c1: char,
+	tokens: fn(Indent, &mut Lex<'a>) -> Option<Vec<Spanned<T>>>,
+	c2: char,
+	name: &str,
+) -> Option<Delimited<T>> {
+	let i0 = i.pos();
+	i.pat(c1)?;
+	let open = i0 | i.pos();
+
+	let tokens = tokens(indent, i)?;
+
+	let i0 = i.pos();
+	// #[allow(clippy::neg_cmp_op_on_partial_ord)]
+	if !(i.space() >= indent) && !i.is_empty() {
+		Diag::error(i0, "invalid indentation")
+			.note(open, format_args!("inside {name} opened here"))
+			.emit();
+		return None
+	} else if i.pat(c2).is_none() {
+		Diag::error(i0, format_args!("expected closing {name}"))
+			.note(open, "opened here")
+			.emit();
+		return None
 	}
-	(i.span(i0).as_str(), indent)
+	let close = i0 | i.pos();
+	Some(Delimited {
+		open,
+		tokens,
+		close,
+	})
 }
 
-#[allow(dead_code)]
-pub fn token<'a>(i: &mut Lex<'a>) -> Token<'a> {
-	let (trivia, indent) = trivia(i);
-	let i0 = i.pos;
-	if let Some(token) = None
-		.or_else(|| ident(i).map(TokenKind::Ident))
-		.or_else(|| hex_number(i).map(TokenKind::Number))
-		.or_else(|| number(i).map(TokenKind::Number))
-		.or_else(|| string(i).map(TokenKind::String))
-		.or_else(|| text(i).map(TokenKind::Text))
+fn continue_line(indent: Indent, i: &mut Lex) -> bool {
+	let ind = i.space();
+	ind > indent || ind == indent && i.clone().pat(['{', ')', ']', '}']).is_some()
+}
 
-		.or_else(|| pat(i, ':').map(|_| TokenKind::Colon))
-		.or_else(|| pat(i, ',').map(|_| TokenKind::Comma))
-		.or_else(|| pat(i, '(').map(|_| TokenKind::LParen))
-		.or_else(|| pat(i, ')').map(|_| TokenKind::RParen))
-		.or_else(|| pat(i, '[').map(|_| TokenKind::LBrack))
-		.or_else(|| pat(i, ']').map(|_| TokenKind::RBrack))
+fn line<'a>(indent: Indent, i: &mut Lex<'a>) -> Line<'a> {
+	let i0 = i.pos();
+	let head = tokens(indent, i).unwrap_or_default();
 
-		.or_else(|| pat(i, '+').map(|_| TokenKind::Plus))
-		.or_else(|| pat(i, '-').map(|_| TokenKind::Minus))
-		.or_else(|| pat(i, '*').map(|_| TokenKind::Star))
-		.or_else(|| pat(i, '/').map(|_| TokenKind::Slash))
-		.or_else(|| pat(i, '%').map(|_| TokenKind::Percent))
-		.or_else(|| pat(i, '!').map(|_| TokenKind::Excl))
-
-		.or_else(|| pat(i, '=').map(|_| TokenKind::Eq))
-		.or_else(|| pat(i, '<').map(|_| TokenKind::Lt))
-		.or_else(|| pat(i, '>').map(|_| TokenKind::Gt))
-		.or_else(|| pat(i, '&').map(|_| TokenKind::Amp))
-		.or_else(|| pat(i, '|').map(|_| TokenKind::Pipe))
-		.or_else(|| pat(i, '^').map(|_| TokenKind::Caret))
-		.or_else(|| pat(i, '~').map(|_| TokenKind::Tilde))
-		.or_else(|| pat(i, '.').map(|_| TokenKind::Dot))
-		.or_else(|| pat(i, '@').map(|_| TokenKind::At))
-	{
-		Token {
-			trivia,
-			indent,
-			span: i.span(i0),
-			token
-		}
-	} else if i.pos.is_empty() {
-		// Eof tokens are always at a new line, but not indented.
-		// This will make sure all indent blocks end as they should.
-		let span = i.span(i0);
-		Token {
-			trivia,
-			indent: Some(span.end().as_str()),
-			span,
-			token: TokenKind::Eof
-		}
+	let (eol, body) = if i.space() <= indent || i.is_empty() {
+		let eol = head.last().unwrap().0.at_end();
+		(eol, None)
 	} else {
-		pat(i, |_| true);
-		i.emit(i0, "unexpected token");
-		Token {
-			trivia,
-			indent,
-			span: i.span(i0),
-			token: TokenKind::Error
+		let i1 = i.pos();
+		while continue_line(indent, i) && i.clone().pat(':').is_none() {
+			i.pat_mul(|a| a != '\n' && a != ':');
 		}
-	}
+		if i1 != i.pos() {
+			Diag::error(i1 | i.pos(), "unexpected character").emit();
+		}
+
+		if let Some(eol) = i.pat_(':') {
+			let ind = i.space();
+			#[allow(clippy::unnecessary_unwrap)]
+			let body = if ind.is_none() {
+				vec![line(indent, i)]
+			} else if ind > indent {
+				lines(ind.unwrap(), i)
+			} else {
+				Vec::new()
+			};
+			(eol, Some(body))
+		} else {
+			(i1, None)
+		}
+	};
+	Line { span: i0 | i.pos(), head, eol, body }
 }
 
-pub fn tokens<'a>(i: &mut Lex<'a>) -> Vec<Token<'a>> {
-	let mut tokens = Vec::new();
-	loop {
-		tokens.push(token(i));
-		if tokens.last().unwrap().token == TokenKind::Eof {
+fn lines<'a>(indent: Indent, i: &mut Lex<'a>) -> Vec<Line<'a>> {
+	let mut indent_pos = i.pos();
+	let mut lines = Vec::new();
+	while {i.space(); !i.is_empty()} {
+		let ind = i.space();
+		ind.expect("lines() can only be called at start of line");
+		if ind > indent {
+			// This error can only happen at the start of the file, or if a line terminates one block but is not consistent with the next.
+			// In the latter case it would probably be better to point to the last line of the preceding block, not here.
+			Diag::error(i.pos(), "unexpected indent")
+				.note(indent_pos, "should perhaps be equal to here")
+				.emit();
+		} else if ind == indent {
+			indent_pos = i.pos(); // print reference indent closer to where the error is shown
+		}
+
+		if ind >= indent {
+			lines.push(line(ind.unwrap(), i))
+		} else {
 			break
 		}
 	}
-	tokens[0].indent = Some(&i.src[..0]);
-	tokens
+	lines
 }
 
-#[test]
-fn test_hexnum() {
-	println!("{:?}", hex_number(&mut Lex::new("abc")));
-	println!("{:?}", hex_number(&mut Lex::new("0xa")));
-	println!("{:?}", hex_number(&mut Lex::new("0xabD")));
-	println!("{:?}", hex_number(&mut Lex::new("0x123456789abcdef12345789")));
-	println!("{:?}", hex_number(&mut Lex::new("0Xabcq")));
-	println!("{:?}", hex_number(&mut Lex::new("0Xabc q")));
-}
-
-#[test]
-fn test_num() {
-	println!("{:?}", number(&mut Lex::new("abc")));
-	println!("{:?}", number(&mut Lex::new("1")));
-	println!("{:?}", number(&mut Lex::new("11")));
-	println!("{:?}", number(&mut Lex::new("1.0")));
-	println!("{:?}", number(&mut Lex::new("1.")));
-	println!("{:?}", number(&mut Lex::new(".1")));
-	println!("{:?}", number(&mut Lex::new("123e")));
-	println!("{:?}", number(&mut Lex::new("1.0")));
-	println!("{:?}", number(&mut Lex::new("1.00")));
-	println!("{:?}", number(&mut Lex::new("10.00")));
+pub fn lex(src: &str) -> Vec<Line> {
+	let mut i = Lex::new(src);
+	let v = lines(Indent(""), &mut i);
+	assert!(i.is_empty());
+	v
 }
 
 #[test]
 fn main() {
 	let src = include_str!("/tmp/kiseki/tc/t1121");
-	let mut parse = Lex::new(src);
-	loop {
-		let t = token(&mut parse);
-		println!("{:?} {:?} {:?} {:?}", t.span.position_in(src).unwrap(), t.trivia, t.indent, t.token);
-		if let TokenKind::Eof = &t.token { break }
-	}
-	for e in &parse.errors {
-		println!("{:?}", e);
+	let (ast, diag) = diagnose(|| lex(src));
+	println!("{:#?}", ast);
+
+	use codespan_reporting::diagnostic::{Diagnostic, Label};
+	use codespan_reporting::files::SimpleFiles;
+	use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
+
+	let writer = StandardStream::stderr(ColorChoice::Always);
+	let config = codespan_reporting::term::Config::default();
+	let mut files = SimpleFiles::new();
+	let file_id = files.add("<input>", src);
+
+	for d in diag {
+		let mut l = vec![
+			Label::primary(file_id, d.span.as_range()).with_message(d.text),
+		];
+		for (s, t) in d.notes {
+			l.push(Label::secondary(file_id, s.as_range()).with_message(t));
+		}
+		let d = Diagnostic::error().with_labels(l);
+		codespan_reporting::term::emit(&mut writer.lock(), &config, &files, &d).unwrap();
 	}
 }

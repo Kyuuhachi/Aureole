@@ -280,13 +280,6 @@ fn val(f: &mut Context, a: I) -> Result<()> {
 		I::OptionalMembers(v)  => write!(f, "{v:?}")?,
 		I::TcMembers(v)        => write!(f, "{v:016b}")?,
 		I::NpcBattleCombatants(v) => write!(f, "{v:?}")?,
-
-		I::AviFileRef(v)   => write!(f, "{v:?}")?,
-		I::EffFileRef(v)   => write!(f, "{v:?}")?,
-		I::MapFileRef(v)   => write!(f, "{v:?}")?,
-		I::OpFileRef(v)    => write!(f, "{v:?}")?,
-		I::ScenaFileRef(v) => write!(f, "{v:?}")?,
-		I::VisFileRef(v)   => write!(f, "{v:?}")?,
 	}
 	Ok(())
 }

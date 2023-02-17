@@ -15,7 +15,7 @@ themelios_macros::bytecode! {
 		/// unknown.
 		///
 		/// Official name is `new_scene`, which also implicitly adds a [`Hcf`](Self::Hcf).
-		NewScene(file_ref(game) -> String alias ScenaFileRef, u8, u8, u8),
+		NewScene(file_ref(game) -> String, u8, u8, u8),
 
 		/// Simply halts the script forever.
 		///
@@ -118,7 +118,7 @@ themelios_macros::bytecode! {
 		Map(match {
 			0 => Hide(),
 			1 => Show(),
-			2 => Set(i32, Pos2, file_ref(game) -> String alias MapFileRef),
+			2 => Set(i32, Pos2, file_ref(game) -> String),
 		}),
 		#[game(Zero, ZeroEvo)]
 		ZeroMap(match {
@@ -333,7 +333,7 @@ themelios_macros::bytecode! {
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _7E(i16, i16, i16, u8, u32),
 
 		#[game(Zero, Ao, AoEvo)] ED7_84(u8, u8),
-		EffLoad(u8 alias EffId, String alias EffFileRef),
+		EffLoad(u8 alias EffId, String),
 		EffPlay(
 			u8 alias EffId, u8 /*alias EffInstanceId*/,
 			u16 as CharId, { i if i.is_ed7() => u16, _ => const 0u16 }, Pos3, // source
@@ -458,7 +458,7 @@ themelios_macros::bytecode! {
 		/// Returns whether the recipe was already known, i.e. if it was *not* successfully learned.
 		RecipeLearn(u16),
 
-		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] ImageShow(file_ref(game) -> String alias VisFileRef, u16, u16, u32 alias Time), // [portrait_open]
+		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] ImageShow(file_ref(game) -> String, u16, u16, u32 alias Time), // [portrait_open]
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] ImageHide(u32 alias Time), // [portrait_close]
 
 		/// Attempts to submit a quest.
@@ -467,7 +467,7 @@ themelios_macros::bytecode! {
 		/// What exactly this entails is unknown; the return value is never used.
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] QuestSubmit(u8 as ShopId, u16 as QuestId),
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _ObjB0(u16 alias ObjectId, u8), // Used along with 6F, 70, and 73 during T0700#11
-		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] OpLoad(String alias OpFileRef),
+		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] OpLoad(String),
 
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_B1(u8),
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] skip!(3),
@@ -478,7 +478,7 @@ themelios_macros::bytecode! {
 		}),
 
 		Video(match {
-			0 => Play(String alias AviFileRef, { IS::Fc|IS::FcEvo => const 0u16, _ => u16 }, { IS::Fc|IS::FcEvo => const 0u16, _ => u16 }), // [movie(MOVIE_START)]
+			0 => Play(String, { IS::Fc|IS::FcEvo => const 0u16, _ => u16 }, { IS::Fc|IS::FcEvo => const 0u16, _ => u16 }), // [movie(MOVIE_START)]
 			1 => End(u8, { IS::Fc|IS::FcEvo => const 0u16, _ => u16 }, { IS::Fc|IS::FcEvo => const 0u16, _ => u16 }), // [movie(MOVIE_END)], probably the 0 is the null terminator of an empty string
 		}),
 

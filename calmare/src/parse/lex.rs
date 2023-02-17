@@ -373,7 +373,6 @@ fn tokens<'a>(indent: Indent, i: &mut Lex<'a>) -> Option<Vec<Spanned<Token<'a>>>
 		test!(delim(indent, i, '[', tokens, ']', "bracket") => Token::Bracket);
 		test!(delim(indent, i, '{', text_tokens, '}', "brace") => Token::Brace);
 
-
 		test!(i.pat(',') => |_| Token::Comma);
 		test!(i.pat('.') => |_| Token::Dot);
 		test!(i.pat('@') => |_| Token::At);

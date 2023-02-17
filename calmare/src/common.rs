@@ -438,3 +438,19 @@ fn text_blind(f: &mut Context, v: &Text) -> Result<()> {
 	}
 	Ok(())
 }
+
+pub(crate) fn game(game: &themelios::gamedata::GameData) -> &'static str {
+	use InstructionSet::*;
+	match game.iset {
+		Fc   => if game.kai { "ed61k" } else { "ed61" },
+		Sc   => if game.kai { "ed62k" } else { "ed62" },
+		Tc   => if game.kai { "ed63k" } else { "ed63" },
+		Zero => if game.kai { "ed71k" } else { "ed71" },
+		Ao   => if game.kai { "ed72k" } else { "ed72" },
+		FcEvo   => "ed61e",
+		ScEvo   => "ed62e",
+		TcEvo   => "ed63e",
+		ZeroEvo => "ed71e",
+		AoEvo   => "ed72e",
+	}
+}

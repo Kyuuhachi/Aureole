@@ -23,22 +23,22 @@ pub fn write(mut f: Context, scena: &ed6::Scena) -> Result<()> {
 		functions,
 	} = scena;
 
-	f.kw("scena")?.kw("ed6")?.suf(":")?.line()?.indent(|f| {
+	let g = common::game(f.game);
+	f.kw("type")?.kw(g)?.kw("scena")?.line()?;
+
+	f.kw("scena")?.suf(":")?.line()?.indent(|f| {
 		f.kw("name")?.val(I::String(path))?.val(I::String(map))?.line()?;
 		f.kw("town")?.val(I::TownId(town))?.line()?;
 		f.kw("bgm")?.val(I::BgmId(bgm))?.line()?;
 		f.kw("item")?.val(I::FuncRef(item))?.line()?;
+		for (i, a) in includes.iter().enumerate() {
+			if let Some(a) = a {
+				f.kw("scp")?.val(I::u16(&(i as u16)))?.val(I::String(a))?.line()?;
+			}
+		}
 		Ok(())
 	}).strict()?;
-
-	for (i, a) in includes.iter().enumerate() {
-		if let Some(a) = a {
-			f.kw("scp")?.val(I::u16(&(i as u16)))?.val(I::String(a))?.line()?;
-		}
-	}
-	if includes.iter().any(|a| a.is_some()) {
-		f.line()?;
-	}
+	f.line()?;
 
 	for entry in entries {
 		f.kw("entry")?.suf(":")?.line()?.indent(|f| {
@@ -65,6 +65,9 @@ pub fn write(mut f: Context, scena: &ed6::Scena) -> Result<()> {
 	loop {
 		let ch = chcp.0.next();
 		let cp = chcp.1.next();
+		if ch.is_none() && cp.is_none() {
+			break
+		}
 		f.kw("chcp")?.val(I::ChcpId(&chcp.2))?;
 		if let Some(ch) = ch {
 			f.val(I::String(ch))?;
@@ -78,9 +81,6 @@ pub fn write(mut f: Context, scena: &ed6::Scena) -> Result<()> {
 		}
 		f.line()?;
 		chcp.2 += 1;
-		if ch.is_none() && cp.is_none() {
-			break
-		}
 	}
 	if !ch.is_empty() || !cp.is_empty() {
 		f.line()?;
@@ -149,7 +149,9 @@ pub fn write(mut f: Context, scena: &ed6::Scena) -> Result<()> {
 	}
 
 	for (i, func) in functions.iter().enumerate() {
-		f.line()?;
+		if i != 0 {
+			f.line()?;
+		}
 		common::func(&mut f, FuncRef(0, i as u16), func)?;
 	}
 

@@ -36,24 +36,25 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 		functions,
 	} = scena;
 
-	f.kw("scena")?.kw("ed7")?.suf(":")?.line()?.indent(|f| {
+	// TODO: a lot of these declarations use nonstandard syntax. Will need to refine that later.
+
+	let g = common::game(f.game);
+	f.kw("type")?.kw(g)?.kw("scena")?.line()?;
+
+	f.kw("scena")?.suf(":")?.line()?.indent(|f| {
 		f.kw("name")?.val(I::String(name1))?.val(I::String(name2))?.val(I::String(filename))?.line()?;
 		f.kw("town")?.val(I::TownId(town))?.line()?;
 		f.kw("bgm")?.val(I::BgmId(bgm))?.line()?;
 		f.kw("flags")?.val(I::u32(flags))?.line()?;
 		f.kw("unk")?.val(I::u8(unk1))?.val(I::u16(unk2))?.val(I::u8(unk3))?.line()?;
+		for (i, a) in includes.iter().enumerate() {
+			if let Some(a) = a {
+				f.kw("scp")?.val(I::u16(&(i as u16)))?.val(I::String(a))?.line()?;
+			}
+		}
 		Ok(())
 	}).strict()?;
 	f.line()?;
-
-	for (i, a) in includes.iter().enumerate() {
-		if let Some(a) = a {
-			f.kw("scp")?.val(I::u16(&(i as u16)))?.val(I::String(a))?.line()?;
-		}
-	}
-	if includes.iter().any(|a| a.is_some()) {
-		f.line()?;
-	}
 
 	for entry in entry {
 		f.kw("entry")?.suf(":")?.line()?.indent(|f| {
@@ -81,7 +82,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 		if let Some(chcp) = chcp {
 			f.val(I::String(chcp))?;
 		} else {
-			f.kw("-")?;
+			f.kw("null")?;
 		}
 		f.line()?;
 	}
@@ -194,7 +195,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 		}
 	} else {
 		// need to keep this for roundtripping
-		f.kw("labels")?.kw("-")?.line()?.line()?;
+		f.kw("labels")?.kw("null")?.line()?.line()?;
 	}
 
 	for (i, anim) in animations.iter().enumerate() {
@@ -203,9 +204,6 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 		for val in &anim.frames {
 			f.val(I::u8(val))?;
 		}
-		f.line()?;
-	}
-	if !animations.is_empty() {
 		f.line()?;
 	}
 
@@ -231,18 +229,12 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 			f.line()?;
 		}
 	}
-	if !field_sepith.is_empty() {
-		f.line()?;
-	}
 
 	for (i, roll) in at_rolls.iter().enumerate() {
 		f.kw("at_roll")?.val(I::u16(&(i as u16)))?.suf(":")?;
 		for val in roll {
 			f.val(I::u8(val))?;
 		}
-		f.line()?;
-	}
-	if !at_rolls.is_empty() {
 		f.line()?;
 	}
 
@@ -256,9 +248,6 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 				f.suf(",")?;
 			}
 		}
-		f.line()?;
-	}
-	if !placements.is_empty() {
 		f.line()?;
 	}
 
@@ -306,7 +295,9 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 	}
 
 	for (i, func) in functions.iter().enumerate() {
-		f.line()?;
+		if i != 0 {
+			f.line()?;
+		}
 		common::func(&mut f, FuncRef(0, i as u16), func)?;
 	}
 

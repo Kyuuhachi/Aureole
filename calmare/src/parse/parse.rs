@@ -287,6 +287,8 @@ fn parse_top(line: &Line) -> Result<Decl> {
 	match line.head.first() {
 		Some(S(_, Token::Ident("fn"))) =>
 			Ok(Decl::Function(parse_fn(line)?)),
+		Some(S(_, Token::Ident("type"))) =>
+			Ok(parse_type(line).map(|(g, t)| Decl::FileType(g, t))?),
 		_ =>
 			Ok(Decl::Data(parse_data(true, line)?))
 	}
@@ -303,6 +305,32 @@ fn key_val(abbrev: bool, p: &mut Parse) -> Result<KeyVal> {
 		terms.push(parse_term(p)?);
 	}
 	Ok(KeyVal { key, terms })
+}
+
+fn parse_type(line: &Line) -> Result<(Game, FileType)> {
+	Parse::run(&line.head, line.eol, |p| {
+		no_body(line);
+		use Token::Ident as I;
+		let game = match p.next()?.1 {
+			I("ed61") => Game::Ed61, I("ed61e") => Game::Ed61e, I("ed61k") => Game::Ed61k,
+			I("ed62") => Game::Ed62, I("ed62e") => Game::Ed62e, I("ed62k") => Game::Ed62k,
+			I("ed63") => Game::Ed63, I("ed63e") => Game::Ed63e, I("ed63k") => Game::Ed63k,
+			I("ed71") => Game::Ed71, I("ed71e") => Game::Ed71e, I("ed71k") => Game::Ed71k,
+			I("ed72") => Game::Ed72, I("ed72e") => Game::Ed72e, I("ed72k") => Game::Ed72k,
+			_ => {
+				Diag::error(p.prev_span(), "unknown game").emit();
+				return Err(Error);
+			}
+		};
+		let ty = match p.next()?.1 {
+			I("scena") => FileType::Scena,
+			_ => {
+				Diag::error(p.prev_span(), "unknown file type").emit();
+				return Err(Error);
+			}
+		};
+		Ok((game, ty))
+	})
 }
 
 fn parse_data(top: bool, line: &Line) -> Result<Data> {

@@ -150,6 +150,7 @@ struct InwardContext {
 	ident: Ident,
 	attrs: Attributes,
 	arg_names: Punctuated<Ident, Token![,]>,
+	#[allow(clippy::vec_box)]
 	args: Vec<Box<Type>>,
 	games: GameSpec,
 	write: Vec<Stmt>,
@@ -161,6 +162,7 @@ struct Insn {
 	span: Span,
 	ident: Ident,
 	attrs: Attributes,
+	#[allow(clippy::vec_box)]
 	args: Vec<Box<Type>>,
 }
 

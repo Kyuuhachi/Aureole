@@ -11,7 +11,7 @@ pub type Result<T, E = std::io::Error> = std::result::Result<T, E>;
 #[extend::ext(name = ContextExt)]
 pub(crate) impl Context<'_> {
 	fn val<I: Val>(&mut self, arg: &I) -> Result<&mut Self> {
-		arg.write(self);
+		arg.write(self)?;
 		self.space()?;
 		Ok(self)
 	}
@@ -276,7 +276,7 @@ impl Val for CharId {
 		let v = self.0;
 		use InstructionSet::*;
 		match v {
-			257.. => NameId((v - 257).into()).write(f),
+			257.. => NameId(v - 257).write(f),
 			256   => write!(f, "(ERROR)"),
 			255   => write!(f, "null"),
 			254   => write!(f, "self"),

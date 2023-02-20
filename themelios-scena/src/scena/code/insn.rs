@@ -193,7 +193,7 @@ themelios_macros::bytecode! {
 		ScPartyClear(),
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] _30(u8),
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_31(u8),
-		PartySetAttr(MemberAttr via member_attr, u16), // [set_status]
+		PartySetAttr(u8 as u16 as NameId, u8, u16), // [set_status]
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo,Zero,Ao)] skip!(2),
 		PartyAddArt(u8 as u16 as NameId, u16 as MagicId),
 		PartyAddCraft(u8 as u16 as NameId, u16 as MagicId),
@@ -1039,21 +1039,6 @@ pub(super) mod char_attr {
 
 	pub fn write(f: &mut impl Write, _: &GameData, &CharAttr(a, b): &CharAttr) -> Result<(), WriteError> {
 		f.u16(a.0);
-		f.u8(b);
-		Ok(())
-	}
-}
-
-pub(super) mod member_attr {
-	use super::*;
-	pub fn read<'a>(f: &mut impl Read<'a>, _: &GameData) -> Result<MemberAttr, ReadError> {
-		let a = NameId(f.u8()? as u16);
-		let b = f.u8()?;
-		Ok(MemberAttr(a, b))
-	}
-
-	pub fn write(f: &mut impl Write, _: &GameData, &MemberAttr(a, b): &MemberAttr) -> Result<(), WriteError> {
-		f.u16(cast(a.0)?);
 		f.u8(b);
 		Ok(())
 	}

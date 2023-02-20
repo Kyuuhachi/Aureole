@@ -1,4 +1,4 @@
-use themelios::scena::{Pos2, Pos3, FuncRef, Emote, CharId, SystemFlags, CharFlags, QuestFlags, ObjectFlags, LookPointFlags, Color, MagicId, ShopId, Attr, Var, Global, CharAttr, MemberAttr};
+use themelios::scena::{Pos2, Pos3, FuncRef, Emote, CharId, SystemFlags, CharFlags, QuestFlags, ObjectFlags, LookPointFlags, Color, MagicId, ShopId, Attr, Var, Global, CharAttr};
 use themelios::scena::code::{InstructionSet, Expr, ExprBinop, ExprUnop, FlatInsn, Label, Insn};
 use themelios::scena::code::decompile::{decompile, TreeInsn};
 use themelios::text::{Text, TextSegment};
@@ -264,14 +264,6 @@ nt_arg!(BattleId, "battle[{}]");
 nt_arg!(ItemId, "item[{}]");
 
 impl Val for CharAttr {
-	fn write(&self, f: &mut Context) -> Result<()> {
-		self.0.write(f)?;
-		f.no_space()?;
-		write!(f, ".{}", self.1)
-	}
-}
-
-impl Val for MemberAttr {
 	fn write(&self, f: &mut Context) -> Result<()> {
 		self.0.write(f)?;
 		f.no_space()?;

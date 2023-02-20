@@ -40,7 +40,7 @@ pub struct Scena {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Label {
-	pub name: String,
+	pub name: TString,
 	pub pos: (f32, f32, f32),
 	pub unk1: u16,
 	pub unk2: u16,
@@ -48,7 +48,7 @@ pub struct Label {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Npc {
-	pub name: String,
+	pub name: TString,
 	pub pos: Pos3,
 	pub angle: Angle,
 	pub flags: CharFlags,
@@ -251,7 +251,7 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 
 	let mut g = f.clone().at(p_npcs)?;
 	let npcs = list(n_npcs, || Ok(Npc {
-		name: strings.string()?,
+		name: TString(strings.string()?),
 		pos: g.pos3()?,
 		angle: Angle(g.i16()?),
 		flags: CharFlags(g.u16()?),
@@ -350,7 +350,7 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 			pos: (g.f32()?, g.f32()?, g.f32()?),
 			unk1: g.u16()?,
 			unk2: g.u16()?,
-			name: g.ptr32()?.string()?,
+			name: TString(g.ptr32()?.string()?),
 		})).strict()?)
 	};
 
@@ -581,7 +581,7 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 
 	let g = &mut npcs;
 	for npc in &scena.npcs {
-		strings.string(&npc.name)?;
+		strings.string(npc.name.as_str())?;
 		g.pos3(npc.pos);
 		g.i16(npc.angle.0);
 		g.u16(npc.flags.0);
@@ -751,7 +751,7 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 			g.u16(l.unk1);
 			g.u16(l.unk2);
 			g.delay_u32(strings.here());
-			strings.string(&l.name)?;
+			strings.string(l.name.as_str())?;
 		}
 	}
 

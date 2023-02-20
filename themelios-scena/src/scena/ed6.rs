@@ -51,7 +51,7 @@ pub struct Entry {  // [Entry]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Npc { // [Player]
 	// They put name last, but that sucks
-	pub name: String, // [Name]
+	pub name: TString, // [Name]
 	pub pos: Pos3, // [X, Y, Z]
 	pub angle: Angle, // [ANG]
 	pub x: u16, // [X]
@@ -65,7 +65,7 @@ pub struct Npc { // [Player]
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Monster { // [Monster]
-	pub name: String,
+	pub name: TString,
 	pub pos: Pos3,
 	pub angle: Angle,
 	pub chcp: ChcpId, // This looks like a chcp index, but npcs have 4×u16 while this only has 1×u16?
@@ -132,7 +132,7 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 
 	let (mut g, n) = npcs;
 	let npcs = list(n as usize, || Ok(Npc {
-		name: strings.string()?,
+		name: TString(strings.string()?),
 		pos: g.pos3()?,
 		angle: Angle(g.i16()?),
 		x: g.u16()?,
@@ -146,7 +146,7 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 
 	let (mut g, n) = monsters;
 	let monsters = list(n as usize, || Ok(Monster {
-		name: strings.string()?,
+		name: TString(strings.string()?),
 		pos: g.pos3()?,
 		angle: Angle(g.i16()?),
 		chcp: ChcpId(g.u16()?),
@@ -297,7 +297,7 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 
 	g.label(l_npcs_);
 	for &Npc { ref name, pos, angle, x, cp, frame, ch, flags, init, talk } in npcs {
-		strings.string(name)?;
+		strings.string(name.as_str())?;
 		g.pos3(pos);
 		g.i16(angle.0);
 		g.u16(x);
@@ -311,7 +311,7 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 
 	g.label(l_monsters_);
 	for &Monster { ref name, pos, angle, chcp, flags, unk2, battle, flag, unk3 } in monsters {
-		strings.string(name)?;
+		strings.string(name.as_str())?;
 		g.pos3(pos);
 		g.i16(angle.0);
 		g.u16(chcp.0);

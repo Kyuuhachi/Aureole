@@ -363,7 +363,7 @@ mod expr {
 					0x1E => Expr::Flag(Flag(f.u16()?)),
 					0x1F => Expr::Var(Var(f.u16()?)),
 					0x20 => Expr::Attr(Attr(f.u8()?)),
-					0x21 => Expr::CharAttr(char_attr::read(f)?),
+					0x21 => Expr::CharAttr(char_attr::read(f, game)?),
 					0x22 => Expr::Rand,
 					0x23 => Expr::Global(Global(f.u8()?)),
 					op => return Err(format!("unknown Expr: 0x{op:02X}").into())
@@ -393,7 +393,7 @@ mod expr {
 				Expr::Flag(v)        => { f.u8(0x1E); f.u16(v.0); },
 				Expr::Var(v)         => { f.u8(0x1F); f.u16(v.0); },
 				Expr::Attr(v)        => { f.u8(0x20); f.u8(v.0); },
-				Expr::CharAttr(v)    => { f.u8(0x21); char_attr::write(f, &v)?; },
+				Expr::CharAttr(v)    => { f.u8(0x21); char_attr::write(f, game, &v)?; },
 				Expr::Rand           => { f.u8(0x22); },
 				Expr::Global(v)      => { f.u8(0x23); f.u8(v.0); },
 			}

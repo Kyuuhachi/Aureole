@@ -3,7 +3,6 @@
 
 use std::collections::BTreeMap;
 
-use convert_case::{Case, Casing, Boundary};
 use proc_macro::{TokenStream as TokenStream0, Diagnostic, Level};
 use proc_macro2::Span;
 use quote::{quote, format_ident, ToTokens};
@@ -58,11 +57,11 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		}
 	};
 
-	let write: Vec<Arm> = ctx.writes.iter().map(|WriteArm { span, games, ident, args, body }| {
+	let write: Vec<Arm> = ctx.writes.iter().map(|WriteArm { span, games, pat, body, .. }| {
 		let games_name = games.iter().map(|a| &a.0).collect::<Vec<_>>();
 		let games_hex  = games.iter().map(|a| &a.1).collect::<Vec<_>>();
 		pq!{span=>
-			(__iset@(#(IS::#games_name)|*), Self::#ident(#args)) => {
+			(__iset@(#(IS::#games_name)|*), Self::#pat) => {
 				__f.u8(match __iset {
 					#(IS::#games_name => #games_hex,)*
 					#[allow(unreachable_patterns)]
@@ -78,7 +77,6 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 				fun(__f)
 			}
 			type IS = #game_ty;
-			#[allow(unused_parens)]
 			match (#game_expr, __insn) {
 				#(#write)*
 				(_is, _i) => return Err(format!("`{}` is not supported on `{:?}`", _i.name(), _is).into())
@@ -90,21 +88,9 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 	let doc_insn_table = make_table(&ctx);
 
 	let Insn_body: Punctuated<Variant, Token![,]> = ctx.defs.iter().map(|Insn { span, attrs, ident, args, .. }| -> Variant {
-		let types = args.iter().map(|a| &a.ty);
-		let aliases = args.iter().map(|a| a.alias());
-		let mut predoc = String::new();
-		predoc.push_str("**`");
-		predoc.push_str(&ident.to_string());
-		predoc.push_str("`**");
-		for alias in aliases {
-			predoc.push_str(&format!(" [`{alias}`](InsnArg::{alias})"));
-		}
-		predoc.push_str("\n\n");
-
 		pq!{span=>
-			#[doc = #predoc]
 			#attrs
-			#ident(#(#types),*)
+			#ident(#(#args),*)
 		}
 	}).collect();
 
@@ -123,83 +109,17 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 			#Insn_body
 		}
 
+		#[allow(clippy::deref_addrof, unused_parens)]
 		impl Insn {
 			#read
 			#write
 		}
 	};
 
-	let mut arg_types = BTreeMap::new();
-	arg_types.insert(Ident::new("String", Span::call_site()), parse_quote! { String });
-	for insn in &ctx.defs {
-		for arg in &insn.args {
-			let alias = arg.alias();
-			if !arg_types.contains_key(&alias) {
-				// collisions will be errored about at type checking
-				arg_types.insert(alias.clone(), arg.ty.clone());
-			}
-		}
-	}
-	let InsnArg_names = arg_types.keys().collect::<Vec<_>>();
-	let InsnArg_types = arg_types.values().collect::<Vec<_>>();
-
-	let insn_arg = quote! {
-		#[cfg(not(doc))]
-		#[allow(non_camel_case_types)]
-		#[derive(Debug, Clone)]
-		pub enum InsnArgOwned {
-			#(#InsnArg_names(#InsnArg_types),)*
-		}
-
-		#[cfg(not(doc))]
-		#[allow(non_camel_case_types)]
-		#[derive(Debug, Clone, Copy)]
-		pub enum InsnArg<'a> {
-			#(#InsnArg_names(&'a #InsnArg_types),)*
-		}
-
-		#[cfg(not(doc))]
-		#[allow(non_camel_case_types)]
-		#[derive(Debug)]
-		pub enum InsnArgMut<'a> {
-			#(#InsnArg_names(&'a mut #InsnArg_types),)*
-		}
-
-		#[cfg(not(doc))]
-		#[allow(non_camel_case_types)]
-		#[derive(Debug, Clone, Copy)]
-		pub enum InsnArgType {
-			#(#InsnArg_names,)*
-		}
-
-		// doc shims
-		#[cfg(doc)]
-		#[doc(alias="InsnArgOwned")]
-		#[doc(alias="InsnArgMut")]
-		#[doc(alias="InsnArgType")]
-		#[allow(non_camel_case_types)]
-		#[derive(Debug)]
-		pub enum InsnArg {
-			#(#InsnArg_names(#InsnArg_types),)*
-		}
-
-		#[cfg(doc)]
-		#[doc(inline, hidden)]
-		pub use InsnArg as InsnArgOwned;
-
-		#[cfg(doc)]
-		#[doc(inline, hidden)]
-		pub use InsnArg as InsnArgMut;
-
-		#[cfg(doc)]
-		#[doc(inline, hidden)]
-		pub use InsnArg as InsnArgType;
-	};
-
 	let introspect = ctx.defs.iter().map(|Insn { span, ident, args, .. }| {
-		let aliases = args.iter().map(|a| a.alias());
+		let types = args.iter();
 		let arg_names = args.iter().enumerate().map(|(i, _)| format_ident!("_{i}")).collect::<Vec<_>>();
-		quote::quote_spanned!{*span=> (#ident #((#arg_names #aliases))*) }
+		quote::quote_spanned!{*span=> (#ident #((#arg_names #types))*) }
 	});
 
 	let introspect = quote! {
@@ -210,7 +130,6 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 
 	quote! {
 		#main
-		#insn_arg
 		#introspect
 	}.into()
 }
@@ -231,8 +150,7 @@ struct InwardContext {
 	ident: Ident,
 	attrs: Attributes,
 	arg_names: Punctuated<Ident, Token![,]>,
-	arg_names2: Punctuated<Ident, Token![,]>,
-	args: Vec<InsnArg>,
+	args: Vec<Box<Type>>,
 	games: GameSpec,
 	write: Vec<Stmt>,
 }
@@ -243,30 +161,7 @@ struct Insn {
 	span: Span,
 	ident: Ident,
 	attrs: Attributes,
-	args: Vec<InsnArg>,
-}
-
-#[derive(Clone)]
-struct InsnArg {
-	span: Span,
-	ty: Box<Type>,
-	alias: Option<Ident>
-}
-
-impl InsnArg {
-	fn alias(&self) -> Ident {
-		match &self.alias {
-			Some(a) => a.clone(),
-			None => {
-				if let Type::Path(ty) = &*self.ty && ty.qself.is_none() && let Some(ident) = ty.path.get_ident() {
-					ident.clone()
-				} else {
-					Diagnostic::spanned(self.span.unwrap(), Level::Error, "cannot determine alias").emit();
-					pq!{self.span=> _no_alias}
-				}
-			}
-		}
-	}
+	args: Vec<Box<Type>>,
 }
 
 struct ReadArm {
@@ -279,7 +174,7 @@ struct WriteArm {
 	span: Span,
 	games: GameSpec,
 	ident: Ident,
-	args: Punctuated<Ident, Token![,]>,
+	pat: Box<Pat>,
 	body: Box<Expr>,
 }
 
@@ -335,17 +230,8 @@ fn make_table(ctx: &Ctx) -> String {
 			}
 
 			let head = choubun::node("td", |n| {
-				for Insn { ident, args, ..} in defs {
-					let aliases = args.iter().map(|a| a.alias());
-					let mut title = String::new();
-					title.push_str(&ident.to_string());
-					for alias in aliases {
-						title.push_str(&format!(" {alias}"));
-					}
-					n.node("span", |n| {
-						n.attr("title", title);
-						n.text(format_args!("[`{ident}`](Self::{ident})"));
-					});
+				for Insn { ident, ..} in defs {
+					n.node("span", |n| n.text(format_args!("[`{ident}`](Self::{ident})")));
 					n.text(" ");
 				}
 			});
@@ -445,7 +331,7 @@ fn gather_top(input: Top) -> Result<Ctx> {
 								span: clause.span(),
 								games: games.clone(),
 								ident: clause.ident,
-								args: clause.args,
+								pat: clause.pat,
 								body: clause.expr,
 							});
 						}
@@ -457,11 +343,7 @@ fn gather_top(input: Top) -> Result<Ctx> {
 					span: def.span(),
 					ident: def.ident,
 					attrs: def.attrs,
-					args: def.args.into_iter().map(|a| InsnArg {
-						span: a.span(),
-						ty: a.ty,
-						alias: a.alias.map(|a| a.ident),
-					}).collect(),
+					args: def.args.into_iter().map(|a| a.ty).collect(),
 				});
 			}
 			Def::Standard(mut def) => {
@@ -472,7 +354,6 @@ fn gather_top(input: Top) -> Result<Ctx> {
 					ident: def.ident.clone(),
 					attrs: def.attrs.other.clone(),
 					arg_names: Punctuated::new(),
-					arg_names2: Punctuated::new(),
 					args: Vec::new(),
 					games: games.clone(),
 					write: Vec::new(),
@@ -531,29 +412,18 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 		match pair.into_tuple() {
 			(Arg::Standard(arg), _) => {
 				let varname = format_ident!("_{}", ictx.args.len(), span=arg.span());
-				let varname2 = format_ident!("__{}", ictx.args.len(), span=arg.span());
 
-				let read_expr = read_source(ctx, &arg.source);
+				let arg = &arg.source;
 
-				let write_init = match &arg.source {
-					Source::Simple(a) if a != "String" => pq!{arg=> *#varname },
-					Source::Cast(_) => pq!{arg=> *#varname },
-					Source::Split(_) => pq!{arg=> *#varname },
-					_ => pq!{arg=> #varname },
-				};
-				let write_expr = write_source(ctx, &arg.source, write_init);
+				let read_expr = read_source(ctx, &arg);
 
-				read.push(pq!{arg=> let #varname2 = #read_expr; });
-				read.push(pq!{arg=> let #varname = &#varname2; });
+				let write_expr = write_source(ctx, &arg, pq!{arg=> #varname });
+
+				read.push(pq!{arg=> let #varname = #read_expr; });
 				ictx.write.push(pq!{arg=> #write_expr; });
 
 				ictx.arg_names.push(varname);
-				ictx.arg_names2.push(varname2);
-				ictx.args.push(InsnArg {
-					span: arg.span(),
-					ty: source_ty(&arg.source),
-					alias: arg.alias.as_ref().map(|a| &a.ident).cloned(),
-				});
+				ictx.args.push(source_ty(&arg));
 			}
 			(Arg::Tail(arg), comma) => {
 				let span = arg.span();
@@ -597,17 +467,19 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 	});
 
 	let write = ictx.write;
+	let ident = ictx.ident;
+	let arg_names = ictx.arg_names;
 	ctx.writes.push(WriteArm {
 		span,
 		games: ictx.games,
-		ident: ictx.ident.clone(),
-		args: ictx.arg_names.clone(),
+		ident: ident.clone(),
+		pat: pq!{span=> #ident(#arg_names) },
 		body: pq!{span=> |__f| { #(#write)* Ok(()) } },
 	});
 
-	let ident = &ictx.ident;
-	let args = &ictx.arg_names2;
-	read.push(Stmt::Expr(pq!{span=> Ok(Self::#ident(#args)) }));
+	// let ident = &ictx.ident;
+	// let args = &ictx.arg_names;
+	read.push(Stmt::Expr(pq!{span=> Ok(Self::#ident(#arg_names)) }));
 	Block {
 		brace_token: token::Brace { span },
 		stmts: read
@@ -616,8 +488,7 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 
 fn source_ty(source: &Source) -> Box<Type> {
 	match source {
-		Source::Simple(source) => pq!{source=> #source },
-		Source::Call(source) => source.ty.clone(),
+		Source::Simple(source) => source.ty.clone(),
 		Source::Const(source) => {
 			if source.lit.suffix().is_empty() {
 				Diagnostic::spanned(source.span().unwrap(), Level::Error, "constants must be suffixed").emit();
@@ -628,17 +499,7 @@ fn source_ty(source: &Source) -> Box<Type> {
 		}
 		Source::Cast(source) => source.ty.clone(),
 		Source::Split(source) => {
-			let mut types = std::collections::HashSet::<Box<Type>>::new();
-			for arm in &source.arms {
-				types.insert(source_ty(&arm.source));
-			}
-
-			if types.len() == 1 {
-				types.iter().next().unwrap().clone()
-			} else {
-				Diagnostic::spanned(source.span().unwrap(), Level::Error, "inconsistent types").emit();
-				pq!{source => () }
-			}
+			source_ty(&source.arms[0].source)
 		},
 	}
 }
@@ -646,35 +507,27 @@ fn source_ty(source: &Source) -> Box<Type> {
 fn write_source(ctx: &Ctx, source: &Source, val: Expr) -> Expr {
 	match source {
 		Source::Simple(source) => {
-			let name = to_snake(source);
-			if source == "String" {
-				pq!{source=> __f.#name(#val)? }
+			let args = ctx.func_args.iter()
+				.map(|a| { let x = &a.pat; quote!(#x) })
+				.chain(Some(quote!(#val)));
+			if let Some(Via { path, .. }) = &source.via {
+				pq!{source=> #path::write(__f, #(#args),*)? }
 			} else {
-				pq!{source=> __f.#name(#val) }
+				pq!{source=> <#source as Arg>::write(__f, #(#args),*)? }
 			}
-		}
-		Source::Call(source) => {
-			let mut args = Punctuated::<Expr, Token![,]>::new();
-			args.push(pq!{source=> __f });
-			for e in &source.args {
-				args.push(pq!{e=> #e })
-			}
-			args.push(val);
-			let ident = &source.ident;
-			pq!{source=> #ident::write(#args)? }
 		}
 		Source::Const(source) => {
 			let lit = &source.lit;
 			pq!{source=> {
 				let v = #val;
-				if v != #lit {
+				if v != &#lit {
 					return Err(format!("{:?} must be {:?}", v, #lit).into());
 				}
 			} }
 		}
 		Source::Cast(source) => {
 			let ty = &source.ty;
-			write_source(ctx, &source.source, pq!{source=> cast::<#ty, _>(#val)? })
+			write_source(ctx, &source.source, pq!{source=> &cast::<#ty, _>(*#val)? })
 		}
 		Source::Split(source) => {
 			let def: Stmt = pq!{val=> let _v = #val; };
@@ -695,17 +548,13 @@ fn write_source(ctx: &Ctx, source: &Source, val: Expr) -> Expr {
 fn read_source(ctx: &Ctx, source: &Source) -> Expr {
 	match source {
 		Source::Simple(source) => {
-			let name = to_snake(source);
-			pq!{source=> __f.#name()? }
-		}
-		Source::Call(source) => {
-			let mut args = Punctuated::<Expr, Token![,]>::new();
-			args.push(pq!{source=> __f });
-			for e in &source.args {
-				args.push(pq!{e=> #e })
+			let args = ctx.func_args.iter()
+				.map(|a| { let x = &a.pat; quote!(#x) });
+			if let Some(Via { path, .. }) = &source.via {
+				pq!{source=> #path::read(__f, #(#args),*)? }
+			} else {
+				pq!{source=> <#source as Arg>::read(__f, #(#args),*)? }
 			}
-			let ident = &source.ident;
-			pq!{source=> #ident::read(#args)? }
 		}
 		Source::Const(source) => {
 			let lit = &source.lit;
@@ -729,11 +578,4 @@ fn read_source(ctx: &Ctx, source: &Source) -> Expr {
 			pq!{source=> match #game_expr { #(#reads)* } }
 		}
 	}
-}
-
-fn to_snake(ident: &Ident) -> Ident {
-	Ident::new(
-		&ident.to_string().with_boundaries(&[Boundary::LowerUpper]).to_case(Case::Snake),
-		ident.span(),
-	)
 }

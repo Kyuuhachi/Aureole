@@ -2,12 +2,14 @@ use proc_macro2::TokenStream;
 use syn::{
 	*,
 	parse::{ParseStream, Parse},
+	spanned::Spanned,
 	punctuated::*,
 };
 use quote::TokenStreamExt;
 
 pub mod kw {
 	syn::custom_keyword!(alias);
+	syn::custom_keyword!(via);
 	syn::custom_keyword!(skip);
 	syn::custom_keyword!(custom);
 	syn::custom_keyword!(def);
@@ -78,19 +80,20 @@ pub enum Arg {
 pub struct ArgStandard {
 	pub source: Source,
 	#[parse(|input| parse_if(input, |input| input.peek(kw::alias)))]
-	pub alias: Option<ArgAlias>,
+	#[deprecated]
+	alias: Option<ArgAlias>,
 }
 
 #[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
-pub struct ArgAlias {
-	pub alias_token: kw::alias,
-	pub ident: Ident,
+#[deprecated]
+struct ArgAlias {
+	alias_token: kw::alias,
+	ident: Ident,
 }
 
 #[derive(Clone, Debug, syn_derive::ToTokens)]
 pub enum Source {
-	Call(SourceCall),
-	Simple(Ident),
+	Simple(SourceSimple),
 	Const(SourceConst),
 	Cast(SourceCast),
 	Split(SourceSplit),
@@ -102,8 +105,6 @@ impl Parse for Source {
 			Source::Split(input.parse()?)
 		} else if input.peek(Token![const]) {
 			Source::Const(input.parse()?)
-		} else if input.peek2(token::Paren) {
-			Source::Call(input.parse()?)
 		} else {
 			Source::Simple(input.parse()?)
 		};
@@ -119,15 +120,16 @@ impl Parse for Source {
 }
 
 #[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
-pub struct SourceCall {
-	pub ident: Ident,
-	#[syn(parenthesized)]
-	pub paren_token: token::Paren,
-	#[syn(in = paren_token)]
-	#[parse(Punctuated::parse_terminated)]
-	pub args: Punctuated<Box<Expr>, Token![,]>,
-	pub arrow_token: Token![->],
+pub struct SourceSimple {
 	pub ty: Box<Type>,
+	#[parse(|input| parse_if(input, |input| input.peek(kw::via)))]
+	pub via: Option<Via>,
+}
+
+#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+pub struct Via {
+	pub alias_token: kw::via,
+	pub path: Path,
 }
 
 #[derive(Clone, Debug, syn_derive::ToTokens)]
@@ -256,12 +258,12 @@ pub struct ClauseRead {
 #[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct ClauseWrite {
 	pub write_token: kw::write,
+	#[parse(|p| {
+		let path = p.fork().parse::<Path>()?;
+		path.get_ident().cloned().ok_or_else(|| Error::new(path.span(), "must be ident"))
+	})]
 	pub ident: Ident,
-	#[syn(parenthesized)]
-	pub paren_token: token::Paren,
-	#[syn(in = paren_token)]
-	#[parse(Punctuated::parse_terminated)]
-	pub args: Punctuated<Ident, Token![,]>,
+	pub pat: Box<Pat>,
 	pub arrow_token: Token![=>],
 	pub expr: Box<Expr>,
 }
@@ -283,7 +285,8 @@ pub struct DefDef {
 pub struct DefDefArg {
 	pub ty: Box<Type>,
 	#[parse(|input| parse_if(input, |input| input.peek(kw::alias)))]
-	pub alias: Option<ArgAlias>,
+	#[deprecated]
+	alias: Option<ArgAlias>,
 }
 
 #[derive(Clone, Debug, syn_derive::ToTokens)]
@@ -310,7 +313,7 @@ pub struct GamesAttr {
 	pub arrow_token: Token![=>],
 	#[parse(|input| {
 		let mut ty = TokenStream::new();
-		#[allow(clippy::nonminimal_bool)] // it's more readable thisw ay
+		#[allow(clippy::nonminimal_bool)] // it's more readable this way
 		while !input.is_empty() && !(input.peek(Token![::]) && input.peek3(token::Brace)) {
 			ty.extend(input.parse::<proc_macro2::TokenTree>())
 		}

@@ -7,7 +7,7 @@ themelios_macros::bytecode! {
 		skip!(1), // null
 		Return(), // [return]
 		skip!(3), // control flow
-		Call(func_ref(game) -> FuncRef),
+		Call(FuncRef via func_ref),
 
 		/// Loads another scena.
 		///
@@ -15,7 +15,7 @@ themelios_macros::bytecode! {
 		/// unknown.
 		///
 		/// Official name is `new_scene`, which also implicitly adds a [`Hcf`](Self::Hcf).
-		NewScene(file_ref(game) -> String, u8, u8, u8),
+		NewScene(String via file_ref, u8, u8, u8),
 
 		/// Simply halts the script forever.
 		///
@@ -23,7 +23,7 @@ themelios_macros::bytecode! {
 		/// `new_scene`.
 		Hcf(),
 
-		Sleep({ i if i.is_ed7() => u16 as u32, _ => u32 } alias Time), // [delay]
+		Sleep({ i if i.is_ed7() => u16 as u32, _ => u32 } /*alias Time*/), // [delay]
 		SystemFlagsSet(u32 as SystemFlags), // [set_system_flag]
 		SystemFlagsUnset(u32 as SystemFlags), // [reset_system_flag]
 
@@ -94,7 +94,7 @@ themelios_macros::bytecode! {
 		///
 		/// Arguments are `D3DRS_FOGCOLOR` (24 bit, so color ignored), `D3DRS_FOGSTART`, `D3DRS_FOGEND`, `D3DRS_RANGEFOGENABLE`, `D3DRS_FOGDENSITY`.
 		/// But since `D3DRS_FOGVERTEXMODE` is hardcoded to `D3DFOG_LINEAR` (at least in FC), the third parameter is never used.
-		Fog(color24() -> Color, i32, i32, i32),
+		Fog(Color via color24, i32, i32, i32),
 
 		/// Something related to fog.
 		/// If I'm reading the assembly correctly, if arg1 is `0f`, then it is set to `32f`. arg2 is similarly defaulted to `130f`.
@@ -118,7 +118,7 @@ themelios_macros::bytecode! {
 		Map(match {
 			0 => Hide(),
 			1 => Show(),
-			2 => Set(i32, Pos2, file_ref(game) -> String),
+			2 => Set(i32, Pos2, String via file_ref),
 		}),
 		#[game(Zero, ZeroEvo)]
 		ZeroMap(match {
@@ -146,7 +146,7 @@ themelios_macros::bytecode! {
 		/// Official name is `event_end`.
 		EventEnd(u8),
 
-		_1B(u8, func_ref_u8_u16() -> FuncRef),
+		_1B(u8, FuncRef via func_ref_u8_u16),
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)]
 		_1C(u8, u8, u16),
 		#[game(Zero, Ao, AoEvo)]
@@ -184,7 +184,7 @@ themelios_macros::bytecode! {
 			0x00 => FlagsGet(u8 as QuestFlags),
 			0x01 => TaskGet(u16 alias QuestTask),
 		}),
-		QuestList(quest_list() -> Vec<QuestId> alias QuestList),
+		QuestList(Vec<QuestId> via quest_list),
 		QuestBonusBp(u16 as QuestId, u16),
 		QuestBonusMira(u16 as QuestId, u16),
 
@@ -199,11 +199,30 @@ themelios_macros::bytecode! {
 		PartyAddCraft(u8 as u16 as NameId, u16 as MagicId),
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] PartyAddSCraft(u8 as u16 as NameId, u16 as MagicId),
 		#[game(Zero, ZeroEvo,Ao, AoEvo)] ED7_37(),
-		PartySetSlot(u8 as u16 as NameId, u8, {
-			IS::Fc|IS::FcEvo => u8,
-			_ if (0x7F..=0xFE).contains(_1) => u8,
-			_ => const 0u8
-		}), // merged with FC's PartyUnlockSlot
+
+		def! PartySetSlot(u16 alias NameId, u8, u8),
+		custom! {
+			read => |f| {
+				let a = f.u8()? as u16;
+				let b = f.u8()?;
+				let c = if matches!(game.iset, IS::Fc|IS::FcEvo) || (0x7F..=0xFE).contains(&b) {
+					f.u8()?
+				} else {
+					0
+				};
+				Ok(Self::PartySetSlot(a, b, c))
+			},
+			write PartySetSlot(a, b, c) => |f| {
+				f.u8(cast(*a)?);
+				f.u8(*b);
+				if matches!(game.iset, IS::Fc|IS::FcEvo) || (0x7F..=0xFE).contains(b) {
+					f.u8(*c);
+				} else {
+					ensure!(*c == 0, "{:?} must be {:?}", *c, 0);
+				};
+				Ok(())
+			},
+		},
 
 		SepithAdd(u8, u16),
 		SepithRemove(u8, u16),
@@ -221,24 +240,24 @@ themelios_macros::bytecode! {
 		}),
 		PartyPosition(u8 as u16 as NameId),
 
-		ForkFunc(u16 as CharId, u8 as u16 alias ForkId, func_ref(game) -> FuncRef), // [execute]
+		ForkFunc(u16 as CharId, u8 as u16 alias ForkId, FuncRef via func_ref), // [execute]
 		ForkQuit(u16 as CharId, u8 as u16 alias ForkId), // [terminate]
-		Fork(u16 as CharId, { i if i.is_ed7() => u8 as u16, _ => u16 } alias ForkId, fork(game) -> Vec<Insn> alias Fork), // [preset]? In t0311, only used with a single instruction inside
-		ForkLoop(u16 as CharId, { i if i.is_ed7() => u8 as u16, _ => u16 } alias ForkId, fork_loop(game) -> Vec<Insn> alias Fork),
+		Fork(u16 as CharId, { i if i.is_ed7() => u8 as u16, _ => u16 } alias ForkId, Vec<Insn> via fork alias Fork), // [preset]? In t0311, only used with a single instruction inside
+		ForkLoop(u16 as CharId, { i if i.is_ed7() => u8 as u16, _ => u16 } alias ForkId, Vec<Insn> via fork_loop alias Fork),
 		ForkWait(u16 as CharId, { i if i.is_ed7() => u8 as u16, _ => u16 } alias ForkId), // [wait_terminate]
 		NextFrame(), // [next_frame]
 
-		Event(func_ref(game) -> FuncRef), // [event] Not sure how this differs from Call
+		Event(FuncRef via func_ref), // [event] Not sure how this differs from Call
 
 		_Char4A(u16 as CharId, u8), // Argument is almost always 255, but sometimes 0, and in a single case 1
 		_Char4B(u16 as CharId, u8),
 
 		skip!(1), // {asm} one-byte nop
-		Var(u16 as Var, expr(game) -> Expr),
+		Var(u16 as Var, Expr),
 		skip!(1), // {asm} one-byte nop
-		Attr(u8 as Attr, expr(game) -> Expr), // [system[n]]
+		Attr(u8 as Attr, Expr), // [system[n]]
 		skip!(1), // {asm} one-byte nop
-		CharAttr(char_attr() -> CharAttr, expr(game) -> Expr),
+		CharAttr(CharAttr via char_attr, Expr via expr),
 
 		TextStart(u16 as CharId), // [talk_start]
 		TextEnd(u16 as CharId), // [talk_end]
@@ -246,22 +265,22 @@ themelios_macros::bytecode! {
 		///
 		/// I believe the CharId, which is only present in ED7, is used to select the textbox title.
 		/// However, it is 999 on chests.
-		TextMessage({ i if i.is_ed7() => u16, _ => const 255u16 } as CharId, text() -> Text), // [mes]
+		TextMessage({ i if i.is_ed7() => u16, _ => const 255u16 } as CharId, Text), // [mes]
 		skip!(1), // {asm} same as NextFrame
 		TextClose(u8), // [mes_close]
-		ScMenuSetTitle(u16, u16, u16, text() -> Text),
+		ScMenuSetTitle(u16, u16, u16, Text),
 		TextWait(), // [wait_prompt]
 		_59(), // Always directly after a TextReset 1, and exists in all but one such case. I suspect that one is a bug.
 		TextSetPos(i16, i16, i16, i16), // [mes_pos]
-		TextTalk(u16 as CharId, text() -> Text), // [popup]
-		TextTalkNamed(u16 as CharId, String alias TextTitle, text() -> Text), // [popup2]
-		Menu(u16 alias MenuId, i16, i16, u8, menu() -> Vec<String> alias Menu), // [menu] (the u8 is a bool)
+		TextTalk(u16 as CharId, Text), // [popup]
+		TextTalkNamed(u16 as CharId, String alias TextTitle, Text), // [popup2]
+		Menu(u16 alias MenuId, i16, i16, u8, Vec<String> via menu alias Menu), // [menu] (the u8 is a bool)
 		MenuWait(u16 as Var), // [wait_menu]
 		MenuClose(u16 alias MenuId), // [menu_close]
 		TextSetName(String alias TextTitle), // [name]
 		CharName2(u16 as CharId), // [name2]
 
-		Emote(u16 as CharId, i32, i32, emote() -> Emote, u8), // [emotion] mostly used through macros such as EMO_BIKKURI3(). Third argument is height.
+		Emote(u16 as CharId, i32, i32, Emote via emote, u8), // [emotion] mostly used through macros such as EMO_BIKKURI3(). Third argument is height.
 		EmoteStop(u16 as CharId), // [emotion_close]
 
 		LookPointFlagsSet(u8 as u16 alias LookPointId, u16 as u32 as LookPointFlags),
@@ -381,7 +400,7 @@ themelios_macros::bytecode! {
 		}),
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_A0(u16 as CharId, u16, u16),
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] CharAnimation(u16 as CharId, u8, u8, u32 alias Time), // [chr_anime]
-		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7CharAnimation(u16 as CharId, u16, char_animation() -> Vec<u8> alias Animation),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7CharAnimation(u16 as CharId, u16, Vec<u8> via char_animation alias Animation),
 		CharFlagsSet   (u16 as CharId, u16 as CharFlags), // [set_state]
 		CharFlagsUnset (u16 as CharId, u16 as CharFlags), // [reset_state]
 		CharFlag2Set   (u16 as CharId, u16 as CharFlags),
@@ -458,7 +477,7 @@ themelios_macros::bytecode! {
 		/// Returns whether the recipe was already known, i.e. if it was *not* successfully learned.
 		RecipeLearn(u16),
 
-		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] ImageShow(file_ref(game) -> String, u16, u16, u32 alias Time), // [portrait_open]
+		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] ImageShow(String via file_ref, u16, u16, u32 alias Time), // [portrait_open]
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] ImageHide(u32 alias Time), // [portrait_close]
 
 		/// Attempts to submit a quest.
@@ -572,7 +591,7 @@ themelios_macros::bytecode! {
 		}),
 		#[game(ZeroEvo)] skip!(1),
 
-		#[game(Sc, ScEvo, Tc, TcEvo)] ScPartySelect(u16, sc_party_select_mandatory() -> [Option<NameId>; 4] alias MandatoryMembers, sc_party_select_optional() -> Vec<NameId> alias OptionalMembers),
+		#[game(Sc, ScEvo, Tc, TcEvo)] ScPartySelect(u16, [Option<NameId>; 4] via sc_party_select_mandatory alias MandatoryMembers, Vec<NameId> via sc_party_select_optional alias OptionalMembers),
 		#[game(Sc, ScEvo)] Sc_CA(u8 as u16 alias ObjectId, u8, u32),
 		#[game(Tc, TcEvo)] Tc_CA(u8 as u16 alias ObjectId, u8, i32, u32),
 		#[game(Sc, ScEvo)] ScCharInSlot(u8), // clearly related to CharId, but not the same
@@ -593,12 +612,12 @@ themelios_macros::bytecode! {
 			6 => _6(u8 alias SelectId),
 		}),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_CD(u16 as CharId), // related to showing photographs
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Global(u8 as Global, expr(game) -> Expr),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Global(u8 as Global, Expr),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_CF(u16 as CharId, u8, String), // something with skeleton animation
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_D0(i32 alias Angle32, u32 alias Time),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_D1(u16 as CharId, i32, i32, i32, u32 alias Time), // something with camera?
-		#[game(Sc, ScEvo, Tc, TcEvo)] ED6LoadChcp(file_ref(game) -> String, file_ref(game) -> String, u8 as u16 alias ChcpId),
-		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7LoadChcp(file_ref(game) -> String, u8 as u16 alias ChcpId),
+		#[game(Sc, ScEvo, Tc, TcEvo)] ED6LoadChcp(String via file_ref, String via file_ref, u8 as u16 alias ChcpId),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7LoadChcp(String via file_ref, u8 as u16 alias ChcpId),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] UnloadChcp(u8 as u16 alias ChcpId),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] PartyGetAttr(u8 as u16 as NameId, u8),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] PartyGetEquipped(u8 as u16 as NameId, u8),
@@ -746,7 +765,7 @@ themelios_macros::bytecode! {
 		#[game(TcEvo)] TcEvo_FC(u8, u8),
 
 		#[game(FcEvo, ScEvo, TcEvo)] EvoVoiceLine(u16), // [pop_msg]
-		#[game(FcEvo, ScEvo, TcEvo)] Evo_E6(text() -> Text),
+		#[game(FcEvo, ScEvo, TcEvo)] Evo_E6(Text),
 		#[game(FcEvo, ScEvo)] Evo_E7(u8 alias VisId, u8),
 		#[game(TcEvo)] skip!(1),
 
@@ -800,7 +819,7 @@ themelios_macros::bytecode! {
 macro make_args(
 	// Names need to be passed from outside for hygiene. Ugh.
 	{ $name:ident $args:ident $args_mut:ident $into_parts:ident $arg_types:ident $from_parts:ident }
-	[$(($ident:ident $(($_n:ident $alias:ident))*))*]
+	[$(($ident:ident $(($_n:ident $ty:ty))*))*]
 ) {
 	impl Insn {
 		pub fn $name(&self) -> &'static str {
@@ -808,71 +827,82 @@ macro make_args(
 				$(Self::$ident(..) => stringify!($ident),)*
 			}
 		}
-
-		pub fn $args(&self) -> Box<[InsnArg]> {
-			match self {
-				$(Self::$ident($($_n),*) => Box::new([$(InsnArg::$alias($_n)),*]),)*
-			}
-		}
-
-		pub fn $args_mut(&mut self) -> Box<[InsnArgMut]> {
-			match self {
-				$(Self::$ident($($_n),*) => Box::new([$(InsnArgMut::$alias($_n)),*]),)*
-			}
-		}
-
-		pub fn $into_parts(self) -> (&'static str, Box<[InsnArgOwned]>) {
-			let name = self.$name();
-			let args: Box<[InsnArgOwned]> = match self {
-				$(Self::$ident($($_n),*) => Box::new([$(InsnArgOwned::$alias($_n)),*]),)*
-			};
-			(name, args)
-		}
-
-		pub fn $arg_types(name: &str) -> Option<&'static [InsnArgType]> {
-			match name {
-				$(stringify!($ident) => Some(&[$(InsnArgType::$alias),*]),)*
-				_ => None
-			}
-		}
-
-		pub fn $from_parts(name: &str, args: impl IntoIterator<Item=InsnArgOwned>) -> Option<Self> {
-			let mut it = args.into_iter();
-			let v = match name {
-				$(stringify!($ident) => {
-					$(let Some(InsnArgOwned::$alias($_n)) = it.next() else { return None; };)*
-					Self::$ident($($_n),*)
-				})*
-				_ => return None
-			};
-			if let Some(_) = it.next() { return None; }
-			Some(v)
-		}
 	}
 }
 introspect!(make_args {name args args_mut into_parts arg_types from_parts});
 
+trait Arg: Sized {
+	fn read<'a>(f: &mut impl Read<'a>, _: &GameData) -> Result<Self, ReadError>;
+	fn write(f: &mut impl Write, _: &GameData, v: &Self) -> Result<(), WriteError>;
+}
+
+macro arg($t:ty,
+	|$fr:pat_param, $gr:pat_param| $r:expr,
+	|$fw:pat_param, $gw:pat_param, $v:pat_param| $w:expr $(,)?
+) {
+	impl Arg for $t {
+		fn read<'a>($fr: &mut impl Read<'a>, $gr: &GameData) -> Result<$t, ReadError> {
+			Ok($r)
+		}
+
+		fn write($fw: &mut impl Write, $gw: &GameData, $v: &$t) -> Result<(), WriteError> {
+			Ok($w)
+		}
+	}
+}
+
+macro prim_arg($t:ty, $i:ident) {
+	arg!($t,
+		|f, _| f.$i()?,
+		|f, _, v| f.$i(*v),
+	);
+}
+
+prim_arg!(u8, u8);
+prim_arg!(u16, u16);
+prim_arg!(u32, u32);
+prim_arg!(i8, i8);
+prim_arg!(i16, i16);
+prim_arg!(i32, i32);
+prim_arg!(Pos3, pos3);
+prim_arg!(Pos2, pos2);
+arg!(String,
+	|f, _| f.string()?,
+	|f, _, v| f.string(v.as_str())?,
+);
+
+arg!(Text,
+	|f, _| crate::text::Text::read(f)?,
+	|f, _, v| crate::text::Text::write(f, v)?,
+);
+
+arg!(Expr,
+	|f, g| super::expr::read(f, g)?,
+	|f, g, v| super::expr::write(f, g, v)?,
+);
+
 mod color24 {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>) -> Result<Color, ReadError> {
-		let a = f.u8()?;
+	pub(super) fn read<'a>(f: &mut impl Read<'a>, _: &GameData) -> Result<Color, ReadError> {
+		let r = f.u8()?;
+		let g = f.u8()?;
 		let b = f.u8()?;
-		let c = f.u8()?;
-		Ok(Color(u32::from_le_bytes([a, b, c, 0])))
+		Ok(Color(u32::from_le_bytes([r, g, b, 0xFF])))
 	}
 
-	pub(super) fn write(f: &mut impl Write, v: &Color) -> Result<(), WriteError> {
-		let [a, b, c, _] = u32::to_le_bytes(v.0);
-		f.u8(a);
+	pub(super) fn write(f: &mut impl Write, _: &GameData, v: &Color) -> Result<(), WriteError> {
+		let [r, g, b, a] = u32::to_le_bytes(v.0);
+		ensure!(a == 0xFF, "alpha must be zero");
+		f.u8(r);
+		f.u8(g);
 		f.u8(b);
-		f.u8(c);
 		Ok(())
 	}
 }
 
 mod quest_list {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>) -> Result<Vec<QuestId>, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl Read<'a>, _: &GameData) -> Result<Vec<QuestId>, ReadError> {
 		let mut quests = Vec::new();
 		loop {
 			match f.u16()? {
@@ -883,7 +913,7 @@ mod quest_list {
 		Ok(quests)
 	}
 
-	pub(super) fn write(f: &mut impl Write, v: &Vec<QuestId>) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Write, _: &GameData, v: &Vec<QuestId>) -> Result<(), WriteError> {
 		for &i in v {
 			f.u16(i.0);
 		}
@@ -967,11 +997,11 @@ mod fork_loop {
 
 mod menu {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>) -> Result<Vec<String>, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl Read<'a>, _: &GameData) -> Result<Vec<String>, ReadError> {
 		Ok(f.string()?.split_terminator('\x01').map(|a| a.to_owned()).collect())
 	}
 
-	pub(super) fn write(f: &mut impl Write, v: &[String]) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Write, _: &GameData, v: &[String]) -> Result<(), WriteError> {
 		let mut s = String::new();
 		for line in v {
 			s.push_str(line.as_str());
@@ -984,14 +1014,14 @@ mod menu {
 
 mod emote {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>) -> Result<Emote, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl Read<'a>, _: &GameData) -> Result<Emote, ReadError> {
 		let a = f.u8()?;
 		let b = f.u8()?;
 		let c = f.u32()?;
 		Ok(Emote(a, b, c))
 	}
 
-	pub(super) fn write(f: &mut impl Write, &Emote(a, b, c): &Emote) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Write, _: &GameData, &Emote(a, b, c): &Emote) -> Result<(), WriteError> {
 		f.u8(a);
 		f.u8(b);
 		f.u32(c);
@@ -1001,13 +1031,13 @@ mod emote {
 
 pub(super) mod char_attr {
 	use super::*;
-	pub fn read<'a>(f: &mut impl Read<'a>) -> Result<CharAttr, ReadError> {
+	pub fn read<'a>(f: &mut impl Read<'a>, _: &GameData) -> Result<CharAttr, ReadError> {
 		let a = CharId(f.u16()?);
 		let b = f.u8()?;
 		Ok(CharAttr(a, b))
 	}
 
-	pub fn write(f: &mut impl Write, &CharAttr(a, b): &CharAttr) -> Result<(), WriteError> {
+	pub fn write(f: &mut impl Write, _: &GameData, &CharAttr(a, b): &CharAttr) -> Result<(), WriteError> {
 		f.u16(a.0);
 		f.u8(b);
 		Ok(())
@@ -1051,44 +1081,33 @@ mod func_ref {
 
 mod func_ref_u8_u16 {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>) -> Result<FuncRef, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl Read<'a>, _: &GameData) -> Result<FuncRef, ReadError> {
 		let a = f.u8()? as u16;
 		let b = f.u16()?;
 		Ok(FuncRef(a, b))
 	}
 
-	pub(super) fn write(f: &mut impl Write, &FuncRef(a, b): &FuncRef) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Write, _: &GameData, &FuncRef(a, b): &FuncRef) -> Result<(), WriteError> {
 		f.u8(cast(a)?);
 		f.u16(b);
 		Ok(())
 	}
 }
 
-mod text {
-	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>) -> Result<Text, ReadError> {
-		crate::text::Text::read(f)
-	}
-
-	pub(super) fn write(f: &mut impl Write, v: &Text) -> Result<(), WriteError> {
-		crate::text::Text::write(f, v)
-	}
-}
-
 mod sc_party_select_mandatory {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>) -> Result<[Option<NameId>; 4], ReadError> {
+	pub(super) fn read<'a>(f: &mut impl Read<'a>, _: &GameData) -> Result<[Option<NameId>; 4], ReadError> {
 		f.multiple_loose::<4, _>(&[0xFF,0], |g| Ok(NameId(cast(g.u16()?)?)))
 	}
 
-	pub(super) fn write(f: &mut impl Write, v: &[Option<NameId>; 4]) -> Result<(), WriteError> {
-		f.multiple_loose::<4, _>(&[0xFF,0], v, |g, a| { g.u16(a.0.into()); Ok(()) })
+	pub(super) fn write(f: &mut impl Write, _: &GameData, v: &[Option<NameId>; 4]) -> Result<(), WriteError> {
+		f.multiple_loose::<4, _>(&[0xFF,0], v, |g, a| { g.u16(a.0); Ok(()) })
 	}
 }
 
 mod sc_party_select_optional {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>) -> Result<Vec<NameId>, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl Read<'a>, _: &GameData) -> Result<Vec<NameId>, ReadError> {
 		let mut quests = Vec::new();
 		loop {
 			match f.u16()? {
@@ -1099,9 +1118,9 @@ mod sc_party_select_optional {
 		Ok(quests)
 	}
 
-	pub(super) fn write(f: &mut impl Write, v: &Vec<NameId>) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Write, _: &GameData, v: &Vec<NameId>) -> Result<(), WriteError> {
 		for &i in v {
-			f.u16(i.0.into());
+			f.u16(i.0);
 		}
 		f.u16(0xFFFF);
 		Ok(())
@@ -1110,7 +1129,7 @@ mod sc_party_select_optional {
 
 mod char_animation {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>) -> Result<Vec<u8>, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl Read<'a>, _: &GameData) -> Result<Vec<u8>, ReadError> {
 		let n = f.u8()?;
 		let mut a = Vec::with_capacity(n as usize);
 		if n == 0 {
@@ -1122,7 +1141,7 @@ mod char_animation {
 		Ok(a)
 	}
 
-	pub(super) fn write(f: &mut impl Write, v: &Vec<u8>) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Write, _: &GameData, v: &Vec<u8>) -> Result<(), WriteError> {
 		f.u8(cast(v.len())?);
 		if v.is_empty() {
 			f.u8(0)

@@ -1,4 +1,4 @@
-use themelios::scena::{Pos2, Pos3, FuncRef, Emote, CharId, SystemFlags, CharFlags, QuestFlags, ObjectFlags, LookPointFlags, Color, MagicId, ShopId, Attr, Var, Global, CharAttr};
+use themelios::scena::*;
 use themelios::scena::code::{InstructionSet, Expr, ExprBinop, ExprUnop, FlatInsn, Label, Insn};
 use themelios::scena::code::decompile::{decompile, TreeInsn};
 use themelios::text::{Text, TextSegment};
@@ -153,9 +153,21 @@ fn insn(f: &mut Context, i: &Insn) -> Result<()> {
 	macro run {
 		([$(($ident:ident $(($_n:ident $($ty:tt)*))*))*]) => {
 			match i {
-				$(Insn::$ident($($_n),*) =>
-					run!($ident $(($_n $($ty)*))*),)*
+				$(Insn::$ident($($_n),*) => {
+					run!($ident $(($_n $($ty)*))*);
+				})*
 			}
+		},
+		(Menu ($v1:ident $_1:ty) ($v2:ident $_2:ty) ($v3:ident $_3:ty) ($v4:ident $_4:ty) ($v5:ident $_5:ty)) => {
+			f.kw("Menu")?.val($v1)?.val($v2)?.val($v3)?.val($v4)?;
+			f.indent(|f| {
+				for (i, line) in $v5.iter().enumerate() {
+					f.line()?;
+					f.val(line)?;
+					write!(f, "// {i}")?;
+				}
+				Ok(())
+			}).strict()?;
 		},
 		($ident:ident ($v1:ident $_:ty) ($v2:ident Expr)) => {
 			f.val($v1)?.expr($v2)?
@@ -240,6 +252,13 @@ prim_arg!(i8, "{}");
 prim_arg!(i16, "{}");
 prim_arg!(i32, "{}");
 prim_arg!(String, "{:?}");
+nt_arg!(TString, "{:?}");
+
+nt_arg!(Time, "{}ms");
+nt_arg!(Angle, "{}deg");
+nt_arg!(Angle32, "{}mdeg");
+nt_arg!(Speed, "{}mm/s");
+nt_arg!(Length, "{}mm");
 
 nt_arg!(Flag, "flag[{}]");
 nt_arg!(Attr, "system[{}]");
@@ -251,17 +270,46 @@ nt_arg!(CharFlags,      "0x{:04X}");
 nt_arg!(QuestFlags,     "0x{:02X}");
 nt_arg!(ObjectFlags,    "0x{:04X}");
 nt_arg!(LookPointFlags, "0x{:04X}");
-nt_arg!(Color,          "0x{:08X}");
+nt_arg!(TriggerFlags,   "0x{:04X}");
+nt_arg!(EntryFlags,     "0x{:04X}");
 
-nt_arg!(NameId, "name[{}]");
-nt_arg!(BgmId, "bgm[{}]");
-nt_arg!(MagicId, "magic[{}]");
-nt_arg!(QuestId, "quest[{}]");
-nt_arg!(ShopId, "shop[{}]");
-nt_arg!(SoundId, "sound[{}]");
-nt_arg!(TownId, "town[{}]");
+nt_arg!(Color,          "0x{:08X}");
+nt_arg!(TcMembers,      "0x{:08X}");
+
+impl Val for QuestTask {
+	fn write(&self, f: &mut Context) -> Result<()> {
+		if f.game.iset.is_ed7() {
+			write!(f, "{}", self.0)
+		} else {
+			write!(f, "0x{:04X}", self.0)
+		}
+	}
+}
+
+nt_arg!(NameId,   "name[{}]");
+nt_arg!(BgmId,    "bgm[{}]");
+nt_arg!(MagicId,  "magic[{}]");
+nt_arg!(QuestId,  "quest[{}]");
+nt_arg!(ShopId,   "shop[{}]");
+nt_arg!(SoundId,  "sound[{}]");
+nt_arg!(TownId,   "town[{}]");
 nt_arg!(BattleId, "battle[{}]");
-nt_arg!(ItemId, "item[{}]");
+nt_arg!(ItemId,   "item[{}]");
+
+nt_arg!(LookPointId, "look_point[{}]");
+nt_arg!(EntranceId,  "entrance[{}]");
+nt_arg!(ObjectId,    "object[{}]");
+nt_arg!(TriggerId,   "trigger[{}]");
+nt_arg!(LabelId,     "label[{}]");
+nt_arg!(AnimId,      "anim[{}]");
+
+nt_arg!(ChcpId,  "chcp[{}]");
+nt_arg!(VisId,   "vis[{}]");
+nt_arg!(ForkId,  "fork[{}]");
+nt_arg!(EffId,   "eff[{}]");
+nt_arg!(EffInstanceId, "eff_instance[{}]");
+nt_arg!(SelectId, "select[{}]");
+nt_arg!(MenuId,  "menu[{}]");
 
 impl Val for CharAttr {
 	fn write(&self, f: &mut Context) -> Result<()> {

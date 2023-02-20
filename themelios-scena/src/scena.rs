@@ -1,6 +1,5 @@
 use hamu::read::le::*;
 use hamu::write::le::*;
-use crate::types::NameId;
 use crate::util::*;
 
 pub mod code;
@@ -22,11 +21,6 @@ pub struct Pos2(pub i32, pub i32);
 #[debug(fmt = "Pos3({_0}, {_1}, {_2})")]
 pub struct Pos3(pub i32, pub i32, pub i32);
 
-newtype!(Color, u32);
-newtype!(ShopId, u8);
-newtype!(Member, u8);
-newtype!(MagicId, u16);
-
 // 0x00000001 SF_CAMERA_AUTO
 // 0x00400000 SF_ENTRY_DISABLE
 // 0x02000000 SF_FADEBGM_DISABLE
@@ -34,6 +28,7 @@ newtype!(SystemFlags, u32);
 
 // 0x10 done
 newtype!(QuestFlags, u8);
+newtype!(QuestTask, u16);
 
 // 0x0002 PF_NOVEC
 // 0x0004 PF_NOHEIGHT
@@ -48,7 +43,12 @@ newtype!(CharFlags, u16);
 // 0x0020 MOF_LOOPPLAY
 newtype!(ObjectFlags, u32);
 
-newtype!(LookPointFlags, u32);
+newtype!(LookPointFlags, u16);
+newtype!(EntryFlags, u16);
+newtype!(TriggerFlags, u16);
+
+// A bitfield in 3rd's party select menu
+newtype!(TcMembers, u32);
 
 newtype!(Var, u16); // called Work internally
 
@@ -81,17 +81,26 @@ newtype!(Global, u8);
 // 49 TownId for the next save, values include 19, 140, 302, 400, 401, 274, 259, 297, 296, 299
 newtype!(Attr, u8);
 
+newtype!(ChcpId, u16);
 newtype!(CharId, u16);
+newtype!(LookPointId, u16);
+newtype!(ObjectId, u16);
+newtype!(EntranceId, u8);
+newtype!(TriggerId, u16);
+newtype!(LabelId, u16);
+newtype!(AnimId, u16);
+
+newtype!(SelectId, u8);
+newtype!(EffId, u8);
+newtype!(EffInstanceId, u8);
+newtype!(MenuId, u16);
+newtype!(VisId, u8);
+newtype!(ForkId, u16);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[derive(derive_more::DebugCustom)]
 #[debug(fmt = "CharAttr({_0:?}, {_1})")]
 pub struct CharAttr(pub CharId, pub u8);
-
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-#[derive(derive_more::DebugCustom)]
-#[debug(fmt = "MemberAttr({_0:?}, {_1})")]
-pub struct MemberAttr(pub NameId, pub u8);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[derive(derive_more::DebugCustom)]

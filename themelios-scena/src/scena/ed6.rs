@@ -31,19 +31,18 @@ pub struct Scena {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Entry {  // [Entry]
 	pub pos: Pos3,  // [PlyX, PlyY, PlyZ; Ｘ/Ｙ/Ｚ座標(1m単位)]
-	pub chr: u16,   // [PlyChr; キャラパターン] a chcp?
-	pub angle: i16, // [PlyVec; キャラ方角]
+	pub chr: u16,   // [PlyChr; キャラパターン] Always 4
+	pub angle: Angle, // [PlyVec; キャラ方角]
 
 	pub cam_from: Pos3,  // [CameraFrom: カメラ位置(1m単位)]
 	pub cam_at: Pos3,    // [CameraAt; 注目点⟩]
 	pub cam_zoom: i32,   // [CameraZoom; ズーム(1mm単位)]
 	pub cam_pers: i32,   // [CameraPers; パース]
-	pub cam_deg: i16,    // [CameraDeg; 角度(1度単位)]
-	pub cam_limit1: i16, // [CameraLimitDeg; カメラの回転可能角度]
-	pub cam_limit2: i16, // ↑
-	pub north: i16,      // [NorthDeg; 北角度]
+	pub cam_deg: Angle,    // [CameraDeg; 角度(1度単位)]
+	pub cam_limit: (Angle, Angle), // [CameraLimitDeg; カメラの回転可能角度]
+	pub north: Angle,      // [NorthDeg; 北角度]
 
-	pub flags: u16,   // [Flag]
+	pub flags: EntryFlags,   // [Flag]
 	pub town: TownId, // [Place; 地名]
 	pub init: FuncRef, // [Init; 初期化用イベント]
 	pub reinit: FuncRef, // [ReInit; ロード後の再初期化用イベント]
@@ -54,11 +53,11 @@ pub struct Npc { // [Player]
 	// They put name last, but that sucks
 	pub name: String, // [Name]
 	pub pos: Pos3, // [X, Y, Z]
-	pub angle: i16, // [ANG]
+	pub angle: Angle, // [ANG]
 	pub x: u16, // [X]
-	pub cp: u16, // [Pt]
+	pub cp: ChcpId, // [Pt]
 	pub frame: u16, // [No]
-	pub ch: u16, // [Bs]
+	pub ch: ChcpId, // [Bs]
 	pub flags: CharFlags, // [BXPNAWTDS]
 	pub init: FuncRef, // [MOVE_FUNC]
 	pub talk: FuncRef, // [EVENT_FUNC]
@@ -68,8 +67,8 @@ pub struct Npc { // [Player]
 pub struct Monster { // [Monster]
 	pub name: String,
 	pub pos: Pos3,
-	pub angle: i16,
-	pub unk1: u16, // This looks like a chcp index, but npcs have 4×u16 while this only has 1×u16?
+	pub angle: Angle,
+	pub chcp: ChcpId, // This looks like a chcp index, but npcs have 4×u16 while this only has 1×u16?
 	pub flags: CharFlags,
 	pub unk2: i32, // Always -1
 	pub battle: BattleId,
@@ -81,7 +80,7 @@ pub struct Monster { // [Monster]
 pub struct Trigger { // [Event]
 	pub pos1: Pos3, // [X, Y, Z]
 	pub pos2: Pos3, // [X, Y, Z]
-	pub flags: u16, // [  SN6428]
+	pub flags: TriggerFlags, // [  SN6428]
 	pub func: FuncRef, // [Scp:Func]
 	pub unk1: u16, // (absent)
 }
@@ -89,7 +88,7 @@ pub struct Trigger { // [Event]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LookPoint { // [LookPoint]
 	pub pos: Pos3, // [X, Y, Z]
-	pub radius: u32, // [R],
+	pub radius: Length, // [R],
 	pub bubble_pos: Pos3, // (absent)
 	pub flags: LookPointFlags, // [_N____],
 	pub func: FuncRef, // [Scp:Func]
@@ -135,11 +134,11 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	let npcs = list(n as usize, || Ok(Npc {
 		name: strings.string()?,
 		pos: g.pos3()?,
-		angle: g.i16()?,
+		angle: Angle(g.i16()?),
 		x: g.u16()?,
-		cp: g.u16()?,
+		cp: ChcpId(g.u16()?),
 		frame: g.u16()?,
-		ch: g.u16()?,
+		ch: ChcpId(g.u16()?),
 		flags: CharFlags(g.u16()?),
 		init: FuncRef(g.u16()?, g.u16()?),
 		talk: FuncRef(g.u16()?, g.u16()?),
@@ -149,8 +148,8 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	let monsters = list(n as usize, || Ok(Monster {
 		name: strings.string()?,
 		pos: g.pos3()?,
-		angle: g.i16()?,
-		unk1: g.u16()?,
+		angle: Angle(g.i16()?),
+		chcp: ChcpId(g.u16()?),
 		flags: CharFlags(g.u16()?),
 		unk2: g.i32()?,
 		battle: BattleId(cast(g.u16()?)?),
@@ -162,7 +161,7 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	let triggers = list(n as usize, || Ok(Trigger {
 		pos1: g.pos3()?,
 		pos2: g.pos3()?,
-		flags: g.u16()?,
+		flags: TriggerFlags(g.u16()?),
 		func: FuncRef(g.u16()?, g.u16()?),
 		unk1: g.u16()?,
 	})).strict()?;
@@ -170,7 +169,7 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	let (mut g, n) = look_points;
 	let look_points = list(n as usize, || Ok(LookPoint {
 		pos: g.pos3()?,
-		radius: g.u32()?,
+		radius: Length(g.i32()?),
 		bubble_pos: g.pos3()?,
 		flags: LookPointFlags(cast(g.u16()?)?),
 		func: FuncRef(g.u16()?, g.u16()?),
@@ -188,16 +187,15 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 		entries.push(Entry {
 			pos: f.pos3()?,
 			chr: f.u16()?,
-			angle: f.i16()?,
+			angle: Angle(f.i16()?),
 			cam_from: f.pos3()?,
 			cam_at: f.pos3()?,
 			cam_zoom: f.i32()?,
 			cam_pers: f.i32()?,
-			cam_deg: f.i16()?,
-			cam_limit1: f.i16()?,
-			cam_limit2: f.i16()?,
-			north: f.i16()?,
-			flags: f.u16()?,
+			cam_deg: Angle(f.i16()?),
+			cam_limit: (Angle(f.i16()?), Angle(f.i16()?)),
+			north: Angle(f.i16()?),
+			flags: EntryFlags(f.u16()?),
 			town: TownId(f.u16()?),
 			init: FuncRef(f.u16()?, f.u16()?),
 			reinit: FuncRef(f.u16()?, f.u16()?),
@@ -301,22 +299,22 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	for &Npc { ref name, pos, angle, x, cp, frame, ch, flags, init, talk } in npcs {
 		strings.string(name)?;
 		g.pos3(pos);
-		g.i16(angle);
+		g.i16(angle.0);
 		g.u16(x);
-		g.u16(cp);
+		g.u16(cp.0);
 		g.u16(frame);
-		g.u16(ch);
+		g.u16(ch.0);
 		g.u16(flags.0);
 		g.u16(init.0); g.u16(init.1);
 		g.u16(talk.0); g.u16(talk.1);
 	}
 
 	g.label(l_monsters_);
-	for &Monster { ref name, pos, angle, unk1, flags, unk2, battle, flag, unk3 } in monsters {
+	for &Monster { ref name, pos, angle, chcp, flags, unk2, battle, flag, unk3 } in monsters {
 		strings.string(name)?;
 		g.pos3(pos);
-		g.i16(angle);
-		g.u16(unk1);
+		g.i16(angle.0);
+		g.u16(chcp.0);
 		g.u16(flags.0);
 		g.i32(unk2);
 		g.u16(cast(battle.0)?);
@@ -328,7 +326,7 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	for &Trigger { pos1, pos2, flags, func, unk1 } in triggers {
 		g.pos3(pos1);
 		g.pos3(pos2);
-		g.u16(flags);
+		g.u16(flags.0);
 		g.u16(func.0); g.u16(func.1);
 		g.u16(unk1);
 	}
@@ -336,7 +334,7 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	g.label(l_look_points_);
 	for &LookPoint { pos, radius, bubble_pos, flags, func, unk1 } in look_points {
 		g.pos3(pos);
-		g.u32(radius);
+		g.i32(radius.0);
 		g.pos3(bubble_pos);
 		g.u16(cast(flags.0)?);
 		g.u16(func.0); g.u16(func.1);
@@ -352,21 +350,21 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 
 	for &Entry {
 		pos, chr, angle,
-		cam_from, cam_at, cam_zoom, cam_pers, cam_deg, cam_limit1, cam_limit2, north,
+		cam_from, cam_at, cam_zoom, cam_pers, cam_deg, cam_limit, north,
 		flags, town, init, reinit,
 	} in entries {
 		f.pos3(pos);
 		f.u16(chr);
-		f.i16(angle);
+		f.i16(angle.0);
 		f.pos3(cam_from);
 		f.pos3(cam_at);
 		f.i32(cam_zoom);
 		f.i32(cam_pers);
-		f.i16(cam_deg);
-		f.i16(cam_limit1);
-		f.i16(cam_limit2);
-		f.i16(north);
-		f.u16(flags);
+		f.i16(cam_deg.0);
+		f.i16(cam_limit.0.0);
+		f.i16(cam_limit.1.0);
+		f.i16(north.0);
+		f.u16(flags.0);
 		f.u16(town.0);
 		f.u16(init.0); f.u16(init.1);
 		f.u16(reinit.0); f.u16(reinit.1);

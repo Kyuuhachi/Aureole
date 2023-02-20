@@ -121,7 +121,7 @@ pub struct Entry {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Animation {
-	pub speed: u16,
+	pub speed: Time,
 	pub unk: u8,
 	pub frames: Vec<u8>,
 }
@@ -308,7 +308,7 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	let anim_count = (p_func_table-p_animations)/12;
 	let mut g = f.clone().at(p_animations)?;
 	let animations = list(anim_count, || {
-		let speed = g.u16()?;
+		let speed = Time(g.u16()? as u32);
 		let unk = g.u8()?;
 		let count = g.u8()? as usize;
 		let frames = array::<8, _>(|| Ok(g.u8()?)).strict()?;
@@ -670,7 +670,7 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		ensure!(count <= 8, "too many frames: {count}");
 		let mut frames = [0; 8];
 		frames[..count].copy_from_slice(&anim.frames);
-		g.u16(anim.speed);
+		g.u16(cast(anim.speed.0)?);
 		g.u8(anim.unk);
 		g.u8(count as u8);
 		g.slice(&frames);

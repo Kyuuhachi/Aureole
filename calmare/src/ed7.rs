@@ -1,4 +1,4 @@
-use themelios::scena::{FuncRef, CharId};
+use themelios::scena::*;
 use themelios::scena::ed7;
 use strict_result::Strict;
 use themelios::types::BattleId;
@@ -78,7 +78,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 	}
 
 	for (i, chcp) in chcp.iter().enumerate() {
-		f.kw("chcp")?.val(&(i as u16))?;
+		f.kw("chcp")?.val(&ChcpId(i as u16))?;
 		if let Some(chcp) = chcp {
 			f.val(chcp)?;
 		} else {
@@ -127,7 +127,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 	}
 
 	for (i, tr) in triggers.iter().enumerate() {
-		f.kw("trigger")?.val(&(i as u16))?.suf(":")?.line()?.indent(|f| {
+		f.kw("trigger")?.val(&TriggerId(i as u16))?.suf(":")?.line()?.indent(|f| {
 			f.kw("pos")?;
 			write!(f, "({:?}, {:?}, {:?})", tr.pos.0, tr.pos.1, tr.pos.2)?;
 			f.line()?;
@@ -160,7 +160,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 	}
 
 	for (i, lp) in look_points.iter().enumerate() {
-		f.kw("look_point")?.val(&(i as u16))?.suf(":")?.line()?.indent(|f| {
+		f.kw("look_point")?.val(&LookPointId(i as u16))?.suf(":")?.line()?.indent(|f| {
 			f.kw("pos")?.val(&lp.pos)?.line()?;
 			f.kw("radius")?.val(&lp.radius)?.line()?;
 			f.kw("bubble_pos")?.val(&lp.bubble_pos)?.line()?;
@@ -176,7 +176,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 
 	if let Some(labels) = labels {
 		for (i, lb) in labels.iter().enumerate() {
-			f.kw("label")?.val(&(i as u16))?.suf(":")?.line()?.indent(|f| {
+			f.kw("label")?.val(&LabelId(i as u16))?.suf(":")?.line()?.indent(|f| {
 				f.kw("name")?.val(&lb.name)?.line()?;
 
 				f.kw("pos")?;
@@ -199,8 +199,8 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 	}
 
 	for (i, anim) in animations.iter().enumerate() {
-		f.kw("anim")?.val(&(i as u16))?.suf(":")?;
-		f.val(&(anim.speed as u32))?.val(&anim.unk)?.suf(";")?;
+		f.kw("anim")?.val(&AnimId(i as u16))?.suf(":")?;
+		f.val(&anim.speed)?.val(&anim.unk)?.suf(";")?;
 		for val in &anim.frames {
 			f.val(val)?;
 		}

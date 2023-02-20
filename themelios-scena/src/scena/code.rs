@@ -10,10 +10,7 @@ use crate::types::*;
 use crate::util::*;
 use crate::text::Text;
 
-use super::{
-	Attr, CharAttr, CharFlags, CharId, Color, Emote, SystemFlags, FuncRef, ReadStreamExt2, MagicId,
-	MemberAttr, WriteStreamExt2, Pos2, Pos3, QuestFlags, ShopId, Var, ObjectFlags, Global, LookPointFlags,
-};
+use super::*;
 
 mod insn;
 pub use insn::*;

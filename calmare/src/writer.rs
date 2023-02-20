@@ -11,7 +11,6 @@ enum Space {
 
 pub struct Context<'a> {
 	pub game: &'a GameData<'a>,
-	pub blind: bool, // These two might belong in a different type,
 	pub decompile: bool, //  but then I'd have to reexport all the writing functions and that's a pain
 	indent: usize,
 	space: Space,
@@ -22,17 +21,11 @@ impl<'a> Context<'a> {
 	pub fn new(game: &'a GameData<'a>, out: impl Write + 'a) -> Self {
 		Self {
 			game,
-			blind: false,
 			decompile: true,
 			indent: 0,
 			space: Space::None,
 			out: Box::new(out),
 		}
-	}
-
-	pub fn blind(mut self) -> Self {
-		self.blind = true;
-		self
 	}
 
 	pub fn flat(mut self) -> Self {

@@ -64,7 +64,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 			f.kw("cam_pers")?.val(&entry.cam_pers)?.line()?;
 			f.kw("unk2")?.val(&entry.unk2)?.line()?;
 			f.kw("cam_deg")?.val(&entry.cam_deg)?.line()?;
-			f.kw("cam_limit")?.val(&entry.cam_limit1)?.val(&entry.cam_limit2)?.line()?;
+			f.kw("cam_limit")?.val(&entry.cam_limit.0)?.val(&entry.cam_limit.1)?.line()?;
 			f.kw("cam_at")?.val(&entry.cam_at)?.line()?;
 			f.kw("unk3")?.val(&entry.unk3)?.line()?;
 			f.kw("unk4")?.val(&entry.unk4)?.line()?;
@@ -97,9 +97,9 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 			f.kw("name")?.val(&npc.name)?.line()?;
 			f.kw("pos")?.val(&npc.pos)?.line()?;
 			f.kw("angle")?.val(&npc.angle)?.line()?;
-			f.kw("unk1")?.val(&npc.unk1)?.line()?;
+			f.kw("flags")?.val(&npc.flags)?.line()?;
 			f.kw("unk2")?.val(&npc.unk2)?.line()?;
-			f.kw("unk3")?.val(&npc.unk3)?.line()?;
+			f.kw("chcp")?.val(&npc.chcp)?.line()?;
 			f.kw("init")?.val(&npc.init)?.line()?;
 			f.kw("talk")?.val(&npc.talk)?.line()?;
 			f.kw("unk4")?.val(&npc.unk4)?.line()?;
@@ -113,7 +113,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 		f.kw("monster")?.val(&CharId(n))?.suf(":")?.line()?.indent(|f| {
 			f.kw("pos")?.val(&monster.pos)?.line()?;
 			f.kw("angle")?.val(&monster.angle)?.line()?;
-			f.kw("unk1")?.val(&monster.unk1)?.line()?;
+			f.kw("flags")?.val(&monster.flags)?.line()?;
 			f.kw("battle")?.val(&monster.battle)?.line()?;
 			f.kw("flag")?.val(&monster.flag)?.line()?;
 			f.kw("chcp")?.val(&monster.chcp)?.line()?;

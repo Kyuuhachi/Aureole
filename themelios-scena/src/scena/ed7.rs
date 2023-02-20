@@ -30,7 +30,7 @@ pub struct Scena {
 	/// The first five, if present, are always the same nonsensical values.
 	pub field_sepith: Vec<[u8; 8]>,
 	pub at_rolls: Vec<[u8; 16]>,
-	pub placements: Vec<[(u8,u8,i16); 8]>,
+	pub placements: Vec<[(u8,u8,Angle); 8]>,
 	pub battles: Vec<Battle>,
 
 	pub unk1: u8,
@@ -50,10 +50,10 @@ pub struct Label {
 pub struct Npc {
 	pub name: String,
 	pub pos: Pos3,
-	pub angle: i16,
-	pub unk1: u16,
+	pub angle: Angle,
+	pub flags: CharFlags,
 	pub unk2: u16,
-	pub unk3: u16,
+	pub chcp: ChcpId,
 	pub init: FuncRef,
 	pub talk: FuncRef,
 	pub unk4: u32,
@@ -63,13 +63,13 @@ pub struct Npc {
 pub struct Monster {
 	pub pos: Pos3,
 	pub angle: i16,
-	pub unk1: u16,
+	pub flags: CharFlags,
 	pub battle: BattleId,
 	pub flag: Flag,
-	pub chcp: u16,
+	pub chcp: ChcpId,
 	pub unk2: u16,
-	pub stand_anim: u32,
-	pub walk_anim: u32,
+	pub stand_anim: AnimId,
+	pub walk_anim: AnimId,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -106,14 +106,13 @@ pub struct Entry {
 	pub cam_from: Pos3,
 	pub cam_pers: u32,
 	pub unk2: u16,
-	pub cam_deg: u16,
-	pub cam_limit1: u16,
-	pub cam_limit2: u16,
+	pub cam_deg: Angle,
+	pub cam_limit: (Angle, Angle),
 	pub cam_at: Pos3,
 	pub unk3: u16,
 	pub unk4: u16,
 
-	pub flags: u16,
+	pub flags: EntryFlags,
 	pub town: TownId,
 	pub init: FuncRef,
 	pub reinit: FuncRef,
@@ -196,13 +195,12 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 			cam_from: f.pos3()?,
 			cam_pers: f.u32()?,
 			unk2: f.u16()?,
-			cam_deg: f.u16()?,
-			cam_limit1: f.u16()?,
-			cam_limit2: f.u16()?,
+			cam_deg: Angle(f.i16()?),
+			cam_limit: (Angle(f.i16()?), Angle(f.i16()?)),
 			cam_at: f.pos3()?,
 			unk3: f.u16()?,
 			unk4: f.u16()?,
-			flags: f.u16()?,
+			flags: EntryFlags(f.u16()?),
 			town: TownId(f.u16()?),
 			init: FuncRef(f.u8()? as u16, f.u8()? as u16),
 			reinit: FuncRef(f.u8()? as u16, f.u8()? as u16),
@@ -255,10 +253,10 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	let npcs = list(n_npcs, || Ok(Npc {
 		name: strings.string()?,
 		pos: g.pos3()?,
-		angle: g.i16()?,
-		unk1: g.u16()?,
+		angle: Angle(g.i16()?),
+		flags: CharFlags(g.u16()?),
 		unk2: g.u16()?,
-		unk3: g.u16()?,
+		chcp: ChcpId(g.u16()?),
 		init: FuncRef(g.u8()? as u16, g.u8()? as u16),
 		talk: FuncRef(g.u8()? as u16, g.u8()? as u16),
 		unk4: g.u32()?,
@@ -268,13 +266,13 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	let mut monsters = list(n_monsters, || Ok(Monster {
 		pos: g.pos3()?,
 		angle: g.i16()?,
-		unk1: g.u16()?,
+		flags: CharFlags(g.u16()?),
 		battle: BattleId(cast(g.u16()?)?),
 		flag: Flag(g.u16()?),
-		chcp: g.u16()?,
+		chcp: ChcpId(g.u16()?),
 		unk2: g.u16()?,
-		stand_anim: g.u32()?,
-		walk_anim: g.u32()?,
+		stand_anim: AnimId(cast(g.u32()?)?),
+		walk_anim: AnimId(cast(g.u32()?)?),
 	})).strict()?;
 
 	let mut g = f.clone().at(p_triggers)?;
@@ -441,7 +439,7 @@ struct BattleRead {
 	field_sepith_pos: HashMap<usize, u16>,
 	at_rolls: Vec<[u8;16]>,
 	at_roll_pos: HashMap<usize, u16>,
-	placements: Vec<[(u8,u8,i16);8]>,
+	placements: Vec<[(u8,u8,Angle);8]>,
 	placement_pos: HashMap<usize, u16>,
 	battles: Vec<Battle>,
 	battle_pos: HashMap<usize, u32>,
@@ -475,7 +473,7 @@ impl BattleRead {
 			std::collections::hash_map::Entry::Occupied(e) => Ok(*e.get()),
 			std::collections::hash_map::Entry::Vacant(e) => {
 				let v = *e.insert(self.placements.len() as u16);
-				self.placements.push(array::<8, _>(|| Ok((f.u8()?, f.u8()?, f.i16()?))).strict()?);
+				self.placements.push(array::<8, _>(|| Ok((f.u8()?, f.u8()?, Angle(f.i16()?)))).strict()?);
 				Ok(v)
 			}
 		}
@@ -585,10 +583,10 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	for npc in &scena.npcs {
 		strings.string(&npc.name)?;
 		g.pos3(npc.pos);
-		g.i16(npc.angle);
-		g.u16(npc.unk1);
+		g.i16(npc.angle.0);
+		g.u16(npc.flags.0);
 		g.u16(npc.unk2);
-		g.u16(npc.unk3);
+		g.u16(npc.chcp.0);
 		g.u8(cast(npc.init.0)?);
 		g.u8(cast(npc.init.1)?);
 		g.u8(cast(npc.talk.0)?);
@@ -600,13 +598,13 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	for monster in &scena.monsters {
 		g.pos3(monster.pos);
 		g.i16(monster.angle);
-		g.u16(monster.unk1);
+		g.u16(monster.flags.0);
 		g.delay_u16(hamu::write::Label::known(monster.battle.0).0);
 		g.u16(monster.flag.0);
-		g.u16(monster.chcp);
+		g.u16(monster.chcp.0);
 		g.u16(monster.unk2);
-		g.u32(monster.stand_anim);
-		g.u32(monster.walk_anim);
+		g.u32(monster.stand_anim.0 as u32);
+		g.u32(monster.walk_anim.0 as u32);
 	}
 
 	let g = &mut triggers;
@@ -650,13 +648,13 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		g.pos3(entry.cam_from);
 		g.u32(entry.cam_pers);
 		g.u16(entry.unk2);
-		g.u16(entry.cam_deg);
-		g.u16(entry.cam_limit1);
-		g.u16(entry.cam_limit2);
+		g.i16(entry.cam_deg.0);
+		g.i16(entry.cam_limit.0.0);
+		g.i16(entry.cam_limit.1.0);
 		g.pos3(entry.cam_at);
 		g.u16(entry.unk3);
 		g.u16(entry.unk4);
-		g.u16(entry.flags);
+		g.u16(entry.flags.0);
 		g.u16(entry.town.0);
 		g.u8(cast(entry.init.0)?);
 		g.u8(cast(entry.init.1)?);
@@ -700,7 +698,7 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		for p in plac {
 			g.u8(p.0);
 			g.u8(p.1);
-			g.i16(p.2);
+			g.i16(p.2.0);
 		}
 	}
 

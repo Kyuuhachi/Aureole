@@ -6,11 +6,7 @@ use hamu::write::le::*;
 use hamu::write::Label as HLabel;
 use hamu::write::LabelDef as HLabelDef;
 use crate::gamedata::GameData;
-use crate::tables::btlset::BattleId;
-use crate::tables::item::ItemId;
 use crate::types::*;
-use crate::tables::se::SoundId;
-use crate::tables::town::TownId;
 use crate::util::*;
 use crate::text::Text;
 

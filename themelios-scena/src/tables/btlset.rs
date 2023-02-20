@@ -5,10 +5,8 @@ use enumflags2::*;
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use crate::gamedata::Lookup;
-use crate::types::BgmId;
+use crate::types::{BgmId, BattleId};
 use crate::util::*;
-
-newtype!(BattleId, u32);
 
 #[bitflags]
 #[repr(u16)]

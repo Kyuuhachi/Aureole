@@ -1,7 +1,7 @@
 use hamu::read::le::*;
 use hamu::write::le::*;
 use crate::util::*;
-use crate::tables::item::ItemId;
+use crate::types::ItemId;
 
 #[derive(Clone, PartialEq, Eq, derive_more::Deref, derive_more::DerefMut)]
 pub struct Text(#[deref] #[deref_mut] pub Vec<TextSegment>);

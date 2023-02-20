@@ -2,9 +2,7 @@ use std::collections::HashMap;
 use hamu::read::le::*;
 use hamu::write::le::*;
 use crate::gamedata::GameData;
-use crate::tables::btlset::BattleId;
-use crate::tables::town::TownId;
-use crate::types::{Flag, BgmId};
+use crate::types::*;
 use crate::util::*;
 
 use super::*;

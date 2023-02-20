@@ -1,5 +1,6 @@
 use hamu::read::le::*;
 use hamu::write::le::*;
+use crate::types::NameId;
 use crate::util::*;
 
 pub mod code;
@@ -25,9 +26,6 @@ newtype!(Color, u32);
 newtype!(ShopId, u8);
 newtype!(Member, u8);
 newtype!(MagicId, u16);
-
-// 254 STATUS_RECOVERY
-newtype!(MemberAttr, u8);
 
 // 0x00000001 SF_CAMERA_AUTO
 // 0x00400000 SF_ENTRY_DISABLE
@@ -89,6 +87,11 @@ newtype!(CharId, u16);
 #[derive(derive_more::DebugCustom)]
 #[debug(fmt = "CharAttr({_0:?}, {_1})")]
 pub struct CharAttr(pub CharId, pub u8);
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(derive_more::DebugCustom)]
+#[debug(fmt = "MemberAttr({_0:?}, {_1})")]
+pub struct MemberAttr(pub NameId, pub u8);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[derive(derive_more::DebugCustom)]

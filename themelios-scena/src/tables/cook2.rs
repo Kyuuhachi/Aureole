@@ -5,9 +5,7 @@ use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
 use crate::util::*;
-use super::item::ItemId;
-
-newtype!(RecipeId, u16);
+use crate::types::{RecipeId, ItemId};
 
 #[bitflags]
 #[repr(u16)]

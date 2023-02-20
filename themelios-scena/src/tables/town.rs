@@ -1,9 +1,8 @@
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
+use crate::types::TownId;
 use crate::util::*;
-
-newtype!(TownId, u16);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Town(pub String, pub TownType);

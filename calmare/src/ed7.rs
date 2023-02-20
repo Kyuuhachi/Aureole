@@ -1,7 +1,7 @@
 use themelios::scena::{FuncRef, CharId};
 use themelios::scena::ed7;
-use themelios::scena::code::InsnArg as I;
 use strict_result::Strict;
+use themelios::types::BattleId;
 use crate::writer::Context;
 use crate::common::{self, Result, ContextExt};
 
@@ -42,14 +42,14 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 	f.kw("type")?.kw(g)?.kw("scena")?.line()?;
 
 	f.kw("scena")?.suf(":")?.line()?.indent(|f| {
-		f.kw("name")?.val(I::String(name1))?.val(I::String(name2))?.val(I::String(filename))?.line()?;
-		f.kw("town")?.val(I::TownId(town))?.line()?;
-		f.kw("bgm")?.val(I::BgmId(bgm))?.line()?;
-		f.kw("flags")?.val(I::u32(flags))?.line()?;
-		f.kw("unk")?.val(I::u8(unk1))?.val(I::u16(unk2))?.val(I::u8(unk3))?.line()?;
+		f.kw("name")?.val(name1)?.val(name2)?.val(filename)?.line()?;
+		f.kw("town")?.val(town)?.line()?;
+		f.kw("bgm")?.val(bgm)?.line()?;
+		f.kw("flags")?.val(flags)?.line()?;
+		f.kw("unk")?.val(unk1)?.val(unk2)?.val(unk3)?.line()?;
 		for (i, a) in includes.iter().enumerate() {
 			if let Some(a) = a {
-				f.kw("scp")?.val(I::u16(&(i as u16)))?.val(I::String(a))?.line()?;
+				f.kw("scp")?.val(&(i as u16))?.val(a)?.line()?;
 			}
 		}
 		Ok(())
@@ -58,29 +58,29 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 
 	for entry in entry {
 		f.kw("entry")?.suf(":")?.line()?.indent(|f| {
-			f.kw("pos")?.val(I::Pos3(&entry.pos))?.line()?;
-			f.kw("unk1")?.val(I::u32(&entry.unk1))?.line()?;
-			f.kw("cam_from")?.val(I::Pos3(&entry.cam_from))?.line()?;
-			f.kw("cam_pers")?.val(I::u32(&entry.cam_pers))?.line()?;
-			f.kw("unk2")?.val(I::u16(&entry.unk2))?.line()?;
-			f.kw("cam_deg")?.val(I::u16(&entry.cam_deg))?.line()?;
-			f.kw("cam_limit")?.val(I::u16(&entry.cam_limit1))?.val(I::u16(&entry.cam_limit2))?.line()?;
-			f.kw("cam_at")?.val(I::Pos3(&entry.cam_at))?.line()?;
-			f.kw("unk3")?.val(I::u16(&entry.unk3))?.line()?;
-			f.kw("unk4")?.val(I::u16(&entry.unk4))?.line()?;
-			f.kw("flags")?.val(I::u16(&entry.flags))?.line()?;
-			f.kw("town")?.val(I::TownId(&entry.town))?.line()?;
-			f.kw("init")?.val(I::FuncRef(&entry.init))?.line()?;
-			f.kw("reinit")?.val(I::FuncRef(&entry.reinit))?.line()?;
+			f.kw("pos")?.val(&entry.pos)?.line()?;
+			f.kw("unk1")?.val(&entry.unk1)?.line()?;
+			f.kw("cam_from")?.val(&entry.cam_from)?.line()?;
+			f.kw("cam_pers")?.val(&entry.cam_pers)?.line()?;
+			f.kw("unk2")?.val(&entry.unk2)?.line()?;
+			f.kw("cam_deg")?.val(&entry.cam_deg)?.line()?;
+			f.kw("cam_limit")?.val(&entry.cam_limit1)?.val(&entry.cam_limit2)?.line()?;
+			f.kw("cam_at")?.val(&entry.cam_at)?.line()?;
+			f.kw("unk3")?.val(&entry.unk3)?.line()?;
+			f.kw("unk4")?.val(&entry.unk4)?.line()?;
+			f.kw("flags")?.val(&entry.flags)?.line()?;
+			f.kw("town")?.val(&entry.town)?.line()?;
+			f.kw("init")?.val(&entry.init)?.line()?;
+			f.kw("reinit")?.val(&entry.reinit)?.line()?;
 			Ok(())
 		}).strict()?;
 		f.line()?;
 	}
 
 	for (i, chcp) in chcp.iter().enumerate() {
-		f.kw("chcp")?.val(I::ChcpId(&(i as u16)))?;
+		f.kw("chcp")?.val(&(i as u16))?;
 		if let Some(chcp) = chcp {
-			f.val(I::String(chcp))?;
+			f.val(chcp)?;
 		} else {
 			f.kw("null")?;
 		}
@@ -93,16 +93,16 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 	let mut n = 8;
 
 	for npc in npcs {
-		f.kw("npc")?.val(I::CharId(&CharId(n)))?.suf(":")?.line()?.indent(|f| {
-			f.kw("name")?.val(I::TextTitle(&npc.name))?.line()?;
-			f.kw("pos")?.val(I::Pos3(&npc.pos))?.line()?;
-			f.kw("angle")?.val(I::Angle(&npc.angle))?.line()?;
-			f.kw("unk1")?.val(I::u16(&npc.unk1))?.line()?;
-			f.kw("unk2")?.val(I::u16(&npc.unk2))?.line()?;
-			f.kw("unk3")?.val(I::u16(&npc.unk3))?.line()?;
-			f.kw("init")?.val(I::FuncRef(&npc.init))?.line()?;
-			f.kw("talk")?.val(I::FuncRef(&npc.talk))?.line()?;
-			f.kw("unk4")?.val(I::u32(&npc.unk4))?.line()?;
+		f.kw("npc")?.val(&CharId(n))?.suf(":")?.line()?.indent(|f| {
+			f.kw("name")?.val(&npc.name)?.line()?;
+			f.kw("pos")?.val(&npc.pos)?.line()?;
+			f.kw("angle")?.val(&npc.angle)?.line()?;
+			f.kw("unk1")?.val(&npc.unk1)?.line()?;
+			f.kw("unk2")?.val(&npc.unk2)?.line()?;
+			f.kw("unk3")?.val(&npc.unk3)?.line()?;
+			f.kw("init")?.val(&npc.init)?.line()?;
+			f.kw("talk")?.val(&npc.talk)?.line()?;
+			f.kw("unk4")?.val(&npc.unk4)?.line()?;
 			Ok(())
 		}).strict()?;
 		n += 1;
@@ -110,16 +110,16 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 	}
 
 	for monster in monsters {
-		f.kw("monster")?.val(I::CharId(&CharId(n)))?.suf(":")?.line()?.indent(|f| {
-			f.kw("pos")?.val(I::Pos3(&monster.pos))?.line()?;
-			f.kw("angle")?.val(I::Angle(&monster.angle))?.line()?;
-			f.kw("unk1")?.val(I::u16(&monster.unk1))?.line()?;
-			f.kw("battle")?.val(I::BattleId(&monster.battle))?.line()?;
-			f.kw("flag")?.val(I::Flag(&monster.flag))?.line()?;
-			f.kw("chcp")?.val(I::u16(&monster.chcp))?.line()?;
-			f.kw("unk2")?.val(I::u16(&monster.unk2))?.line()?;
-			f.kw("stand_anim")?.val(I::u32(&monster.stand_anim))?.line()?;
-			f.kw("walk_anim")?.val(I::u32(&monster.walk_anim))?.line()?;
+		f.kw("monster")?.val(&CharId(n))?.suf(":")?.line()?.indent(|f| {
+			f.kw("pos")?.val(&monster.pos)?.line()?;
+			f.kw("angle")?.val(&monster.angle)?.line()?;
+			f.kw("unk1")?.val(&monster.unk1)?.line()?;
+			f.kw("battle")?.val(&monster.battle)?.line()?;
+			f.kw("flag")?.val(&monster.flag)?.line()?;
+			f.kw("chcp")?.val(&monster.chcp)?.line()?;
+			f.kw("unk2")?.val(&monster.unk2)?.line()?;
+			f.kw("stand_anim")?.val(&monster.stand_anim)?.line()?;
+			f.kw("walk_anim")?.val(&monster.walk_anim)?.line()?;
 			Ok(())
 		}).strict()?;
 		n += 1;
@@ -127,7 +127,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 	}
 
 	for (i, tr) in triggers.iter().enumerate() {
-		f.kw("trigger")?.val(I::u16(&(i as u16)))?.suf(":")?.line()?.indent(|f| {
+		f.kw("trigger")?.val(&(i as u16))?.suf(":")?.line()?.indent(|f| {
 			f.kw("pos")?;
 			write!(f, "({:?}, {:?}, {:?})", tr.pos.0, tr.pos.1, tr.pos.2)?;
 			f.line()?;
@@ -146,13 +146,13 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 			}).strict()?;
 			// TODO add a comment with decomposition
 
-			f.kw("unk1")?.val(I::u8(&tr.unk1))?.line()?;
-			f.kw("unk2")?.val(I::u16(&tr.unk2))?.line()?;
-			f.kw("function")?.val(I::FuncRef(&tr.function))?.line()?;
-			f.kw("unk3")?.val(I::u8(&tr.unk3))?.line()?;
-			f.kw("unk4")?.val(I::u16(&tr.unk4))?.line()?;
-			f.kw("unk5")?.val(I::u32(&tr.unk5))?.line()?;
-			f.kw("unk6")?.val(I::u32(&tr.unk6))?.line()?;
+			f.kw("unk1")?.val(&tr.unk1)?.line()?;
+			f.kw("unk2")?.val(&tr.unk2)?.line()?;
+			f.kw("function")?.val(&tr.function)?.line()?;
+			f.kw("unk3")?.val(&tr.unk3)?.line()?;
+			f.kw("unk4")?.val(&tr.unk4)?.line()?;
+			f.kw("unk5")?.val(&tr.unk5)?.line()?;
+			f.kw("unk6")?.val(&tr.unk6)?.line()?;
 
 			Ok(())
 		}).strict()?;
@@ -160,15 +160,15 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 	}
 
 	for (i, lp) in look_points.iter().enumerate() {
-		f.kw("look_point")?.val(I::LookPointId(&(i as u16)))?.suf(":")?.line()?.indent(|f| {
-			f.kw("pos")?.val(I::Pos3(&lp.pos))?.line()?;
-			f.kw("radius")?.val(I::u32(&lp.radius))?.line()?;
-			f.kw("bubble_pos")?.val(I::Pos3(&lp.bubble_pos))?.line()?;
-			f.kw("unk1")?.val(I::u8(&lp.unk1))?.line()?;
-			f.kw("unk2")?.val(I::u16(&lp.unk2))?.line()?;
-			f.kw("function")?.val(I::FuncRef(&lp.function))?.line()?;
-			f.kw("unk3")?.val(I::u8(&lp.unk3))?.line()?;
-			f.kw("unk4")?.val(I::u16(&lp.unk4))?.line()?;
+		f.kw("look_point")?.val(&(i as u16))?.suf(":")?.line()?.indent(|f| {
+			f.kw("pos")?.val(&lp.pos)?.line()?;
+			f.kw("radius")?.val(&lp.radius)?.line()?;
+			f.kw("bubble_pos")?.val(&lp.bubble_pos)?.line()?;
+			f.kw("unk1")?.val(&lp.unk1)?.line()?;
+			f.kw("unk2")?.val(&lp.unk2)?.line()?;
+			f.kw("function")?.val(&lp.function)?.line()?;
+			f.kw("unk3")?.val(&lp.unk3)?.line()?;
+			f.kw("unk4")?.val(&lp.unk4)?.line()?;
 			Ok(())
 		}).strict()?;
 		f.line()?;
@@ -176,15 +176,15 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 
 	if let Some(labels) = labels {
 		for (i, lb) in labels.iter().enumerate() {
-			f.kw("label")?.val(I::u16(&(i as u16)))?.suf(":")?.line()?.indent(|f| {
-				f.kw("name")?.val(I::TextTitle(&lb.name))?.line()?;
+			f.kw("label")?.val(&(i as u16))?.suf(":")?.line()?.indent(|f| {
+				f.kw("name")?.val(&lb.name)?.line()?;
 
 				f.kw("pos")?;
 				write!(f, "({}, {}, {})", lb.pos.0, lb.pos.1, lb.pos.2)?;
 				f.line()?;
 
-				f.kw("unk1")?.val(I::u16(&lb.unk1))?.line()?;
-				f.kw("unk2")?.val(I::u16(&lb.unk2))?.line()?;
+				f.kw("unk1")?.val(&lb.unk1)?.line()?;
+				f.kw("unk2")?.val(&lb.unk2)?.line()?;
 
 				Ok(())
 			}).strict()?;
@@ -199,10 +199,10 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 	}
 
 	for (i, anim) in animations.iter().enumerate() {
-		f.kw("anim")?.val(I::u16(&(i as u16)))?.suf(":")?;
-		f.val(I::Time(&(anim.speed as u32)))?.val(I::u8(&anim.unk))?.suf(";")?;
+		f.kw("anim")?.val(&(i as u16))?.suf(":")?;
+		f.val(&(anim.speed as u32))?.val(&anim.unk)?.suf(";")?;
 		for val in &anim.frames {
-			f.val(I::u8(val))?;
+			f.val(val)?;
 		}
 		f.line()?;
 	}
@@ -220,9 +220,9 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 		f.line()?;
 	}
 	for (i, sep) in field_sepith.iter().enumerate() {
-		f.kw("sepith")?.val(I::u16(&(i as u16)))?.suf(":")?;
+		f.kw("sepith")?.val(&(i as u16))?.suf(":")?;
 		for val in sep {
-			f.val(I::u8(val))?;
+			f.val(val)?;
 		}
 		f.line()?;
 		if junk_sepith && i == 4 && field_sepith.len() != 5 {
@@ -231,19 +231,19 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 	}
 
 	for (i, roll) in at_rolls.iter().enumerate() {
-		f.kw("at_roll")?.val(I::u16(&(i as u16)))?.suf(":")?;
+		f.kw("at_roll")?.val(&(i as u16))?.suf(":")?;
 		for val in roll {
-			f.val(I::u8(val))?;
+			f.val(val)?;
 		}
 		f.line()?;
 	}
 
 	for (i, plac) in placements.iter().enumerate() {
-		f.kw("battle_placement")?.val(I::u16(&(i as u16)))?.suf(":")?;
+		f.kw("battle_placement")?.val(&(i as u16))?.suf(":")?;
 		for (i, (x, y, r)) in plac.iter().enumerate() {
-			f.val(I::u8(x))?;
-			f.val(I::u8(y))?;
-			f.val(I::Angle(r))?;
+			f.val(x)?;
+			f.val(y)?;
+			f.val(r)?;
 			if i != 7 {
 				f.suf(",")?;
 			}
@@ -252,39 +252,39 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 	}
 
 	for (i, btl) in battles.iter().enumerate() {
-		f.kw("battle")?.val(I::BattleId(&(i as u32).into()))?.suf(":")?.line()?.indent(|f| {
-			f.kw("flags")?.val(I::u16(&btl.flags))?.line()?;
-			f.kw("level")?.val(I::u16(&btl.level))?.line()?;
-			f.kw("unk1")?.val(I::u8(&btl.unk1))?.line()?;
-			f.kw("vision_range")?.val(I::u8(&btl.vision_range))?.line()?;
-			f.kw("move_range")?.val(I::u8(&btl.move_range))?.line()?;
-			f.kw("can_move")?.val(I::u8(&btl.can_move))?.line()?;
-			f.kw("move_speed")?.val(I::u16(&btl.move_speed))?.line()?;
-			f.kw("unk2")?.val(I::u16(&btl.unk2))?.line()?;
-			f.kw("battlefiled")?.val(I::String(&btl.battlefield))?.line()?;
+		f.kw("battle")?.val(&BattleId(i as u32))?.suf(":")?.line()?.indent(|f| {
+			f.kw("flags")?.val(&btl.flags)?.line()?;
+			f.kw("level")?.val(&btl.level)?.line()?;
+			f.kw("unk1")?.val(&btl.unk1)?.line()?;
+			f.kw("vision_range")?.val(&btl.vision_range)?.line()?;
+			f.kw("move_range")?.val(&btl.move_range)?.line()?;
+			f.kw("can_move")?.val(&btl.can_move)?.line()?;
+			f.kw("move_speed")?.val(&btl.move_speed)?.line()?;
+			f.kw("unk2")?.val(&btl.unk2)?.line()?;
+			f.kw("battlefiled")?.val(&btl.battlefield)?.line()?;
 
 			f.kw("sepith")?;
 			if let Some(sepith) = &btl.sepith {
-				f.val(I::u16(sepith))?;
+				f.val(sepith)?;
 			} else {
 				f.kw("-")?;
 			}
 			f.line()?;
 
 			for setup in &btl.setups {
-				f.kw("setup")?.val(I::u8(&setup.weight))?.suf(":")?.line()?.indent(|f| {
+				f.kw("setup")?.val(&setup.weight)?.suf(":")?.line()?.indent(|f| {
 					f.kw("enemies")?;
 					for e in &setup.enemies {
 						if let Some(e) = e {
-							f.val(I::String(e))?;
+							f.val(e)?;
 						} else {
 							f.kw("-")?;
 						}
 					}
 					f.line()?;
-					f.kw("placement")?.val(I::u16(&setup.placement))?.val(I::u16(&setup.placement_ambush))?.line()?;
-					f.kw("bgm")?.val(I::BgmId(&setup.bgm))?.val(I::BgmId(&setup.bgm))?.line()?;
-					f.kw("at_roll")?.val(I::u16(&setup.at_roll))?.line()?;
+					f.kw("placement")?.val(&setup.placement)?.val(&setup.placement_ambush)?.line()?;
+					f.kw("bgm")?.val(&setup.bgm)?.val(&setup.bgm)?.line()?;
+					f.kw("at_roll")?.val(&setup.at_roll)?.line()?;
 					Ok(())
 				}).strict()?;
 			}

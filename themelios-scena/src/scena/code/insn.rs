@@ -193,7 +193,7 @@ themelios_macros::bytecode! {
 		ScPartyClear(),
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] _30(u8),
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_31(u8),
-		PartySetAttr(u8 as u16 as NameId, u8 as MemberAttr, u16), // [set_status]
+		PartySetAttr(MemberAttr via member_attr, u16), // [set_status]
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo,Zero,Ao)] skip!(2),
 		PartyAddArt(u8 as u16 as NameId, u16 as MagicId),
 		PartyAddCraft(u8 as u16 as NameId, u16 as MagicId),
@@ -257,7 +257,7 @@ themelios_macros::bytecode! {
 		skip!(1), // {asm} one-byte nop
 		Attr(u8 as Attr, Expr), // [system[n]]
 		skip!(1), // {asm} one-byte nop
-		CharAttr(CharAttr via char_attr, Expr via expr),
+		CharAttr(CharAttr via char_attr, Expr),
 
 		TextStart(u16 as CharId), // [talk_start]
 		TextEnd(u16 as CharId), // [talk_end]
@@ -818,7 +818,7 @@ themelios_macros::bytecode! {
 
 macro make_args(
 	// Names need to be passed from outside for hygiene. Ugh.
-	{ $name:ident $args:ident $args_mut:ident $into_parts:ident $arg_types:ident $from_parts:ident }
+	{ $name:ident }
 	[$(($ident:ident $(($_n:ident $ty:ty))*))*]
 ) {
 	impl Insn {
@@ -829,7 +829,7 @@ macro make_args(
 		}
 	}
 }
-introspect!(make_args {name args args_mut into_parts arg_types from_parts});
+introspect!(make_args {name});
 
 trait Arg: Sized {
 	fn read<'a>(f: &mut impl Read<'a>, _: &GameData) -> Result<Self, ReadError>;
@@ -1039,6 +1039,21 @@ pub(super) mod char_attr {
 
 	pub fn write(f: &mut impl Write, _: &GameData, &CharAttr(a, b): &CharAttr) -> Result<(), WriteError> {
 		f.u16(a.0);
+		f.u8(b);
+		Ok(())
+	}
+}
+
+pub(super) mod member_attr {
+	use super::*;
+	pub fn read<'a>(f: &mut impl Read<'a>, _: &GameData) -> Result<MemberAttr, ReadError> {
+		let a = NameId(f.u8()? as u16);
+		let b = f.u8()?;
+		Ok(MemberAttr(a, b))
+	}
+
+	pub fn write(f: &mut impl Write, _: &GameData, &MemberAttr(a, b): &MemberAttr) -> Result<(), WriteError> {
+		f.u16(cast(a.0)?);
 		f.u8(b);
 		Ok(())
 	}

@@ -343,7 +343,7 @@ fn gather_top(input: Top) -> Result<Ctx> {
 					span: def.span(),
 					ident: def.ident,
 					attrs: def.attrs,
-					args: def.args.into_iter().map(|a| a.ty).collect(),
+					args: def.args.into_iter().collect(),
 				});
 			}
 			Def::Standard(mut def) => {
@@ -413,10 +413,7 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 			(Arg::Standard(arg), _) => {
 				let varname = format_ident!("_{}", ictx.args.len(), span=arg.span());
 
-				let arg = &arg.source;
-
 				let read_expr = read_source(ctx, &arg);
-
 				let write_expr = write_source(ctx, &arg, pq!{arg=> #varname });
 
 				read.push(pq!{arg=> let #varname = #read_expr; });

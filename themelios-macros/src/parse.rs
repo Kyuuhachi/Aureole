@@ -8,7 +8,6 @@ use syn::{
 use quote::TokenStreamExt;
 
 pub mod kw {
-	syn::custom_keyword!(alias);
 	syn::custom_keyword!(via);
 	syn::custom_keyword!(skip);
 	syn::custom_keyword!(custom);
@@ -73,22 +72,7 @@ pub struct DefStandard {
 pub enum Arg {
 	#[parse(peek = Token![match])]
 	Tail(ArgTail),
-	Standard(ArgStandard),
-}
-
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
-pub struct ArgStandard {
-	pub source: Source,
-	#[parse(|input| parse_if(input, |input| input.peek(kw::alias)))]
-	#[deprecated]
-	alias: Option<ArgAlias>,
-}
-
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
-#[deprecated]
-struct ArgAlias {
-	alias_token: kw::alias,
-	ident: Ident,
+	Standard(Source),
 }
 
 #[derive(Clone, Debug, syn_derive::ToTokens)]
@@ -128,7 +112,7 @@ pub struct SourceSimple {
 
 #[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct Via {
-	pub alias_token: kw::via,
+	pub via_token: kw::via,
 	pub path: Path,
 }
 
@@ -278,15 +262,7 @@ pub struct DefDef {
 	pub paren_token: token::Paren,
 	#[syn(in = paren_token)]
 	#[parse(Punctuated::parse_terminated)]
-	pub args: Punctuated<DefDefArg, Token![,]>,
-}
-
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
-pub struct DefDefArg {
-	pub ty: Box<Type>,
-	#[parse(|input| parse_if(input, |input| input.peek(kw::alias)))]
-	#[deprecated]
-	alias: Option<ArgAlias>,
+	pub args: Punctuated<Box<Type>, Token![,]>,
 }
 
 #[derive(Clone, Debug, syn_derive::ToTokens)]

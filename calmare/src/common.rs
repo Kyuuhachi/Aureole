@@ -158,17 +158,6 @@ fn insn(f: &mut Context, i: &Insn) -> Result<()> {
 				})*
 			}
 		},
-		(Menu ($v1:ident $_1:ty) ($v2:ident $_2:ty) ($v3:ident $_3:ty) ($v4:ident $_4:ty) ($v5:ident $_5:ty)) => {
-			f.kw("Menu")?.val($v1)?.val($v2)?.val($v3)?.val($v4)?;
-			f.indent(|f| {
-				for (i, line) in $v5.iter().enumerate() {
-					f.line()?;
-					f.val(line)?;
-					write!(f, "// {i}")?;
-				}
-				Ok(())
-			}).strict()?;
-		},
 		($ident:ident ($v1:ident $_:ty) ($v2:ident Expr)) => {
 			f.val($v1)?.expr($v2)?
 		},
@@ -177,7 +166,29 @@ fn insn(f: &mut Context, i: &Insn) -> Result<()> {
 				$(.val($_n)?)*
 		}
 	}
-	themelios::scena::code::introspect!(run);
+
+	match i {
+		Insn::Menu(a, b, c, d, e) => {
+			f.kw("Menu")?.val(a)?.val(b)?.val(c)?.val(d)?;
+			f.indent(|f| {
+				for (i, line) in e.iter().enumerate() {
+					f.line()?;
+					f.val(line)?;
+					write!(f, "// {i}")?;
+				}
+				Ok(())
+			}).strict()?;
+		}
+		Insn::VisSet(v, p@0..=2, a,b,c,d) => {
+			f.kw("VisSet")?.val(v)?.val(p)?.val(a)?.val(b)?.val(&Time(*c as u32))?.val(d)?;
+		}
+		Insn::VisSet(v, p@3, a,b,c,d) => {
+			f.kw("VisSet")?.val(v)?.val(p)?.val(&Color(*a as u32))?.val(&Time(*b as u32))?.val(c)?.val(d)?;
+		}
+		_ => {
+			themelios::scena::code::introspect!(run);
+		}
+	}
 	Ok(())
 }
 

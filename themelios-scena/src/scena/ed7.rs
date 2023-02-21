@@ -104,7 +104,7 @@ pub struct Entry {
 	pub unk1: u32,
 
 	pub cam_from: Pos3,
-	pub cam_pers: u32,
+	pub cam_pers: i32,
 	pub unk2: u16,
 	pub cam_deg: Angle,
 	pub cam_limit: (Angle, Angle),
@@ -193,7 +193,7 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 			pos: f.pos3()?,
 			unk1: f.u32()?,
 			cam_from: f.pos3()?,
-			cam_pers: f.u32()?,
+			cam_pers: f.i32()?,
 			unk2: f.u16()?,
 			cam_deg: Angle(f.i16()?),
 			cam_limit: (Angle(f.i16()?), Angle(f.i16()?)),
@@ -646,7 +646,7 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		g.pos3(entry.pos);
 		g.u32(entry.unk1);
 		g.pos3(entry.cam_from);
-		g.u32(entry.cam_pers);
+		g.i32(entry.cam_pers);
 		g.u16(entry.unk2);
 		g.i16(entry.cam_deg.0);
 		g.i16(entry.cam_limit.0.0);

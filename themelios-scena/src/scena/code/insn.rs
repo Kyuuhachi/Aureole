@@ -146,11 +146,12 @@ themelios_macros::bytecode! {
 		/// Official name is `event_end`.
 		EventEnd(u8),
 
-		_1B(u8, FuncRef via func_ref_u8_u16),
+		// I'm not certain about these two. Could be EntranceId or TriggerId.
+		_1B(u8 as u16 as LookPointId, FuncRef via func_ref_u8_u16),
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)]
-		_1C(u8, u8, u16),
+		_1C(u8 as u16 as ObjectId, FuncRef via func_ref_u8_u16),
 		#[game(Zero, Ao, AoEvo)]
-		ED7_1C(u8, u8, u8, u8, u8, u8, u16 as Flag, u16),
+		ED7_1C(u8, u8 as u16 as ObjectId, u8, u8, u8, u8, u16 as Flag, u16),
 
 		#[game(Zero, ZeroEvo, Ao, AoEvo)]
 		ED7_1D(match {
@@ -190,7 +191,7 @@ themelios_macros::bytecode! {
 
 		PartyAdd(u8 as u16 as NameId, u8 as u16 as CharId, { IS::Fc|IS::FcEvo => const 0u8, _ => u8 }), // [join_party]
 		PartyRemove(u8 as u16 as NameId, u8), // [separate_party]
-		ScPartyClear(),
+		PartyClear(),
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] _30(u8),
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_31(u8),
 		PartySetAttr(u8 as u16 as NameId, u8, u16), // [set_status]
@@ -280,7 +281,7 @@ themelios_macros::bytecode! {
 		TextSetName(TString), // [name]
 		CharName2(u16 as CharId), // [name2]
 
-		Emote(u16 as CharId, i32, i32, Emote via emote, u8), // [emotion] mostly used through macros such as EMO_BIKKURI3(). Third argument is height.
+		Emote(u16 as CharId, i32 as Length, i32 as Length, Emote via emote, u8), // [emotion] mostly used through macros such as EMO_BIKKURI3(). Third argument is height.
 		EmoteStop(u16 as CharId), // [emotion_close]
 
 		LookPointFlagsSet(u8 as u16 as LookPointId, u16 as LookPointFlags),
@@ -296,7 +297,7 @@ themelios_macros::bytecode! {
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] CamRotate(i32 as Angle32, u32 as Time), // [camera_rotate]
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] CamLookPos(Pos3, u32 as Time), // [camera_look_at]
 		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7CamRotate(i16 as Angle, i16 as Angle, i16 as Angle, u32 as Time),
-		CamPers(u32, u32 as Time), // [camera_pers]
+		CamPers(i32, u32 as Time), // [camera_pers]
 
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] ObjFrame(u16 as ObjectId, u32), // [mapobj_frame]
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] ObjPlay(u16 as ObjectId, u32), // [mapobj_play]
@@ -351,7 +352,7 @@ themelios_macros::bytecode! {
 		}),
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _7E(i16, i16, i16, u8, u32),
 
-		#[game(Zero, Ao, AoEvo)] ED7_84(u8, u8),
+		#[game(Zero, Ao, AoEvo)] ED7_84(u8, u8), // Wild guess: master quartz.
 		EffLoad(u8 as EffId, String),
 		EffPlay(
 			u8 as EffId, u8 as EffInstanceId,
@@ -370,13 +371,13 @@ themelios_macros::bytecode! {
 		),
 		EffStop(u8 as EffInstanceId, u8),
 		#[game(Fc, FcEvo)] FcAchievement(u8, u8),
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] _83(u8, u8), // might have to do with EffPlay
-		_84(u8),
-		_85(u8, u8),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] _83(u8 as EffInstanceId, u8),
+		_84(u8 as EffId),
+		_85(u16 as CharId),
 
 		CharSetBase    (u16 as CharId, { i if i.is_ed7() => u8 as u16, _ => u16 } as ChcpId), // [set_chr_base]
 		CharSetPattern (u16 as CharId, { i if i.is_ed7() => u8 as u16, _ => u16 }), // [set_chr_ptn]
-		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7CharSetName (u16 as CharId, TString), // debug script only
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] CharSetName(u16 as CharId, TString), // debug script only
 		CharSetPos     (u16 as CharId, Pos3, i16 as Angle), // [set_pos]
 		CharSetPos2    (u16 as CharId, Pos3, i16 as Angle),
 		CharLookAtChar (u16 as CharId, u16 as CharId, u16 as u32 as Time), // [look_to]
@@ -521,11 +522,7 @@ themelios_macros::bytecode! {
 		#[game(Zero, ZeroEvo, Ao)] skip!(1),
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_BA(u8),
 
-		/// Opens the book reading interface, as if using it from the inventory.
-		///
-		/// It is unknown what the second argument means; all known uses have zero.
-		/// The assembly hints that it might be a character, in which case the instruction might be a more general-purpose use-item instruction.
-		ReadBook(u16 as ItemId, u16),
+		ItemUse(u16 as ItemId, u16 as CharId),
 
 		/// Returns whether the given member has a particular orbal art.
 		///
@@ -537,32 +534,16 @@ themelios_macros::bytecode! {
 
 		#[game(Fc, FcEvo)] skip!(10),
 
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] ScSetPortrait(u8 as u16 as NameId, u8, u8, u8, u8, u8),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] PartySetPortrait(u8 as u16 as NameId, u8, u8, u8, u8, u8),
 		// This instruction is only used a single time throughout FC..=3rd, but this is its signature according to the asm
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, Ao)] Sc_BC(u8, match {
 			0 => _0(u16),
 			1 => _1(u16),
 		}),
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] ScSetPortraitFinish(),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] PartySetPortraitFinish(),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_BE(u8,u8,u8,u8, u16, u16, u8, i32,i32,i32,i32,i32,i32),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_BF(u8,u8,u8,u8, u16 as Flag),
-		/// ```text
-		///  1 ⇒ something about using items on the field
-		/// 11 ⇒ roulette
-		/// 12 ⇒ slots
-		/// 13 ⇒ blackjack
-		/// 14 ... ⇒ fishing
-		/// 15 ⇒ poker
-		/// 16 ... ⇒ used in Axis Pillar
-		/// 17 ⇒ broken shooting minigame
-		/// 18 n ⇒ check if have fish n
-		/// 19 ⇒ menu with st/eq/orb
-		/// 20 5000 ⇒ after beating Luciola
-		/// 21 ⇒ used after a few battles
-		/// 22 ⇒ after Weissman sets up a barrier
-		/// 23 ⇒ used after sequences of ScLoadChcp
-		/// ```
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] ScMinigame(u8, i32,i32,i32,i32,i32,i32,i32,i32),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Minigame(u8, i32,i32,i32,i32,i32,i32,i32,i32),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao)] Sc_C1(u16 as ItemId, u32),
 		#[game(Sc, ScEvo)] Sc_C2(),
 		#[game(Tc, TcEvo)] Tc_C2(u8, u8),
@@ -578,9 +559,15 @@ themelios_macros::bytecode! {
 		}),
 
 		#[game(Fc)] skip!(3),
-		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] VisLoad(u8 as VisId, i16,i16,u16,u16, i16,i16,u16,u16, i16,i16,u16,u16, u32 as Color, u8, String),
-		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] VisColor(u8 as VisId, u8, u32 as Color, u32 as Time, u32, { IS::FcEvo|IS::Ao|IS::AoEvo => u32, _ => const 0u32 }),
-		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] VisDispose(u8, u8 as VisId, u8),
+		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)]
+		VisLoad(u8 as VisId, i16,i16,u16,u16, i16,i16,u16,u16, i16,i16,u16,u16, u32 as Color, u8, String),
+		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)]
+		/// Attribute 3 is color. The others are unknown, but probably include at least position, scale, and rotation.
+		VisSet(u8 as VisId, u8, i32, i32, i32, { IS::FcEvo|IS::Ao|IS::AoEvo => u32, _ => const 0u32 }),
+		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Vis(match {
+			0 => Await(u8 as VisId, u8), // The argument is the same as for VisSet.
+			1 => Dispose(u8 as VisId, u8),
+		}),
 
 		#[game(Fc,FcEvo)] skip!(19),
 
@@ -591,12 +578,12 @@ themelios_macros::bytecode! {
 		}),
 		#[game(ZeroEvo)] skip!(1),
 
-		#[game(Sc, ScEvo, Tc, TcEvo)] ScPartySelect(u16, [Option<NameId>; 4] via sc_party_select_mandatory, Vec<NameId> via sc_party_select_optional),
+		#[game(Sc, ScEvo, Tc, TcEvo)] PartySelect(u16, [Option<NameId>; 4] via sc_party_select_mandatory, Vec<NameId> via sc_party_select_optional),
 		#[game(Sc, ScEvo)] Sc_CA(u8 as u16 as ObjectId, u8, u32),
 		#[game(Tc, TcEvo)] Tc_CA(u8 as u16 as ObjectId, u8, i32, u32),
 		#[game(Sc, ScEvo)] ScCharInSlot(u8), // clearly related to CharId, but not the same
 		#[game(Tc, TcEvo)] TcCharInSlot(u8, u8), // added team id I guess?
-		#[game(Sc, ScEvo, Tc, TcEvo)] ScSelect(match {
+		#[game(Sc, ScEvo, Tc, TcEvo)] ED6Select(match {
 			0 => New(u8 as SelectId, u16, u16, u8),
 			1 => Add(u8 as SelectId, TString),
 			2 => Show(u8 as SelectId),
@@ -731,11 +718,11 @@ themelios_macros::bytecode! {
 		#[game(TcEvo)] TcEvo_F2(u16 as CharId, u8, u16, u16),
 		#[game(Sc, ScEvo)] Sc_E6(u8), // related to RAM saving, according to debug script
 		#[game(TcEvo)] custom! {
-			// What's Evo_E7 doing up here? Maybe they wanted FF to stay clear.
+			// What's EvoVisLipSync doing up here? Maybe they wanted FF to stay clear.
 			read => |f| {
-				Ok(Self::Evo_E7(VisId(f.u8()?), f.u8()?))
+				Ok(Self::EvoVisLipSync(VisId(f.u8()?), f.u8()?))
 			},
-			write Evo_E7(a, b) => |f| {
+			write EvoVisLipSync(a, b) => |f| {
 				f.u8(a.0);
 				f.u8(*b);
 				Ok(())
@@ -766,7 +753,7 @@ themelios_macros::bytecode! {
 
 		#[game(FcEvo, ScEvo, TcEvo)] EvoVoiceLine(u16), // [pop_msg]
 		#[game(FcEvo, ScEvo, TcEvo)] Evo_E6(Text),
-		#[game(FcEvo, ScEvo)] Evo_E7(u8 as VisId, u8),
+		#[game(FcEvo, ScEvo)] EvoVisLipSync(u8 as VisId, u8),
 		#[game(TcEvo)] skip!(1),
 
 		#[game(Fc)] skip!(33),
@@ -798,7 +785,7 @@ themelios_macros::bytecode! {
 		#[game(ZeroEvo, AoEvo)] ZeroEvo_E1(u32,u32,u32,u32, u32,u32,u32,u32, u32,u32,u32,u32),
 		#[game(ZeroEvo, AoEvo)] ZeroEvo_E2(u32,u32,u32, u8, u32, u32),
 		#[game(ZeroEvo, AoEvo)] ZeroEvo_E3(u8, String, u32, u32, u8),
-		#[game(AoEvo)] AoEvo_E7(u32, u32 as Color, u32, u32),
+		#[game(AoEvo)] AoEvo_E7(u32, i32, i32, i32),
 		#[game(AoEvo)] AoEvo_E8(u8),
 		#[game(ZeroEvo, AoEvo)] ZeroEvo_E4(u8, u16),
 		#[game(ZeroEvo, AoEvo)] ZeroEvo_E5(u8, u8, String, String, Pos3, Pos3, Pos3, u8),

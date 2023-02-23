@@ -33,10 +33,10 @@ themelios_macros::bytecode! {
 		CrossFade(u32 as Time), // [cross_fade]
 
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)]
-		Battle(u32 as BattleId, u16, u16, u8, u16, u8 as u16 as CharId),
+		ED6Battle(u32 as BattleId, u32 /*FileId*/, u8, u16, u8 as u16 as CharId),
 
-		def! ED7Battle(BattleId, u16,u8,u8,u8, u16, u16, CharId),
-		def! ED7NpcBattle(u16,u8,u8,u8, [Option<String>; 8], u16, u16),
+		def! ED7Battle(BattleId, u32 /*FileId*/, u8, u16, u16, CharId),
+		def! ED7NpcBattle(u32 /*FileId*/, u8, [Option<String>; 8], u16, u16),
 
 		#[game(Zero, ZeroEvo, Ao, AoEvo)]
 		custom! {
@@ -46,14 +46,14 @@ themelios_macros::bytecode! {
 					// Pointer is filled in properly later
 					Ok(Self::ED7Battle(
 						BattleId(ptr),
-						f.u16()?, f.u8()?, f.u8()?, f.u8()?,
+						f.u32()?, f.u8()?,
 						f.u16()?,
 						f.u16()?,
 						CharId(f.u16()?),
 					))
 				} else {
 					Ok(Self::ED7NpcBattle(
-						f.u16()?, f.u8()?, f.u8()?, f.u8()?,
+						f.u32()?, f.u8()?,
 						array::<8, _>(|| match f.u32()? {
 							0 => Ok(None),
 							n => Ok(Some(game.lookup.name(n)?))
@@ -66,16 +66,16 @@ themelios_macros::bytecode! {
 					))
 				}
 			},
-			write ED7Battle(ptr, s1,s2,s3,s4, a1, a2, ch) => |f| {
+			write ED7Battle(ptr, s1,s2, a1, a2, ch) => |f| {
 				f.delay_u32(hamu::write::Label::known(ptr.0).0);
-				f.u16(*s1); f.u8(*s2); f.u8(*s3); f.u8(*s4);
+				f.u32(*s1); f.u8(*s2);
 				f.u16(*a1); f.u16(*a2);
 				f.u16(ch.0);
 				Ok(())
 			},
-			write ED7NpcBattle(s1,s2,s3,s4, c, a1, a2) => |f| {
+			write ED7NpcBattle(s1,s2, c, a1, a2) => |f| {
 				f.u32(0xFFFFFFFF);
-				f.u16(*s1); f.u8(*s2); f.u8(*s3); f.u8(*s4);
+				f.u32(*s1); f.u8(*s2);
 				for c in c {
 					f.u32(c.as_ref().map_or(Ok(0), |a| game.lookup.index(a))?);
 				}
@@ -111,8 +111,16 @@ themelios_macros::bytecode! {
 
 		#[game(Fc, FcEvo)] skip!(1), // Unused one-byte instruction that calls an unknown function
 		#[game(Fc, FcEvo)] skip!(1), // One-byte nop
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_14({ IS::Ao|IS::AoEvo => u16 as u32, _ => u32 }, u32 as Color, { IS::Ao|IS::AoEvo => u16 as u32, _ => u32 }, u8, { IS::Ao|IS::AoEvo => u16 as u32, _ => u32 }),
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_15(u32),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)]
+		BlurOn(
+			{ IS::Ao|IS::AoEvo => u16 as u32, _ => u32 } as Time,
+			u32 as Color,
+			{ IS::Ao|IS::AoEvo => u16 as u32, _ => u32 },
+			u8,
+			{ IS::Ao|IS::AoEvo => u16 as u32, _ => u32 }
+		),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)]
+		BlurOff(u32 as Time),
 
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)]
 		Map(match {
@@ -372,7 +380,7 @@ themelios_macros::bytecode! {
 		EffStop(u8 as EffInstanceId, u8),
 		#[game(Fc, FcEvo)] FcAchievement(u8, u8),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] _83(u8 as EffInstanceId, u8),
-		_84(u8 as EffId),
+		EffUnload(u8 as EffId),
 		_85(u16 as CharId),
 
 		CharSetBase    (u16 as CharId, { i if i.is_ed7() => u8 as u16, _ => u16 } as ChcpId), // [set_chr_base]
@@ -479,6 +487,7 @@ themelios_macros::bytecode! {
 		RecipeLearn(u16),
 
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] ImageShow(String via file_ref, u16, u16, u32 as Time), // [portrait_open]
+		// This is sometimes called with a vis[]. I think that's a bug in the scripts, 
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] ImageHide(u32 as Time), // [portrait_close]
 
 		/// Attempts to submit a quest.
@@ -492,9 +501,9 @@ themelios_macros::bytecode! {
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_B1(u8),
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] skip!(3),
 
-		_B2(match {
-			0 => Set(u8, u16),
-			1 => Unset(u8, u16),
+		TriggerFlags(match {
+			0 => Set(u8 as u16 as TriggerId, u16 as TriggerFlags),
+			1 => Unset(u8 as u16 as TriggerId, u16 as TriggerFlags),
 		}),
 
 		Video(match {
@@ -560,13 +569,13 @@ themelios_macros::bytecode! {
 
 		#[game(Fc)] skip!(3),
 		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)]
-		VisLoad(u8 as VisId, i16,i16,u16,u16, i16,i16,u16,u16, i16,i16,u16,u16, u32 as Color, u8, String),
+		VisShow(u8 as VisId, i16,i16,u16,u16, i16,i16,u16,u16, i16,i16,u16,u16, u32 as Color, u8, String),
 		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)]
 		/// Attribute 3 is color. The others are unknown, but probably include at least position, scale, and rotation.
 		VisSet(u8 as VisId, u8, i32, i32, i32, { IS::FcEvo|IS::Ao|IS::AoEvo => u32, _ => const 0u32 }),
 		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Vis(match {
 			0 => Await(u8 as VisId, u8), // The argument is the same as for VisSet.
-			1 => Dispose(u8 as VisId, u8),
+			1 => Hide(u8 as VisId, u8),
 		}),
 
 		#[game(Fc,FcEvo)] skip!(19),
@@ -581,8 +590,7 @@ themelios_macros::bytecode! {
 		#[game(Sc, ScEvo, Tc, TcEvo)] PartySelect(u16, [Option<NameId>; 4] via sc_party_select_mandatory, Vec<NameId> via sc_party_select_optional),
 		#[game(Sc, ScEvo)] Sc_CA(u8 as u16 as ObjectId, u8, u32),
 		#[game(Tc, TcEvo)] Tc_CA(u8 as u16 as ObjectId, u8, i32, u32),
-		#[game(Sc, ScEvo)] ScCharInSlot(u8), // clearly related to CharId, but not the same
-		#[game(Tc, TcEvo)] TcCharInSlot(u8, u8), // added team id I guess?
+		#[game(Sc, ScEvo, Tc, TcEvo)] CharInSlot({ IS::Tc|IS::TcEvo => u8, _ => const 0u8 }, u8 as u16 as CharId),
 		#[game(Sc, ScEvo, Tc, TcEvo)] ED6Select(match {
 			0 => New(u8 as SelectId, u16, u16, u8),
 			1 => Add(u8 as SelectId, TString),

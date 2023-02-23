@@ -78,13 +78,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 	}
 
 	for (i, chcp) in chcp.iter().enumerate() {
-		f.kw("chcp")?.val(&ChcpId(i as u16))?;
-		if let Some(chcp) = chcp {
-			f.val(chcp)?;
-		} else {
-			f.kw("null")?;
-		}
-		f.line()?;
+		f.kw("chcp")?.val(&ChcpId(i as u16))?.val(chcp)?.line()?;
 	}
 	if !chcp.is_empty() {
 		f.line()?;
@@ -275,11 +269,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 				f.kw("setup")?.val(&setup.weight)?.suf(":")?.line()?.indent(|f| {
 					f.kw("enemies")?;
 					for e in &setup.enemies {
-						if let Some(e) = e {
-							f.val(e)?;
-						} else {
-							f.kw("-")?;
-						}
+						f.val(e)?;
 					}
 					f.line()?;
 					f.kw("placement")?.val(&setup.placement)?.val(&setup.placement_ambush)?.line()?;

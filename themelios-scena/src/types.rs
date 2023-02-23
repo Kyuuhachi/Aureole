@@ -1,5 +1,11 @@
 use crate::util::*;
 
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(derive_more::From, derive_more::Into)]
+#[derive(derive_more::DebugCustom)]
+#[debug(fmt = "FileId(0x{_0:08X})")]
+pub struct FileId(pub u32);
+
 newtype!(QuestId, u16);
 newtype!(NameId, u16);
 newtype!(BgmId, u16);

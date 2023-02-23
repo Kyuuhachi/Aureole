@@ -14,11 +14,11 @@ pub struct Scena {
 	pub town: TownId, // [Town; 町名]
 	pub bgm: BgmId, // [BGM; BGM 番号]
 	pub item: FuncRef, // [Item; アイテム使用時イベント]
-	pub includes: [Option<String>; 8], // [Scp0..7; スクリプト(１つだけは必須), これ以降は必要な場合のみ定義する]
+	pub includes: [Option<FileId>; 8], // [Scp0..7; スクリプト(１つだけは必須), これ以降は必要な場合のみ定義する]
 
 	// The script puts cp before ch.
-	pub ch: Vec<String>, // [Char_Data; キャラデータファイル]
-	pub cp: Vec<String>, // [Char_Ptn; キャラパターンファイル]
+	pub ch: Vec<FileId>, // [Char_Data; キャラデータファイル]
+	pub cp: Vec<FileId>, // [Char_Ptn; キャラパターンファイル]
 
 	pub npcs: Vec<Npc>,
 	pub monsters: Vec<Monster>,
@@ -103,7 +103,7 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	let town = TownId(f.u16()?);
 	let bgm = BgmId(f.u16()?);
 	let item = FuncRef(f.u16()?, f.u16()?);
-	let includes = f.multiple_loose::<8, _>(&[0xFF;4], |g| Ok(game.lookup.name(g.u32()?)?))?;
+	let includes = f.multiple_loose::<8, _>(&[0xFF;4], |g| Ok(FileId(g.u32()?)))?;
 	f.check_u16(0)?;
 
 	let head_end = f.clone().u16()? as usize;
@@ -125,10 +125,10 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	ensure!(strings.string()? == "@FileName", "expected @FileName");
 
 	let (mut g, n) = ch;
-	let ch = list(n as usize, || Ok(game.lookup.name(g.u32()?)?)).strict()?;
+	let ch = list(n as usize, || Ok(FileId(g.u32()?))).strict()?;
 
 	let (mut g, n) = cp;
-	let cp = list(n as usize, || Ok(game.lookup.name(g.u32()?)?)).strict()?;
+	let cp = list(n as usize, || Ok(FileId(g.u32()?))).strict()?;
 
 	let (mut g, n) = npcs;
 	let npcs = list(n as usize, || Ok(Npc {
@@ -250,7 +250,7 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	f.u16(town.0);
 	f.u16(bgm.0);
 	f.u16(item.0); f.u16(item.1);
-	f.multiple_loose::<8, _>(&[0xFF; 4], includes, |g, a| { g.u32(game.lookup.index(a)?); Ok(()) }).strict()?;
+	f.multiple_loose::<8, _>(&[0xFF; 4], includes, |g, a| { g.u32(a.0); Ok(()) }).strict()?;
 	f.u16(0);
 
 	let (l_ch, l_ch_) = Label::new();
@@ -288,11 +288,11 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	f.u16(cast(functions.len() * 2)?);
 
 	g.label(l_ch_);
-	for ch in ch { g.u32(game.lookup.index(ch)?); }
+	for ch in ch { g.u32(ch.0); }
 	g.u8(0xFF);
 
 	g.label(l_cp_);
-	for cp in cp { g.u32(game.lookup.index(cp)?); }
+	for cp in cp { g.u32(cp.0); }
 	g.u8(0xFF);
 
 	g.label(l_npcs_);

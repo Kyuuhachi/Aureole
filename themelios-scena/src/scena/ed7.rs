@@ -15,9 +15,9 @@ pub struct Scena {
 	pub town: TownId,
 	pub bgm: BgmId,
 	pub flags: u32,
-	pub includes: [Option<String>; 6],
+	pub includes: [Option<FileId>; 6],
 
-	pub chcp: Vec<Option<String>>,
+	pub chcp: Vec<FileId>,
 	pub labels: Option<Vec<Label>>,
 	pub npcs: Vec<Npc>,
 	pub monsters: Vec<Monster>,
@@ -143,7 +143,7 @@ pub struct Battle {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BattleSetup {
 	pub weight: u8,
-	pub enemies: [Option<String>; 8],
+	pub enemies: [FileId; 8],
 	pub placement: u16, // index
 	pub placement_ambush: u16,
 	pub bgm: BgmId,
@@ -159,7 +159,7 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	let town = TownId(f.u16()?);
 	let bgm = BgmId(f.u16()?);
 	let flags = f.u32()?;
-	let includes = f.multiple_loose::<6, _>(&[0xFF;4], |g| Ok(game.lookup.name(g.u32()?)?))?;
+	let includes = f.multiple_loose::<6, _>(&[0xFF;4], |g| Ok(FileId(g.u32()?)))?;
 
 	let mut strings = f.ptr32()?;
 	let strings_start = strings.pos();
@@ -244,10 +244,7 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	};
 
 	let mut g = f.clone().at(p_chcp)?;
-	let chcp = list(n_chcp, || Ok(match g.u32()? {
-		0 => None,
-		n => Some(game.lookup.name(n)?)
-	})).strict()?;
+	let chcp = list(n_chcp, || Ok(FileId(g.u32()?))).strict()?;
 
 	let mut g = f.clone().at(p_npcs)?;
 	let npcs = list(n_npcs, || Ok(Npc {
@@ -506,10 +503,7 @@ impl BattleRead {
 							}
 							setups.push(BattleSetup {
 								weight,
-								enemies: array(|| match f.u32()? {
-									0 => Ok(None),
-									n => Ok(Some(game.lookup.name(n)?))
-								}).strict()?,
+								enemies: array(|| Ok(FileId(f.u32()?))).strict()?,
 								placement: self.get_placement(&mut f.ptr()?)?,
 								placement_ambush: self.get_placement(&mut f.ptr()?)?,
 								bgm: BgmId(f.u16()?),
@@ -534,7 +528,7 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	f.u16(scena.town.0);
 	f.u16(scena.bgm.0);
 	f.u32(scena.flags);
-	f.multiple_loose::<6, _>(&[0xFF; 4], &scena.includes, |g, a| { g.u32(game.lookup.index(a)?); Ok(()) }).strict()?;
+	f.multiple_loose::<6, _>(&[0xFF; 4], &scena.includes, |g, a| { g.u32(a.0); Ok(()) }).strict()?;
 
 	let mut strings = f.ptr32();
 	strings.string(&scena.filename)?;
@@ -576,7 +570,7 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 
 	let g = &mut chcp;
 	for chcp in &scena.chcp {
-		g.u32(chcp.as_ref().map_or(Ok(0), |a| game.lookup.index(a))?);
+		g.u32(chcp.0);
 	}
 
 	let g = &mut npcs;
@@ -727,7 +721,7 @@ pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		for (i, setup) in battle.setups.iter().enumerate() {
 			weights[i] = setup.weight;
 			for ms in &setup.enemies {
-				h.u32(ms.as_ref().map_or(Ok(0), |a| game.lookup.index(a))?);
+				h.u32(ms.0);
 			}
 			h.delay_u16(placement_pos.get(setup.placement as usize).cloned()
 				.ok_or_else(|| "placement out of bounds".to_owned())?);

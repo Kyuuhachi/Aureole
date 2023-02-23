@@ -322,6 +322,16 @@ nt_arg!(EffInstanceId, "eff_instance[{}]");
 nt_arg!(SelectId, "select[{}]");
 nt_arg!(MenuId,  "menu[{}]");
 
+impl Val for FileId {
+	fn write(&self, f: &mut Context) -> Result<()> {
+		if self.0 == 0 {
+			write!(f, "null")
+		} else {
+			write!(f, "file[0x{:08X}]", self.0)
+		}
+	}
+}
+
 impl Val for CharAttr {
 	fn write(&self, f: &mut Context) -> Result<()> {
 		self.0.write(f)?;

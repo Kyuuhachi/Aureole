@@ -5,7 +5,7 @@ use hamu::read::le::*;
 use hamu::write::le::*;
 use themelios_scena::gamedata::GameData;
 use themelios_scena::text::Text;
-use themelios_scena::types::{QuestId, Flag};
+use themelios_scena::types::*;
 use themelios_scena::util::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -16,7 +16,7 @@ pub struct ED6Quest {
 	pub bp: u16,
 	pub mira: u16,
 	pub flags: [Flag; 3],
-	pub name: String,
+	pub name: TString,
 	pub desc: Text,
 	pub steps: Vec<Text>,
 }
@@ -38,7 +38,7 @@ pub fn read_ed6(_game: &GameData, data: &[u8]) -> Result<Vec<ED6Quest>, ReadErro
 		let mira = g.u16()?;
 		let flags = array(|| Ok(Flag(g.u16()?))).strict()?;
 
-		let name = g.ptr()?.string()?;
+		let name = TString(g.ptr()?.string()?);
 		let desc = Text::read(&mut g.ptr()?)?;
 		let mut steps = Vec::new();
 		for _ in 0..16 {
@@ -71,7 +71,7 @@ pub fn write_ed6(_game: &GameData, table: &[ED6Quest]) -> Result<Vec<u8>, WriteE
 		let mut h = Writer::new();
 
 		g.delay_u16(h.here());
-		h.string(name)?;
+		h.string(&name.0)?;
 		g.delay_u16(h.here());
 		Text::write(&mut h, desc)?;
 		for step in steps {
@@ -94,8 +94,8 @@ pub struct ED7Quest {
 	pub bp: u8,
 	pub unk1: u8,
 	pub flags: [Flag; 2],
-	pub name: String,
-	pub client: String,
+	pub name: TString,
+	pub client: TString,
 	pub desc: Text,
 	pub steps: Vec<Text>,
 }
@@ -121,8 +121,8 @@ pub fn read_ed7(_game: &GameData, data: &[u8]) -> Result<Vec<ED7Quest>, ReadErro
 		let unk1 = f.u8()?;
 		f.check_u16(0)?;
 		let flags = [Flag(f.u16()?), Flag(f.u16()?)];
-		let name = ptr(f.u32()?)?.string()?;
-		let client = ptr(f.u32()?)?.string()?;
+		let name = TString(ptr(f.u32()?)?.string()?);
+		let client = TString(ptr(f.u32()?)?.string()?);
 		let desc = Text::read(&mut ptr(f.u32()?)?)?;
 		step_ptrs.push(ptr(f.u32()?)?);
 		table.push(ED7Quest {
@@ -163,8 +163,8 @@ pub fn write_ed7(_game: &GameData, table: &[ED7Quest]) -> Result<Vec<u8>, WriteE
 		f.u16(0);
 		f.u16(q.flags[0].0);
 		f.u16(q.flags[1].0);
-		f.delay_u32(g.here()); g.string(&q.name)?;
-		f.delay_u32(g.here()); g.string(&q.client)?;
+		f.delay_u32(g.here()); g.string(&q.name.0)?;
+		f.delay_u32(g.here()); g.string(&q.client.0)?;
 		f.delay_u32(g.here()); Text::write(&mut g, &q.desc)?;
 		f.delay_u32(h.here());
 		for task in &q.steps {

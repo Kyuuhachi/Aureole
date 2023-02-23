@@ -15,7 +15,7 @@ themelios_macros::bytecode! {
 		/// unknown.
 		///
 		/// Official name is `new_scene`, which also implicitly adds a [`Hcf`](Self::Hcf).
-		NewScene(String via file_ref, u8, u8, u8),
+		NewScene(FileId, u8, u8, u8),
 
 		/// Simply halts the script forever.
 		///
@@ -33,10 +33,10 @@ themelios_macros::bytecode! {
 		CrossFade(u32 as Time), // [cross_fade]
 
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)]
-		ED6Battle(u32 as BattleId, u32 /*FileId*/, u8, u16, u8 as u16 as CharId),
+		ED6Battle(u32 as BattleId, FileId, u8, u16, u8 as u16 as CharId),
 
-		def! ED7Battle(BattleId, u32 /*FileId*/, u8, u16, u16, CharId),
-		def! ED7NpcBattle(u32 /*FileId*/, u8, [Option<String>; 8], u16, u16),
+		def! ED7Battle(BattleId, FileId, u8, u16, u16, CharId),
+		def! ED7NpcBattle(FileId, u8, [FileId; 8], u16, u16),
 
 		#[game(Zero, ZeroEvo, Ao, AoEvo)]
 		custom! {
@@ -46,18 +46,15 @@ themelios_macros::bytecode! {
 					// Pointer is filled in properly later
 					Ok(Self::ED7Battle(
 						BattleId(ptr),
-						f.u32()?, f.u8()?,
+						FileId(f.u32()?), f.u8()?,
 						f.u16()?,
 						f.u16()?,
 						CharId(f.u16()?),
 					))
 				} else {
 					Ok(Self::ED7NpcBattle(
-						f.u32()?, f.u8()?,
-						array::<8, _>(|| match f.u32()? {
-							0 => Ok(None),
-							n => Ok(Some(game.lookup.name(n)?))
-						}).strict()?,
+						FileId(f.u32()?), f.u8()?,
+						array::<8, _>(|| Ok(FileId(f.u32()?))).strict()?,
 						{
 							f.check(&[0;16])?;
 							f.u16()?
@@ -68,16 +65,16 @@ themelios_macros::bytecode! {
 			},
 			write ED7Battle(ptr, s1,s2, a1, a2, ch) => |f| {
 				f.delay_u32(hamu::write::Label::known(ptr.0).0);
-				f.u32(*s1); f.u8(*s2);
+				f.u32(s1.0); f.u8(*s2);
 				f.u16(*a1); f.u16(*a2);
 				f.u16(ch.0);
 				Ok(())
 			},
 			write ED7NpcBattle(s1,s2, c, a1, a2) => |f| {
 				f.u32(0xFFFFFFFF);
-				f.u32(*s1); f.u8(*s2);
+				f.u32(s1.0); f.u8(*s2);
 				for c in c {
-					f.u32(c.as_ref().map_or(Ok(0), |a| game.lookup.index(a))?);
+					f.u32(c.0);
 				}
 				f.array([0;16]);
 				f.u16(*a1); f.u16(*a2);
@@ -126,7 +123,7 @@ themelios_macros::bytecode! {
 		Map(match {
 			0 => Hide(),
 			1 => Show(),
-			2 => Set(i32, Pos2, String via file_ref),
+			2 => Set(i32, Pos2, FileId),
 		}),
 		#[game(Zero, ZeroEvo)]
 		ZeroMap(match {
@@ -486,7 +483,7 @@ themelios_macros::bytecode! {
 		/// Returns whether the recipe was already known, i.e. if it was *not* successfully learned.
 		RecipeLearn(u16),
 
-		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] ImageShow(String via file_ref, u16, u16, u32 as Time), // [portrait_open]
+		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] ImageShow(FileId, u16, u16, u32 as Time), // [portrait_open]
 		// This is sometimes called with a vis[]. I think that's a bug in the scripts, 
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] ImageHide(u32 as Time), // [portrait_close]
 
@@ -611,8 +608,8 @@ themelios_macros::bytecode! {
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_CF(u16 as CharId, u8, String), // something with skeleton animation
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_D0(i32 as Angle32, u32 as Time),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_D1(u16 as CharId, i32, i32, i32, u32 as Time), // something with camera?
-		#[game(Sc, ScEvo, Tc, TcEvo)] ED6LoadChcp(String via file_ref, String via file_ref, u8 as u16 as ChcpId),
-		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7LoadChcp(String via file_ref, u8 as u16 as ChcpId),
+		#[game(Sc, ScEvo, Tc, TcEvo)] ED6LoadChcp(FileId, FileId, u8 as u16 as ChcpId),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7LoadChcp(FileId, u8 as u16 as ChcpId),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] UnloadChcp(u8 as u16 as ChcpId),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] PartyGetAttr(u8 as u16 as NameId, u8),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] PartyGetEquipped(u8 as u16 as NameId, u8),
@@ -861,13 +858,20 @@ prim_arg!(i16, i16);
 prim_arg!(i32, i32);
 prim_arg!(Pos3, pos3);
 prim_arg!(Pos2, pos2);
+
 arg!(String,
 	|f, _| f.string()?,
 	|f, _, v| f.string(v.as_str())?,
 );
+
 arg!(TString,
 	|f, _| TString(f.string()?),
 	|f, _, v| f.string(v.as_str())?,
+);
+
+arg!(FileId,
+	|f, _| FileId(f.u32()?),
+	|f, _, v| f.u32(v.0),
 );
 
 arg!(Text,
@@ -1039,18 +1043,6 @@ pub(super) mod char_attr {
 	pub fn write(f: &mut impl Write, _: &GameData, &CharAttr(a, b): &CharAttr) -> Result<(), WriteError> {
 		f.u16(a.0);
 		f.u8(b);
-		Ok(())
-	}
-}
-
-mod file_ref {
-	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>, game: &GameData) -> Result<String, ReadError> {
-		Ok(game.lookup.name(f.u32()?)?)
-	}
-
-	pub(super) fn write(f: &mut impl Write, game: &GameData, v: &str) -> Result<(), WriteError> {
-		f.u32(game.lookup.index(v)?);
 		Ok(())
 	}
 }

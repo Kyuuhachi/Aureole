@@ -77,6 +77,7 @@ impl std::convert::From<u32> for LookupError {
 	}
 }
 
+#[deprecated]
 pub trait Lookup {
 	fn name(&self, index: u32) -> Result<String, LookupError>;
 	fn index(&self, name: &str) -> Result<u32, LookupError>;

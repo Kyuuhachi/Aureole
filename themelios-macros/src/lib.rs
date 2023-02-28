@@ -497,9 +497,8 @@ fn source_ty(source: &Source) -> Box<Type> {
 			}
 		}
 		Source::Cast(source) => source.ty.clone(),
-		Source::Split(source) => {
-			source_ty(&source.arms[0].source)
-		},
+		Source::Block(source) => source_ty(&source.source),
+		Source::If(source) => source_ty(&source.then_branch),
 	}
 }
 
@@ -528,18 +527,14 @@ fn write_source(ctx: &Ctx, source: &Source, val: Expr) -> Expr {
 			let ty = &source.ty;
 			write_source(ctx, &source.source, pq!{source=> &cast::<#ty, _>(*#val)? })
 		}
-		Source::Split(source) => {
-			let def: Stmt = pq!{val=> let _v = #val; };
-			let mut writes = Vec::<Arm>::new();
-			for arm in &source.arms {
-				let pat = &arm.pat;
-				let guard = &arm.guard;
-				let write_expr = write_source(ctx, &arm.source, pq!{val=> _v});
-				writes.push(pq!{arm=> #pat #guard => #write_expr, });
-			}
-
-			let game_expr = &ctx.game_expr;
-			pq!{source=> { #def match #game_expr { #(#writes)* } } }
+		Source::Block(source) => {
+			let source = write_source(ctx, &source.source, val);
+			pq!{source=> { #source } }
+		}
+		Source::If(SourceIf { if_token, cond, then_branch, else_token, else_branch }) => {
+			let then_branch = write_source(ctx, then_branch, pq!{val=> _v});
+			let else_branch = write_source(ctx, else_branch, pq!{val=> _v});
+			pq!{source=> { let _v = #val; #if_token #cond #then_branch #else_token #else_branch } }
 		}
 	}
 }
@@ -564,17 +559,14 @@ fn read_source(ctx: &Ctx, source: &Source) -> Expr {
 			let expr = read_source(ctx, &source.source);
 			pq!{source=> cast::<_, #ty>(#expr)? }
 		}
-		Source::Split(source) => {
-			let mut reads = Vec::<Arm>::new();
-			for arm in &source.arms {
-				let pat = &arm.pat;
-				let guard = &arm.guard;
-				let read_expr = read_source(ctx, &arm.source);
-				reads.push(pq!{arm=> #pat #guard => #read_expr, });
-			}
-
-			let game_expr = &ctx.game_expr;
-			pq!{source=> match #game_expr { #(#reads)* } }
+		Source::Block(source) => {
+			let source = read_source(ctx, &source.source);
+			pq!{source=> { #source } }
+		}
+		Source::If(SourceIf { if_token, cond, then_branch, else_token, else_branch }) => {
+			let then_branch = read_source(ctx, then_branch);
+			let else_branch = read_source(ctx, else_branch);
+			pq!{source=> #if_token #cond #then_branch #else_token #else_branch }
 		}
 	}
 }

@@ -30,6 +30,10 @@ impl Game {
 			Game::AoKai => ISet::Ao,
 		}
 	}
+
+	fn is_ed7_kai(self) -> bool {
+		matches!(self, Game::ZeroKai|Game::AoKai)
+	}
 }
 
 themelios_macros::bytecode! {
@@ -55,7 +59,7 @@ themelios_macros::bytecode! {
 		/// `new_scene`.
 		Hcf(),
 
-		Sleep({ _ if game.is_ed7() => u16 as u32, _ => u32 } as Time), // [delay]
+		Sleep(if game.is_ed7() { u16 as u32 } else { u32 } as Time), // [delay]
 		SystemFlagsSet(u32 as SystemFlags), // [set_system_flag]
 		SystemFlagsUnset(u32 as SystemFlags), // [reset_system_flag]
 
@@ -142,11 +146,11 @@ themelios_macros::bytecode! {
 		#[game(Fc, FcEvo)] skip!(1), // One-byte nop
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)]
 		BlurOn(
-			{ IS::Ao|IS::AoEvo => u16 as u32, _ => u32 } as Time,
+			if game.base() == BaseGame::Ao { u16 as u32 } else { u32 } as Time,
 			u32 as Color,
-			{ IS::Ao|IS::AoEvo => u16 as u32, _ => u32 },
+			if game.base() == BaseGame::Ao { u16 as u32 } else { u32 },
 			u8,
-			{ IS::Ao|IS::AoEvo => u16 as u32, _ => u32 }
+			if game.base() == BaseGame::Ao { u16 as u32 } else { u32 }
 		),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)]
 		BlurOff(u32 as Time),
@@ -198,8 +202,8 @@ themelios_macros::bytecode! {
 		}),
 
 		BgmPlay(
-			{ _ if game.is_ed7() => u16, _ => u8 as u16 } as BgmId,
-			{ _ if game.is_ed7() => u8, _ => const 0u8 },
+			if game.is_ed7() { u16 } else { u8 as u16 } as BgmId,
+			if game.is_ed7() { u8 } else { const 0u8 },
 		), // [play_bgm]
 		BgmResume(), // [resume_bgm]
 		BgmVolume(u8, u32 as Time), // [volume_bgm]
@@ -207,18 +211,18 @@ themelios_macros::bytecode! {
 		BgmWait(), // [wait_bgm]
 
 		SoundPlay(
-			{ i if game.is_ed7() && game.is_kai() => u32, _ => u16 as u32 } as SoundId,
+			if game.is_ed7_kai() { u32 } else { u16 as u32 } as SoundId,
 			u8,
-			{ i if game.is_ed7() => u8, _ => const 0u8 },
+			if game.is_ed7() { u8 } else { const 0u8 },
 			u8,
 		), // [sound]
 		SoundStop(
-			{ IS::Ao|IS::AoEvo if game.is_kai() => u32, _ => u16 as u32 } as SoundId,
+			if game == Game::AoKai { u32 } else { u16 as u32 } as SoundId,
 		),
 		SoundSetVolume(u16 as u32 as SoundId, u8),
 		SoundPlayContinuously(u16 as u32 as SoundId, Pos3, u32, u32, u8, u32),
 		SoundLoad(
-			{ IS::Ao|IS::AoEvo if game.is_kai() => u32, _ => u16 as u32 } as SoundId,
+			if game == Game::AoKai { u32 } else { u16 as u32 } as SoundId,
 		), // [sound_load]
 
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] skip!(1),
@@ -238,7 +242,7 @@ themelios_macros::bytecode! {
 		QuestBonusBp(u16 as QuestId, u16),
 		QuestBonusMira(u16 as QuestId, u16),
 
-		PartyAdd(u8 as u16 as NameId, u8 as u16 as CharId, { IS::Fc|IS::FcEvo => const 0u8, _ => u8 }), // [join_party]
+		PartyAdd(u8 as u16 as NameId, u8 as u16 as CharId, if game.base() == BaseGame::Fc { const 0u8 } else { u8 }), // [join_party]
 		PartyRemove(u8 as u16 as NameId, u8), // [separate_party]
 		PartyClear(),
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] _30(u8),
@@ -282,19 +286,16 @@ themelios_macros::bytecode! {
 		BpSub(u16),
 		ItemAdd(u16 as ItemId, u16),
 		ItemRemove(u16 as ItemId, u16), // [release_item]
-		ItemHas(u16 as ItemId, { IS::Fc|IS::FcEvo => const 0u8, _ => u8 }), // or is it ItemGetCount?
+		ItemHas(u16 as ItemId, if game.base() == BaseGame::Fc { const 0u8 } else { u8 }), // or is it ItemGetCount?
 
-		PartyEquip(u8 as u16 as NameId, u16 as ItemId, {
-			IS::Fc|IS::FcEvo if !(600..=799).contains(&_1.0) => const 0u8,
-			_ => u8,
-		}),
+		PartyEquip(u8 as u16 as NameId, u16 as ItemId, if game.base() == BaseGame::Fc && !(600..=799).contains(&_1.0) { const 0u8 } else { u8 }),
 		PartyPosition(u8 as u16 as NameId),
 
 		ForkFunc(u16 as CharId, u8 as u16 as ForkId, FuncRef via func_ref), // [execute]
 		ForkQuit(u16 as CharId, u8 as u16 as ForkId), // [terminate]
-		Fork(u16 as CharId, { i if game.is_ed7() => u8 as u16, _ => u16 } as ForkId, Vec<Insn> via fork), // [preset]? In t0311, only used with a single instruction inside
-		ForkLoop(u16 as CharId, { i if game.is_ed7() => u8 as u16, _ => u16 } as ForkId, Vec<Insn> via fork_loop),
-		ForkWait(u16 as CharId, { i if game.is_ed7() => u8 as u16, _ => u16 } as ForkId), // [wait_terminate]
+		Fork(    u16 as CharId, if game.is_ed7() { u8 as u16 } else { u16 } as ForkId, Vec<Insn> via fork), // [preset]? In t0311, only used with a single instruction inside
+		ForkLoop(u16 as CharId, if game.is_ed7() { u8 as u16 } else { u16 } as ForkId, Vec<Insn> via fork_loop),
+		ForkWait(u16 as CharId, if game.is_ed7() { u8 as u16 } else { u16 } as ForkId), // [wait_terminate]
 		NextFrame(), // [next_frame]
 
 		Event(FuncRef via func_ref), // [event] Not sure how this differs from Call
@@ -315,7 +316,7 @@ themelios_macros::bytecode! {
 		///
 		/// I believe the CharId, which is only present in ED7, is used to select the textbox title.
 		/// However, it is 999 on chests.
-		TextMessage({ i if game.is_ed7() => u16, _ => const 255u16 } as CharId, Text), // [mes]
+		TextMessage(if game.is_ed7() { u16 } else { const 255u16 } as CharId, Text), // [mes]
 		skip!(1), // {asm} same as NextFrame
 		TextClose(u8), // [mes_close]
 		ScMenuSetTitle(u16, u16, u16, Text),
@@ -354,12 +355,12 @@ themelios_macros::bytecode! {
 		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7ObjFrame(u8 as u16 as ObjectId, u16),
 		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7ObjPlay(u8 as u16 as ObjectId, u16, u32, u32), // TODO EDDec thinks the first u32 is two u16
 		ObjFlagsSet( // [mapobj_set_flag]
-			{ IS::Fc|IS::FcEvo|IS::Sc|IS::ScEvo => u16, _ => u8 as u16 } as ObjectId,
-			{ IS::Fc|IS::FcEvo|IS::Sc|IS::ScEvo => u16 as u32, _ => u32 } as ObjectFlags,
+			if matches!(game.base(), BaseGame::Fc|BaseGame::Sc) { u16 } else { u8 as u16 } as ObjectId,
+			if matches!(game.base(), BaseGame::Fc|BaseGame::Sc) { u16 as u32 } else { u32 } as ObjectFlags,
 		),
 		ObjFlagsUnset( // [mapobj_reset_flag]
-			{ IS::Fc|IS::FcEvo|IS::Sc|IS::ScEvo => u16, _ => u8 as u16 } as ObjectId,
-			{ IS::Fc|IS::FcEvo|IS::Sc|IS::ScEvo => u16 as u32, _ => u32 } as ObjectFlags,
+			if matches!(game.base(), BaseGame::Fc|BaseGame::Sc) { u16 } else { u8 as u16 } as ObjectId,
+			if matches!(game.base(), BaseGame::Fc|BaseGame::Sc) { u16 as u32 } else { u32 } as ObjectFlags,
 		),
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] ObjWait(u16 as ObjectId),
 		// I can confirm with 100% certainty that ObjFlags(Un)Set, ED7_76_0, ED7_74, and ED7ObjPlay have the same namespace, being "mapobj"
@@ -405,7 +406,7 @@ themelios_macros::bytecode! {
 		EffLoad(u8 as EffId, String),
 		EffPlay(
 			u8 as EffId, u8 as EffInstanceId,
-			u16 as CharId, { i if game.is_ed7() => u16, _ => const 0u16 }, Pos3, // source
+			u16 as CharId, if game.is_ed7() { u16 } else { const 0u16 }, Pos3, // source
 			i16, i16, i16,
 			u32, u32, u32, // scale?
 			u16 as CharId, Pos3, // target
@@ -413,7 +414,7 @@ themelios_macros::bytecode! {
 		),
 		EffPlay2(
 			u8 as EffId, u8 as EffInstanceId,
-			u8 as u16 as ObjectId, String, { i if game.is_ed7() => u16, _ => const 0u16 }, Pos3, // source
+			u8 as u16 as ObjectId, String, if game.is_ed7() { u16 } else { const 0u16 }, Pos3, // source
 			i16, i16, i16,
 			u32, u32, u32, // scale
 			u32 as Time, // period (0 if one-shot)
@@ -424,8 +425,8 @@ themelios_macros::bytecode! {
 		EffUnload(u8 as EffId),
 		_85(u16 as CharId),
 
-		CharSetBase    (u16 as CharId, { i if game.is_ed7() => u8 as u16, _ => u16 } as ChcpId), // [set_chr_base]
-		CharSetPattern (u16 as CharId, { i if game.is_ed7() => u8 as u16, _ => u16 }), // [set_chr_ptn]
+		CharSetBase    (u16 as CharId, if game.is_ed7() { u8 as u16 } else { u16 } as ChcpId), // [set_chr_base]
+		CharSetPattern (u16 as CharId, if game.is_ed7() { u8 as u16 } else { u16 }), // [set_chr_ptn]
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] CharSetName(u16 as CharId, TString), // debug script only
 		CharSetPos     (u16 as CharId, Pos3, i16 as Angle), // [set_pos]
 		CharSetPos2    (u16 as CharId, Pos3, i16 as Angle),
@@ -548,8 +549,8 @@ themelios_macros::bytecode! {
 		}),
 
 		Video(match {
-			0 => Play(String, { IS::Fc|IS::FcEvo => const 0u16, _ => u16 }, { IS::Fc|IS::FcEvo => const 0u16, _ => u16 }), // [movie(MOVIE_START)]
-			1 => End(u8, { IS::Fc|IS::FcEvo => const 0u16, _ => u16 }, { IS::Fc|IS::FcEvo => const 0u16, _ => u16 }), // [movie(MOVIE_END)], probably the 0 is the null terminator of an empty string
+			0 => Play(String, if game.base() == BaseGame::Fc { const 0u16 } else { u16 }, if game.base() == BaseGame::Fc { const 0u16 } else { u16 }), // [movie(MOVIE_START)]
+			1 => End(String,  if game.base() == BaseGame::Fc { const 0u16 } else { u16 }, if game.base() == BaseGame::Fc { const 0u16 } else { u16 }), // [movie(MOVIE_END)]
 		}),
 
 		ReturnToTitle(u8),
@@ -613,7 +614,7 @@ themelios_macros::bytecode! {
 		VisShow(u8 as VisId, i16,i16,u16,u16, i16,i16,u16,u16, i16,i16,u16,u16, u32 as Color, u8, String),
 		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)]
 		/// Attribute 3 is color. The others are unknown, but probably include at least position, scale, and rotation.
-		VisSet(u8 as VisId, u8, i32, i32, i32, { IS::FcEvo|IS::Ao|IS::AoEvo => u32, _ => const 0u32 }),
+		VisSet(u8 as VisId, u8, i32, i32, i32, if matches!(game, Game::FcEvo|Game::Ao|Game::AoEvo) { u32 } else { const 0u32 }),
 		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Vis(match {
 			0 => Await(u8 as VisId, u8), // The argument is the same as for VisSet.
 			1 => Hide(u8 as VisId, u8),
@@ -631,7 +632,7 @@ themelios_macros::bytecode! {
 		#[game(Sc, ScEvo, Tc, TcEvo)] PartySelect(u16, [Option<NameId>; 4] via sc_party_select_mandatory, Vec<NameId> via sc_party_select_optional),
 		#[game(Sc, ScEvo)] Sc_CA(u8 as u16 as ObjectId, u8, u32),
 		#[game(Tc, TcEvo)] Tc_CA(u8 as u16 as ObjectId, u8, i32, u32),
-		#[game(Sc, ScEvo, Tc, TcEvo)] CharInSlot({ IS::Tc|IS::TcEvo => u8, _ => const 0u8 }, u8 as u16 as CharId),
+		#[game(Sc, ScEvo, Tc, TcEvo)] CharInSlot(if game.base() == BaseGame::Tc { u8 } else { const 0u8 }, u8 as u16 as CharId),
 		#[game(Sc, ScEvo, Tc, TcEvo)] ED6Select(match {
 			0 => New(u8 as SelectId, u16, u16, u8),
 			1 => Add(u8 as SelectId, TString),

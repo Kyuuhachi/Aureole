@@ -15,12 +15,6 @@ mod insn;
 pub use insn::*;
 pub mod decompile;
 
-impl Game {
-	fn is_kai(self) -> bool {
-		matches!(self, Game::ZeroKai|Game::AoKai)
-	}
-}
-
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Label(pub usize);
 

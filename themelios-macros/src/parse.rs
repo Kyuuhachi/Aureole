@@ -80,15 +80,18 @@ pub enum Source {
 	Simple(SourceSimple),
 	Const(SourceConst),
 	Cast(SourceCast),
-	Split(SourceSplit),
+	Block(SourceBlock),
+	If(SourceIf),
 }
 
 impl Parse for Source {
 	fn parse(input: ParseStream) -> Result<Self> {
-		let mut source = if input.peek(token::Brace) {
-			Source::Split(input.parse()?)
+		let mut source = if input.peek(Token![if]) {
+			Source::If(input.parse()?)
 		} else if input.peek(Token![const]) {
 			Source::Const(input.parse()?)
+		} else if input.peek(token::Brace) {
+			Source::Block(input.parse()?)
 		} else {
 			Source::Simple(input.parse()?)
 		};
@@ -101,6 +104,14 @@ impl Parse for Source {
 		}
 		Ok(source)
 	}
+}
+
+#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+pub struct SourceBlock {
+	#[syn(braced)]
+	pub brace_token: token::Brace,
+	#[syn(in = brace_token)]
+	pub source: Box<Source>,
 }
 
 #[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
@@ -149,12 +160,27 @@ pub struct TailArm {
 }
 
 #[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
-pub struct SourceSplit {
-	#[syn(braced)]
-	pub brace_token: token::Brace,
-	#[syn(in = brace_token)]
-	#[parse(Punctuated::parse_terminated)]
-	pub arms: Punctuated<SplitArm, Token![,]>,
+pub struct SourceIf {
+	pub if_token: Token![if],
+	#[parse(|input| Ok(Box::new(Expr::parse_without_eager_brace(input)?)))]
+	pub cond: Box<Expr>,
+	#[parse(|input| Ok(Box::new(Source::Block(input.parse()?))))]
+	pub then_branch: Box<Source>,
+	pub else_token: Token![else],
+	#[parse(else_branch)]
+	pub else_branch: Box<Source>,
+}
+
+fn else_branch(input: ParseStream) -> Result<Box<Source>> {
+	let lookahead = input.lookahead1();
+	let else_branch = if input.peek(Token![if]) {
+		Source::If(input.parse()?)
+	} else if input.peek(token::Brace) {
+		Source::Block(input.parse()?)
+	} else {
+		return Err(lookahead.error());
+	};
+	Ok(Box::new(else_branch))
 }
 
 #[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]

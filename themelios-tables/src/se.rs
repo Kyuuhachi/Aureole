@@ -1,7 +1,5 @@
-use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
-use themelios_scena::gamedata::GameData;
 use themelios_scena::types::SoundId;
 use themelios_scena::util::*;
 
@@ -13,7 +11,7 @@ pub struct ED7Sound {
 	pub unk2: [u8; 4],
 }
 
-pub fn read_ed7(_game: &GameData, data: &[u8]) -> Result<Vec<ED7Sound>, ReadError> {
+pub fn read_ed7(data: &[u8]) -> Result<Vec<ED7Sound>, ReadError> {
 	let mut f = Reader::new(data);
 	let mut table = Vec::new();
 	let mut xs = Vec::new();
@@ -39,7 +37,7 @@ pub fn read_ed7(_game: &GameData, data: &[u8]) -> Result<Vec<ED7Sound>, ReadErro
 	Ok(table)
 }
 
-pub fn write_ed7(_game: &GameData, table: &[ED7Sound]) -> Result<Vec<u8>, WriteError> {
+pub fn write_ed7(table: &[ED7Sound]) -> Result<Vec<u8>, WriteError> {
 	let mut table = table.to_owned();
 	table.sort_by_key(|a| a.id);
 	let mut f = Writer::new();

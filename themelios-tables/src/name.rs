@@ -1,7 +1,6 @@
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
-use themelios_scena::gamedata::GameData;
 use themelios_scena::types::*;
 use themelios_scena::util::*;
 
@@ -15,7 +14,7 @@ pub struct ED7Name {
 	pub ms2: FileId,
 }
 
-pub fn read_ed7(_game: &GameData, data: &[u8]) -> Result<Vec<ED7Name>, ReadError> {
+pub fn read_ed7(data: &[u8]) -> Result<Vec<ED7Name>, ReadError> {
 	let mut f = Coverage::new(Reader::new(data));
 	let mut table = Vec::new();
 	loop {
@@ -31,7 +30,7 @@ pub fn read_ed7(_game: &GameData, data: &[u8]) -> Result<Vec<ED7Name>, ReadError
 	Ok(table)
 }
 
-pub fn write_ed7(_game: &GameData, table: &[ED7Name]) -> Result<Vec<u8>, WriteError> {
+pub fn write_ed7(table: &[ED7Name]) -> Result<Vec<u8>, WriteError> {
 	let mut f = Writer::new();
 	let mut g = Writer::new();
 	for name in table {

@@ -3,7 +3,6 @@ use std::collections::BTreeSet;
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
-use themelios_scena::gamedata::GameData;
 use themelios_scena::text::Text;
 use themelios_scena::types::*;
 use themelios_scena::util::*;
@@ -21,7 +20,7 @@ pub struct ED6Quest {
 	pub steps: Vec<Text>,
 }
 
-pub fn read_ed6(_game: &GameData, data: &[u8]) -> Result<Vec<ED6Quest>, ReadError> {
+pub fn read_ed6(data: &[u8]) -> Result<Vec<ED6Quest>, ReadError> {
 	let mut f = Reader::new(data);
 	let n = f.clone().u16()? / 2;
 	let mut table = Vec::new();
@@ -51,7 +50,7 @@ pub fn read_ed6(_game: &GameData, data: &[u8]) -> Result<Vec<ED6Quest>, ReadErro
 	Ok(table)
 }
 
-pub fn write_ed6(_game: &GameData, table: &[ED6Quest]) -> Result<Vec<u8>, WriteError> {
+pub fn write_ed6(table: &[ED6Quest]) -> Result<Vec<u8>, WriteError> {
 	let mut f = Writer::new();
 	let mut g = Writer::new();
 
@@ -100,7 +99,7 @@ pub struct ED7Quest {
 	pub steps: Vec<Text>,
 }
 
-pub fn read_ed7(_game: &GameData, data: &[u8]) -> Result<Vec<ED7Quest>, ReadError> {
+pub fn read_ed7(data: &[u8]) -> Result<Vec<ED7Quest>, ReadError> {
 	let mut f = Coverage::new(Reader::new(data));
 	let mut table = Vec::new();
 	let mut step_ptrs = Vec::new();
@@ -150,7 +149,7 @@ pub fn read_ed7(_game: &GameData, data: &[u8]) -> Result<Vec<ED7Quest>, ReadErro
 	Ok(table)
 }
 
-pub fn write_ed7(_game: &GameData, table: &[ED7Quest]) -> Result<Vec<u8>, WriteError> {
+pub fn write_ed7(table: &[ED7Quest]) -> Result<Vec<u8>, WriteError> {
 	let mut f = Writer::new();
 	let mut g = Writer::new();
 	let mut h = Writer::new();

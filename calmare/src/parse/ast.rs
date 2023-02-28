@@ -1,5 +1,6 @@
 pub use super::lex::Spanned;
 use Spanned as S;
+pub use themelios::types::Game;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Decl {
@@ -7,13 +8,6 @@ pub enum Decl {
 	Function(Function),
 	Data(Data),
 	// Alias(Alias),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Game {
-	Ed61, Ed62, Ed63, Ed71, Ed72,
-	Ed61e, Ed62e, Ed63e, Ed71e, Ed72e,
-	Ed61k, Ed62k, Ed63k, Ed71k, Ed72k,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

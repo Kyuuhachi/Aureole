@@ -87,3 +87,9 @@ impl Game {
 		}
 	}
 }
+
+impl Game {
+	pub fn is_ed7(self) -> bool {
+		matches!(self.base(), BaseGame::Zero|BaseGame::Ao)
+	}
+}

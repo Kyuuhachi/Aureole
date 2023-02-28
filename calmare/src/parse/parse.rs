@@ -312,11 +312,11 @@ fn parse_type(line: &Line) -> Result<(Game, FileType)> {
 		no_body(line);
 		use Token::Ident as I;
 		let game = match p.next()?.1 {
-			I("ed61") => Game::Ed61, I("ed61e") => Game::Ed61e, I("ed61k") => Game::Ed61k,
-			I("ed62") => Game::Ed62, I("ed62e") => Game::Ed62e, I("ed62k") => Game::Ed62k,
-			I("ed63") => Game::Ed63, I("ed63e") => Game::Ed63e, I("ed63k") => Game::Ed63k,
-			I("ed71") => Game::Ed71, I("ed71e") => Game::Ed71e, I("ed71k") => Game::Ed71k,
-			I("ed72") => Game::Ed72, I("ed72e") => Game::Ed72e, I("ed72k") => Game::Ed72k,
+			I("fc") => Game::Fc, I("fc_e") => Game::FcEvo, I("fc_k") => Game::FcKai,
+			I("sc") => Game::Sc, I("sc_e") => Game::ScEvo, I("sc_k") => Game::ScKai,
+			I("tc") => Game::Tc, I("tc_e") => Game::TcEvo, I("tc_k") => Game::TcKai,
+			I("zero") => Game::Zero, I("zero_e") => Game::ZeroEvo, I("zero_k") => Game::ZeroKai,
+			I("ao") => Game::Ao, I("ao_e") => Game::AoEvo, I("ao_k") => Game::AoKai,
 			_ => {
 				Diag::error(p.prev_span(), "unknown game").emit();
 				return Err(Error);

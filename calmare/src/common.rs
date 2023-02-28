@@ -1,5 +1,5 @@
 use themelios::scena::*;
-use themelios::scena::code::{InstructionSet, Expr, ExprBinop, ExprUnop, FlatInsn, Label, Insn};
+use themelios::scena::code::{Expr, ExprBinop, ExprUnop, FlatInsn, Label, Insn};
 use themelios::scena::code::decompile::{decompile, TreeInsn};
 use themelios::text::{Text, TextSegment};
 use strict_result::Strict;
@@ -289,7 +289,7 @@ nt_arg!(TcMembers,      "0x{:08X}");
 
 impl Val for QuestTask {
 	fn write(&self, f: &mut Context) -> Result<()> {
-		if f.game.iset.is_ed7() {
+		if f.game.is_ed7() {
 			write!(f, "{}", self.0)
 		} else {
 			write!(f, "0x{:04X}", self.0)
@@ -343,18 +343,17 @@ impl Val for CharAttr {
 impl Val for CharId {
 	fn write(&self, f: &mut Context) -> Result<()> {
 		let v = self.0;
-		use InstructionSet::*;
 		match v {
 			257.. => NameId(v - 257).write(f),
 			256   => write!(f, "(ERROR)"),
 			255   => write!(f, "null"),
 			254   => write!(f, "self"),
-			244.. if matches!(f.game.iset, Ao|AoEvo)
+			244.. if f.game.base() == BaseGame::Ao
 			      => write!(f, "custom[{}]", v-244),
-			246.. if matches!(f.game.iset, Sc|ScEvo)
+			246.. if f.game.base() == BaseGame::Sc
 			      => write!(f, "party[{}]", v-246),
 			238.. => write!(f, "party[{}]", v-238),
-			16..  if matches!(f.game.iset, Tc|TcEvo)
+			16..  if f.game.base() == BaseGame::Tc
 			      => write!(f, "char[{}]", v - 16),
 			8..   => write!(f, "char[{}]", v - 8),
 			0..   => write!(f, "field_party[{}]", v),
@@ -522,18 +521,23 @@ fn text(f: &mut Context, v: &Text) -> Result<()> {
 	Ok(())
 }
 
-pub(crate) fn game(game: &themelios::gamedata::GameData) -> &'static str {
-	use InstructionSet::*;
-	match game.iset {
-		Fc   => if game.kai { "ed61k" } else { "ed61" },
-		Sc   => if game.kai { "ed62k" } else { "ed62" },
-		Tc   => if game.kai { "ed63k" } else { "ed63" },
-		Zero => if game.kai { "ed71k" } else { "ed71" },
-		Ao   => if game.kai { "ed72k" } else { "ed72" },
-		FcEvo   => "ed61e",
-		ScEvo   => "ed62e",
-		TcEvo   => "ed63e",
-		ZeroEvo => "ed71e",
-		AoEvo   => "ed72e",
+pub(crate) fn game(game: Game) -> &'static str {
+	use Game::*;
+	match game {
+		Fc      => "fc",
+		Sc      => "sc",
+		Tc      => "tc",
+		Zero    => "zero",
+		Ao      => "ao",
+		FcEvo   => "fc_e",
+		ScEvo   => "sc_e",
+		TcEvo   => "tc_e",
+		ZeroEvo => "zero_e",
+		AoEvo   => "ao_e",
+		FcKai   => "fc_k",
+		ScKai   => "sc_k",
+		TcKai   => "tc_k",
+		ZeroKai => "zero_k",
+		AoKai   => "ao_k",
 	}
 }

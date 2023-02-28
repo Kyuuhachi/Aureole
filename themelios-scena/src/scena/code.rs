@@ -16,10 +16,6 @@ pub use insn::*;
 pub mod decompile;
 
 impl Game {
-	fn is_ed7(self) -> bool {
-		matches!(self.base(), BaseGame::Zero|BaseGame::Ao)
-	}
-
 	fn is_kai(self) -> bool {
 		matches!(self, Game::ZeroKai|Game::AoKai)
 	}

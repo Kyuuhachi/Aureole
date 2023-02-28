@@ -1,7 +1,6 @@
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
-use crate::gamedata::GameData;
 use crate::types::*;
 use crate::util::*;
 
@@ -95,7 +94,7 @@ pub struct LookPoint { // [LookPoint]
 	pub unk1: u16, // (absent)
 }
 
-pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
+pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 	let mut f = Coverage::new(Reader::new(data));
 
 	let path = f.sized_string::<10>()?;
@@ -223,7 +222,7 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 	})
 }
 
-pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
+pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	let &Scena {
 		ref path,
 		ref map,

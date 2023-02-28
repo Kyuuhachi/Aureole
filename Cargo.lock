@@ -552,16 +552,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mapr"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46a28a55dbc005b2f6f123c4058933d57add373d362f6fd3a76aab4fe6973500"
-dependencies = [
- "libc",
- "winapi",
-]
-
-[[package]]
 name = "matrixmultiply"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -947,6 +937,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "themelios-archive"
+version = "0.1.0"
+dependencies = [
+ "cp932",
+ "hamu",
+]
+
+[[package]]
 name = "themelios-macros"
 version = "0.1.0"
 dependencies = [
@@ -962,17 +960,11 @@ name = "themelios-scena"
 version = "0.1.0"
 dependencies = [
  "cp932",
- "decompress",
  "derive_more",
- "enumflags2",
  "extend",
  "hamu",
- "lazy_static",
- "mapr",
  "num_enum",
- "similar",
  "strict_result 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "test-case",
  "themelios-macros",
  "thiserror",
 ]

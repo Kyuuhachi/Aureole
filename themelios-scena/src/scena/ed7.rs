@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use hamu::read::le::*;
 use hamu::write::le::*;
-use crate::gamedata::GameData;
 use crate::types::*;
 use crate::util::*;
 
@@ -151,7 +150,7 @@ pub struct BattleSetup {
 	pub at_roll: u16, // index
 }
 
-pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
+pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 	let mut f = Reader::new(data);
 
 	let name1 = f.sized_string::<10>()?;
@@ -387,18 +386,18 @@ pub fn read(game: &GameData, data: &[u8]) -> Result<Scena, ReadError> {
 		}
 
 		while g.pos() < battle_end {
-			btl.get_battle(game, &mut g)?;
+			btl.get_battle(&mut g)?;
 		}
 	}
 
 	// Fill in battles
 	for mons in &mut monsters {
-		mons.battle.0 = btl.get_battle(game, &mut f.clone().at(mons.battle.0 as usize)?)?;
+		mons.battle.0 = btl.get_battle(&mut f.clone().at(mons.battle.0 as usize)?)?;
 	}
 	for func in &mut functions {
 		for insn in func {
 			if let code::FlatInsn::Insn(code::Insn::ED7Battle { 0: battle, .. }) = insn {
-				battle.0 = btl.get_battle(game, &mut f.clone().at(battle.0 as usize)?)?;
+				battle.0 = btl.get_battle(&mut f.clone().at(battle.0 as usize)?)?;
 			}
 		}
 	}
@@ -476,7 +475,7 @@ impl BattleRead {
 		}
 	}
 
-	fn get_battle<'a, T: Read<'a> + Clone>(&mut self, game: &GameData, f: &mut T) -> Result<u32, ReadError> {
+	fn get_battle<'a, T: Read<'a> + Clone>(&mut self, f: &mut T) -> Result<u32, ReadError> {
 		match self.battle_pos.entry(f.pos()) {
 			std::collections::hash_map::Entry::Occupied(e) => Ok(*e.get()),
 			std::collections::hash_map::Entry::Vacant(e) => {
@@ -521,7 +520,7 @@ impl BattleRead {
 	}
 }
 
-pub fn write(game: &GameData, scena: &Scena) -> Result<Vec<u8>, WriteError> {
+pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	let mut f = Writer::new();
 	f.sized_string::<10>(&scena.name1)?;
 	f.sized_string::<10>(&scena.name2)?;

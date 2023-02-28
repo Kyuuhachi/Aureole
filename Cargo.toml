@@ -7,6 +7,7 @@ members = [
 	"themelios-macros",
 	"themelios-scena",
 	"themelios-tables",
+	"themelios-archive",
 	"themelios",
 	"kagami",
 

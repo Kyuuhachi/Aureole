@@ -5,7 +5,6 @@ use hamu::read::le::*;
 use hamu::write::le::*;
 use hamu::write::Label as HLabel;
 use hamu::write::LabelDef as HLabelDef;
-use crate::gamedata::GameData;
 use crate::types::*;
 use crate::util::*;
 use crate::text::Text;
@@ -16,18 +15,13 @@ mod insn;
 pub use insn::*;
 pub mod decompile;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum InstructionSet {
-	Fc, FcEvo,
-	Sc, ScEvo,
-	Tc, TcEvo, // It's called 3rd, I know, but that's not a valid identifier
-	Zero, ZeroEvo,
-	Ao, AoEvo,
-}
+impl Game {
+	fn is_ed7(self) -> bool {
+		matches!(self.base(), BaseGame::Zero|BaseGame::Ao)
+	}
 
-impl InstructionSet {
-	pub fn is_ed7(&self) -> bool {
-		matches!(self, Self::Zero|Self::ZeroEvo|Self::Ao|Self::AoEvo)
+	fn is_kai(self) -> bool {
+		matches!(self, Game::ZeroKai|Game::AoKai)
 	}
 }
 
@@ -67,7 +61,7 @@ enum RawOInsn<'a> {
 	Label(HLabelDef),
 }
 
-pub fn read<'a>(f: &mut (impl Read<'a> + Dump), game: &GameData, end: Option<usize>) -> Result<Vec<FlatInsn>, ReadError> {
+pub fn read<'a>(f: &mut (impl Read<'a> + Dump), game: Game, end: Option<usize>) -> Result<Vec<FlatInsn>, ReadError> {
 	let mut insns = Vec::new();
 	let mut extent = f.pos();
 	loop {
@@ -146,10 +140,10 @@ pub fn read<'a>(f: &mut (impl Read<'a> + Dump), game: &GameData, end: Option<usi
 	Ok(insns2)
 }
 
-fn read_raw_insn<'a>(f: &mut impl Read<'a>, game: &GameData) -> Result<RawIInsn, ReadError> {
+fn read_raw_insn<'a>(f: &mut impl Read<'a>, game: Game) -> Result<RawIInsn, ReadError> {
 	let pos = f.pos();
-	fn addr<'a>(f: &mut impl Read<'a>, game: &GameData) -> Result<usize, ReadError> {
-		if game.iset.is_ed7() {
+	fn addr<'a>(f: &mut impl Read<'a>, game: Game) -> Result<usize, ReadError> {
+		if game.is_ed7() {
 			Ok(f.u32()? as usize)
 		} else {
 			Ok(f.u16()? as usize)
@@ -167,7 +161,7 @@ fn read_raw_insn<'a>(f: &mut impl Read<'a>, game: &GameData) -> Result<RawIInsn,
 		}
 		0x04 => {
 			let e = expr::read(f, game)?;
-			let count = if game.iset.is_ed7() {
+			let count = if game.is_ed7() {
 				f.u8()? as u16
 			} else {
 				f.u16()?
@@ -188,7 +182,7 @@ fn read_raw_insn<'a>(f: &mut impl Read<'a>, game: &GameData) -> Result<RawIInsn,
 	Ok(insn)
 }
 
-pub fn write(f: &mut impl Write, game: &GameData, insns: &[FlatInsn]) -> Result<(), WriteError> {
+pub fn write(f: &mut impl Write, game: Game, insns: &[FlatInsn]) -> Result<(), WriteError> {
 	let mut labels = HashMap::new();
 	let mut labeldefs = HashMap::new();
 	let mut label = |k| {
@@ -233,9 +227,9 @@ pub fn write(f: &mut impl Write, game: &GameData, insns: &[FlatInsn]) -> Result<
 	Ok(())
 }
 
-fn write_raw_insn(f: &mut impl Write, game: &GameData, insn: RawOInsn) -> Result<(), WriteError> {
-	fn addr(f: &mut impl Write, game: &GameData, l: HLabel) {
-		if game.iset.is_ed7() {
+fn write_raw_insn(f: &mut impl Write, game: Game, insn: RawOInsn) -> Result<(), WriteError> {
+	fn addr(f: &mut impl Write, game: Game, l: HLabel) {
+		if game.is_ed7() {
 			f.delay_u32(l)
 		} else {
 			f.delay_u16(l)
@@ -254,7 +248,7 @@ fn write_raw_insn(f: &mut impl Write, game: &GameData, insn: RawOInsn) -> Result
 		RawOInsn::Switch(e, cs, l) => {
 			f.u8(0x04);
 			expr::write(f, game, e)?;
-			if game.iset.is_ed7() {
+			if game.is_ed7() {
 				f.u8(cast(cs.len())?)
 			} else {
 				f.u16(cast(cs.len())?)
@@ -337,7 +331,7 @@ pub enum Expr {
 
 mod expr {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>, game: &GameData) -> Result<Expr, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl Read<'a>, game: Game) -> Result<Expr, ReadError> {
 		let mut stack = Vec::new();
 		loop {
 			let op = f.u8()?;
@@ -368,8 +362,8 @@ mod expr {
 		Ok(stack.pop().unwrap())
 	}
 
-	pub(super) fn write(f: &mut impl Write, game: &GameData, v: &Expr) -> Result<(), WriteError> {
-		fn write_node(f: &mut impl Write, game: &GameData, v: &Expr) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Write, game: Game, v: &Expr) -> Result<(), WriteError> {
+		fn write_node(f: &mut impl Write, game: Game, v: &Expr) -> Result<(), WriteError> {
 			match *v {
 				Expr::Binop(op, ref a, ref b) => {
 					write_node(f, game, a)?;

@@ -3,8 +3,6 @@
 #![feature(let_chains)]
 #![feature(decl_macro)]
 
-pub mod gamedata;
-pub mod archive;
 pub mod util;
 pub mod scena;
 pub mod text;

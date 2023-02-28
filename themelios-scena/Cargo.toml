@@ -6,18 +6,10 @@ edition = "2021"
 [dependencies]
 hamu.workspace = true
 themelios-macros = { path = "../themelios-macros" }
-decompress = { path = "../decompress" }
 cp932 = { path = "../cp932" }
-mapr = "0.8.0"
 strict_result = "1.1.0"
 
 thiserror = "1.0.0"
 num_enum = "0.5.7"
-enumflags2 = { version = "0.7.5", features = ["std"] }
 extend = "1.1.2"
 derive_more = { version = "0.99.17", default-features = false, features = ["deref", "deref_mut", "display", "from", "into"] }
-
-[dev-dependencies]
-test-case = "2.2.1"
-lazy_static = "1.4.0"
-similar = "2.2.0"

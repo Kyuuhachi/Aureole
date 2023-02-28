@@ -57,3 +57,33 @@ impl std::fmt::Debug for TString {
 		write!(f, "t{:?}", &self.0)
 	}
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BaseGame {
+	Fc, Sc, Tc,
+	Zero, Ao,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Game {
+	Fc, FcEvo, FcKai,
+	Sc, ScEvo, ScKai,
+	Tc, TcEvo, TcKai,
+
+	Zero, ZeroEvo, ZeroKai,
+	Ao, AoEvo, AoKai,
+}
+
+impl Game {
+	pub fn base(self) -> BaseGame {
+		use Game::*;
+		match self {
+			Fc|FcEvo|FcKai => BaseGame::Fc,
+			Sc|ScEvo|ScKai => BaseGame::Sc,
+			Tc|TcEvo|TcKai => BaseGame::Tc,
+
+			Zero|ZeroEvo|ZeroKai => BaseGame::Zero,
+			Ao|AoEvo|AoKai => BaseGame::Ao,
+		}
+	}
+}

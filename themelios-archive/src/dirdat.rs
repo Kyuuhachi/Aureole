@@ -4,45 +4,68 @@ use crate::lookup::ED6Lookup;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DirEntry {
+	/// This field is only informative: it might be useful for consumers, but this module does not make use of it.
+	pub index: u16,
 	pub name: String,
+	/// There are only three files in 3rd/dt29 where this field is nonzero.
+	/// In those cases, it looks like a timestamp pointing to 2009-08-12 21:58:33.
 	pub unk1: u32,
-	pub unk2: usize,
+	pub compressed_size: usize,
+	/// Unknown. In many cases it is equal to `compressed_size`, but not always.
 	pub unk3: usize,
+	/// Usually equal to `compressed_size`, but in sc/dt31 it is bigger. The difference is filled with null bytes.
 	pub archived_size: usize,
 	pub timestamp: u32,
 	pub offset: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DatEntry<'a> {
+pub struct DatEntry {
 	pub offset: usize,
-	pub data: &'a [u8],
+	pub end: usize,
 }
 
 pub fn read_dir(data: &[u8]) -> Result<Vec<DirEntry>, hamu::read::Error> {
 	let mut f = Reader::new(data);
 	f.check(b"LB DIR\x1A\0")?;
-	let count = f.u64()?;
+	let count = f.u64()? as usize;
 
-	let mut items = Vec::with_capacity(count as usize);
-	for _ in 0..count {
-		let name = cp932::decode_lossy(f.slice(12)?);
-		let unk1 = f.u32()?; // Zero in all but a few files in 3rd; in those cases it looks kinda like a timestamp
-		let unk2 = f.u32()? as usize;
-		let unk3 = f.u32()? as usize;
-		let archived_size = f.u32()? as usize;
-		let timestamp = f.u32()?;
-		let offset = f.u32()? as usize;
+	let mut items = Vec::with_capacity(count);
+	assert_eq!(items.capacity(), count);
+
+	for index in 0..count {
+		if f.clone().check(b"/_______.___").is_ok() {
+			break
+		}
+
+		let name = normalize_name(&cp932::decode_lossy(f.slice(12)?));
+		let unk1            = f.u32()?;
+		let compressed_size = f.u32()? as usize;
+		let unk3            = f.u32()? as usize;
+		let archived_size   = f.u32()? as usize;
+		let timestamp       = f.u32()?;
+		let offset          = f.u32()? as usize;
 
 		items.push(DirEntry {
-			name: normalize_name(&name),
+			index: index as u16,
+			name,
 			unk1,
-			unk2,
+			compressed_size,
 			unk3,
 			archived_size,
 			timestamp,
 			offset,
 		});
+	}
+
+	for _ in items.len()..count {
+		f.check(b"/_______.___")?;
+		f.check_u32(0)?;
+		f.check_u32(0)?;
+		f.check_u32(0)?;
+		f.check_u32(0)?;
+		f.check_u32(0)?;
+		f.check_u32(0)?;
 	}
 	Ok(items)
 }
@@ -50,16 +73,16 @@ pub fn read_dir(data: &[u8]) -> Result<Vec<DirEntry>, hamu::read::Error> {
 pub fn read_dat(data: &[u8]) -> Result<Vec<DatEntry>, hamu::read::Error> {
 	let mut f = Reader::new(data);
 	f.check(b"LB DAT\x1A\0")?;
-	let count = f.u64()?;
+	let count = f.u64()? as usize;
 
-	let mut items = Vec::with_capacity(count as usize);
+	let mut items = Vec::with_capacity(count);
+	assert_eq!(items.capacity(), count);
 	for _ in 0..count {
 		let offset = f.u32()? as usize;
 		let end = f.clone().u32()? as usize;
-		let data = f.clone().at(offset)?.slice(end - offset)?;
-		items.push(DatEntry { offset, data });
+		items.push(DatEntry { offset, end });
 	}
-	f.check_u32(f.pos() as u32)?;
+	f.u32()?;
 	Ok(items)
 }
 

@@ -20,7 +20,7 @@ impl Lookup for NullLookup {
 
 #[derive(Clone)]
 pub struct ED6Lookup {
-	name: [Vec<String>; 64],
+	pub(crate) name: [Vec<String>; 64],
 	index: HashMap<String, u32>,
 }
 

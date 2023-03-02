@@ -112,7 +112,7 @@ version = "0.1.0"
 dependencies = [
  "codespan-reporting",
  "extend",
- "strict_result 1.1.0",
+ "strict_result",
  "themelios",
  "unicode-xid",
 ]
@@ -532,7 +532,7 @@ dependencies = [
  "ndarray",
  "png",
  "serde",
- "strict_result 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "strict_result",
  "thiserror",
 ]
 
@@ -857,10 +857,6 @@ checksum = "2fd0db749597d91ff862fd1d55ea87f7855a744a8425a64695b6fca237d1dad1"
 [[package]]
 name = "strict_result"
 version = "1.1.0"
-
-[[package]]
-name = "strict_result"
-version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "721c36b5e593790ae6b96747b657482f8d90eee883cf83f15d0ada5c7eea7d78"
 
@@ -969,7 +965,7 @@ dependencies = [
  "extend",
  "hamu",
  "num_enum",
- "strict_result 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "strict_result",
  "themelios-macros",
  "thiserror",
 ]
@@ -982,7 +978,7 @@ dependencies = [
  "enumflags2",
  "hamu",
  "num_enum",
- "strict_result 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "strict_result",
  "themelios-scena",
  "thiserror",
 ]

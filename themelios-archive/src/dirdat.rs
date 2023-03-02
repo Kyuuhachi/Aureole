@@ -95,25 +95,27 @@ pub fn normalize_name(name: &str) -> String {
 	}
 }
 
-pub fn to_lookup(dir: impl AsRef<Path>) -> std::io::Result<ED6Lookup> {
-	let dir = dir.as_ref();
-	let mut x = [(); 64].map(|_| Vec::new());
-	for (n, x) in x.iter_mut().enumerate() {
-		let Ok(data) = std::fs::read(dir.join(format!("ED6_DT{n:02X}.dir"))) else { continue };
-		*x = read_dir(&data)
-			.map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
-			.into_iter()
-			.filter(|a| a.name != "/_______.___")
-			.map(|a| match n {
-				0x06 => format!("apl/{}", a.name),
-				0x26 => format!("apl2/{}", a.name),
-				0x07 => format!("npl/{}", a.name),
-				0x27 => format!("npl2/{}", a.name),
-				0x08 => format!("mons/{}", a.name),
-				0x28 => format!("mons2/{}", a.name),
-				_ => a.name,
-			})
+impl ED6Lookup {
+	pub fn from_pc(dir: impl AsRef<Path>) -> std::io::Result<ED6Lookup> {
+		let dir = dir.as_ref();
+		let mut x = [(); 64].map(|_| Vec::new());
+		for (n, x) in x.iter_mut().enumerate() {
+			let Ok(data) = std::fs::read(dir.join(format!("ED6_DT{n:02X}.dir"))) else { continue };
+			*x = read_dir(&data)
+				.map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
+				.into_iter()
+				.filter(|a| a.name != "/_______.___")
+				.map(|a| match n {
+					0x06 => format!("apl/{}", a.name),
+					0x26 => format!("apl2/{}", a.name),
+					0x07 => format!("npl/{}", a.name),
+					0x27 => format!("npl2/{}", a.name),
+					0x08 => format!("mons/{}", a.name),
+					0x28 => format!("mons2/{}", a.name),
+					_ => a.name,
+				})
 			.collect();
+		}
+		Ok(ED6Lookup::new(x))
 	}
-	Ok(ED6Lookup::new(x))
 }

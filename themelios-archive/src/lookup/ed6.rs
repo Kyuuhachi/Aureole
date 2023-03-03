@@ -81,8 +81,8 @@ impl ED6Lookup {
 					0x26 => format!("apl2/{}", a.name),
 					0x07 => format!("npl/{}", a.name),
 					0x27 => format!("npl2/{}", a.name),
-					0x08 => format!("mons/{}", a.name),
-					0x28 => format!("mons2/{}", a.name),
+					0x09 => format!("mons/{}", a.name),
+					0x29 => format!("mons2/{}", a.name),
 					_ => a.name,
 				})
 			.collect();

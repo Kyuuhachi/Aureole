@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 themelios = { path = "../themelios" }
 themelios-archive.path = "../themelios-archive"
+themelios-archive-prebuilt.path = "../themelios-archive-prebuilt"
 strict_result = "1.1.0"
 extend = "1.1.2"
 

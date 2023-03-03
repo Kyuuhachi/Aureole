@@ -1,21 +1,30 @@
-use std::path::Path;
+//! Utilities for reading ED6 PC's .dir/.dat archives.
+//!
+//! There is currently no support for writing archives; this may be added later.
 use hamu::read::le::*;
-use crate::lookup::ED6Lookup;
 
+/// An entry in a .dir file,
+///
+/// As far as I am aware, only three of the fields are actually used by the games: `name`, `compressed_size`, and `offset`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DirEntry {
 	/// This field is only informative: it might be useful for consumers, but this module does not make use of it.
 	pub index: u16,
+	/// The name of the file.
 	pub name: String,
 	/// There are only three files in 3rd/dt29 where this field is nonzero.
 	/// In those cases, it looks like a timestamp pointing to 2009-08-12 21:58:33.
 	pub unk1: u32,
+	/// The size of the file data in the archive.
 	pub compressed_size: usize,
 	/// Unknown. In many cases it is equal to `compressed_size`, but not always.
+	/// In other cases it is a power of two that is often fairly consistent with adjacent files, but is wholly uncorrelated with any file sizes.
 	pub unk3: usize,
-	/// Usually equal to `compressed_size`, but in sc/dt31 it is bigger. The difference is filled with null bytes.
+	/// Usually equal to `compressed_size`, but in SC/dt31 it is bigger. The difference is filled with null bytes.
 	pub archived_size: usize,
+	/// A unix timestamp, presumably when the file was last edited. Timezone is unknown.
 	pub timestamp: u32,
+	/// Offset in the .dat file where the data starts.
 	pub offset: usize,
 }
 
@@ -25,13 +34,16 @@ pub struct DatEntry {
 	pub end: usize,
 }
 
+/// Reads the contents of entries from a .dir file.
+///
+/// In many cases, .dir files contain a number of trailing entries named `/_______.___`.
+/// These entries are not returned, but the capacity of the returned Vec is set to accomodate them.
 pub fn read_dir(data: &[u8]) -> Result<Vec<DirEntry>, hamu::read::Error> {
 	let mut f = Reader::new(data);
 	f.check(b"LB DIR\x1A\0")?;
 	let count = f.u64()? as usize;
 
 	let mut items = Vec::with_capacity(count);
-	assert_eq!(items.capacity(), count);
 
 	for index in 0..count {
 		if f.clone().check(b"/_______.___").is_ok() {
@@ -67,6 +79,8 @@ pub fn read_dir(data: &[u8]) -> Result<Vec<DirEntry>, hamu::read::Error> {
 		f.check_u32(0)?;
 		f.check_u32(0)?;
 	}
+
+	assert_eq!(items.capacity(), count);
 	Ok(items)
 }
 
@@ -76,13 +90,14 @@ pub fn read_dat(data: &[u8]) -> Result<Vec<DatEntry>, hamu::read::Error> {
 	let count = f.u64()? as usize;
 
 	let mut items = Vec::with_capacity(count);
-	assert_eq!(items.capacity(), count);
 	for _ in 0..count {
 		let offset = f.u32()? as usize;
 		let end = f.clone().u32()? as usize;
 		items.push(DatEntry { offset, end });
 	}
 	f.u32()?;
+
+	assert_eq!(items.capacity(), count);
 	Ok(items)
 }
 
@@ -92,30 +107,5 @@ pub fn normalize_name(name: &str) -> String {
 		format!("{}.{ext}", name.trim_end_matches(' '))
 	} else {
 		name
-	}
-}
-
-impl ED6Lookup {
-	pub fn from_pc(dir: impl AsRef<Path>) -> std::io::Result<ED6Lookup> {
-		let dir = dir.as_ref();
-		let mut x = [(); 64].map(|_| Vec::new());
-		for (n, x) in x.iter_mut().enumerate() {
-			let Ok(data) = std::fs::read(dir.join(format!("ED6_DT{n:02X}.dir"))) else { continue };
-			*x = read_dir(&data)
-				.map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
-				.into_iter()
-				.filter(|a| a.name != "/_______.___")
-				.map(|a| match n {
-					0x06 => format!("apl/{}", a.name),
-					0x26 => format!("apl2/{}", a.name),
-					0x07 => format!("npl/{}", a.name),
-					0x27 => format!("npl2/{}", a.name),
-					0x08 => format!("mons/{}", a.name),
-					0x28 => format!("mons2/{}", a.name),
-					_ => a.name,
-				})
-			.collect();
-		}
-		Ok(ED6Lookup::new(x))
 	}
 }

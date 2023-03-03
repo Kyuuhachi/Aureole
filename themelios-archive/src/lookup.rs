@@ -1,11 +1,19 @@
-use std::collections::HashMap;
+//! Contains everything related to file id lookups.
+//!
+//! Everything here is reexported at the crate root, so there's little reason to interact with this module directly.
+mod ed6;
+pub use ed6::ED6Lookup;
 
+/// The main lookup trait.
 pub trait Lookup {
+	/// Given a file id, return the corresponding filename, if any.
 	fn name(&self, index: u32) -> Option<String>;
+	/// Given a filename, return the corresponding file id, if any.
 	fn index(&self, name: &str) -> Option<u32>;
 }
 
-#[derive(Debug, Clone, Copy)]
+/// A dummy object that does not perform any lookups.
+#[derive(Debug, Clone)]
 pub struct NullLookup;
 
 impl Lookup for NullLookup {
@@ -18,48 +26,10 @@ impl Lookup for NullLookup {
 	}
 }
 
-#[derive(Clone)]
-pub struct ED6Lookup {
-	pub(crate) name: [Vec<String>; 64],
-	index: HashMap<String, u32>,
-}
-
-impl ED6Lookup {
-	pub fn new(name: [Vec<String>; 64]) -> Self {
-		let mut index = HashMap::new();
-		for (n, x) in name.iter().enumerate() {
-			for (i, v) in x.iter().enumerate() {
-				index.insert(v.clone(), (n << 16) as u32 | i as u32);
-			}
-		}
-		Self { name, index }
-	}
-}
-
-impl std::fmt::Debug for ED6Lookup {
-	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		let mut d = f.debug_struct("ED6Lookup");
-		for (n, x) in self.name.iter().enumerate() {
-			if !x.is_empty() {
-				d.field(&format!("ED6_DT{n:02X}"), &format_args!("{} entries", x.len()));
-			}
-		}
-		d.finish()
-	}
-}
-
-impl Lookup for ED6Lookup {
-	fn name(&self, index: u32) -> Option<String> {
-		let (arch, index) = (index >> 16, index & 0xFFFF);
-		Some(self.name.get(arch as usize)?.get(index as usize)?.clone())
-	}
-
-	fn index(&self, name: &str) -> Option<u32> {
-		Some(*self.index.get(name)?)
-	}
-}
-
-#[derive(Debug, Clone, Copy)]
+/// Lookup for ED7: *Trails from Zero* and *Trails to Azure*.
+///
+/// These games encode the filenames directly into the file ids, so this does not require any additional data.
+#[derive(Debug, Clone)]
 pub struct ED7Lookup;
 
 impl Lookup for ED7Lookup {
@@ -158,4 +128,3 @@ impl Lookup for ED7Lookup {
 		None
 	}
 }
-

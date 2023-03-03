@@ -44,9 +44,8 @@ pub enum Term {
 	Int(S<i64>, S<Unit>),
 	String(String),
 	Tuple(Vec<S<Term>>),
+	Struct(String, Vec<S<Term>>),
 	Text(Vec<S<TextSegment>>),
-	Ident(String),
-	Sub(Box<Term>, Vec<S<Term>>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

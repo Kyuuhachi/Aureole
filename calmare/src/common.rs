@@ -336,9 +336,12 @@ impl Val for FileId {
 
 impl Val for CharAttr {
 	fn write(&self, f: &mut Context) -> Result<()> {
+		write!(f, "char_attr[")?;
 		self.0.write(f)?;
-		f.no_space()?;
-		write!(f, ".{}", self.1)
+		write!(f, ",")?;
+		self.1.write(f)?;
+		write!(f, "]")?;
+		Ok(())
 	}
 }
 

@@ -183,19 +183,25 @@ fn try_parse_term(p: &mut Parse) -> Result<Option<S<Term>>> {
 			Term::Text(segs)
 		}
 
-		Token::Ident(s) => Term::Ident((*s).to_owned()),
+		Token::Ident(s) => {
+			let args = if p.is_tight() && let Some(S(_, Token::Bracket(d))) = p.peek() {
+				p.next()?;
+				let a = parse_delim(d, "bracket")?;
+				if a.is_empty() {
+					Diag::error(d.open|d.close, "this cannot be empty").emit();
+				}
+				a
+			} else {
+				Vec::new()
+			};
+			Term::Struct((*s).to_owned(), args)
+		},
 
 		_ => {
 			p.rewind();
 			return Ok(None)
 		}
 	};
-
-	let mut t = t;
-	while p.is_tight() && let Some(S(_, Token::Bracket(d))) = p.peek() {
-		p.next()?;
-		t = Term::Sub(Box::new(t), parse_delim(d, "bracket")?)
-	}
 
 	Ok(Some(S(i0 | p.prev_pos(), t)))
 }

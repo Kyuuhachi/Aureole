@@ -1,4 +1,6 @@
 use std::{collections::HashMap, path::Path};
+use hamu::write::le::*;
+use hamu::read::le::*;
 
 /// Lookup for ED6: *Trails in the Sky FC*, *SC*, and *the 3rd*.
 ///
@@ -135,5 +137,45 @@ impl ED6Lookup {
 		// And also system/chrpt[12].txt, not sure what that is for.
 
 		Ok(ED6Lookup::new(x))
+	}
+}
+
+/// .ed6i reading and writing.
+///
+/// .ed6i is a simple format that encodes an `ED6Lookup`.
+/// You probably won't have much need for these functions, they're mainly intended for use by `themelios-archive-prebuilt`.
+impl ED6Lookup {
+	pub fn read_ed6i(data: &[u8]) -> Result<Self, hamu::read::Error> {
+		let mut f = Reader::new(data);
+		f.check(b"ED6I")?;
+		f.check_u8(0)?; // version
+		let mut x = [(); 64].map(|_| Vec::new());
+		for i in x.iter_mut() {
+			let n = f.u16()?;
+			i.reserve(n as usize);
+			for _ in 0..n {
+				let len = f.u8()? as usize;
+				let a = f.error_state();
+				let s = f.vec(len)?;
+				let s = String::from_utf8(s)
+					.map_err(|e| Reader::to_error(a, Box::new(e)))?;
+				i.push(s);
+			}
+		}
+		Ok(Self::new(x))
+	}
+
+	pub fn write_ed6i(&self) -> Result<Vec<u8>, hamu::write::Error> {
+		let mut f = Writer::new();
+		f.slice(b"ED6I");
+		f.u8(0); // version
+		for i in &self.name {
+			f.u16(i.len() as u16);
+			for s in i {
+				f.u8(s.len() as u8);
+				f.slice(s.as_bytes());
+			}
+		}
+		f.finish()
 	}
 }

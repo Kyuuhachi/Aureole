@@ -2,6 +2,7 @@ use std::str::pattern::Pattern;
 use crate::span::{Spanned, Span};
 use super::diag::Diag;
 
+use total_float::F64;
 use unicode_xid::UnicodeXID;
 
 // from https://github.com/rust-lang/rfcs/pull/2796
@@ -146,12 +147,12 @@ impl<'a> Lex<'a> {
 	}
 }
 
-enum Number<'a> {
+enum Number {
 	Int(u64),
-	Float(&'a str),
+	Float(F64),
 }
 
-fn number<'a>(i: &mut Lex<'a>) -> Option<Number<'a>> {
+fn number(i: &mut Lex) -> Option<Number> {
 	i.clone().pat(|c| char::is_ascii_digit(&c))?;
 	let i0 = i.pos();
 
@@ -169,11 +170,12 @@ fn number<'a>(i: &mut Lex<'a>) -> Option<Number<'a>> {
 		if i.pat('.').is_some() {
 			i.pat_mul(|a| char::is_ascii_digit(&a));
 			let s = i.span_text(i0|i.pos());
-			if let Err(e) = s.parse::<f64>() {
-				Diag::error(i0 | i.pos(), e).emit();
-				Some(Number::Float("0"))
-			} else {
-				Some(Number::Float(s))
+			match s.parse::<f64>() {
+				Ok(v) => return Some(Number::Float(F64(v))),
+				Err(e) => {
+					Diag::error(i0 | i.pos(), e).emit();
+					return Some(Number::Float(F64(0.)))
+				}
 			}
 		} else {
 			let s = i.span_text(i0|i.pos());
@@ -265,7 +267,7 @@ pub enum Token<'a> {
 	Ident(&'a str),
 	Insn(&'a str),
 	Int(u64),
-	Float(&'a str), // always represents a valid f64, so can just unwrap it
+	Float(F64),
 	String(String),
 	Var(&'a str),
 

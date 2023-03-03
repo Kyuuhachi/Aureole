@@ -633,20 +633,20 @@ themelios_macros::bytecode! {
 		#[game(Sc, ScEvo)] Sc_CA(u8 as u16 as ObjectId, u8, u32),
 		#[game(Tc, TcEvo)] Tc_CA(u8 as u16 as ObjectId, u8, i32, u32),
 		#[game(Sc, ScEvo, Tc, TcEvo)] CharInSlot(if game.base() == BaseGame::Tc { u8 } else { const 0u8 }, u8 as u16 as CharId),
-		#[game(Sc, ScEvo, Tc, TcEvo)] ED6Select(match {
-			0 => New(u8 as SelectId, u16, u16, u8),
-			1 => Add(u8 as SelectId, TString),
-			2 => Show(u8 as SelectId),
-			3 => SetDisabled(u8 as SelectId, u8),
+		#[game(Sc, ScEvo, Tc, TcEvo)] ED6Menu(match {
+			0 => New(u8 as u16 as MenuId, u16, u16, u8),
+			1 => Add(u8 as u16 as MenuId, TString),
+			2 => Show(u8 as u16 as MenuId),
+			3 => SetDisabled(u8 as u16 as MenuId, u8),
 		}),
-		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7Select(match {
-			0 => New(u8 as SelectId),
-			1 => Add(u8 as SelectId, TString),
-			2 => Show(u8 as SelectId, u16, u16, u8),
-			3 => SetDisabled(u8 as SelectId, u8),
-			4 => _4(u8 as SelectId, u8),
-			5 => _5(u8 as SelectId, u8),
-			6 => _6(u8 as SelectId),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7Menu(match {
+			0 => New(u8 as u16 as MenuId),
+			1 => Add(u8 as u16 as MenuId, TString),
+			2 => Show(u8 as u16 as MenuId, u16, u16, u8),
+			3 => SetDisabled(u8 as u16 as MenuId, u8),
+			4 => SetStyle(u8 as u16 as MenuId, u8),
+			5 => Select(u8 as u16 as MenuId, u8),
+			6 => _6(u8 as u16 as MenuId),
 		}),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_CD(u16 as CharId), // related to showing photographs
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Global(u8 as Global, Expr),

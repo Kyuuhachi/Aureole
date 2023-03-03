@@ -91,7 +91,6 @@ newtype!(TriggerId, u16);
 newtype!(LabelId, u16);
 newtype!(AnimId, u16);
 
-newtype!(SelectId, u8);
 newtype!(EffId, u8);
 newtype!(EffInstanceId, u8);
 newtype!(MenuId, u16);

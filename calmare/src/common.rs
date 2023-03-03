@@ -319,7 +319,6 @@ nt_arg!(VisId,   "vis[{}]");
 nt_arg!(ForkId,  "fork[{}]");
 nt_arg!(EffId,   "eff[{}]");
 nt_arg!(EffInstanceId, "eff_instance[{}]");
-nt_arg!(SelectId, "select[{}]");
 nt_arg!(MenuId,  "menu[{}]");
 
 impl Val for FileId {

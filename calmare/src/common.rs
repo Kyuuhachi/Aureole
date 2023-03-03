@@ -326,6 +326,8 @@ impl Val for FileId {
 	fn write(&self, f: &mut Context) -> Result<()> {
 		if self.0 == 0 {
 			write!(f, "null")
+		} else if let Some(name) = f.lookup.name(self.0) {
+			name.write(f)
 		} else {
 			write!(f, "file[0x{:08X}]", self.0)
 		}

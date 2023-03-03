@@ -114,6 +114,7 @@ dependencies = [
  "extend",
  "strict_result",
  "themelios",
+ "themelios-archive",
  "unicode-xid",
 ]
 

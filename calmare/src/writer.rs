@@ -1,6 +1,7 @@
 use std::io::{Write, Result};
 
 use themelios::types::Game;
+use themelios_archive::lookup::Lookup;
 
 #[derive(Clone, Copy, Debug)]
 enum Space {
@@ -14,16 +15,18 @@ pub struct Context<'a> {
 	pub decompile: bool, //  but then I'd have to reexport all the writing functions and that's a pain
 	indent: usize,
 	space: Space,
+	pub lookup: Box<dyn Lookup + 'a>,
 	out: Box<dyn Write + 'a>,
 }
 
 impl<'a> Context<'a> {
-	pub fn new(game: Game, out: impl Write + 'a) -> Self {
+	pub fn new(game: Game, lookup: impl Lookup + 'a, out: impl Write + 'a) -> Self {
 		Self {
 			game,
 			decompile: true,
 			indent: 0,
 			space: Space::None,
+			lookup: Box::new(lookup),
 			out: Box::new(out),
 		}
 	}

@@ -331,7 +331,7 @@ themelios_macros::bytecode! {
 		TextSetName(TString), // [name]
 		CharName2(u16 as CharId), // [name2]
 
-		Emote(u16 as CharId, i32 as Length, i32 as Length, Emote via emote, u8), // [emotion] mostly used through macros such as EMO_BIKKURI3(). Third argument is height.
+		Emote(u16 as CharId, i32 as Length, i32 as Length, Emote, u8), // [emotion] mostly used through macros such as EMO_BIKKURI3(). Third argument is height.
 		EmoteStop(u16 as CharId), // [emotion_close]
 
 		LookPointFlagsSet(u8 as u16 as LookPointId, u16 as LookPointFlags),
@@ -929,6 +929,11 @@ arg!(Expr,
 	|f, g, v| super::expr::write(f, g, v)?,
 );
 
+arg!(Emote,
+	|f, _| Emote(f.u8()?, f.u8()?, Time(f.u32()?)),
+	|f, _, v| { f.u8(v.0); f.u8(v.1); f.u32(v.2.0); },
+);
+
 mod color24 {
 	use super::*;
 	pub(super) fn read<'a>(f: &mut impl Read<'a>, _: Game) -> Result<Color, ReadError> {
@@ -1056,23 +1061,6 @@ mod menu {
 			s.push('\x01');
 		}
 		f.string(&s)?;
-		Ok(())
-	}
-}
-
-mod emote {
-	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>, _: Game) -> Result<Emote, ReadError> {
-		let a = f.u8()?;
-		let b = f.u8()?;
-		let c = f.u32()?;
-		Ok(Emote(a, b, c))
-	}
-
-	pub(super) fn write(f: &mut impl Write, _: Game, &Emote(a, b, c): &Emote) -> Result<(), WriteError> {
-		f.u8(a);
-		f.u8(b);
-		f.u32(c);
 		Ok(())
 	}
 }

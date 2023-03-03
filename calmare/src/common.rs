@@ -365,7 +365,14 @@ impl Val for CharId {
 
 impl Val for Emote {
 	fn write(&self, f: &mut Context) -> Result<()> {
-		write!(f, "emote[{},{},{}ms]", self.0, self.1, self.2)
+		write!(f, "emote[")?;
+		self.0.write(f)?;
+		write!(f, ",")?;
+		self.1.write(f)?;
+		write!(f, ",")?;
+		self.2.write(f)?;
+		write!(f, "]")?;
+		Ok(())
 	}
 }
 

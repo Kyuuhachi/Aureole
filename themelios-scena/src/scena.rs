@@ -1,5 +1,6 @@
 use hamu::read::le::*;
 use hamu::write::le::*;
+use crate::types::Time;
 use crate::util::*;
 
 pub mod code;
@@ -104,8 +105,8 @@ pub struct CharAttr(pub CharId, pub u8);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[derive(derive_more::DebugCustom)]
-#[debug(fmt = "Emote({_0:?}, {_1}, {_2})")]
-pub struct Emote(pub u8, pub u8, pub u32);
+#[debug(fmt = "Emote({_0:?}, {_1}, {_2:?})")]
+pub struct Emote(pub u8, pub u8, pub Time);
 
 pub trait ReadStreamExt2: ReadStream {
 	fn pos2(&mut self) -> Result<Pos2, Self::Error> {
@@ -116,7 +117,7 @@ pub trait ReadStreamExt2: ReadStream {
 		Ok(Pos3(self.i32()?, self.i32()?, self.i32()?))
 	}
 }
-impl<'a, T: ReadStream> ReadStreamExt2 for T {}
+impl<T: ReadStream> ReadStreamExt2 for T {}
 
 pub trait WriteStreamExt2: WriteStream {
 	fn pos2(&mut self, p: Pos2) {

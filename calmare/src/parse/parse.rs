@@ -1,7 +1,7 @@
 use super::lex::*;
-use super::diag::*;
-use super::ast::*;
-use Spanned as S;
+use super::diag::Diag;
+use crate::ast::*;
+use crate::span::{Span, Spanned as S};
 
 struct Error;
 type Result<T> = std::result::Result<T, Error>;
@@ -84,7 +84,7 @@ impl<'a> Parse<'a> {
 
 fn parse_int(p: &mut Parse) -> Result<S<u64>> {
 	match p.next()? {
-		S(s, Token::Int(v)) => Ok(Spanned(s, *v)),
+		S(s, Token::Int(v)) => Ok(S(s, *v)),
 		S(s, _) => {
 			Diag::error(s, "expected integer").emit();
 			Err(Error)
@@ -94,7 +94,7 @@ fn parse_int(p: &mut Parse) -> Result<S<u64>> {
 
 fn parse_ident(p: &mut Parse) -> Result<S<String>> {
 	match p.next()? {
-		S(s, Token::Ident(v)) => Ok(Spanned(s, (*v).to_owned())),
+		S(s, Token::Ident(v)) => Ok(S(s, (*v).to_owned())),
 		S(s, _) => {
 			Diag::error(s, "expected keyword").emit();
 			Err(Error)
@@ -104,7 +104,7 @@ fn parse_ident(p: &mut Parse) -> Result<S<String>> {
 
 fn parse_insn_name(p: &mut Parse) -> Result<S<String>> {
 	match p.next()? {
-		S(s, Token::Insn(v)) => Ok(Spanned(s, (*v).to_owned())),
+		S(s, Token::Insn(v)) => Ok(S(s, (*v).to_owned())),
 		S(s, _) => {
 			Diag::error(s, "expected insn").emit();
 			Err(Error)
@@ -127,7 +127,7 @@ fn parse_unit(p: &mut Parse) -> Result<S<Unit>> {
 			p.pos += 1;
 			v
 		}
-		_ => return Ok(Spanned(s0, Unit::None))
+		_ => return Ok(S(s0, Unit::None))
 	};
 	let u = match (u1, u2) {
 		("mm", None) => Unit::Mm,
@@ -140,7 +140,7 @@ fn parse_unit(p: &mut Parse) -> Result<S<Unit>> {
 			return Err(Error)
 		}
 	};
-	Ok(Spanned(s, u))
+	Ok(S(s, u))
 }
 
 fn parse_term(p: &mut Parse) -> Result<S<Term>> {
@@ -174,7 +174,7 @@ fn try_parse_term(p: &mut Parse) -> Result<Option<S<Term>>> {
 		Token::Paren(d) => Term::Tuple(parse_delim(d, "parenthesis")?),
 
 		Token::Brace(d) => {
-			let segs = d.tokens.iter().map(|t| Ok(Spanned(t.0, match &t.1 {
+			let segs = d.tokens.iter().map(|t| Ok(S(t.0, match &t.1 {
 				TextToken::Text(t) => TextSegment::Text(t.clone()),
 				TextToken::Newline(n) => TextSegment::Newline(*n),
 				TextToken::Hex(v) => TextSegment::Hex(*v),
@@ -197,10 +197,10 @@ fn try_parse_term(p: &mut Parse) -> Result<Option<S<Term>>> {
 		t = Term::Sub(Box::new(t), parse_delim(d, "bracket")?)
 	}
 
-	Ok(Some(Spanned(i0 | p.prev_pos(), t)))
+	Ok(Some(S(i0 | p.prev_pos(), t)))
 }
 
-fn parse_delim(d: &Delimited<Token>, name: &str) -> Result<Vec<Spanned<Term>>> {
+fn parse_delim(d: &Delimited<Token>, name: &str) -> Result<Vec<S<Term>>> {
 	Parse::run(&d.tokens, d.close, |p| {
 		let mut terms = Vec::new();
 		while !p.is_empty() {
@@ -293,7 +293,7 @@ fn parse_fn(line: &Line) -> Result<Function> {
 	})
 }
 
-fn parse_code(line: &Line) -> Result<Spanned<Code>> {
+fn parse_code(line: &Line) -> Result<S<Code>> {
 	let a = Parse::run(&line.head, line.eol, |p| match p.next()?.1 {
 		Token::Ident("if") => {
 			let e = parse_expr(p);
@@ -403,7 +403,7 @@ macro op($p:ident; $t1:ident $($t:ident)* => $op:expr) {
 	let i0 = $p.next_pos();
 	let pos = $p.pos;
 	if $p.test(&Token::$t1) $( && $p.is_tight() && $p.test(&Token::$t))* {
-		return Some(Spanned(i0 | $p.prev_pos(), $op))
+		return Some(S(i0 | $p.prev_pos(), $op))
 	}
 	$p.pos = pos;
 }
@@ -482,29 +482,10 @@ pub fn parse(lines: &[Line]) -> Vec<Decl> {
 #[test]
 fn main() {
 	let src = include_str!("/tmp/kiseki/tc/t1121");
-	let (v, diag) = diagnose(|| {
+	let (v, diag) = super::diag::diagnose(|| {
 		let tok = lex(src);
 		parse(&tok)
 	});
 	println!("{:#?}", v);
-
-	use codespan_reporting::diagnostic::{Diagnostic, Label};
-	use codespan_reporting::files::SimpleFiles;
-	use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
-
-	let writer = StandardStream::stderr(ColorChoice::Always);
-	let config = codespan_reporting::term::Config::default();
-	let mut files = SimpleFiles::new();
-	let file_id = files.add("<input>", src);
-
-	for d in diag {
-		let mut l = vec![
-			Label::primary(file_id, d.span.as_range()).with_message(d.text),
-		];
-		for (s, t) in d.notes {
-			l.push(Label::secondary(file_id, s.as_range()).with_message(t));
-		}
-		let d = Diagnostic::error().with_labels(l);
-		codespan_reporting::term::emit(&mut writer.lock(), &config, &files, &d).unwrap();
-	}
+	super::diag::print_diags("<input>", src, &diag);
 }

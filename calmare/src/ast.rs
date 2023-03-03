@@ -1,6 +1,6 @@
-pub use super::lex::Spanned;
-use Spanned as S;
 pub use themelios::types::Game;
+
+use crate::span::Spanned as S;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Decl {
@@ -41,11 +41,9 @@ pub struct Data {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Term {
-	// Basics
 	Int(S<i64>, S<Unit>),
 	String(String),
 	Tuple(Vec<S<Term>>),
-
 	Text(Vec<S<TextSegment>>),
 	Ident(String),
 	Sub(Box<Term>, Vec<S<Term>>),

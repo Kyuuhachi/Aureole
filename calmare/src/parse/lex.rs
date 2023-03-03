@@ -1,5 +1,6 @@
 use std::str::pattern::Pattern;
-use super::diag::*;
+use crate::span::{Spanned, Span};
+use super::diag::Diag;
 
 use unicode_xid::UnicodeXID;
 
@@ -156,28 +157,34 @@ fn number<'a>(i: &mut Lex<'a>) -> Option<Number<'a>> {
 
 	if i.pat("0x").is_some() {
 		let s = i.pat_mul(UnicodeXID::is_xid_continue);
-		let v = u64::from_str_radix(s, 16)
-			.consume_err(|e| Diag::error(i0 | i.pos(), e).emit())
-			.unwrap_or_default();
-		return Some(Number::Int(v))
-	}
-
-	i.pat_mul(|a| char::is_ascii_digit(&a));
-	if i.pat('.').is_some() {
-		i.pat_mul(|a| char::is_ascii_digit(&a));
-		let s = i.span_text(i0|i.pos());
-		if let Err(e) = s.parse::<f64>() {
-			Diag::error(i0 | i.pos(), e).emit();
-			Some(Number::Float("0"))
-		} else {
-			Some(Number::Float(s))
+		match u64::from_str_radix(s, 16) {
+			Ok(v) => return Some(Number::Int(v)),
+			Err(e) => {
+				Diag::error(i0 | i.pos(), e).emit();
+				return Some(Number::Int(0))
+			}
 		}
 	} else {
-		let s = i.span_text(i0|i.pos());
-		let v = s.parse::<u64>()
-			.consume_err(|e| Diag::error(i0 | i.pos(), e).emit())
-			.unwrap_or_default();
-		Some(Number::Int(v))
+		i.pat_mul(|a| char::is_ascii_digit(&a));
+		if i.pat('.').is_some() {
+			i.pat_mul(|a| char::is_ascii_digit(&a));
+			let s = i.span_text(i0|i.pos());
+			if let Err(e) = s.parse::<f64>() {
+				Diag::error(i0 | i.pos(), e).emit();
+				Some(Number::Float("0"))
+			} else {
+				Some(Number::Float(s))
+			}
+		} else {
+			let s = i.span_text(i0|i.pos());
+			match s.parse::<u64>() {
+				Ok(v) => return Some(Number::Int(v)),
+				Err(e) => {
+					Diag::error(i0 | i.pos(), e).emit();
+					return Some(Number::Int(0))
+				}
+			}
+		}
 	}
 }
 
@@ -211,25 +218,6 @@ fn string(i: &mut Lex) -> Option<String> {
 		}
 	}
 	Some(s)
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub struct Spanned<T>(pub Span, pub T);
-
-impl<T: std::fmt::Debug> std::fmt::Debug for Spanned<T> {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		if f.alternate() {
-			self.0.fmt(f)?;
-		}
-		f.write_str("@")?;
-		self.1.fmt(f)
-	}
-}
-
-impl<A> Spanned<A> {
-	pub fn map<B>(self, f: impl FnOnce(A) -> B) -> Spanned<B> {
-		Spanned(self.0, f(self.1))
-	}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -502,7 +490,7 @@ fn delim<'a, T: 'a>(
 	let tokens = tokens(indent, i)?;
 
 	let i0 = i.pos();
-	// #[allow(clippy::neg_cmp_op_on_partial_ord)]
+	#[allow(clippy::neg_cmp_op_on_partial_ord)]
 	if !(i.space() >= indent) && !i.is_empty() {
 		Diag::error(i0, "invalid indentation")
 			.note(open, format_args!("inside {name} opened here"))
@@ -596,26 +584,7 @@ pub fn lex(src: &str) -> Vec<Line> {
 #[test]
 fn main() {
 	let src = include_str!("/tmp/kiseki/tc/t1121");
-	let (ast, diag) = diagnose(|| lex(src));
+	let (ast, diag) = super::diag::diagnose(|| lex(src));
 	println!("{:#?}", ast);
-
-	use codespan_reporting::diagnostic::{Diagnostic, Label};
-	use codespan_reporting::files::SimpleFiles;
-	use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
-
-	let writer = StandardStream::stderr(ColorChoice::Always);
-	let config = codespan_reporting::term::Config::default();
-	let mut files = SimpleFiles::new();
-	let file_id = files.add("<input>", src);
-
-	for d in diag {
-		let mut l = vec![
-			Label::primary(file_id, d.span.as_range()).with_message(d.text),
-		];
-		for (s, t) in d.notes {
-			l.push(Label::secondary(file_id, s.as_range()).with_message(t));
-		}
-		let d = Diagnostic::error().with_labels(l);
-		codespan_reporting::term::emit(&mut writer.lock(), &config, &files, &d).unwrap();
-	}
+	super::diag::print_diags("<input>", src, &diag);
 }

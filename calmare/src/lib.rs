@@ -10,4 +10,6 @@ pub mod common;
 
 pub use writer::Context;
 
+pub mod span;
 pub mod parse;
+pub mod ast;

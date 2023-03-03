@@ -65,20 +65,8 @@ impl<'a> Parse<'a> {
 		}
 	}
 
-	fn require(&mut self, t: &Token<'a>, name: &str) {
-		if !self.test(t) {
-			Diag::error(self.next_pos(), format_args!("expected {name}")).emit();
-		}
-	}
-
 	fn is_tight(&self) -> bool {
 		self.prev_pos().connects(self.next_pos())
-	}
-
-	fn require_tight(&self) {
-		if !self.is_tight() {
-			Diag::error(self.prev_pos() | self.next_pos(), "no space allowed here").emit();
-		}
 	}
 
 	fn rewind(&mut self) {
@@ -109,6 +97,16 @@ fn parse_ident(p: &mut Parse) -> Result<S<String>> {
 		S(s, Token::Ident(v)) => Ok(Spanned(s, (*v).to_owned())),
 		S(s, _) => {
 			Diag::error(s, "expected keyword").emit();
+			Err(Error)
+		}
+	}
+}
+
+fn parse_insn_name(p: &mut Parse) -> Result<S<String>> {
+	match p.next()? {
+		S(s, Token::Insn(v)) => Ok(Spanned(s, (*v).to_owned())),
+		S(s, _) => {
+			Diag::error(s, "expected insn").emit();
 			Err(Error)
 		}
 	}
@@ -155,23 +153,6 @@ fn parse_term(p: &mut Parse) -> Result<S<Term>> {
 }
 
 fn try_parse_term(p: &mut Parse) -> Result<Option<S<Term>>> {
-	fn brack(p: &mut Parse, f: impl FnOnce(&mut Parse) -> Result<Term>) -> Result<Term> {
-		p.require_tight();
-		match p.next()? {
-			S(_, Token::Bracket(b)) => {
-				Parse::run(&b.tokens, b.close, f)
-			}
-			S(s, _) => {
-				Diag::error(s, "expected bracket").emit();
-				Err(Error)
-			}
-		}
-	}
-
-	fn brack_int(p: &mut Parse, f: impl FnOnce(S<u64>) -> Term) -> Result<Term> {
-		brack(p, |p| parse_int(p).map(f))
-	}
-
 	let i0 = p.next_pos();
 
 	let t = match p.next()?.1 {
@@ -190,82 +171,19 @@ fn try_parse_term(p: &mut Parse) -> Result<Option<S<Term>>> {
 			Term::Int(n, unit)
 		}
 
-		Token::Paren(d) => Parse::run(&d.tokens, d.close, |p| {
-			let mut terms = Vec::new();
-			while !p.is_empty() {
-				terms.push(parse_term(p)?);
-				if p.is_empty() {
-					break
-				}
-				if !p.test(&Token::Comma) {
-					Diag::error(p.next_span(), "expected comma or closing parenthesis")
-						.note(d.open, "opened here")
-						.emit();
-					return Err(Error)
-				}
-			}
-			Ok(Term::Tuple(terms))
-		})?,
+		Token::Paren(d) => Term::Tuple(parse_delim(d, "parenthesis")?),
 
 		Token::Brace(d) => {
 			let segs = d.tokens.iter().map(|t| Ok(Spanned(t.0, match &t.1 {
 				TextToken::Text(t) => TextSegment::Text(t.clone()),
 				TextToken::Newline(n) => TextSegment::Newline(*n),
 				TextToken::Hex(v) => TextSegment::Hex(*v),
-				TextToken::Brace(a) => TextSegment::Directive(Parse::run(&a.tokens, a.close, |p| key_val(true, p))?),
+				TextToken::Brace(a) => TextSegment::Directive(Parse::run(&a.tokens, a.close, |p| key_val(true, p, parse_ident))?),
 			}))).collect::<Result<Vec<_>>>()?;
 			Term::Text(segs)
 		}
 
-		Token::Ident("random") => Term::Random,
-		Token::Ident("flag") => brack_int(p, Term::Flag)?,
-		Token::Ident("system") => brack_int(p, Term::System)?,
-		Token::Ident("var") => brack_int(p, Term::Var)?,
-		Token::Ident("global") => brack_int(p, Term::Global)?,
-
-		Token::Ident("emote") => brack(p, |p| {
-			let a = parse_int(p)?;
-			p.require(&Token::Comma, "comma");
-			let b = parse_int(p)?;
-			p.require(&Token::Comma, "comma");
-			let c = parse_term(p)?;
-			Ok(Term::Emote(a,b,Box::new(c)))
-		})?,
-
-		Token::Ident("null") => Term::Null,
-		Token::Ident("self") => Term::Self_,
-		Token::Ident("custom") => brack_int(p, Term::Custom)?,
-		Token::Ident("party") => brack_int(p, Term::Party)?,
-		Token::Ident("field_party") => brack_int(p, Term::FieldParty)?,
-
-		Token::Ident("fn") => brack(p, |p| {
-			let a = parse_int(p)?;
-			p.require(&Token::Comma, "comma");
-			let b = parse_int(p)?;
-			Ok(Term::Fn(a, b))
-		})?,
-		Token::Ident("char") => brack_int(p, Term::Char)?,
-		Token::Ident("entrance") => brack_int(p, Term::Entrance)?,
-		Token::Ident("object") => brack_int(p, Term::Object)?,
-		Token::Ident("look_point") => brack_int(p, Term::LookPoint)?,
-		Token::Ident("chcp") => brack_int(p, Term::Chcp)?,
-
-		Token::Ident("fork") => brack_int(p, Term::Fork)?,
-		Token::Ident("menu") => brack_int(p, Term::Menu)?,
-		Token::Ident("select") => brack_int(p, Term::Select)?,
-		Token::Ident("vis") => brack_int(p, Term::Vis)?,
-		Token::Ident("eff") => brack_int(p, Term::Eff)?,
-		Token::Ident("eff_instance") => brack_int(p, Term::EffInstance)?,
-
-		Token::Ident("name") => brack_int(p, Term::Name)?,
-		Token::Ident("battle") => brack_int(p, Term::Battle)?,
-		Token::Ident("bgm") => brack_int(p, Term::Bgm)?,
-		Token::Ident("sound") => brack_int(p, Term::Sound)?,
-		Token::Ident("item") => brack_int(p, Term::Item)?,
-		Token::Ident("magic") => brack_int(p, Term::Magic)?,
-		Token::Ident("quest") => brack_int(p, Term::Quest)?,
-		Token::Ident("shop") => brack_int(p, Term::Shop)?,
-		Token::Ident("town") => brack_int(p, Term::Town)?,
+		Token::Ident(s) => Term::Ident((*s).to_owned()),
 
 		_ => {
 			p.rewind();
@@ -274,13 +192,31 @@ fn try_parse_term(p: &mut Parse) -> Result<Option<S<Term>>> {
 	};
 
 	let mut t = t;
-	while p.is_tight() && p.test(&Token::Dot) {
-		p.require_tight();
-		let b = parse_int(p)?;
-		t = Term::Attr(Box::new(t), b)
+	while p.is_tight() && let Some(S(_, Token::Bracket(d))) = p.peek() {
+		p.next()?;
+		t = Term::Sub(Box::new(t), parse_delim(d, "bracket")?)
 	}
 
 	Ok(Some(Spanned(i0 | p.prev_pos(), t)))
+}
+
+fn parse_delim(d: &Delimited<Token>, name: &str) -> Result<Vec<Spanned<Term>>> {
+	Parse::run(&d.tokens, d.close, |p| {
+		let mut terms = Vec::new();
+		while !p.is_empty() {
+			terms.push(parse_term(p)?);
+			if p.is_empty() {
+				break
+			}
+			if !p.test(&Token::Comma) {
+				Diag::error(p.next_span(), format!("expected comma or closing {name}"))
+					.note(d.open, "opened here")
+					.emit();
+				return Err(Error)
+			}
+		}
+		Ok(terms)
+	})
 }
 
 fn parse_top(line: &Line) -> Result<Decl> {
@@ -294,8 +230,8 @@ fn parse_top(line: &Line) -> Result<Decl> {
 	}
 }
 
-fn key_val(abbrev: bool, p: &mut Parse) -> Result<KeyVal> {
-	let key = parse_ident(p)?;
+fn key_val(abbrev: bool, p: &mut Parse, f: impl FnOnce(&mut Parse) -> Result<S<String>>) -> Result<KeyVal> {
+	let key = f(p)?;
 	// allow {item[413]} instead of {item item[413]}
 	if abbrev && matches!(p.peek(), Some(S(_, Token::Bracket(_)))) {
 		p.rewind()
@@ -309,6 +245,7 @@ fn key_val(abbrev: bool, p: &mut Parse) -> Result<KeyVal> {
 
 fn parse_type(line: &Line) -> Result<(Game, FileType)> {
 	Parse::run(&line.head, line.eol, |p| {
+		assert_eq!(p.next()?.1, &Token::Ident("type"));
 		no_body(line);
 		use Token::Ident as I;
 		let game = match p.next()?.1 {
@@ -334,7 +271,7 @@ fn parse_type(line: &Line) -> Result<(Game, FileType)> {
 }
 
 fn parse_data(top: bool, line: &Line) -> Result<Data> {
-	let head = Parse::run(&line.head, line.eol, |p| key_val(top, p))?;
+	let head = Parse::run(&line.head, line.eol, |p| key_val(top, p, parse_ident))?;
 	let body = line.body.as_deref().map(|b| parse_lines(b, |p| parse_data(false, p)));
 	Ok(Data { head, body })
 }
@@ -412,7 +349,7 @@ fn parse_code(line: &Line) -> Result<Spanned<Code>> {
 				let e = parse_expr(p)?;
 				Ok(Code::Assign(t, o, e))
 			} else {
-				Ok(Code::Insn(key_val(false, p)?))
+				Ok(Code::Insn(key_val(false, p, parse_insn_name)?))
 			}
 		}
 	})?;
@@ -455,7 +392,7 @@ fn parse_atom(p: &mut Parse) -> Result<S<Expr>> {
 			if let Some(t) = try_parse_term(p)? {
 				Expr::Term(t.1)
 			} else {
-				Expr::Insn(key_val(false, p)?)
+				Expr::Insn(key_val(false, p, parse_insn_name)?)
 			}
 		}
 	};
@@ -571,4 +508,3 @@ fn main() {
 		codespan_reporting::term::emit(&mut writer.lock(), &config, &files, &d).unwrap();
 	}
 }
-

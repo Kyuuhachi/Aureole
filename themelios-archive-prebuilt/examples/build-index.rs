@@ -17,6 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let names = x.iter().flat_map(|a| a.1.names()).flatten().collect::<Vec<_>>();
 	let dict = zstd::dict::from_samples(&names, 256)?;
 	File::create(dir.join("dict"))?.write_all(&dict)?;
+	println!("dict");
 	let dict = zstd::dict::EncoderDictionary::copy(&dict, -21);
 	for (name, val) in x {
 		let ed6i = val.write_ed6i()?;
@@ -25,6 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		enc.set_pledged_src_size(Some(ed6i.len() as u64))?;
 		enc.write_all(&ed6i)?;
 		enc.finish()?;
+		println!("{name}.ed6i.zst");
 	}
 	Ok(())
 }

@@ -8,6 +8,7 @@ members = [
 	"themelios-scena",
 	"themelios-tables",
 	"themelios-archive",
+	"themelios-archive-prebuilt",
 	"themelios",
 	"kagami",
 

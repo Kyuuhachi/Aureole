@@ -9,7 +9,7 @@ use hamu::read::le::*;
 /// uses a number of .txt files with lists of filenames for resolving the numbers to filenames.
 #[derive(Clone)]
 pub struct ED6Lookup {
-	pub(crate) name: [Vec<String>; 64],
+	name: [Vec<String>; 64],
 	index: HashMap<String, u32>,
 }
 
@@ -39,6 +39,11 @@ impl ED6Lookup {
 		}
 		Self { name, index }
 	}
+
+	/// Get the lists of names.
+	pub fn names(&self) -> &[Vec<String>; 64] {
+		&self.name
+	}
 }
 
 impl super::Lookup for ED6Lookup {
@@ -63,6 +68,7 @@ impl ED6Lookup {
 	/// For ch/cp files, a prefix is added to denote which archive they are in; names are taken from the Vita's index files.
 	pub fn for_pc(dir: impl AsRef<Path>) -> std::io::Result<ED6Lookup> {
 		let dir = dir.as_ref();
+		dir.read_dir()?;
 		let mut x = [(); 64].map(|_| Vec::new());
 		for (n, x) in x.iter_mut().enumerate() {
 			let Ok(data) = std::fs::read(dir.join(format!("ED6_DT{n:02X}.dir"))) else { continue };
@@ -92,6 +98,9 @@ impl ED6Lookup {
 	///
 	/// For ch/cp files, a prefix is added to denote which index file they are in.
 	pub fn for_vita(dir: impl AsRef<Path>) -> std::io::Result<ED6Lookup> {
+		let dir = dir.as_ref();
+		dir.read_dir()?;
+
 		fn txt(lines: &mut Vec<String>, path: std::path::PathBuf, format: impl Fn(&str) -> String) -> std::io::Result<()> {
 			use std::io::BufRead;
 			if let Ok(file) = std::fs::File::open(path) {
@@ -113,8 +122,6 @@ impl ED6Lookup {
 		let suf = |suf| move |s: &str| {
 			format!("{s}.{suf}")
 		};
-
-		let dir = dir.as_ref();
 
 		let mut x = [(); 64].map(|_| Vec::new());
 

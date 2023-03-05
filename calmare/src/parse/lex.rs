@@ -561,8 +561,7 @@ fn lines<'a>(indent: Indent, i: &mut Lex<'a>) -> Vec<Line<'a>> {
 	let mut indent_pos = i.pos();
 	let mut lines = Vec::new();
 	while {i.space(); !i.is_empty()} {
-		let ind = i.space();
-		ind.expect("lines() can only be called at start of line");
+		let ind = i.space().expect("lines() can only be called at start of line");
 		if ind > indent {
 			// This error can only happen at the start of the file, or if a line terminates one block but is not consistent with the next.
 			// In the latter case it would probably be better to point to the last line of the preceding block, not here.
@@ -574,7 +573,7 @@ fn lines<'a>(indent: Indent, i: &mut Lex<'a>) -> Vec<Line<'a>> {
 		}
 
 		if ind >= indent {
-			line(ind.unwrap(), i, &mut lines);
+			line(ind, i, &mut lines);
 		} else {
 			break
 		}

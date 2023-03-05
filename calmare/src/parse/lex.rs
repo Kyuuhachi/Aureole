@@ -517,38 +517,42 @@ fn continue_line(indent: Indent, i: &mut Lex) -> bool {
 	ind > indent || ind == indent && i.clone().pat(['{', ')', ']', '}']).is_some()
 }
 
-fn line<'a>(indent: Indent, i: &mut Lex<'a>) -> Line<'a> {
+fn line<'a>(indent: Indent, i: &mut Lex<'a>, out: &mut Vec<Line<'a>>) {
 	let i0 = i.pos();
 	let head = tokens(indent, i).unwrap_or_default();
 
-	let (eol, body) = if i.space() <= indent || i.is_empty() {
+	if i.space() <= indent || i.is_empty() {
 		let eol = head.last().unwrap().0.at_end();
-		(eol, None)
+		out.push(Line { span: i0 | i.pos(), head, eol, body: None });
 	} else {
 		let i1 = i.pos();
-		while continue_line(indent, i) && i.clone().pat(':').is_none() {
-			i.pat_mul(|a| a != '\n' && a != ':');
+		while continue_line(indent, i) && i.clone().pat([':', ';']).is_none() {
+			i.pat_mul(|a| a != '\n' && a != ':' && a != ';');
 		}
 		if i1 != i.pos() {
-			Diag::error(i1 | i.pos(), "unexpected character").emit();
+			Diag::error(i1, "unexpected character").emit();
 		}
 
 		if let Some(eol) = i.pat_(':') {
 			let ind = i.space();
 			#[allow(clippy::unnecessary_unwrap)]
 			let body = if ind.is_none() {
-				vec![line(indent, i)]
+				let mut lines2 = Vec::new();
+				line(indent, i, &mut lines2);
+				lines2
 			} else if ind > indent {
 				lines(ind.unwrap(), i)
 			} else {
 				Vec::new()
 			};
-			(eol, Some(body))
+			out.push(Line { span: i0 | i.pos(), head, eol, body: Some(body) })
+		} else if let Some(eol) = i.pat_(';') {
+			out.push(Line { span: i0 | i.pos(), head, eol, body: None });
+			line(indent, i, out);
 		} else {
-			(i1, None)
+			out.push(Line { span: i0 | i.pos(), head, eol: i1, body: None })
 		}
 	};
-	Line { span: i0 | i.pos(), head, eol, body }
 }
 
 fn lines<'a>(indent: Indent, i: &mut Lex<'a>) -> Vec<Line<'a>> {
@@ -568,7 +572,7 @@ fn lines<'a>(indent: Indent, i: &mut Lex<'a>) -> Vec<Line<'a>> {
 		}
 
 		if ind >= indent {
-			lines.push(line(ind.unwrap(), i))
+			line(ind.unwrap(), i, &mut lines);
 		} else {
 			break
 		}

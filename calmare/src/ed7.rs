@@ -184,20 +184,19 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 			}).strict()?;
 			f.line()?;
 		}
-		if !labels.is_empty() {
-			f.line()?;
-		}
 	} else {
 		// need to keep this for roundtripping
 		f.kw("labels")?.kw("null")?.line()?.line()?;
 	}
 
 	for (i, anim) in animations.iter().enumerate() {
-		f.kw("anim")?.val(&AnimId(i as u16))?.suf(":")?;
-		f.val(&anim.speed)?.suf(";")?;
+		f.kw("anim")?.val(&AnimId(i as u16))?.val(&anim.speed)?;
 		for val in &anim.frames {
 			f.val(val)?;
 		}
+		f.line()?;
+	}
+	if !animations.is_empty() {
 		f.line()?;
 	}
 
@@ -214,7 +213,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 		f.line()?;
 	}
 	for (i, sep) in field_sepith.iter().enumerate() {
-		f.kw("sepith")?.val(&(i as u16))?.suf(":")?;
+		f.kw("sepith")?.val(&(i as u16))?;
 		for val in sep {
 			f.val(val)?;
 		}
@@ -224,24 +223,40 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 		}
 	}
 
+	if !field_sepith.is_empty() {
+		f.line()?;
+	}
+
 	for (i, roll) in at_rolls.iter().enumerate() {
 		f.kw("at_roll")?.val(&(i as u16))?.suf(":")?;
-		for val in roll {
-			f.val(val)?;
+		let names = [
+			"none", "hp10", "hp50", "ep10", "ep50", "cp10", "cp50",
+			"unk1", "unk2", "unk3", "unk4", "unk5", "unk6", "unk7", "unk8", "unk9",
+		];
+		let mut first = true;
+		for (name, val) in names.iter().zip(roll)  {
+			if *val != 0 {
+				if !first {
+					f.suf(";")?;
+				}
+				first = false;
+				f.kw(name)?.val(val)?;
+			}
 		}
 		f.line()?;
 	}
 
+	if !at_rolls.is_empty() {
+		f.line()?;
+	}
+
 	for (i, plac) in placements.iter().enumerate() {
-		f.kw("battle_placement")?.val(&(i as u16))?.suf(":")?;
-		for (i, (x, y, r)) in plac.iter().enumerate() {
-			f.val(x)?;
-			f.val(y)?;
-			f.val(r)?;
-			if i != 7 {
-				f.suf(",")?;
+		f.kw("battle_placement")?.val(&(i as u16))?.suf(":")?.line()?.indent(|f| {
+			for (x, y, r) in plac {
+				f.kw("pos")?.val(x)?.val(y)?.val(r)?.line()?;
 			}
-		}
+			Ok(())
+		}).strict()?;
 		f.line()?;
 	}
 
@@ -261,7 +276,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 			if let Some(sepith) = &btl.sepith {
 				f.val(sepith)?;
 			} else {
-				f.kw("-")?;
+				f.kw("null")?;
 			}
 			f.line()?;
 

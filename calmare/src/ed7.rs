@@ -194,7 +194,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 
 	for (i, anim) in animations.iter().enumerate() {
 		f.kw("anim")?.val(&AnimId(i as u16))?.suf(":")?;
-		f.val(&anim.speed)?.val(&anim.unk)?.suf(";")?;
+		f.val(&anim.speed)?.suf(";")?;
 		for val in &anim.frames {
 			f.val(val)?;
 		}

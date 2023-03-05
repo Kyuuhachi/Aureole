@@ -78,7 +78,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 	}
 
 	for (i, chcp) in chcp.iter().enumerate() {
-		f.kw("chcp")?.val(&ChcpId(i as u16))?.val(chcp)?.line()?;
+		f.val(&ChcpId(i as u16))?.val(chcp)?.line()?;
 	}
 	if !chcp.is_empty() {
 		f.line()?;
@@ -121,7 +121,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 	}
 
 	for (i, tr) in triggers.iter().enumerate() {
-		f.kw("trigger")?.val(&TriggerId(i as u16))?.suf(":")?.line()?.indent(|f| {
+		f.val(&TriggerId(i as u16))?.suf(":")?.line()?.indent(|f| {
 			f.kw("pos")?;
 			write!(f, "({}, {}, {})", tr.pos.0 * 1000., tr.pos.1 * 1000., tr.pos.2 * 1000.)?;
 			f.line()?;
@@ -154,7 +154,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 	}
 
 	for (i, lp) in look_points.iter().enumerate() {
-		f.kw("look_point")?.val(&LookPointId(i as u16))?.suf(":")?.line()?.indent(|f| {
+		f.val(&LookPointId(i as u16))?.suf(":")?.line()?.indent(|f| {
 			f.kw("pos")?.val(&lp.pos)?.line()?;
 			f.kw("radius")?.val(&lp.radius)?.line()?;
 			f.kw("bubble_pos")?.val(&lp.bubble_pos)?.line()?;
@@ -170,7 +170,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 
 	if let Some(labels) = labels {
 		for (i, lb) in labels.iter().enumerate() {
-			f.kw("label")?.val(&LabelId(i as u16))?.suf(":")?.line()?.indent(|f| {
+			f.val(&LabelId(i as u16))?.suf(":")?.line()?.indent(|f| {
 				f.kw("name")?.val(&lb.name)?.line()?;
 
 				f.kw("pos")?;
@@ -190,7 +190,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 	}
 
 	for (i, anim) in animations.iter().enumerate() {
-		f.kw("anim")?.val(&AnimId(i as u16))?.val(&anim.speed)?;
+		f.val(&AnimId(i as u16))?.val(&anim.speed)?;
 		for val in &anim.frames {
 			f.val(val)?;
 		}
@@ -213,7 +213,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 		f.line()?;
 	}
 	for (i, sep) in sepith.iter().enumerate() {
-		f.kw("sepith")?.val(&SepithId(i as u16))?;
+		f.val(&SepithId(i as u16))?;
 		for val in sep {
 			f.val(val)?;
 		}
@@ -228,7 +228,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 	}
 
 	for (i, roll) in at_rolls.iter().enumerate() {
-		f.kw("at_roll")?.val(&AtRollId(i as u16))?.suf(":")?;
+		f.val(&AtRollId(i as u16))?.suf(":")?;
 		let names = [
 			"none", "hp10", "hp50", "ep10", "ep50", "cp10", "cp50",
 			"unk1", "unk2", "unk3", "unk4", "unk5", "unk6", "unk7", "unk8", "unk9",
@@ -251,7 +251,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 	}
 
 	for (i, plac) in placements.iter().enumerate() {
-		f.kw("placement")?.val(&PlacementId(i as u16))?.suf(":")?.line()?.indent(|f| {
+		f.val(&PlacementId(i as u16))?.suf(":")?.line()?.indent(|f| {
 			for (x, y, r) in plac {
 				f.kw("pos")?.val(x)?.val(y)?.val(r)?.line()?;
 			}
@@ -261,7 +261,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 	}
 
 	for (i, btl) in battles.iter().enumerate() {
-		f.kw("battle")?.val(&BattleId(i as u32))?.suf(":")?.line()?.indent(|f| {
+		f.val(&BattleId(i as u32))?.suf(":")?.line()?.indent(|f| {
 			f.kw("flags")?.val(&btl.flags)?.line()?;
 			f.kw("level")?.val(&btl.level)?.line()?;
 			f.kw("unk1")?.val(&btl.unk1)?.line()?;
@@ -303,7 +303,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 		if i != 0 {
 			f.line()?;
 		}
-		common::func(&mut f, FuncRef(0, i as u16), func)?;
+		common::func(&mut f, i, func)?;
 	}
 
 	Ok(())

@@ -24,7 +24,7 @@ pub(crate) impl Context<'_> {
 	}
 }
 
-pub fn func(f: &mut Context, n: FuncRef, func: &[FlatInsn]) -> Result<()> {
+pub fn func(f: &mut Context, n: usize, func: &[FlatInsn]) -> Result<()> {
 	let result = if f.decompile {
 		decompile(func).map_err(Some)
 	} else {
@@ -32,16 +32,14 @@ pub fn func(f: &mut Context, n: FuncRef, func: &[FlatInsn]) -> Result<()> {
 	};
 	match result {
 		Ok(result) => {
-			f.kw("fn")?
-				.val(&n)?
-				.suf(":")?
+			write!(f, "fn[{n}]")?;
+			f.suf(":")?
 				.line()?;
 			f.indent(|f| tree_func(f, &result))?;
 		}
 		Err(err) => {
-			f.kw("fn")?
-				.val(&n)?
-				.kw("flat")?
+			write!(f, "fn[{n}]")?;
+			f.kw("flat")?
 				.suf(":")?;
 			if let Some(err) = err {
 				write!(f, " // {err}")?;

@@ -68,7 +68,7 @@ pub fn write(mut f: Context, scena: &ed6::Scena) -> Result<()> {
 		if ch.is_none() && cp.is_none() {
 			break
 		}
-		f.kw("chcp")?.val(&ChcpId(chcp.2))?;
+		f.val(&ChcpId(chcp.2))?;
 		if let Some(ch) = ch {
 			f.val(ch)?;
 		} else {
@@ -124,7 +124,7 @@ pub fn write(mut f: Context, scena: &ed6::Scena) -> Result<()> {
 	}
 
 	for (i, trigger) in triggers.iter().enumerate() {
-		f.kw("trigger")?.val(&TriggerId(i as u16))?.suf(":")?.line()?.indent(|f| {
+		f.val(&TriggerId(i as u16))?.suf(":")?.line()?.indent(|f| {
 			f.kw("pos1")?.val(&trigger.pos1)?.line()?;
 			f.kw("pos2")?.val(&trigger.pos2)?.line()?;
 			f.kw("flags")?.val(&trigger.flags)?.line()?;
@@ -136,7 +136,7 @@ pub fn write(mut f: Context, scena: &ed6::Scena) -> Result<()> {
 	}
 
 	for (i, lp) in look_points.iter().enumerate() {
-		f.kw("look_point")?.val(&LookPointId(i as u16))?.suf(":")?.line()?.indent(|f| {
+		f.val(&LookPointId(i as u16))?.suf(":")?.line()?.indent(|f| {
 			f.kw("pos")?.val(&lp.pos)?.line()?;
 			f.kw("radius")?.val(&lp.radius)?.line()?;
 			f.kw("bubble_pos")?.val(&lp.bubble_pos)?.line()?;
@@ -152,7 +152,7 @@ pub fn write(mut f: Context, scena: &ed6::Scena) -> Result<()> {
 		if i != 0 {
 			f.line()?;
 		}
-		common::func(&mut f, FuncRef(0, i as u16), func)?;
+		common::func(&mut f, i, func)?;
 	}
 
 	Ok(())

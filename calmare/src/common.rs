@@ -1,6 +1,7 @@
 use themelios::scena::*;
 use themelios::scena::code::{Expr, ExprBinop, ExprUnop, FlatInsn, Label, Insn};
 use themelios::scena::code::decompile::{decompile, TreeInsn};
+use themelios::scena::ed7::{SepithId, AtRollId, PlacementId};
 use themelios::text::{Text, TextSegment};
 use strict_result::Strict;
 use themelios::types::*;
@@ -320,6 +321,10 @@ nt_arg!(ForkId,  "fork[{}]");
 nt_arg!(EffId,   "eff[{}]");
 nt_arg!(EffInstanceId, "eff_instance[{}]");
 nt_arg!(MenuId,  "menu[{}]");
+
+nt_arg!(SepithId,  "sepith[{}]");
+nt_arg!(AtRollId,  "at_roll[{}]");
+nt_arg!(PlacementId,  "placement[{}]");
 
 impl Val for FileId {
 	fn write(&self, f: &mut Context) -> Result<()> {

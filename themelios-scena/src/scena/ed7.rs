@@ -6,6 +6,10 @@ use crate::util::*;
 
 use super::*;
 
+newtype!(SepithId, u16);
+newtype!(PlacementId, u16);
+newtype!(AtRollId, u16);
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Scena {
 	pub name1: String,
@@ -27,7 +31,7 @@ pub struct Scena {
 	pub functions: Vec<Vec<code::FlatInsn>>,
 
 	/// The first five, if present, are always the same nonsensical values.
-	pub field_sepith: Vec<[u8; 8]>,
+	pub sepith: Vec<[u8; 8]>,
 	pub at_rolls: Vec<[u8; 16]>,
 	pub placements: Vec<[(u8,u8,Angle); 8]>,
 	pub battles: Vec<Battle>,
@@ -134,7 +138,7 @@ pub struct Battle {
 	pub move_speed: u16,
 	pub unk2: u16,
 	pub battlefield: String,
-	pub sepith: Option<u16>, // index
+	pub sepith: Option<SepithId>,
 	pub setups: Vec<BattleSetup>,
 }
 
@@ -142,11 +146,11 @@ pub struct Battle {
 pub struct BattleSetup {
 	pub weight: u8,
 	pub enemies: [FileId; 8],
-	pub placement: u16, // index
-	pub placement_ambush: u16,
+	pub placement: PlacementId,
+	pub placement_ambush: PlacementId,
 	pub bgm: BgmId,
 	pub bgm_ambush: BgmId, // not entirely sure if this is what it is
-	pub at_roll: u16, // index
+	pub at_roll: AtRollId,
 }
 
 pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
@@ -390,12 +394,12 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 
 	// Fill in battles
 	for mons in &mut monsters {
-		mons.battle.0 = btl.get_battle(&mut f.clone().at(mons.battle.0 as usize)?)?;
+		mons.battle = btl.get_battle(&mut f.clone().at(mons.battle.0 as usize)?)?;
 	}
 	for func in &mut functions {
 		for insn in func {
 			if let code::FlatInsn::Insn(code::Insn::ED7Battle { 0: battle, .. }) = insn {
-				battle.0 = btl.get_battle(&mut f.clone().at(battle.0 as usize)?)?;
+				*battle = btl.get_battle(&mut f.clone().at(battle.0 as usize)?)?;
 			}
 		}
 	}
@@ -417,7 +421,7 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 		animations,
 		entry,
 		functions,
-		field_sepith: btl.field_sepith,
+		sepith: btl.sepith,
 		at_rolls: btl.at_rolls,
 		placements: btl.placements,
 		battles: btl.battles,
@@ -429,55 +433,55 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 
 #[derive(Default)]
 struct BattleRead {
-	field_sepith: Vec<[u8;8]>,
-	field_sepith_pos: HashMap<usize, u16>,
+	sepith: Vec<[u8;8]>,
+	sepith_pos: HashMap<usize, SepithId>,
 	at_rolls: Vec<[u8;16]>,
-	at_roll_pos: HashMap<usize, u16>,
+	at_roll_pos: HashMap<usize, AtRollId>,
 	placements: Vec<[(u8,u8,Angle);8]>,
-	placement_pos: HashMap<usize, u16>,
+	placement_pos: HashMap<usize, PlacementId>,
 	battles: Vec<Battle>,
-	battle_pos: HashMap<usize, u32>,
+	battle_pos: HashMap<usize, BattleId>,
 }
 
 impl BattleRead {
-	fn get_sepith<'a, T: Read<'a> + Clone>(&mut self, f: &mut T) -> Result<u16, ReadError> {
-		match self.field_sepith_pos.entry(f.pos()) {
+	fn get_sepith<'a, T: Read<'a> + Clone>(&mut self, f: &mut T) -> Result<SepithId, ReadError> {
+		match self.sepith_pos.entry(f.pos()) {
 			std::collections::hash_map::Entry::Occupied(e) => Ok(*e.get()),
 			std::collections::hash_map::Entry::Vacant(e) => {
-				let v = *e.insert(self.field_sepith.len() as u16);
-				self.field_sepith.push(f.array::<8>()?);
+				let v = *e.insert(SepithId(self.sepith.len() as u16));
+				self.sepith.push(f.array::<8>()?);
 				Ok(v)
 			}
 		}
 	}
 
-	fn get_at_roll<'a, T: Read<'a> + Clone>(&mut self, f: &mut T) -> Result<u16, ReadError> {
+	fn get_at_roll<'a, T: Read<'a> + Clone>(&mut self, f: &mut T) -> Result<AtRollId, ReadError> {
 		match self.at_roll_pos.entry(f.pos()) {
 			std::collections::hash_map::Entry::Occupied(e) => Ok(*e.get()),
 			std::collections::hash_map::Entry::Vacant(e) => {
-				let v = *e.insert(self.at_rolls.len() as u16);
+				let v = *e.insert(AtRollId(self.at_rolls.len() as u16));
 				self.at_rolls.push(f.array::<16>()?);
 				Ok(v)
 			}
 		}
 	}
 
-	fn get_placement<'a, T: Read<'a> + Clone>(&mut self, f: &mut T) -> Result<u16, ReadError> {
+	fn get_placement<'a, T: Read<'a> + Clone>(&mut self, f: &mut T) -> Result<PlacementId, ReadError> {
 		match self.placement_pos.entry(f.pos()) {
 			std::collections::hash_map::Entry::Occupied(e) => Ok(*e.get()),
 			std::collections::hash_map::Entry::Vacant(e) => {
-				let v = *e.insert(self.placements.len() as u16);
+				let v = *e.insert(PlacementId(self.placements.len() as u16));
 				self.placements.push(array::<8, _>(|| Ok((f.u8()?, f.u8()?, Angle(f.i16()?)))).strict()?);
 				Ok(v)
 			}
 		}
 	}
 
-	fn get_battle<'a, T: Read<'a> + Clone>(&mut self, f: &mut T) -> Result<u32, ReadError> {
+	fn get_battle<'a, T: Read<'a> + Clone>(&mut self, f: &mut T) -> Result<BattleId, ReadError> {
 		match self.battle_pos.entry(f.pos()) {
 			std::collections::hash_map::Entry::Occupied(e) => Ok(*e.get()),
 			std::collections::hash_map::Entry::Vacant(e) => {
-				let v = *e.insert(self.battles.len() as u32);
+				let v = *e.insert(BattleId(self.battles.len() as u32));
 				let battle = Battle {
 					flags: f.u16()?,
 					level: f.u16()?,
@@ -560,7 +564,7 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 
 	let mut entry = Writer::new();
 	let mut functions = Writer::new();
-	let mut field_sepith = Writer::new();
+	let mut sepith = Writer::new();
 	let mut at_rolls = Writer::new();
 	let mut placements = Writer::new();
 	let mut battles = Writer::new();
@@ -670,10 +674,10 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		code::write(&mut functions, game, func)?;
 	}
 
-	let mut field_sepith_pos = Vec::new();
-	for sep in &scena.field_sepith {
-		field_sepith_pos.push(field_sepith.here());
-		field_sepith.slice(sep);
+	let mut sepith_pos = Vec::new();
+	for sep in &scena.sepith {
+		sepith_pos.push(sepith.here());
+		sepith.slice(sep);
 	}
 
 	let mut at_roll_pos = Vec::new();
@@ -707,7 +711,7 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		g.delay_u32(strings.here());
 		strings.string(&battle.battlefield)?;
 		if let Some(s) = battle.sepith {
-			g.delay_u32(field_sepith_pos.get(s as usize).cloned()
+			g.delay_u32(sepith_pos.get(s.0 as usize).cloned()
 				.ok_or_else(|| "field sepith out of bounds".to_owned())?);
 		} else {
 			g.u32(0);
@@ -720,13 +724,13 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 			for ms in &setup.enemies {
 				h.u32(ms.0);
 			}
-			h.delay_u16(placement_pos.get(setup.placement as usize).cloned()
+			h.delay_u16(placement_pos.get(setup.placement.0 as usize).cloned()
 				.ok_or_else(|| "placement out of bounds".to_owned())?);
-			h.delay_u16(placement_pos.get(setup.placement_ambush as usize).cloned()
+			h.delay_u16(placement_pos.get(setup.placement_ambush.0 as usize).cloned()
 				.ok_or_else(|| "placement out of bounds".to_owned())?);
 			h.u16(setup.bgm.0);
 			h.u16(setup.bgm_ambush.0);
-			h.delay_u32(at_roll_pos.get(setup.at_roll as usize).cloned()
+			h.delay_u32(at_roll_pos.get(setup.at_roll.0 as usize).cloned()
 				.ok_or_else(|| "at roll out of bounds".to_owned())?);
 		}
 		g.array(weights);
@@ -759,10 +763,10 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	f.append(animations);
 	f.append(func_table);
 	f.append(functions);
-	f.append(field_sepith);
+	f.append(sepith);
 	f.append(strings);
 	// EDDec has order
-	//   header, entry, at_rolls, field_sepith, placements, battles,
+	//   header, entry, at_rolls, sepith, placements, battles,
 	//   chcp, npcs, monsters, triggers, look_points, labels,
 	//   animations, func_table, functions, strings
 	Ok(f.finish()?)

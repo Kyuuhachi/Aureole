@@ -1,5 +1,5 @@
 use themelios::scena::*;
-use themelios::scena::ed7;
+use themelios::scena::ed7::{self, PlacementId, AtRollId, SepithId};
 use strict_result::Strict;
 use themelios::types::BattleId;
 use crate::writer::Context;
@@ -28,7 +28,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 		look_points,
 		animations,
 
-		field_sepith,
+		sepith,
 		at_rolls,
 		placements,
 		battles,
@@ -200,7 +200,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 		f.line()?;
 	}
 
-	let junk_sepith = matches!(field_sepith.as_slice(), &[
+	let junk_sepith = matches!(sepith.as_slice(), &[
 		[100, 1, 2, 3, 70, 89, 99, 0],
 		[100, 5, 1, 5, 1, 5, 1, 0],
 		[100, 5, 1, 5, 1, 5, 1, 0],
@@ -212,23 +212,23 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 		write!(f, "// NB: the first five sepith sets are seemingly junk data.")?;
 		f.line()?;
 	}
-	for (i, sep) in field_sepith.iter().enumerate() {
-		f.kw("sepith")?.val(&(i as u16))?;
+	for (i, sep) in sepith.iter().enumerate() {
+		f.kw("sepith")?.val(&SepithId(i as u16))?;
 		for val in sep {
 			f.val(val)?;
 		}
 		f.line()?;
-		if junk_sepith && i == 4 && field_sepith.len() != 5 {
+		if junk_sepith && i == 4 && sepith.len() != 5 {
 			f.line()?;
 		}
 	}
 
-	if !field_sepith.is_empty() {
+	if !sepith.is_empty() {
 		f.line()?;
 	}
 
 	for (i, roll) in at_rolls.iter().enumerate() {
-		f.kw("at_roll")?.val(&(i as u16))?.suf(":")?;
+		f.kw("at_roll")?.val(&AtRollId(i as u16))?.suf(":")?;
 		let names = [
 			"none", "hp10", "hp50", "ep10", "ep50", "cp10", "cp50",
 			"unk1", "unk2", "unk3", "unk4", "unk5", "unk6", "unk7", "unk8", "unk9",
@@ -251,7 +251,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 	}
 
 	for (i, plac) in placements.iter().enumerate() {
-		f.kw("battle_placement")?.val(&(i as u16))?.suf(":")?.line()?.indent(|f| {
+		f.kw("placement")?.val(&PlacementId(i as u16))?.suf(":")?.line()?.indent(|f| {
 			for (x, y, r) in plac {
 				f.kw("pos")?.val(x)?.val(y)?.val(r)?.line()?;
 			}

@@ -123,11 +123,11 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 	for (i, tr) in triggers.iter().enumerate() {
 		f.kw("trigger")?.val(&TriggerId(i as u16))?.suf(":")?.line()?.indent(|f| {
 			f.kw("pos")?;
-			write!(f, "({:?}, {:?}, {:?})", tr.pos.0, tr.pos.1, tr.pos.2)?;
+			write!(f, "({}, {}, {})", tr.pos.0 * 1000., tr.pos.1 * 1000., tr.pos.2 * 1000.)?;
 			f.line()?;
 
 			f.kw("radius")?;
-			write!(f, "{:?}", tr.radius)?;
+			write!(f, "{}", tr.radius * 1000.)?;
 			f.line()?;
 
 			f.kw("transform")?;
@@ -174,7 +174,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 				f.kw("name")?.val(&lb.name)?.line()?;
 
 				f.kw("pos")?;
-				write!(f, "({}, {}, {})", lb.pos.0, lb.pos.1, lb.pos.2)?;
+				write!(f, "({}, {}, {})", lb.pos.0 * 1000., lb.pos.1 * 1000., lb.pos.2 * 1000.)?;
 				f.line()?;
 
 				f.kw("unk1")?.val(&lb.unk1)?.line()?;

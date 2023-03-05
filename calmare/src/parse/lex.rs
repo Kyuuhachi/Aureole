@@ -522,8 +522,10 @@ fn line<'a>(indent: Indent, i: &mut Lex<'a>, out: &mut Vec<Line<'a>>) {
 	let head = tokens(indent, i).unwrap_or_default();
 
 	if i.space() <= indent || i.is_empty() {
-		let eol = head.last().unwrap().0.at_end();
-		out.push(Line { span: i0 | i.pos(), head, eol, body: None });
+		if !head.is_empty() {
+			let eol = head.last().unwrap().0.at_end();
+			out.push(Line { span: i0 | i.pos(), head, eol, body: None });
+		}
 	} else {
 		let i1 = i.pos();
 		while continue_line(indent, i) && i.clone().pat([':', ';']).is_none() {

@@ -358,15 +358,17 @@ macro parse_data {
 					});
 				})*
 				_ => {
+					let fields: &[&str] = &[
+						$(concat!("'", stringify!($k), "'"),)*
+					];
 					Diag::error(head.0, "unknown field")
-						.note(head.0, format_args!("allowed fields are {}", [
-							$(concat!("'", stringify!($k), "'"),)*
-						].join(", ")))
+						.note(head.0, format_args!("allowed fields are {}", &fields.join(", ")))
 						.emit();
 				}
 			}
 		}
-		let mut failures = Vec::new();
+		#[allow(unused_mut)]
+		let mut failures: Vec<&str> = Vec::new();
 		$($(when!($t);
 			let $k = $k.optional();
 			if $k.is_none() {

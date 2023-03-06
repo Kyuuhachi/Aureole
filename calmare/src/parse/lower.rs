@@ -281,6 +281,8 @@ impl Val for FileId {
 				Diag::error(pos, "could not resolve file id").emit();
 				0x00000000
 			})))
+		} else if let Some(()) = p.term("null")? {
+			Ok(FileId(0))
 		} else if let Some(s) = p.term("file")? {
 			Ok(FileId(s))
 		} else {

@@ -36,6 +36,7 @@ struct ScenaBuild {
 	animations: Many<AnimId, Animation>,
 	sepith: Many<SepithId, [u8; 8]>,
 	at_rolls: Many<AtRollId, [u8; 16]>,
+	placements: Many<PlacementId, [(u8, u8, Angle); 8]>,
 	battles: Many<BattleId, Battle>,
 }
 
@@ -81,6 +82,7 @@ pub fn lower(file: &File, lookup: Option<&dyn Lookup>) {
 	let animations = scena.animations.finish(|a| a.0 as usize);
 	let sepith = scena.sepith.finish(|a| a.0 as usize);
 	let at_rolls = scena.at_rolls.finish(|a| a.0 as usize);
+	let placements = scena.placements.finish(|a| a.0 as usize);
 	let battles = scena.battles.finish(|a| a.0 as usize);
 }
 
@@ -260,6 +262,20 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 			scena.at_rolls.insert(d.head.key.0 | s, n, values);
 		}
 		"placement" => {
+			let mut vs = Vec::new();
+			parse_data!(d, ctx => S(s, n), {
+				pos => |l: &Data| {
+					parse_data!(l, ctx => v);
+					vs.push(v);
+					Ok(())
+				}
+			});
+			if let Ok(vs) = vs.try_into() {
+				scena.placements.insert(d.head.key.0 | s, n, vs);
+			} else {
+				scena.placements.insert(d.head.key.0 | s, n, [(0,0,Angle(180));8]);
+				Diag::error(d.head.span(), "needs exactly 8 'pos'").emit();
+			}
 		}
 		"battle" => {
 		}

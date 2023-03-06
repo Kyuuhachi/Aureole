@@ -178,7 +178,7 @@ fn try_parse_term(p: &mut Parse) -> Result<Option<S<Term>>> {
 			Term::Int(n, unit)
 		}
 
-		Token::Paren(d) => Term::Tuple(parse_delim(d, "parenthesis")?),
+		Token::Paren(d) => Term::Tuple(parse_delim(S(t.0, String::new()), d, "parenthesis")?),
 
 		Token::Brace(d) => {
 			let segs = d.tokens.iter().map(|t| Ok(S(t.0, match &t.1 {
@@ -191,17 +191,18 @@ fn try_parse_term(p: &mut Parse) -> Result<Option<S<Term>>> {
 		}
 
 		Token::Ident(s) => {
-			let terms = if p.is_tight() && let Some(S(_, Token::Bracket(d))) = p.peek() {
+			let key = S(t.0, (*s).to_owned());
+			let key_val = if p.is_tight() && let Some(S(_, Token::Bracket(d))) = p.peek() {
 				p.next()?;
-				let a = parse_delim(d, "bracket")?;
-				if a.is_empty() {
+				let a = parse_delim(key, d, "bracket")?;
+				if a.terms.is_empty() {
 					Diag::error(d.open|d.close, "this cannot be empty").emit();
 				}
 				a
 			} else {
-				Vec::new()
+				KeyVal { key, terms: Vec::new(), end: p.prev_span().at_start() }
 			};
-			Term::Struct(KeyVal { key: S(t.0, (*s).to_owned()), terms, end: p.prev_span().at_start() })
+			Term::Struct(key_val)
 		},
 
 		_ => {
@@ -213,7 +214,7 @@ fn try_parse_term(p: &mut Parse) -> Result<Option<S<Term>>> {
 	Ok(Some(S(i0 | p.prev_pos(), t)))
 }
 
-fn parse_delim(d: &Delimited<Token>, name: &str) -> Result<Vec<S<Term>>> {
+fn parse_delim(key: S<String>, d: &Delimited<Token>, name: &str) -> Result<KeyVal> {
 	Parse::run(&d.tokens, d.close, |p| {
 		let mut terms = Vec::new();
 		while !p.is_empty() {
@@ -228,7 +229,7 @@ fn parse_delim(d: &Delimited<Token>, name: &str) -> Result<Vec<S<Term>>> {
 				return Err(Error)
 			}
 		}
-		Ok(terms)
+		Ok(KeyVal { key, terms, end: d.close })
 	})
 }
 

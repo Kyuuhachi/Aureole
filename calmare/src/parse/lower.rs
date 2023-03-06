@@ -1,3 +1,4 @@
+use themelios::scena::*;
 use themelios::types::*;
 
 use super::diag::*;
@@ -73,7 +74,7 @@ tuple!(A B C D E F G H I);
 tuple!(A B C D E F G H I J);
 tuple!(A B C D E F G H I J K);
 
-macro int($T:ident) {
+macro int($T:ident $(=> $(#$CONV:ident)?)?) {
 	impl Val for $T {
 		fn parse(p: &mut Parse) -> Result<Self> {
 			if let Some(S(_, Term::Int(s, u))) = p.peek() {
@@ -81,10 +82,10 @@ macro int($T:ident) {
 				if u.1 != Unit::None {
 					Diag::warn(u.0, "this should be unitless").emit();
 				}
-				Self::try_from(s.1).map_err(|e| {
+				s.1.try_into().map_err(|e| {
 					Diag::error(s.0, e).emit();
 					Error
-				})
+				}).map(unless!($($($CONV)? $T)?, {|a| a}))
 			} else {
 				Diag::error(p.pos(), "expected int").emit();
 				Err(Error)
@@ -101,6 +102,7 @@ int!(i8);
 int!(i16);
 int!(i32);
 int!(i64);
+int!(EntryFlags =>);
 
 impl Val for String {
 	fn parse(p: &mut Parse) -> Result<Self> {
@@ -114,6 +116,54 @@ impl Val for String {
 	}
 }
 
+macro unit($T:ident, $unit:ident, $unit_str:literal) {
+	impl Val for $T {
+		fn parse(p: &mut Parse) -> Result<Self> {
+			if let Some(S(_, Term::Int(s, u))) = p.peek() {
+				p.next()?;
+				if u.1 != Unit::$unit {
+					Diag::warn(u.0, format_args!("unit should be '{}'", $unit_str)).emit();
+				}
+				s.1.try_into().map_err(|e| {
+					Diag::error(s.0, e).emit();
+					Error
+				}).map(Self)
+			} else {
+				Diag::error(p.pos(), format_args!("expected '{}' number", $unit_str)).emit();
+				Err(Error)
+			}
+		}
+	}
+}
+
+unit!(Angle, Deg, "deg");
+
+impl Val for Pos3 {
+	fn parse(p: &mut Parse) -> Result<Self> {
+		if let Some(S(_, Term::Tuple(s))) = p.peek() {
+			p.next()?;
+			let (x, y, z) = s.parse()?;
+			Ok(Pos3(x, y, z))
+		} else {
+			Diag::error(p.pos(), "expected pos3").emit();
+			Err(Error)
+		}
+	}
+}
+
+impl Val for FuncRef {
+	fn parse(p: &mut Parse) -> Result<Self> {
+		if let Some(S(_, Term::Struct(s))) = p.peek() && s.key.1 == "fn" {
+			p.next()?;
+			let (a, b) = s.parse()?;
+			Ok(FuncRef(a, b))
+		} else {
+			Diag::error(p.pos(), "expected pos3").emit();
+			Err(Error)
+		}
+	}
+}
+
 macro newtype($T:ident, $s:literal) {
 	impl Val for $T {
 		fn parse(p: &mut Parse) -> Result<Self> {
@@ -121,7 +171,7 @@ macro newtype($T:ident, $s:literal) {
 				p.next()?;
 				Ok(Self(k.parse()?))
 			} else {
-				Diag::error(p.pos(), "expected 'bgm'").emit();
+				Diag::error(p.pos(), format_args!("expected '{}'", $s)).emit();
 				Err(Error)
 			}
 		}
@@ -225,6 +275,8 @@ pub mod scena {
 	pub mod ed7 {
 		use super::*;
 
+		use themelios::scena::ed7::*;
+
 		#[derive(Debug, Clone)]
 		pub struct Header {
 			pub name: (String, String, String),
@@ -256,9 +308,29 @@ pub mod scena {
 											Ok(())
 										}
 									});
-									dbg!(Header { name, town, bgm, flags, unk, scp });
+									println!("{:#?}", Header { name, town, bgm, flags, unk, scp });
 								}
 								"entry" => {
+									parse_data!(d => (), {
+										pos: _,
+										unk1: _,
+										cam_from: _,
+										cam_pers: _,
+										unk2: _,
+										cam_deg: _,
+										cam_limit: _,
+										cam_at: _,
+										unk3: _,
+										unk4: _,
+										flags: _,
+										town: _,
+										init: _,
+										reinit: _,
+									});
+									println!("{:#?}", Entry {
+										pos, unk1, cam_from, cam_pers, unk2, cam_deg, cam_limit,
+										cam_at, unk3, unk4, flags, town, init, reinit,
+									});
 								}
 								"chcp" => {
 								}

@@ -131,7 +131,25 @@ fn lower_assign(ctx: &Context, term: &S<Term>, o: S<Assop>, e: &S<Expr>) -> Insn
 		Assop::Xor => ExprUnop::XorAss,
 	};
 	let e = LExpr::Unop(o, Box::new(e));
-	Insn::Return()
+
+	if let Term::Term(kv) = &term.1 {
+		match kv.key.1.as_str() {
+			"var"    => Insn::Var(Var(kv.parse(ctx).unwrap_or_default()), e),
+			"system" => Insn::Attr(Attr(kv.parse(ctx).unwrap_or_default()), e),
+			"char_attr" => {
+				let (a, b) = kv.parse(ctx).unwrap_or((CharId(0), 0));
+				Insn::CharAttr(CharAttr(a, b), e)
+			},
+			"global" => Insn::Global(Global(kv.parse(ctx).unwrap_or_default()), e),
+			_ => {
+				Diag::error(term.0, "invalid assignment target").emit();
+				Insn::Return()
+			}
+		}
+	} else {
+		Diag::error(term.0, "invalid assignment target").emit();
+		Insn::Return()
+	}
 }
 
 fn lower_expr(ctx: &Context, e: &S<Expr>) -> LExpr {

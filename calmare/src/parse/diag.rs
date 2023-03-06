@@ -11,7 +11,6 @@ pub enum Level {
 	Error,
 	Warning,
 	Info,
-	Note,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,11 +31,11 @@ impl Diag {
 	}
 
 	pub fn warn(span: Span, text: impl ToString) -> Diag {
-		Self::new(Level::Error, span, text)
+		Self::new(Level::Warning, span, text)
 	}
 
 	pub fn info(span: Span, text: impl ToString) -> Diag {
-		Self::new(Level::Error, span, text)
+		Self::new(Level::Info, span, text)
 	}
 
 	pub fn note(mut self, span: Span, text: impl ToString) -> Diag {
@@ -75,7 +74,12 @@ pub fn print_diags(filename: &str, source: &str, diags: &[Diag]) {
 		for n in &d.notes {
 			l.push(Label::secondary(file_id, n.0.as_range()).with_message(&n.1));
 		}
-		let d = Diagnostic::error().with_labels(l);
+		let d = match d.level {
+			Level::Error => Diagnostic::error(),
+			Level::Warning => Diagnostic::warning(),
+			Level::Info => Diagnostic::help(),
+		};
+		let d = d.with_labels(l);
 		codespan_reporting::term::emit(&mut writer.lock(), &config, &files, &d).unwrap();
 	}
 }

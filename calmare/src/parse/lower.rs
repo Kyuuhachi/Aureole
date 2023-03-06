@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use themelios::scena::*;
 use themelios::types::*;
 use themelios_archive::Lookup;
@@ -245,6 +247,7 @@ macro newtype($T:ident, $s:literal) {
 
 newtype!(TownId, "town");
 newtype!(BgmId, "bgm");
+newtype!(ChcpId, "chcp");
 
 macro when {
 	($t1:tt) => {},
@@ -255,67 +258,77 @@ macro unless {
 	($t:tt,$v:tt) => { $t },
 }
 
-macro parse_data($d:expr, $c:expr => $head:pat, {
-	$($k:ident $(: $t:ty)? $(=> $e:expr)?),* $(,)?
-}) {
-	let d = $d;
-	let c = $c;
-	let head = d.head.parse(c);
+macro parse_data {
+	($d:expr, $c:expr => $head:pat) => {
+		let d = $d;
+		let c = $c;
+		if d.body.is_some() {
+			Diag::error(d.head.end, "a body is not allowed here").emit();
+		}
+		let $head = d.head.parse(c)?;
+	},
+	($d:expr, $c:expr => $head:pat, {
+		$($k:ident $(: $t:ty)? $(=> $e:expr)?),* $(,)?
+	}) => {
+		let d = $d;
+		let c = $c;
+		let head = d.head.parse(c);
 
-	$($(let mut $k: One<Option<$t>> = One::Empty;)?)*
-	let Some(body) = &d.body else {
-		Diag::error(d.head.end, "a body is required here").emit();
-		Err(Error)?;
-		unreachable!()
-	};
-	for line in body {
-		let head = &line.head.key;
-		match head.1.as_str() {
-			$(stringify!($k) => {
-				let _val = unless!($({
-					let a: Result<_> = $e(line);
-					a
-				})?, {
-					if line.body.is_some() {
-						Diag::error(d.head.end, "body is not allowed here").emit();
-					}
-					line.head.parse(c)
-				});
+		$($(let mut $k: One<Option<$t>> = One::Empty;)?)*
+		let Some(body) = &d.body else {
+			Diag::error(d.head.end, "a body is required here").emit();
+			Err(Error)?;
+			unreachable!()
+		};
+		for line in body {
+			let head = &line.head.key;
+			match head.1.as_str() {
+				$(stringify!($k) => {
+					let _val = unless!($({
+						let a: Result<_> = $e(line);
+						a
+					})?, {
+						if line.body.is_some() {
+							Diag::error(d.head.end, "body is not allowed here").emit();
+						}
+						line.head.parse(c)
+					});
 
-				unless!($({
-					when!($t);
-					$k.set(head.0, _val.ok());
-				})?, {
-					let _: Result<()> = _val;
-				});
-			})*
-			_ => {
-				Diag::error(head.0, "unknown field")
-					.note(head.0, format_args!("allowed fields are {}", [
-						$(concat!("'", stringify!($k), "'"),)*
-					].join(", ")))
-					.emit();
+					unless!($({
+						when!($t);
+						$k.set(head.0, _val.ok());
+					})?, {
+						let _: Result<()> = _val;
+					});
+				})*
+				_ => {
+					Diag::error(head.0, "unknown field")
+						.note(head.0, format_args!("allowed fields are {}", [
+							$(concat!("'", stringify!($k), "'"),)*
+						].join(", ")))
+						.emit();
+				}
 			}
 		}
-	}
-	let mut failures = Vec::new();
-	$($(when!($t);
-		let $k = $k.optional();
-		if $k.is_none() {
-			failures.push(concat!("'", stringify!($k), "'"));
+		let mut failures = Vec::new();
+		$($(when!($t);
+			let $k = $k.optional();
+			if $k.is_none() {
+				failures.push(concat!("'", stringify!($k), "'"));
+			}
+		)?)*;
+		if !failures.is_empty() {
+			Diag::error(d.head.span(), "missing fields")
+				.note(d.head.span(), failures.join(", "))
+				.emit();
+			Err(Error)?;
+			unreachable!()
 		}
-	)?)*;
-	if !failures.is_empty() {
-		Diag::error(d.head.span(), "missing fields")
-			.note(d.head.span(), failures.join(", "))
-			.emit();
-		Err(Error)?;
-		unreachable!()
-	}
 
-	#[allow(clippy::let_unit_value)]
-	let $head = head?;
-	$($(let Some($k): $t = $k.unwrap() else { Err(Error)?; unreachable!() };)?)*
+		#[allow(clippy::let_unit_value)]
+		let $head = head?;
+		$($(let Some($k): $t = $k.unwrap() else { Err(Error)?; unreachable!() };)?)*
+	}
 }
 
 fn no_body(d: &Data) {
@@ -362,6 +375,42 @@ impl<T> One<T> {
 	}
 }
 
+#[derive(Debug, Clone)]
+struct Many<K, V>(BTreeMap<K, (Span, V)>);
+
+impl<K, V> Default for Many<K, V> {
+	fn default() -> Self {
+		Self(Default::default())
+	}
+}
+
+impl<K: Ord, V> Many<K, V> {
+	fn insert(&mut self, s: Span, n: K, v: V) {
+		if let Some((prev, _)) = self.0.get(&n) {
+			Diag::error(s, "duplicate item")
+				.note(*prev, "previous here")
+				.emit();
+		}
+		self.0.insert(n, (s, v));
+	}
+
+	fn finish(self, f: impl Fn(K) -> usize) -> Vec<V> {
+		let mut vs = Vec::with_capacity(self.0.len());
+		let mut expect = 0;
+		for (k, (s, v)) in self.0 {
+			let k = f(k);
+			if k != expect {
+				Diag::error(s, "gap in list")
+					.note(s, format_args!("missing index {expect}"))
+					.emit();
+			}
+			expect = k + 1;
+			vs.push(v)
+		}
+		vs
+	}
+}
+
 pub mod scena {
 	use super::*;
 
@@ -384,6 +433,7 @@ pub mod scena {
 		struct ScenaBuild {
 			header: One<Header>,
 			entry: One<Entry>,
+			chcp: Many<ChcpId, FileId>,
 		}
 
 		pub fn lower(file: &File, lookup: Option<&dyn Lookup>) {
@@ -406,8 +456,8 @@ pub mod scena {
 										flags: _,
 										unk: _,
 										scp => |l: &Data| {
-											let (S(s, n), v) = l.head.parse::<(S<u32>, FileId)>(ctx)?;
-											no_body(l);
+											parse_data!(l, ctx => (S(s, n), v));
+											let n: u32 = n;
 											if n >= 6 {
 												Diag::error(s, "only values 0-5 allowed").emit();
 												return Err(Error)
@@ -442,6 +492,8 @@ pub mod scena {
 									});
 								}
 								"chcp" => {
+									parse_data!(d, ctx => (S(s, n), v));
+									scena.chcp.insert(d.head.key.0 | s, n, v);
 								}
 								"npc" => {
 								}
@@ -472,6 +524,7 @@ pub mod scena {
 					}
 				};
 			}
+			let scp = scena.chcp.finish(|a| a.0 as usize);
 		}
 	}
 }

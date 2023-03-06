@@ -69,6 +69,8 @@ pub fn lower(file: &File, lookup: Option<&dyn Lookup>) {
 			NpcOrMonster::Monster(m) => monsters.push(m),
 		}
 	}
+	let npcs = npcs;
+	let monsters = monsters;
 
 	let look_points = scena.look_points.finish(|a| a.0 as usize);
 	let labels = scena.labels.finish(|a| a.0 as usize);

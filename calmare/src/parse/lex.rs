@@ -63,7 +63,7 @@ impl<'a, 'b> PartialOrd<Indent<'b>> for Option<Indent<'a>> {
 #[derive(Clone)]
 struct Lex<'a> {
 	src: &'a str,
-	pos_: &'a str,
+	pos: &'a str,
 	last_indent: Option<Indent<'a>>,
 }
 
@@ -71,7 +71,7 @@ impl<'a> Lex<'a> {
 	fn new(src: &'a str) -> Self {
 		let mut new = Lex {
 			src,
-			pos_: src,
+			pos: src,
 			last_indent: None,
 		};
 		new.space();
@@ -82,20 +82,20 @@ impl<'a> Lex<'a> {
 	}
 
 	fn is_empty(&self) -> bool {
-		self.pos_.is_empty()
+		self.pos.is_empty()
 	}
 
 	// TODO track some whitespace-aware positions too:
 	// - position before any space
 	// - position before indentation (i.e. start of line)
 	fn pos(&self) -> Span {
-		let r = range_of(self.src.as_bytes(), self.pos_.as_bytes()).unwrap();
+		let r = range_of(self.src.as_bytes(), self.pos.as_bytes()).unwrap();
 		Span::new_at(r.start)
 	}
 
 	fn pat_<P: Pattern<'a> + 'a>(&mut self, p: P) -> Option<Span> {
 		let i0 = self.pos();
-		self.pos_ = self.pos_.strip_prefix(p)?;
+		self.pos = self.pos.strip_prefix(p)?;
 		self.last_indent = None;
 		Some(i0 | self.pos())
 	}
@@ -409,12 +409,12 @@ impl std::fmt::Debug for TextToken<'_> {
 fn text_tokens<'a>(indent: Indent, i: &mut Lex<'a>) -> Option<Vec<Spanned<TextToken<'a>>>> {
 	let mut out = Vec::new();
 
-	let p = i.pos_;
+	let p = i.pos;
 	i.pat_mul([' ', '\t']);
 	if i.pat('\n').is_some() {
 		i.last_indent = Some(Indent(i.pat_mul([' ', '\t'])));
 	} else {
-		i.pos_ = p;
+		i.pos = p;
 	}
 
 	let mut i0 = i.pos();

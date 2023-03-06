@@ -42,8 +42,27 @@ pub fn lower(file: &File, lookup: Option<&dyn Lookup>) {
 			},
 		}
 	}
+
 	let scp = scena.chcp.finish(|a| a.0 as usize);
-	let npcs_monsters = scena.npcs_monsters.finish(|a| a.0 as usize);
+
+	let misorder = scena.npcs_monsters.0.iter()
+		.skip_while(|a| matches!(&a.1.1, NpcOrMonster::Npc(_)))
+		.find(|a| matches!(&a.1.1, NpcOrMonster::Npc(_)));
+	if let Some((k, (s, _))) = misorder {
+		let (_, (prev, _)) = scena.npcs_monsters.0.range(..k).last().unwrap();
+		Diag::error(*prev, "monsters must come after npcs")
+			.note(*s, "is before this npc")
+			.emit();
+	}
+
+	let mut npcs = Vec::new();
+	let mut monsters = Vec::new();
+	for m in scena.npcs_monsters.finish(|a| a.0 as usize) {
+		match m {
+			NpcOrMonster::Npc(n) => npcs.push(n),
+			NpcOrMonster::Monster(m) => monsters.push(m),
+		}
+	}
 }
 
 fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {

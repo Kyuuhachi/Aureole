@@ -1,9 +1,12 @@
 use super::*;
 
-use themelios::scena::ed7::*;
+use themelios::scena::{ed7::*, code::FlatInsn};
 
 themelios::util::newtype!(CharDefId, u16);
 newtype!(CharDefId, "char");
+
+themelios::util::newtype!(FuncId, u16);
+newtype!(FuncId, "fn");
 
 newtype!(SepithId, "sepith");
 newtype!(AtRollId, "at_roll");
@@ -51,6 +54,7 @@ struct ScenaBuild {
 	at_rolls: Many<AtRollId, [u8; 16]>,
 	placements: Many<PlacementId, [(u8, u8, Angle); 8]>,
 	battles: Many<BattleId, Battle>,
+	functions: Many<FuncId, Vec<FlatInsn>>,
 }
 
 pub fn lower(file: &File, lookup: Option<&dyn Lookup>) -> Result<Scena> {
@@ -59,7 +63,10 @@ pub fn lower(file: &File, lookup: Option<&dyn Lookup>) -> Result<Scena> {
 	for decl in &file.decls {
 		match decl {
 			Decl::Function(Function { id, body }) => {
-				// lower_scena_function(body);
+				if let Ok(id1) = parse_one(ctx, id) {
+					let f = lower_func(ctx, body).unwrap_or_default();
+					scena.functions.insert(id.0, id1, f);
+				}
 			}
 			Decl::Data(d) => {
 				let _ = lower_data(&mut scena, ctx, d);
@@ -106,7 +113,7 @@ pub fn lower(file: &File, lookup: Option<&dyn Lookup>) -> Result<Scena> {
 		look_points: scena.look_points.get(|a| a.0 as usize),
 		animations: scena.animations.get(|a| a.0 as usize),
 		entry: scena.entry.get(),
-		functions: todo!(),
+		functions: scena.functions.get(|a| a.0 as usize),
 		sepith: scena.sepith.get(|a| a.0 as usize),
 		at_rolls: scena.at_rolls.get(|a| a.0 as usize),
 		placements: scena.placements.get(|a| a.0 as usize),

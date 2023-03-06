@@ -89,6 +89,15 @@ impl KeyVal {
 	}
 }
 
+fn parse_one<T: Val>(ctx: &Context, t: &S<Term>) -> Result<T> {
+	let kv = KeyVal {
+		key: S(t.0, String::new()),
+		terms: vec![t.clone()], // inefficient but whatever
+		end: t.0.at_end(),
+	};
+	kv.parse(ctx)
+}
+
 trait Val: Sized {
 	fn parse(p: &mut Parse) -> Result<Self>;
 }
@@ -484,7 +493,7 @@ pub mod scena;
 
 #[test]
 fn main() {
-	let src = include_str!("/tmp/kiseki/ao_gf_en/a0000");
+	let src = include_str!("/tmp/kiseki/ao_gf_en/c1200");
 	let (v, diag) = super::diag::diagnose(|| {
 		let tok = crate::parse::lex::lex(src);
 		let ast = crate::parse::parse::parse(&tok).unwrap();

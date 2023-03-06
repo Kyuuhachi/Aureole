@@ -75,16 +75,14 @@ fn lower_tree(ctx: &Context, insns: &[S<Code>], can_break: bool, can_continue: b
 				let mut seen = Many::default(); // only used for duplicate checking, not order
 				for (k, b) in bs {
 					let b = lower_tree(ctx, b.as_slice(), true, can_continue);
-					let i = k.parse_with(ctx, |p| {
-						if let Some(i) = p.term("case")? {
-							Ok(Some(i))
-						} else if let Some(()) = p.term("default")? {
-							Ok(None)
-						} else {
-							Diag::error(p.pos(), "expected 'case' or 'default'").emit();
+					let i = match k.key.1.as_str() {
+						"case" => k.parse(ctx).map(Some),
+						"default" => k.parse(ctx).map(|()| None),
+						_ => {
+							Diag::error(k.span(), "expected 'case' or 'default'").emit();
 							Err(Error)
 						}
-					});
+					};
 					if let Ok(i) = i {
 						seen.insert(*s, i, ());
 						cases.push((i, b))

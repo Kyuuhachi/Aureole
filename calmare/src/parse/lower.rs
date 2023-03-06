@@ -488,7 +488,7 @@ pub mod scena;
 
 #[test]
 fn main() {
-	let src = include_str!("/tmp/kiseki/ao_gf_en/c1200");
+	let src = include_str!("/tmp/kiseki/ao_gf_en/a0000");
 	let (v, diag) = super::diag::diagnose(|| {
 		let tok = crate::parse::lex::lex(src);
 		let ast = crate::parse::parse::parse(&tok).unwrap();

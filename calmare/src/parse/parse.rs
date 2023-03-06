@@ -51,6 +51,7 @@ impl<'a> Parse<'a> {
 			self.pos += 1;
 			Ok(t)
 		} else {
+			Diag::error(self.eof, "unexpected end").emit();
 			Err(Error)
 		}
 	}
@@ -403,7 +404,7 @@ fn parse_atom(p: &mut Parse) -> Result<S<Expr>> {
 			} else {
 				let key = parse_insn_name(p)?;
 				let mut terms = Vec::new();
-				while let Some(t) = try_parse_term(p)? {
+				while !p.is_empty() && let Some(t) = try_parse_term(p)? {
 					terms.push(t);
 				}
 				Expr::Insn(KeyVal { key, terms, end: p.next_pos() })

@@ -323,6 +323,7 @@ newtype!(Flag, "flag");
 newtype!(AnimId, "anim");
 newtype!(LookPointId, "look_point");
 newtype!(LabelId, "label");
+newtype!(TriggerId, "trigger");
 
 macro when {
 	($t1:tt) => {},

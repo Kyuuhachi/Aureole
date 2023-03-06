@@ -25,12 +25,25 @@ pub enum NpcOrMonster {
 	Monster(Monster),
 }
 
+struct FPos3(f32, f32, f32);
+impl Val for FPos3 {
+	fn parse(p: &mut Parse) -> Result<Self> {
+		if let Some((x, y, z)) = p.term("")? {
+			Ok(FPos3(x, y, z))
+		} else {
+			Diag::error(p.pos(), "expected fpos3").emit();
+			Err(Error)
+		}
+	}
+}
+
 #[derive(Debug, Clone, Default)]
 struct ScenaBuild {
 	header: One<Header>,
 	entry: One<Entry>,
 	chcp: Many<ChcpId, FileId>,
 	npcs_monsters: Many<CharDefId, NpcOrMonster>,
+	triggers: Many<TriggerId, Trigger>,
 	look_points: Many<LookPointId, LookPoint>,
 	labels: Many<LabelId, Label>,
 	animations: Many<AnimId, Animation>,
@@ -89,7 +102,7 @@ pub fn lower(file: &File, lookup: Option<&dyn Lookup>) -> Result<Scena> {
 		labels: Some(scena.labels.get(|a| a.0 as usize)),
 		npcs,
 		monsters,
-		triggers: todo!(),
+		triggers: scena.triggers.get(|a| a.0 as usize),
 		look_points: scena.look_points.get(|a| a.0 as usize),
 		animations: scena.animations.get(|a| a.0 as usize),
 		entry: scena.entry.get(),
@@ -188,6 +201,34 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 				chcp, unk2, stand_anim, walk_anim,
 			}));
 		}
+		"trigger" => {
+			parse_data!(d, ctx => S(s, n), {
+				pos,
+				radius,
+				transform,
+				unk1,
+				unk2,
+				function,
+				unk3,
+				unk4,
+				unk5,
+				unk6,
+			});
+			let FPos3(x, y, z) = pos;
+			let radius: f32 = radius;
+			scena.triggers.insert(d.head.key.0 | s, n, Trigger {
+				pos: (x / 1000., y / 1000., z / 1000.),
+				radius: radius / 1000.,
+				transform,
+				unk1,
+				unk2,
+				function,
+				unk3,
+				unk4,
+				unk5,
+				unk6,
+			});
+		}
 		"look_point" => {
 			parse_data!(d, ctx => S(s, n), {
 				pos,
@@ -211,17 +252,6 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 			});
 		}
 		"label" => {
-			struct FPos3(f32, f32, f32);
-			impl Val for FPos3 {
-				fn parse(p: &mut Parse) -> Result<Self> {
-					if let Some((x, y, z)) = p.term("")? {
-						Ok(FPos3(x, y, z))
-					} else {
-						Diag::error(p.pos(), "expected fpos3").emit();
-						Err(Error)
-					}
-				}
-			}
 			parse_data!(d, ctx => S(s, n), {
 				name,
 				pos,
@@ -328,8 +358,10 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 		}
 		_ => {
 			Diag::error(d.head.key.0, "unknown declaration")
-				.note(d.head.key.0, "expected 'scena', 'entry', 'chcp', 'npc', 'monster', 'look_point', \
-					  'label', 'anim', 'sepith', 'at_roll', 'placement', 'battle', 'fn'")
+				.note(d.head.key.0, "expected \
+					'scena', 'entry', 'chcp', 'npc', 'monster', \
+					'trigger', 'look_point', 'label', 'anim', \
+					'sepith', 'at_roll', 'placement', 'battle', 'fn'")
 				.emit();
 		}
 	}

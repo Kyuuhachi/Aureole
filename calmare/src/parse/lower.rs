@@ -1,9 +1,36 @@
 use themelios::scena::*;
 use themelios::types::*;
+use themelios_archive::Lookup;
 
 use super::diag::*;
 use crate::ast::*;
 use crate::span::{Spanned as S, Span};
+
+#[derive(Clone, Copy)]
+struct Context<'a> {
+	game: Game,
+	ty: FileType,
+	lookup: &'a dyn Lookup,
+}
+impl<'a> Context<'a> {
+    fn new(file: &File, lookup: Option<&'a dyn Lookup>) -> Self {
+		Context {
+			game: file.game,
+			ty: file.ty,
+			lookup: lookup.unwrap_or_else(|| crate::util::default_lookup(file.game)),
+		}
+    }
+}
+
+impl<'a> std::fmt::Debug for Context<'a> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("Context")
+			.field("game", &self.game)
+			.field("ty", &self.ty)
+			.field("lookup", &format_args!("_"))
+			.finish()
+	}
+}
 
 #[derive(Debug, Clone)]
 pub struct Error;
@@ -13,11 +40,12 @@ type Result<T, E=Error> = std::result::Result<T, E>;
 pub struct Parse<'a> {
 	key_val: &'a KeyVal,
 	pos: usize,
+	context: &'a Context<'a>,
 }
 
 impl<'a> Parse<'a> {
-	fn new(key_val: &'a KeyVal) -> Self {
-		Parse { key_val, pos: 0 }
+	fn new(key_val: &'a KeyVal, context: &'a Context<'a>) -> Self {
+		Parse { key_val, pos: 0, context }
 	}
 
 	fn pos(&self) -> Span {
@@ -39,8 +67,8 @@ impl<'a> Parse<'a> {
 }
 
 impl KeyVal {
-	fn parse<V: Val>(&self) -> Result<V> {
-		let mut a = Parse::new(self);
+	fn parse<V: Val>(&self, context: &Context) -> Result<V> {
+		let mut a = Parse::new(self, context);
 		let v = V::parse(&mut a)?;
 		if let Some(a) = a.peek() {
 			Diag::error(a.0, "expected end of data").emit();
@@ -142,7 +170,7 @@ impl Val for Pos3 {
 	fn parse(p: &mut Parse) -> Result<Self> {
 		if let Some(S(_, Term::Tuple(s))) = p.peek() {
 			p.next()?;
-			let (x, y, z) = s.parse()?;
+			let (x, y, z) = s.parse(p.context)?;
 			Ok(Pos3(x, y, z))
 		} else {
 			Diag::error(p.pos(), "expected pos3").emit();
@@ -155,8 +183,26 @@ impl Val for FuncRef {
 	fn parse(p: &mut Parse) -> Result<Self> {
 		if let Some(S(_, Term::Struct(s))) = p.peek() && s.key.1 == "fn" {
 			p.next()?;
-			let (a, b) = s.parse()?;
+			let (a, b) = s.parse(p.context)?;
 			Ok(FuncRef(a, b))
+		} else {
+			Diag::error(p.pos(), "expected pos3").emit();
+			Err(Error)
+		}
+	}
+}
+
+impl Val for FileId {
+	fn parse(p: &mut Parse) -> Result<Self> {
+		if let Some(S(_, Term::Struct(s))) = p.peek() && s.key.1 == "file" {
+			p.next()?;
+			Ok(FileId(s.parse(p.context)?))
+		} else if let Some(S(sp, Term::String(s))) = p.peek() {
+			p.next()?;
+			Ok(FileId(p.context.lookup.index(s).unwrap_or_else(|| {
+				Diag::error(sp, "could not resolve file id").emit();
+				0x00000000
+			})))
 		} else {
 			Diag::error(p.pos(), "expected pos3").emit();
 			Err(Error)
@@ -169,7 +215,7 @@ macro newtype($T:ident, $s:literal) {
 		fn parse(p: &mut Parse) -> Result<Self> {
 			if let Some(S(_, Term::Struct(k))) = p.peek() && k.key.1 == $s {
 				p.next()?;
-				Ok(Self(k.parse()?))
+				Ok(Self(k.parse(p.context)?))
 			} else {
 				Diag::error(p.pos(), format_args!("expected '{}'", $s)).emit();
 				Err(Error)
@@ -190,11 +236,12 @@ macro unless {
 	($t:tt,$v:tt) => { $t },
 }
 
-macro parse_data($d:expr => $head:pat, {
+macro parse_data($d:expr, $c:expr => $head:pat, {
 	$($k:ident $(: $t:ty)? $(=> $e:expr)?),* $(,)?
 }) {
 	let d = $d;
-	let head = d.head.parse();
+	let c = $c;
+	let head = d.head.parse(c);
 
 	$($(let mut $k: Option<S<Option<$t>>> = None;)?)*
 	let Some(body) = &d.body else {
@@ -213,7 +260,7 @@ macro parse_data($d:expr => $head:pat, {
 					if line.body.is_some() {
 						Diag::error(d.head.end, "body is not allowed here").emit();
 					}
-					line.head.parse()
+					line.head.parse(c)
 				});
 
 				unless!($({
@@ -256,11 +303,17 @@ macro parse_data($d:expr => $head:pat, {
 	$($(let Some($k): $t = $k.unwrap().1 else { Err(Error)?; unreachable!() };)?)*
 }
 
-pub fn lower(file: &File) {
+fn no_body(d: &Data) {
+	if d.body.is_some() {
+		Diag::error(d.head.end, "a body is not allowed here").emit();
+	}
+}
+
+pub fn lower(file: &File, lookup: Option<&dyn Lookup>) {
 	match file.ty {
 		FileType::Scena => {
 			if file.game.is_ed7() {
-				scena::ed7::lower(file);
+				scena::ed7::lower(file, lookup);
 			} else {
 				todo!();
 				// lower_ed6_scena(&file);
@@ -287,7 +340,8 @@ pub mod scena {
 			pub scp: Vec<(u8, FileId)>,
 		}
 
-		pub fn lower(file: &File) {
+		pub fn lower(file: &File, lookup: Option<&dyn Lookup>) {
+			let ctx = &Context::new(file, lookup);
 			for decl in &file.decls {
 				let _: Result<()> = try {
 					match decl {
@@ -298,20 +352,22 @@ pub mod scena {
 							match d.head.key.1.as_str() {
 								"scena" => {
 									let mut scp = Vec::new();
-									parse_data!(d => (), {
+									parse_data!(d, ctx => (), {
 										name: _,
 										town: _,
 										bgm: _,
 										flags: _,
 										unk: _,
-										scp => |l| {
+										scp => |l: &Data| {
+											scp.push(l.head.parse(ctx)?);
+											no_body(l);
 											Ok(())
 										}
 									});
 									println!("{:#?}", Header { name, town, bgm, flags, unk, scp });
 								}
 								"entry" => {
-									parse_data!(d => (), {
+									parse_data!(d, ctx => (), {
 										pos: _,
 										unk1: _,
 										cam_from: _,
@@ -506,7 +562,7 @@ fn main() {
 	let (v, diag) = super::diag::diagnose(|| {
 		let tok = crate::parse::lex::lex(src);
 		let ast = crate::parse::parse::parse(&tok).unwrap();
-		lower(&ast)
+		lower(&ast, None)
 	});
 	println!("{:#?}", v);
 	super::diag::print_diags("<input>", src, &diag);

@@ -7,6 +7,7 @@ pub mod ed6;
 pub mod ed7;
 mod writer;
 pub mod common;
+pub mod util;
 
 pub use writer::Context;
 

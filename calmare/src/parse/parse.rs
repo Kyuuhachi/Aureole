@@ -1,3 +1,5 @@
+use total_float::F64;
+
 use super::lex::*;
 use super::diag::Diag;
 use crate::ast::*;
@@ -99,6 +101,16 @@ fn parse_int(p: &mut Parse) -> Result<S<u64>> {
 	}
 }
 
+fn parse_float(p: &mut Parse) -> Result<S<F64>> {
+	match p.next()? {
+		S(s, Token::Float(v)) => Ok(S(s, *v)),
+		S(s, _) => {
+			Diag::error(s, "expected float").emit();
+			Err(Error)
+		}
+	}
+}
+
 fn parse_ident(p: &mut Parse) -> Result<S<String>> {
 	match p.next()? {
 		S(s, Token::Ident(v)) => Ok(S(s, (*v).to_owned())),
@@ -166,16 +178,33 @@ fn try_parse_term(p: &mut Parse) -> Result<Option<S<Term>>> {
 		Token::String(s) => {
 			Term::String(s.clone())
 		}
+
 		Token::Int(_) => {
-			p.rewind();
-			let n = parse_int(p)?.map(|a| a as i64);
+			let s = p.prev_span();
+			let Token::Int(n) = t.1 else { unreachable!() };
 			let unit = parse_unit(p)?;
-			Term::Int(n, unit)
+			Term::Int(S(s, *n as i64), unit)
 		}
 		Token::Minus if p.is_tight() && matches!(p.peek(), Some(S(_, Token::Int(_)))) => {
-			let n = parse_int(p)?.map(|a| -(a as i64));
+			let s = p.prev_span();
+			let Token::Int(n) = p.next()?.1 else { unreachable!() };
+			let s = s | p.prev_span();
 			let unit = parse_unit(p)?;
-			Term::Int(n, unit)
+			Term::Int(S(s, -(*n as i64)), unit)
+		}
+
+		Token::Float(_) => {
+			let s = p.prev_span();
+			let Token::Float(n) = t.1 else { unreachable!() };
+			let unit = parse_unit(p)?;
+			Term::Float(S(s, *n), unit)
+		}
+		Token::Minus if p.is_tight() && matches!(p.peek(), Some(S(_, Token::Float(_)))) => {
+			let s = p.prev_span();
+			let Token::Float(n) = p.next()?.1 else { unreachable!() };
+			let s = s | p.prev_span();
+			let unit = parse_unit(p)?;
+			Term::Float(S(s, F64(-n.0)), unit)
 		}
 
 		Token::Paren(d) => Term::Term(parse_delim(S(t.0, String::new()), d, "parenthesis")?),

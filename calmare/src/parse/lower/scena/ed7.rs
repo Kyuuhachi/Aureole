@@ -27,6 +27,12 @@ struct ScenaBuild {
 	entry: One<Entry>,
 	chcp: Many<ChcpId, FileId>,
 	npcs_monsters: Many<CharDefId, NpcOrMonster>,
+	look_points: Many<LookPointId, LookPoint>,
+	labels: Many<LabelId, Label>,
+	animations: Many<AnimId, Animation>,
+	sepith: Many<SepithId, [u8; 8]>,
+	at_rolls: Many<AtRollId, [u8; 16]>,
+	battles: Many<BattleId, Battle>,
 }
 
 pub fn lower(file: &File, lookup: Option<&dyn Lookup>) {
@@ -63,6 +69,13 @@ pub fn lower(file: &File, lookup: Option<&dyn Lookup>) {
 			NpcOrMonster::Monster(m) => monsters.push(m),
 		}
 	}
+
+	let look_points = scena.look_points.finish(|a| a.0 as usize);
+	let labels = scena.labels.finish(|a| a.0 as usize);
+	let animations = scena.animations.finish(|a| a.0 as usize);
+	let sepith = scena.sepith.finish(|a| a.0 as usize);
+	let at_rolls = scena.at_rolls.finish(|a| a.0 as usize);
+	let battles = scena.battles.finish(|a| a.0 as usize);
 }
 
 fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
@@ -150,8 +163,54 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 			}));
 		}
 		"look_point" => {
+			parse_data!(d, ctx => S(s, n), {
+				pos: _,
+				radius: _,
+				bubble_pos: _,
+				unk1: _,
+				unk2: _,
+				function: _,
+				unk3: _,
+				unk4: _,
+			});
+			scena.look_points.insert(d.head.key.0 | s, n, LookPoint {
+				pos,
+				radius,
+				bubble_pos,
+				unk1,
+				unk2,
+				function,
+				unk3,
+				unk4,
+			});
 		}
 		"label" => {
+			parse_data!(d, ctx => S(s, n), {
+				name: _,
+				pos: _ => |l: &Data| {
+					struct FPos3(f32, f32, f32);
+					impl Val for FPos3 {
+						fn parse(p: &mut Parse) -> Result<Self> {
+							if let Some((x, y, z)) = p.term("")? {
+								Ok(FPos3(x, y, z))
+							} else {
+								Diag::error(p.pos(), "expected fpos3").emit();
+								Err(Error)
+							}
+						}
+					}
+					parse_data!(l, ctx => FPos3(x,y,z));
+					Ok((x / 1000., y / 1000., z / 1000.))
+				},
+				unk1: _,
+				unk2: _,
+			});
+			scena.labels.insert(d.head.key.0 | s, n, Label {
+				name,
+				pos,
+				unk1,
+				unk2,
+			});
 		}
 		"anim" => {
 		}

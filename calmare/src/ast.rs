@@ -1,4 +1,5 @@
 pub use themelios::types::Game;
+use total_float::F64;
 
 use crate::span::{Spanned as S, Span};
 
@@ -56,6 +57,7 @@ pub struct Data {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Term {
 	Int(S<i64>, S<Unit>),
+	Float(S<F64>, S<Unit>),
 	String(String),
 	Term(KeyVal),
 	Text(Vec<S<TextSegment>>),

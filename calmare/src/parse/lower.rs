@@ -210,6 +210,28 @@ macro unit($T:ident, $unit:ident, $unit_str:literal) {
 
 unit!(Angle, Deg, "deg");
 
+impl Val for f32 {
+	fn parse(p: &mut Parse) -> Result<Self> {
+		if let Some(Term::Float(s, u)) = p.peek() {
+			p.next()?;
+			if u.1 != Unit::None {
+				Diag::warn(u.0, "this should be unitless").emit();
+			}
+			Ok(s.1.0 as f32)
+		} else if let Some(Term::Int(s, u)) = p.peek() {
+			p.next()?;
+			if u.1 != Unit::None {
+				Diag::warn(u.0, "this should be unitless").emit();
+			}
+			Ok(s.1 as f32)
+		} else {
+			Diag::error(p.pos(), "expected int").emit();
+			Err(Error)
+		}
+	}
+}
+
+
 impl Val for Pos3 {
 	fn parse(p: &mut Parse) -> Result<Self> {
 		if let Some((x, y, z)) = p.term("")? {
@@ -269,6 +291,8 @@ newtype!(ChcpId, "chcp");
 newtype!(BattleId, "battle");
 newtype!(Flag, "flag");
 newtype!(AnimId, "anim");
+newtype!(LookPointId, "look_point");
+newtype!(LabelId, "label");
 
 macro when {
 	($t1:tt) => {},
@@ -337,7 +361,7 @@ macro parse_data {
 			if $k.is_none() {
 				failures.push(concat!("'", stringify!($k), "'"));
 			}
-		)?)*;
+		)?)*
 		if !failures.is_empty() {
 			Diag::error(d.head.span(), "missing fields")
 				.note(d.head.span(), failures.join(", "))

@@ -215,6 +215,11 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 			});
 		}
 		"anim" => {
+			parse_data!(d, ctx => (S(s, n), speed, frames));
+			scena.animations.insert(d.head.key.0 | s, n, Animation {
+				speed,
+				frames,
+			});
 		}
 		"sepith" => {
 		}

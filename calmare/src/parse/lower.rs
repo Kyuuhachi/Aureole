@@ -128,6 +128,16 @@ tuple!(A B C D E F G H I);
 tuple!(A B C D E F G H I J);
 tuple!(A B C D E F G H I J K);
 
+impl<T: Val> Val for Vec<T> {
+	fn parse(p: &mut Parse) -> Result<Self> {
+		let mut v = Vec::new();
+		while p.peek().is_some() {
+			v.push(T::parse(p)?);
+		}
+		Ok(v)
+	}
+}
+
 macro int($T:ident $(=> $(#$CONV:ident)?)?) {
 	impl Val for $T {
 		fn parse(p: &mut Parse) -> Result<Self> {
@@ -209,6 +219,7 @@ macro unit($T:ident, $unit:ident, $unit_str:literal) {
 }
 
 unit!(Angle, Deg, "deg");
+unit!(Time, Ms, "ms");
 
 impl Val for f32 {
 	fn parse(p: &mut Parse) -> Result<Self> {

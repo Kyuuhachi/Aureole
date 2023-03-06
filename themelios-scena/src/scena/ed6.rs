@@ -13,7 +13,7 @@ pub struct Scena {
 	pub town: TownId, // [Town; 町名]
 	pub bgm: BgmId, // [BGM; BGM 番号]
 	pub item: FuncRef, // [Item; アイテム使用時イベント]
-	pub includes: [Option<FileId>; 8], // [Scp0..7; スクリプト(１つだけは必須), これ以降は必要な場合のみ定義する]
+	pub includes: [FileId; 8], // [Scp0..7; スクリプト(１つだけは必須), これ以降は必要な場合のみ定義する]
 
 	// The script puts cp before ch.
 	pub ch: Vec<FileId>, // [Char_Data; キャラデータファイル]
@@ -102,7 +102,7 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 	let town = TownId(f.u16()?);
 	let bgm = BgmId(f.u16()?);
 	let item = FuncRef(f.u16()?, f.u16()?);
-	let includes = f.multiple_loose::<8, _>(&[0xFF;4], |g| Ok(FileId(g.u32()?)))?;
+	let includes = array(|| Ok(FileId(match f.u32()? { 0xFFFFFFFF => 0, a => a}))).strict()?;
 	f.check_u16(0)?;
 
 	let head_end = f.clone().u16()? as usize;
@@ -249,7 +249,9 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	f.u16(town.0);
 	f.u16(bgm.0);
 	f.u16(item.0); f.u16(item.1);
-	f.multiple_loose::<8, _>(&[0xFF; 4], includes, |g, a| { g.u32(a.0); Ok(()) }).strict()?;
+	for i in includes {
+		f.u32(match i.0 { 0 => 0xFFFFFFFF, a => a });
+	}
 	f.u16(0);
 
 	let (l_ch, l_ch_) = Label::new();

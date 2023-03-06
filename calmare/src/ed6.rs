@@ -32,7 +32,7 @@ pub fn write(mut f: Context, scena: &ed6::Scena) -> Result<()> {
 		f.kw("bgm")?.val(bgm)?.line()?;
 		f.kw("item")?.val(item)?.line()?;
 		for (i, a) in includes.iter().enumerate() {
-			if let Some(a) = a {
+			if a.0 != 0 {
 				f.kw("scp")?.val(&(i as u16))?.val(a)?.line()?;
 			}
 		}

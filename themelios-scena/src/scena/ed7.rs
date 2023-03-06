@@ -18,7 +18,7 @@ pub struct Scena {
 	pub town: TownId,
 	pub bgm: BgmId,
 	pub flags: u32,
-	pub includes: [Option<FileId>; 6],
+	pub includes: [FileId; 6],
 
 	pub chcp: Vec<FileId>,
 	pub labels: Option<Vec<Label>>,
@@ -161,7 +161,7 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 	let town = TownId(f.u16()?);
 	let bgm = BgmId(f.u16()?);
 	let flags = f.u32()?;
-	let includes = f.multiple_loose::<6, _>(&[0xFF;4], |g| Ok(FileId(g.u32()?)))?;
+	let includes = array(|| Ok(FileId(match f.u32()? { 0xFFFFFFFF => 0, a => a}))).strict()?;
 
 	let mut strings = f.ptr32()?;
 	let strings_start = strings.pos();
@@ -529,7 +529,9 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	f.u16(scena.town.0);
 	f.u16(scena.bgm.0);
 	f.u32(scena.flags);
-	f.multiple_loose::<6, _>(&[0xFF; 4], &scena.includes, |g, a| { g.u32(a.0); Ok(()) }).strict()?;
+	for i in scena.includes {
+		f.u32(match i.0 { 0 => 0xFFFFFFFF, a => a });
+	}
 
 	let mut strings = f.ptr32();
 	strings.string(&scena.filename)?;

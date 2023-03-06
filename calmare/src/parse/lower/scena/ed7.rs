@@ -91,11 +91,11 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 		"scena" => {
 			let mut scp: [One<FileId>; 6] = [(); 6].map(|_| One::Empty);
 			parse_data!(d, ctx => (), {
-				name: _,
-				town: _,
-				bgm: _,
-				flags: _,
-				unk: _,
+				name,
+				town,
+				bgm,
+				flags,
+				unk,
 				scp => |l: &Data| {
 					parse_data!(l, ctx => (S(s, n), v));
 					let n: u32 = n;
@@ -112,20 +112,20 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 		}
 		"entry" => {
 			parse_data!(d, ctx => (), {
-				pos: _,
-				unk1: _,
-				cam_from: _,
-				cam_pers: _,
-				unk2: _,
-				cam_deg: _,
-				cam_limit: _,
-				cam_at: _,
-				unk3: _,
-				unk4: _,
-				flags: _,
-				town: _,
-				init: _,
-				reinit: _,
+				pos,
+				unk1,
+				cam_from,
+				cam_pers,
+				unk2,
+				cam_deg,
+				cam_limit,
+				cam_at,
+				unk3,
+				unk4,
+				flags,
+				town,
+				init,
+				reinit,
 			});
 			scena.entry.set(d.head.key.0, Entry {
 				pos, unk1, cam_from, cam_pers, unk2, cam_deg, cam_limit,
@@ -138,15 +138,15 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 		}
 		"npc" => {
 			parse_data!(d, ctx => S(s, n), {
-				name: _,
-				pos: _,
-				angle: _,
-				flags: _,
-				unk2: _,
-				chcp: _,
-				init: _,
-				talk: _,
-				unk4: _,
+				name,
+				pos,
+				angle,
+				flags,
+				unk2,
+				chcp,
+				init,
+				talk,
+				unk4,
 			});
 			scena.npcs_monsters.insert(d.head.key.0 | s, n, NpcOrMonster::Npc(Npc {
 				name, pos, angle, flags, unk2,
@@ -155,15 +155,15 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 		}
 		"monster" => {
 			parse_data!(d, ctx => S(s, n), {
-				pos: _,
-				angle: _,
-				flags: _,
-				battle: _,
-				flag: _,
-				chcp: _,
-				unk2: _,
-				stand_anim: _,
-				walk_anim: _,
+				pos,
+				angle,
+				flags,
+				battle,
+				flag,
+				chcp,
+				unk2,
+				stand_anim,
+				walk_anim,
 			});
 			scena.npcs_monsters.insert(d.head.key.0 | s, n, NpcOrMonster::Monster(Monster {
 				pos, angle, flags, battle, flag,
@@ -172,14 +172,14 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 		}
 		"look_point" => {
 			parse_data!(d, ctx => S(s, n), {
-				pos: _,
-				radius: _,
-				bubble_pos: _,
-				unk1: _,
-				unk2: _,
-				function: _,
-				unk3: _,
-				unk4: _,
+				pos,
+				radius,
+				bubble_pos,
+				unk1,
+				unk2,
+				function,
+				unk3,
+				unk4,
 			});
 			scena.look_points.insert(d.head.key.0 | s, n, LookPoint {
 				pos,
@@ -193,29 +193,27 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 			});
 		}
 		"label" => {
-			parse_data!(d, ctx => S(s, n), {
-				name: _,
-				pos: _ => |l: &Data| {
-					struct FPos3(f32, f32, f32);
-					impl Val for FPos3 {
-						fn parse(p: &mut Parse) -> Result<Self> {
-							if let Some((x, y, z)) = p.term("")? {
-								Ok(FPos3(x, y, z))
-							} else {
-								Diag::error(p.pos(), "expected fpos3").emit();
-								Err(Error)
-							}
-						}
+			struct FPos3(f32, f32, f32);
+			impl Val for FPos3 {
+				fn parse(p: &mut Parse) -> Result<Self> {
+					if let Some((x, y, z)) = p.term("")? {
+						Ok(FPos3(x, y, z))
+					} else {
+						Diag::error(p.pos(), "expected fpos3").emit();
+						Err(Error)
 					}
-					parse_data!(l, ctx => FPos3(x,y,z));
-					Ok((x / 1000., y / 1000., z / 1000.))
-				},
-				unk1: _,
-				unk2: _,
-			});
-			scena.labels.insert(d.head.key.0 | s, n, Label {
+				}
+			}
+			parse_data!(d, ctx => S(s, n), {
 				name,
 				pos,
+				unk1,
+				unk2,
+			});
+			let FPos3(x, y, z) = pos;
+			scena.labels.insert(d.head.key.0 | s, n, Label {
+				name,
+				pos: (x / 1000., y / 1000., z / 1000.),
 				unk1,
 				unk2,
 			});

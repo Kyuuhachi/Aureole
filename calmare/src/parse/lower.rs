@@ -156,7 +156,7 @@ macro int($T:ident $(=> $(#$CONV:ident)?)?) {
 				s.1.try_into().map_err(|e| {
 					Diag::error(s.0, e).emit();
 					Error
-				}).map(unless!($($($CONV)? $T)?, {|a| a}))
+				}).map(unless!($({$($CONV)? $T})?, {|a| a}))
 			} else {
 				Diag::error(p.pos(), "expected int").emit();
 				Err(Error)
@@ -317,8 +317,8 @@ macro when {
 	($t1:tt, $($t:tt)*) => { $($t)* }
 }
 macro unless {
-	(, $v:tt) => { $v },
-	($t:tt,$v:tt) => { $t },
+	(, {$($v:tt)*}) => { $($v)* },
+	({$($t:tt)*},{$($v:tt)*}) => { $($t)* },
 }
 
 macro parse_data {
@@ -331,37 +331,30 @@ macro parse_data {
 		let $head = d.head.parse(c)?;
 	},
 	($d:expr, $c:expr => $head:pat, {
-		$($k:ident $(: $t:ty)? $(=> $e:expr)?),* $(,)?
+		$($k:ident $(=> $e:expr)?),* $(,)?
 	}) => {
 		let d = $d;
 		let c = $c;
 		let head = d.head.parse(c);
 
-		$($(let mut $k: One<Option<$t>> = One::Empty;)?)*
+		$(unless!($({when!($e);})?, { let mut $k = One::Empty; });)*
 		let Some(body) = &d.body else {
 			Diag::error(d.head.end, "a body is required here").emit();
 			Err(Error)?;
 			unreachable!()
 		};
+
 		for line in body {
 			let head = &line.head.key;
 			match head.1.as_str() {
 				$(stringify!($k) => {
-					let _val = unless!($({
-						let a: Result<_> = $e(line);
-						a
+					unless!($({
+						let _: Result<()> = $e(line);
 					})?, {
 						if line.body.is_some() {
 							Diag::error(d.head.end, "body is not allowed here").emit();
 						}
-						line.head.parse(c)
-					});
-
-					unless!($({
-						when!($t);
-						$k.set(head.0, _val.ok());
-					})?, {
-						let _: Result<()> = _val;
+						$k.set(head.0, line.head.parse(c).ok());
 					});
 				})*
 				_ => {
@@ -374,14 +367,16 @@ macro parse_data {
 				}
 			}
 		}
+
 		#[allow(unused_mut)]
 		let mut failures: Vec<&str> = Vec::new();
-		$($(when!($t);
+		$(unless!($({when!($e);})?, {
 			let $k = $k.optional();
 			if $k.is_none() {
 				failures.push(concat!("'", stringify!($k), "'"));
 			}
-		)?)*
+		});)*
+
 		if !failures.is_empty() {
 			Diag::error(d.head.span(), "missing fields")
 				.note(d.head.span(), failures.join(", "))
@@ -392,7 +387,9 @@ macro parse_data {
 
 		#[allow(clippy::let_unit_value)]
 		let $head = head?;
-		$($(let Some($k): $t = $k.unwrap() else { Err(Error)?; unreachable!() };)?)*
+		$(unless!($({when!($e);})?, {
+			let Some($k) = $k.unwrap() else { Err(Error)?; unreachable!() };
+		});)*
 	}
 }
 

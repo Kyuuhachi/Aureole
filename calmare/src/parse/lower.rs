@@ -49,10 +49,10 @@ impl<'a> Parse<'a> {
 	}
 
 	fn pos(&self) -> Span {
-		self.peek().map_or(self.key_val.end, |a| a.0)
+		self.key_val.terms.get(self.pos).map_or(self.key_val.end, |a| a.0)
 	}
 
-	fn next(&mut self) -> Result<S<&'a Term>> {
+	fn next(&mut self) -> Result<&'a Term> {
 		if let Some(t) = self.peek() {
 			self.pos += 1;
 			Ok(t)
@@ -61,8 +61,8 @@ impl<'a> Parse<'a> {
 		}
 	}
 
-	fn peek(&self) -> Option<S<&'a Term>> {
-		self.key_val.terms.get(self.pos).map(|S(s, a)| S(*s, a))
+	fn peek(&self) -> Option<&'a Term> {
+		self.key_val.terms.get(self.pos).map(|a| &a.1)
 	}
 }
 
@@ -70,8 +70,8 @@ impl KeyVal {
 	fn parse<V: Val>(&self, context: &Context) -> Result<V> {
 		let mut a = Parse::new(self, context);
 		let v = V::parse(&mut a)?;
-		if let Some(a) = a.peek() {
-			Diag::error(a.0, "expected end of data").emit();
+		if a.peek().is_some() {
+			Diag::error(a.pos(), "expected end of data").emit();
 		}
 		Ok(v)
 	}
@@ -105,7 +105,7 @@ tuple!(A B C D E F G H I J K);
 macro int($T:ident $(=> $(#$CONV:ident)?)?) {
 	impl Val for $T {
 		fn parse(p: &mut Parse) -> Result<Self> {
-			if let Some(S(_, Term::Int(s, u))) = p.peek() {
+			if let Some(Term::Int(s, u)) = p.peek() {
 				p.next()?;
 				if u.1 != Unit::None {
 					Diag::warn(u.0, "this should be unitless").emit();
@@ -134,7 +134,7 @@ int!(EntryFlags =>);
 
 impl Val for String {
 	fn parse(p: &mut Parse) -> Result<Self> {
-		if let Some(S(_, Term::String(s))) = p.peek() {
+		if let Some(Term::String(s)) = p.peek() {
 			p.next()?;
 			Ok(s.to_owned())
 		} else {
@@ -147,7 +147,7 @@ impl Val for String {
 macro unit($T:ident, $unit:ident, $unit_str:literal) {
 	impl Val for $T {
 		fn parse(p: &mut Parse) -> Result<Self> {
-			if let Some(S(_, Term::Int(s, u))) = p.peek() {
+			if let Some(Term::Int(s, u)) = p.peek() {
 				p.next()?;
 				if u.1 != Unit::$unit {
 					Diag::warn(u.0, format_args!("unit should be '{}'", $unit_str)).emit();
@@ -168,7 +168,7 @@ unit!(Angle, Deg, "deg");
 
 impl Val for Pos3 {
 	fn parse(p: &mut Parse) -> Result<Self> {
-		if let Some(S(_, Term::Tuple(s))) = p.peek() {
+		if let Some(Term::Tuple(s)) = p.peek() {
 			p.next()?;
 			let (x, y, z) = s.parse(p.context)?;
 			Ok(Pos3(x, y, z))
@@ -181,7 +181,7 @@ impl Val for Pos3 {
 
 impl Val for FuncRef {
 	fn parse(p: &mut Parse) -> Result<Self> {
-		if let Some(S(_, Term::Struct(s))) = p.peek() && s.key.1 == "fn" {
+		if let Some(Term::Struct(s)) = p.peek() && s.key.1 == "fn" {
 			p.next()?;
 			let (a, b) = s.parse(p.context)?;
 			Ok(FuncRef(a, b))
@@ -194,13 +194,14 @@ impl Val for FuncRef {
 
 impl Val for FileId {
 	fn parse(p: &mut Parse) -> Result<Self> {
-		if let Some(S(_, Term::Struct(s))) = p.peek() && s.key.1 == "file" {
+		if let Some(Term::Struct(s)) = p.peek() && s.key.1 == "file" {
 			p.next()?;
 			Ok(FileId(s.parse(p.context)?))
-		} else if let Some(S(sp, Term::String(s))) = p.peek() {
+		} else if let Some(Term::String(s)) = p.peek() {
+			let pos = p.pos();
 			p.next()?;
 			Ok(FileId(p.context.lookup.index(s).unwrap_or_else(|| {
-				Diag::error(sp, "could not resolve file id").emit();
+				Diag::error(pos, "could not resolve file id").emit();
 				0x00000000
 			})))
 		} else {
@@ -213,7 +214,7 @@ impl Val for FileId {
 macro newtype($T:ident, $s:literal) {
 	impl Val for $T {
 		fn parse(p: &mut Parse) -> Result<Self> {
-			if let Some(S(_, Term::Struct(k))) = p.peek() && k.key.1 == $s {
+			if let Some(Term::Struct(k)) = p.peek() && k.key.1 == $s {
 				p.next()?;
 				Ok(Self(k.parse(p.context)?))
 			} else {

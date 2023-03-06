@@ -409,9 +409,13 @@ impl std::fmt::Debug for TextToken<'_> {
 fn text_tokens<'a>(indent: Indent, i: &mut Lex<'a>) -> Option<Vec<Spanned<TextToken<'a>>>> {
 	let mut out = Vec::new();
 
+	let p = i.pos_;
 	i.pat_mul([' ', '\t']);
-	i.pat('\n')?;
-	i.last_indent = Some(Indent(i.pat_mul([' ', '\t'])));
+	if i.pat('\n').is_some() {
+		i.last_indent = Some(Indent(i.pat_mul([' ', '\t'])));
+	} else {
+		i.pos_ = p;
+	}
 
 	let mut i0 = i.pos();
 	let mut s = String::new();

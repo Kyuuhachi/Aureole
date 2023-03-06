@@ -445,10 +445,10 @@ fn parse_binop(p: &mut Parse, prec: usize) -> Option<S<Binop>> {
 	}
 	prio!(4, op!(p; Eq Eq   => Binop::Eq));
 	prio!(4, op!(p; Excl Eq => Binop::Ne));
-	prio!(4, op!(p; Lt      => Binop::Lt));
 	prio!(4, op!(p; Lt Eq   => Binop::Le));
-	prio!(4, op!(p; Gt      => Binop::Gt));
+	prio!(4, op!(p; Lt      => Binop::Lt));
 	prio!(4, op!(p; Gt Eq   => Binop::Ge));
+	prio!(4, op!(p; Gt      => Binop::Gt));
 
 	prio!(1, op!(p; Pipe Pipe => Binop::BoolOr));
 	prio!(3, op!(p; Amp  Amp  => Binop::BoolAnd));

@@ -331,12 +331,6 @@ macro parse_data {
 	}
 }
 
-fn no_body(d: &Data) {
-	if d.body.is_some() {
-		Diag::error(d.head.end, "a body is not allowed here").emit();
-	}
-}
-
 pub fn lower(file: &File, lookup: Option<&dyn Lookup>) {
 	match file.ty {
 		FileType::Scena => {

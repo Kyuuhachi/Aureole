@@ -90,6 +90,21 @@ trait Val: Sized {
 	fn parse(p: &mut Parse) -> Result<Self>;
 }
 
+impl<T: Val> Val for S<T> {
+	fn parse(p: &mut Parse) -> Result<Self> {
+		let s1 = p.pos().at_start();
+		let p1 = p.pos;
+		let v = T::parse(p)?;
+		let p2 = p.pos;
+		if p1 == p2 {
+			Ok(S(s1, v))
+		} else {
+			Ok(S(p.key_val.terms[p1].0 | p.key_val.terms[p2-1].0, v))
+		}
+	}
+}
+
+
 macro tuple($($T:ident)*) {
 	impl<$($T: Val),*> Val for ($($T,)*) {
 		fn parse(_p: &mut Parse) -> Result<Self> {
@@ -341,7 +356,7 @@ pub mod scena {
 			pub bgm: BgmId,
 			pub flags: u32,
 			pub unk: (u8, u16, u8),
-			pub scp: Vec<(u8, FileId)>,
+			pub scp: [FileId; 6],
 		}
 
 		pub fn lower(file: &File, lookup: Option<&dyn Lookup>) {
@@ -355,7 +370,7 @@ pub mod scena {
 						Decl::Data(d) => {
 							match d.head.key.1.as_str() {
 								"scena" => {
-									let mut scp = Vec::new();
+									let mut scp: [Option<S<FileId>>; 6] = [None; 6];
 									parse_data!(d, ctx => (), {
 										name: _,
 										town: _,
@@ -363,11 +378,26 @@ pub mod scena {
 										flags: _,
 										unk: _,
 										scp => |l: &Data| {
-											scp.push(l.head.parse(ctx)?);
+											let (S(s, n), v) = l.head.parse::<(S<u32>, FileId)>(ctx)?;
 											no_body(l);
+											if n >= 6 {
+												Diag::error(s, "only values 0-5 allowed").emit();
+												// Diag::error(d.head.span(), "missing fields")
+												// 	.note(d.head.span(), failures.join(", "))
+												// 	.emit();
+												return Err(Error)
+											}
+											let s = l.head.key.0 | s;
+											if let Some(prev) = scp[n as usize] {
+												Diag::error(s, "duplicate key")
+													.note(prev.0, "previous here")
+													.emit();
+											}
+											scp[n as usize] = Some(S(s, v));
 											Ok(())
 										}
 									});
+									let scp = scp.map(|a| a.map(|a| a.1).unwrap_or(FileId(0)));
 									println!("{:#?}", Header { name, town, bgm, flags, unk, scp });
 								}
 								"entry" => {

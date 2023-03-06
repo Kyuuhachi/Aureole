@@ -2,6 +2,9 @@ use super::*;
 
 use themelios::scena::ed7::*;
 
+themelios::util::newtype!(CharDefId, u16);
+newtype!(CharDefId, "char");
+
 #[derive(Debug, Clone)]
 pub struct Header {
 	pub name: (String, String, String),
@@ -12,11 +15,18 @@ pub struct Header {
 	pub scp: [FileId; 6],
 }
 
+#[derive(Debug, Clone)]
+pub enum NpcOrMonster {
+	Npc(Npc),
+	Monster(Monster),
+}
+
 #[derive(Debug, Clone, Default)]
 struct ScenaBuild {
 	header: One<Header>,
 	entry: One<Entry>,
 	chcp: Many<ChcpId, FileId>,
+	npcs_monsters: Many<CharDefId, NpcOrMonster>,
 }
 
 pub fn lower(file: &File, lookup: Option<&dyn Lookup>) {
@@ -33,6 +43,7 @@ pub fn lower(file: &File, lookup: Option<&dyn Lookup>) {
 		}
 	}
 	let scp = scena.chcp.finish(|a| a.0 as usize);
+	let npcs_monsters = scena.npcs_monsters.finish(|a| a.0 as usize);
 }
 
 fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
@@ -76,7 +87,7 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 				init: _,
 				reinit: _,
 			});
-			scena.entry.set(d.head.span(), Entry {
+			scena.entry.set(d.head.key.0, Entry {
 				pos, unk1, cam_from, cam_pers, unk2, cam_deg, cam_limit,
 				cam_at, unk3, unk4, flags, town, init, reinit,
 			});
@@ -86,8 +97,38 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 			scena.chcp.insert(d.head.key.0 | s, n, v);
 		}
 		"npc" => {
+			parse_data!(d, ctx => S(s, n), {
+				name: _,
+				pos: _,
+				angle: _,
+				flags: _,
+				unk2: _,
+				chcp: _,
+				init: _,
+				talk: _,
+				unk4: _,
+			});
+			scena.npcs_monsters.insert(d.head.key.0 | s, n, NpcOrMonster::Npc(Npc {
+				name, pos, angle, flags, unk2,
+				chcp, init, talk, unk4,
+			}));
 		}
 		"monster" => {
+			parse_data!(d, ctx => S(s, n), {
+				pos: _,
+				angle: _,
+				flags: _,
+				battle: _,
+				flag: _,
+				chcp: _,
+				unk2: _,
+				stand_anim: _,
+				walk_anim: _,
+			});
+			scena.npcs_monsters.insert(d.head.key.0 | s, n, NpcOrMonster::Monster(Monster {
+				pos, angle, flags, battle, flag,
+				chcp, unk2, stand_anim, walk_anim,
+			}));
 		}
 		"look_point" => {
 		}

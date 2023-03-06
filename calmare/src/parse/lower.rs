@@ -157,6 +157,7 @@ int!(i16);
 int!(i32);
 int!(i64);
 int!(EntryFlags =>);
+int!(CharFlags =>);
 
 impl Val for String {
 	fn parse(p: &mut Parse) -> Result<Self> {
@@ -165,6 +166,23 @@ impl Val for String {
 			Ok(s.to_owned())
 		} else {
 			Diag::error(p.pos(), "expected string").emit();
+			Err(Error)
+		}
+	}
+}
+
+impl Val for TString {
+	fn parse(p: &mut Parse) -> Result<Self> {
+		if let Some(Term::Text(s)) = p.peek() {
+			p.next()?;
+			if let [S(_, TextSegment::Text(s))] = s.as_slice() {
+				Ok(TString(s.to_owned()))
+			} else {
+				Diag::error(p.pos(), "expected short text").emit();
+				Err(Error)
+			}
+		} else {
+			Diag::error(p.pos(), "expected short text").emit();
 			Err(Error)
 		}
 	}
@@ -248,6 +266,9 @@ macro newtype($T:ident, $s:literal) {
 newtype!(TownId, "town");
 newtype!(BgmId, "bgm");
 newtype!(ChcpId, "chcp");
+newtype!(BattleId, "battle");
+newtype!(Flag, "flag");
+newtype!(AnimId, "anim");
 
 macro when {
 	($t1:tt) => {},

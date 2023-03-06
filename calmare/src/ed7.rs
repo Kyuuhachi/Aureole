@@ -270,7 +270,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 			f.kw("can_move")?.val(&btl.can_move)?.line()?;
 			f.kw("move_speed")?.val(&btl.move_speed)?.line()?;
 			f.kw("unk2")?.val(&btl.unk2)?.line()?;
-			f.kw("battlefiled")?.val(&btl.battlefield)?.line()?;
+			f.kw("battlefield")?.val(&btl.battlefield)?.line()?;
 
 			f.kw("sepith")?;
 			if let Some(sepith) = &btl.sepith {

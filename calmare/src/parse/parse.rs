@@ -3,7 +3,8 @@ use super::diag::Diag;
 use crate::ast::*;
 use crate::span::{Span, Spanned as S};
 
-struct Error;
+#[derive(Clone, Debug)]
+pub struct Error;
 type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Clone, Debug)]
@@ -62,6 +63,12 @@ impl<'a> Parse<'a> {
 			true
 		} else {
 			false
+		}
+	}
+
+	fn require(&mut self, t: &Token<'a>, name: &str) {
+		if !self.test(t) {
+			Diag::error(self.next_pos(), format_args!("expected {name}")).emit();
 		}
 	}
 
@@ -154,8 +161,8 @@ fn parse_term(p: &mut Parse) -> Result<S<Term>> {
 
 fn try_parse_term(p: &mut Parse) -> Result<Option<S<Term>>> {
 	let i0 = p.next_pos();
-
-	let t = match p.next()?.1 {
+	let t = p.next()?;
+	let t = match t.1 {
 		Token::String(s) => {
 			Term::String(s.clone())
 		}
@@ -184,7 +191,7 @@ fn try_parse_term(p: &mut Parse) -> Result<Option<S<Term>>> {
 		}
 
 		Token::Ident(s) => {
-			let args = if p.is_tight() && let Some(S(_, Token::Bracket(d))) = p.peek() {
+			let terms = if p.is_tight() && let Some(S(_, Token::Bracket(d))) = p.peek() {
 				p.next()?;
 				let a = parse_delim(d, "bracket")?;
 				if a.is_empty() {
@@ -194,7 +201,7 @@ fn try_parse_term(p: &mut Parse) -> Result<Option<S<Term>>> {
 			} else {
 				Vec::new()
 			};
-			Term::Struct((*s).to_owned(), args)
+			Term::Struct(KeyVal { key: S(t.0, (*s).to_owned()), terms, end: p.prev_span().at_start() })
 		},
 
 		_ => {
@@ -225,17 +232,6 @@ fn parse_delim(d: &Delimited<Token>, name: &str) -> Result<Vec<S<Term>>> {
 	})
 }
 
-fn parse_top(line: &Line) -> Result<Decl> {
-	match line.head.first() {
-		Some(S(_, Token::Ident("fn"))) =>
-			Ok(Decl::Function(parse_fn(line)?)),
-		Some(S(_, Token::Ident("type"))) =>
-			Ok(parse_type(line).map(|(g, t)| Decl::FileType(g, t))?),
-		_ =>
-			Ok(Decl::Data(parse_data(true, line)?))
-	}
-}
-
 fn key_val(abbrev: bool, p: &mut Parse, f: impl FnOnce(&mut Parse) -> Result<S<String>>) -> Result<KeyVal> {
 	let key = f(p)?;
 	// allow {item[413]} instead of {item item[413]}
@@ -246,12 +242,12 @@ fn key_val(abbrev: bool, p: &mut Parse, f: impl FnOnce(&mut Parse) -> Result<S<S
 	while !p.is_empty() {
 		terms.push(parse_term(p)?);
 	}
-	Ok(KeyVal { key, terms })
+	Ok(KeyVal { key, terms, end: p.next_pos() })
 }
 
 fn parse_type(line: &Line) -> Result<(Game, FileType)> {
 	Parse::run(&line.head, line.eol, |p| {
-		assert_eq!(p.next()?.1, &Token::Ident("type"));
+		p.require(&Token::Ident("type"), "'type'");
 		no_body(line);
 		use Token::Ident as I;
 		let game = match p.next()?.1 {
@@ -277,14 +273,15 @@ fn parse_type(line: &Line) -> Result<(Game, FileType)> {
 }
 
 fn parse_data(top: bool, line: &Line) -> Result<Data> {
-	let head = Parse::run(&line.head, line.eol, |p| key_val(top, p, parse_ident))?;
+	let mut head = Parse::run(&line.head, line.eol, |p| key_val(top, p, parse_ident))?;
+	head.end = line.eol;
 	let body = line.body.as_deref().map(|b| parse_lines(b, |p| parse_data(false, p)));
 	Ok(Data { head, body })
 }
 
 fn parse_fn(line: &Line) -> Result<Function> {
 	Parse::run(&line.head, line.eol, |p| {
-		assert_eq!(p.next()?.1, &Token::Ident("fn"));
+		p.require(&Token::Ident("fn"), "'fn'");
 		if matches!(p.peek(), Some(S(_, Token::Bracket(_)))) {
 			p.rewind()
 		}
@@ -398,7 +395,12 @@ fn parse_atom(p: &mut Parse) -> Result<S<Expr>> {
 			if let Some(t) = try_parse_term(p)? {
 				Expr::Term(t.1)
 			} else {
-				Expr::Insn(key_val(false, p, parse_insn_name)?)
+				let key = parse_insn_name(p)?;
+				let mut terms = Vec::new();
+				while let Some(t) = try_parse_term(p)? {
+					terms.push(t);
+				}
+				Expr::Insn(KeyVal { key, terms, end: p.next_pos() })
 			}
 		}
 	};
@@ -481,13 +483,28 @@ fn parse_body<'a, T>(
 	}
 }
 
-pub fn parse(lines: &[Line]) -> Vec<Decl> {
-	parse_lines(lines, parse_top)
+pub fn parse(lines: &[Line]) -> Result<File> {
+	if lines.is_empty() {
+		Diag::error(Span::new_at(0), "no type declaration").emit();
+		return Err(Error);
+	}
+	let (game, ty) = parse_type(&lines[0])?;
+	let decls = parse_lines(&lines[1..], |l| parse_decl(l, game, ty));
+	Ok(File { game, ty, decls })
+}
+
+fn parse_decl(line: &Line, _game: Game, ty: FileType) -> Result<Decl> {
+	match line.head.first() {
+		Some(S(_, Token::Ident("fn"))) if ty == FileType::Scena =>
+			Ok(Decl::Function(parse_fn(line)?)),
+		_ =>
+			Ok(Decl::Data(parse_data(true, line)?))
+	}
 }
 
 #[test]
 fn main() {
-	let src = include_str!("/tmp/kiseki/tc/t1121");
+	let src = include_str!("/tmp/kiseki/ao_gf_en/a0000");
 	let (v, diag) = super::diag::diagnose(|| {
 		let tok = lex(src);
 		parse(&tok)

@@ -1,16 +1,22 @@
 pub use themelios::types::Game;
 
-use crate::span::Spanned as S;
+use crate::span::{Spanned as S, Span};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct File {
+	pub game: Game,
+	pub ty: FileType,
+	pub decls: Vec<Decl>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Decl {
-	FileType(Game, FileType),
 	Function(Function),
 	Data(Data),
 	// Alias(Alias),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileType {
 	Scena,
 }
@@ -19,7 +25,15 @@ pub enum FileType {
 pub struct KeyVal {
 	pub key: S<String>,
 	pub terms: Vec<S<Term>>,
+	pub end: Span,
 }
+
+impl KeyVal {
+	pub fn span(&self) -> Span {
+		self.key.0 | self.end
+	}
+}
+
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Function {
@@ -44,7 +58,7 @@ pub enum Term {
 	Int(S<i64>, S<Unit>),
 	String(String),
 	Tuple(Vec<S<Term>>),
-	Struct(String, Vec<S<Term>>),
+	Struct(KeyVal),
 	Text(Vec<S<TextSegment>>),
 }
 

@@ -145,6 +145,16 @@ impl<const N: usize, T: Val> Val for [T; N] {
 	}
 }
 
+impl<T: Val> Val for Option<T> {
+	fn parse(p: &mut Parse) -> Result<Self> {
+		if let Some(()) = p.term("null")? {
+			Ok(None)
+		} else {
+			T::parse(p).map(Some)
+		}
+	}
+}
+
 macro int($T:ident $(=> $(#$CONV:ident)?)?) {
 	impl Val for $T {
 		fn parse(p: &mut Parse) -> Result<Self> {

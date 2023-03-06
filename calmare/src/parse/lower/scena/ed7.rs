@@ -276,6 +276,37 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 			}
 		}
 		"battle" => {
+			let mut setups = Vec::new();
+			parse_data!(d, ctx => S(s, n), {
+				flags, level, unk1, vision_range, move_range,
+				can_move, move_speed, unk2, battlefield, sepith,
+				setup => |l: &Data| {
+					parse_data!(l, ctx => weight, {
+						enemies, placement, bgm, at_roll
+					});
+					let (placement, placement_ambush) = placement;
+					let (bgm, bgm_ambush) = bgm;
+					if setups.len() >= 4 {
+						Diag::error(l.head.span(), "only up to 4 setups allowed").emit();
+						return Err(Error)
+					}
+					setups.push(BattleSetup {
+						weight,
+						enemies,
+						placement,
+						placement_ambush,
+						bgm,
+						bgm_ambush,
+						at_roll,
+					});
+					Ok(())
+				}
+			});
+			scena.battles.insert(d.head.key.0 | s, n, Battle {
+				flags, level, unk1, vision_range, move_range,
+				can_move, move_speed, unk2, battlefield, sepith,
+				setups,
+			});
 		}
 		_ => {
 			Diag::error(d.head.key.0, "unknown declaration")

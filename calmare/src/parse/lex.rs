@@ -156,13 +156,13 @@ fn number(i: &mut Lex) -> Option<Number> {
 	i.clone().pat(|c| char::is_ascii_digit(&c))?;
 	let i0 = i.pos();
 
-	if i.pat("0x").is_some() {
+	Some(if i.pat("0x").is_some() {
 		let s = i.pat_mul(UnicodeXID::is_xid_continue);
 		match u64::from_str_radix(s, 16) {
-			Ok(v) => return Some(Number::Int(v)),
+			Ok(v) => Number::Int(v),
 			Err(e) => {
 				Diag::error(i0 | i.pos(), e).emit();
-				return Some(Number::Int(0))
+				Number::Int(0)
 			}
 		}
 	} else {
@@ -171,23 +171,23 @@ fn number(i: &mut Lex) -> Option<Number> {
 			i.pat_mul(|a| char::is_ascii_digit(&a));
 			let s = i.span_text(i0|i.pos());
 			match s.parse::<f64>() {
-				Ok(v) => return Some(Number::Float(F64(v))),
+				Ok(v) => Number::Float(F64(v)),
 				Err(e) => {
 					Diag::error(i0 | i.pos(), e).emit();
-					return Some(Number::Float(F64(0.)))
+					Number::Float(F64(0.))
 				}
 			}
 		} else {
 			let s = i.span_text(i0|i.pos());
 			match s.parse::<u64>() {
-				Ok(v) => return Some(Number::Int(v)),
+				Ok(v) => Number::Int(v),
 				Err(e) => {
 					Diag::error(i0 | i.pos(), e).emit();
-					return Some(Number::Int(0))
+					Number::Int(0)
 				}
 			}
 		}
-	}
+	})
 }
 
 fn ident<'a>(i: &mut Lex<'a>) -> Option<&'a str> {

@@ -29,7 +29,9 @@ fn lower_tree(ctx: &Context, insns: &[S<Code>], can_break: bool, can_continue: b
 			Code::Insn(i) => {
 				out.push(TreeInsn::Insn(lower_insn(ctx, i)));
 			}
-			Code::Assign(_, _, _) => todo!(),
+			Code::Assign(term, op, expr) => {
+				out.push(TreeInsn::Insn(lower_assign(ctx, term, *op, expr)));
+			}
 
 			Code::If(c, b) => {
 				let mut cases = Vec::new();
@@ -111,12 +113,18 @@ fn lower_tree(ctx: &Context, insns: &[S<Code>], can_break: bool, can_continue: b
 	out
 }
 
-fn lower_expr(ctx: &Context, e: &S<Expr>) -> LExpr {
-	println!("{:?}", e);
-	LExpr::Const(0)
+fn lower_insn(ctx: &Context, i: &KeyVal) -> Insn {
+	// println!("{:?}", i);
+	Insn::Return()
 }
 
-fn lower_insn(ctx: &Context, i: &KeyVal) -> Insn {
-	println!("{:?}", i);
+fn lower_assign(ctx: &Context, term: &S<Term>, op: S<Assop>, e: &S<Expr>) -> Insn {
+	// println!("{:?}", (term, op));
+	let e = lower_expr(ctx, e);
 	Insn::Return()
+}
+
+fn lower_expr(ctx: &Context, e: &S<Expr>) -> LExpr {
+	// println!("{:?}", e);
+	LExpr::Const(0)
 }

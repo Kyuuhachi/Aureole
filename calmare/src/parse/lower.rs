@@ -64,6 +64,15 @@ impl<'a> Parse<'a> {
 	fn peek(&self) -> Option<&'a Term> {
 		self.key_val.terms.get(self.pos).map(|a| &a.1)
 	}
+
+	fn term<T: Val>(&mut self, name: &str) -> Result<Option<T>> {
+		if let Some(Term::Struct(s)) = self.peek() && s.key.1 == name {
+			self.pos += 1;
+			Ok(Some(s.parse(self.context)?))
+		} else {
+			Ok(None)
+		}
+	}
 }
 
 impl KeyVal {
@@ -181,12 +190,10 @@ impl Val for Pos3 {
 
 impl Val for FuncRef {
 	fn parse(p: &mut Parse) -> Result<Self> {
-		if let Some(Term::Struct(s)) = p.peek() && s.key.1 == "fn" {
-			p.next()?;
-			let (a, b) = s.parse(p.context)?;
+		if let Some((a, b)) = p.term("fn")? {
 			Ok(FuncRef(a, b))
 		} else {
-			Diag::error(p.pos(), "expected pos3").emit();
+			Diag::error(p.pos(), "expected 'fn'").emit();
 			Err(Error)
 		}
 	}
@@ -194,18 +201,17 @@ impl Val for FuncRef {
 
 impl Val for FileId {
 	fn parse(p: &mut Parse) -> Result<Self> {
-		if let Some(Term::Struct(s)) = p.peek() && s.key.1 == "file" {
-			p.next()?;
-			Ok(FileId(s.parse(p.context)?))
-		} else if let Some(Term::String(s)) = p.peek() {
+		if let Some(Term::String(s)) = p.peek() {
 			let pos = p.pos();
 			p.next()?;
 			Ok(FileId(p.context.lookup.index(s).unwrap_or_else(|| {
 				Diag::error(pos, "could not resolve file id").emit();
 				0x00000000
 			})))
+		} else if let Some(s) = p.term("file")? {
+			Ok(FileId(s))
 		} else {
-			Diag::error(p.pos(), "expected pos3").emit();
+			Diag::error(p.pos(), "expected string or 'file'").emit();
 			Err(Error)
 		}
 	}
@@ -214,9 +220,8 @@ impl Val for FileId {
 macro newtype($T:ident, $s:literal) {
 	impl Val for $T {
 		fn parse(p: &mut Parse) -> Result<Self> {
-			if let Some(Term::Struct(k)) = p.peek() && k.key.1 == $s {
-				p.next()?;
-				Ok(Self(k.parse(p.context)?))
+			if let Some(v) = p.term($s)? {
+				Ok(Self(v))
 			} else {
 				Diag::error(p.pos(), format_args!("expected '{}'", $s)).emit();
 				Err(Error)

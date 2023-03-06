@@ -80,22 +80,17 @@ impl<'a> Parse<'a> {
 
 impl KeyVal {
 	fn parse<V: Val>(&self, context: &Context) -> Result<V> {
+		self.parse_with(context, V::parse)
+	}
+
+	fn parse_with<V>(&self, context: &Context, f: impl FnOnce(&mut Parse) -> Result<V>) -> Result<V> {
 		let mut a = Parse::new(self, context);
-		let v = V::parse(&mut a)?;
+		let v = f(&mut a)?;
 		if a.peek().is_some() {
 			Diag::error(a.pos(), "expected end of data").emit();
 		}
 		Ok(v)
 	}
-}
-
-fn parse_one<T: Val>(ctx: &Context, t: &S<Term>) -> Result<T> {
-	let kv = KeyVal {
-		key: S(t.0, String::new()),
-		terms: vec![t.clone()], // inefficient but whatever
-		end: t.0.at_end(),
-	};
-	kv.parse(ctx)
 }
 
 trait Val: Sized {
@@ -305,7 +300,7 @@ impl Val for FileId {
 		} else if let Some(s) = p.term("file")? {
 			Ok(FileId(s))
 		} else {
-			Diag::error(p.pos(), "expected string or 'file'").emit();
+			Diag::error(p.pos(), "expected string, 'null', or 'file'").emit();
 			Err(Error)
 		}
 	}

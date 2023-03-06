@@ -315,14 +315,17 @@ fn parse_fn(line: &Line) -> Result<Function> {
 		if matches!(p.peek(), Some(S(_, Token::Bracket(_)))) {
 			p.rewind()
 		}
-		let id = parse_term(p)?;
+		parse_term(p)?;
 		let asm = p.test(&Token::Ident("asm"));
 		let body = if asm {
 			todo!()
 		} else {
 			FnBody::Code(parse_body(line, parse_code)?)
 		};
-		Ok(Function { id, body })
+
+		let mut head = Parse::run(&line.head, line.eol, |p| key_val(true, p, parse_ident))?;
+		head.end = line.eol;
+		Ok(Function { head, body })
 	})
 }
 
@@ -350,17 +353,10 @@ fn parse_code(line: &Line) -> Result<S<Code>> {
 		Token::Ident("switch") => {
 			let e = parse_expr(p);
 			let b = parse_body(line, |line| {
-				let head = Parse::run(&line.head, line.eol, |p| match p.next()?.1 {
-					Token::Ident("case") => Ok(SwitchCase::Case(parse_term(p)?)),
-					Token::Ident("default") => Ok(SwitchCase::Default),
-					_ => {
-						p.rewind();
-						Diag::error(p.next_span(), "invalid switch case").emit();
-						Err(Error)
-					}
-				});
+				let mut head = Parse::run(&line.head, line.eol, |p| key_val(false, p, parse_ident))?;
+				head.end = line.eol;
 				let body = parse_body(line, parse_code);
-				Ok((S(line.head_span(), head?), body?))
+				Ok((head, body?))
 			});
 			Ok(Code::Switch(e?, b?))
 		}

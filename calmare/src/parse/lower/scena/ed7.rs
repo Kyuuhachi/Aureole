@@ -62,10 +62,10 @@ pub fn lower(file: &File, lookup: Option<&dyn Lookup>) -> Result<Scena> {
 	let mut scena = ScenaBuild::default();
 	for decl in &file.decls {
 		match decl {
-			Decl::Function(Function { id, body }) => {
-				if let Ok(id1) = parse_one(ctx, id) {
-					let f = lower_func(ctx, body).unwrap_or_default();
-					scena.functions.insert(id.0, id1, f);
+			Decl::Function(func) => {
+				let f = lower_func(ctx, &func.body).unwrap_or_default();
+				if let Ok(id1) = func.head.parse(ctx) {
+					scena.functions.insert(func.head.span(), id1, f);
 				}
 			}
 			Decl::Data(d) => {

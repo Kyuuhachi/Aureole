@@ -73,12 +73,19 @@ fn lower_tree(ctx: &Context, insns: &[S<Code>], can_break: bool, can_continue: b
 				let c = lower_expr(ctx, c);
 				let mut cases = Vec::new();
 				let mut seen = Many::default(); // only used for duplicate checking, not order
-				for (S(s, k), b) in bs {
+				for (k, b) in bs {
 					let b = lower_tree(ctx, b.as_slice(), true, can_continue);
-					if let Ok(i) = match k {
-						SwitchCase::Case(t) => parse_one(ctx, t).map(Some),
-						SwitchCase::Default => Ok(None),
-					} {
+					let i = k.parse_with(ctx, |p| {
+						if let Some(i) = p.term("case")? {
+							Ok(Some(i))
+						} else if let Some(()) = p.term("default")? {
+							Ok(None)
+						} else {
+							Diag::error(p.pos(), "expected 'case' or 'default'").emit();
+							Err(Error)
+						}
+					});
+					if let Ok(i) = i {
 						seen.insert(*s, i, ());
 						cases.push((i, b))
 					}

@@ -38,7 +38,7 @@ impl KeyVal {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Function {
-	pub id: S<Term>,
+	pub head: KeyVal,
 	pub body: FnBody,
 }
 
@@ -89,7 +89,7 @@ pub enum Code {
 	Elif(S<Expr>, Vec<S<Code>>),
 	Else(Vec<S<Code>>),
 	While(S<Expr>, Vec<S<Code>>),
-	Switch(S<Expr>, Vec<(S<SwitchCase>, Vec<S<Code>>)>),
+	Switch(S<Expr>, Vec<(KeyVal, Vec<S<Code>>)>),
 	Break,
 	Continue,
 }

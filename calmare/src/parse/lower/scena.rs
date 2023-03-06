@@ -114,13 +114,23 @@ fn lower_tree(ctx: &Context, insns: &[S<Code>], can_break: bool, can_continue: b
 }
 
 fn lower_insn(ctx: &Context, i: &KeyVal) -> Insn {
-	// println!("{:?}", i);
 	Insn::Return()
 }
 
-fn lower_assign(ctx: &Context, term: &S<Term>, op: S<Assop>, e: &S<Expr>) -> Insn {
-	// println!("{:?}", (term, op));
+fn lower_assign(ctx: &Context, term: &S<Term>, o: S<Assop>, e: &S<Expr>) -> Insn {
 	let e = lower_expr(ctx, e);
+	let o = match o.1 {
+		Assop::Assign => ExprUnop::Ass,
+		Assop::Add => ExprUnop::AddAss,
+		Assop::Sub => ExprUnop::SubAss,
+		Assop::Mul => ExprUnop::MulAss,
+		Assop::Div => ExprUnop::DivAss,
+		Assop::Mod => ExprUnop::ModAss,
+		Assop::Or  => ExprUnop::OrAss,
+		Assop::And => ExprUnop::AndAss,
+		Assop::Xor => ExprUnop::XorAss,
+	};
+	let e = LExpr::Unop(o, Box::new(e));
 	Insn::Return()
 }
 

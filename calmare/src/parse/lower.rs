@@ -383,7 +383,7 @@ macro parse_data {
 		#[allow(unused_mut)]
 		let mut failures: Vec<&str> = Vec::new();
 		$(unless!($({when!($e);})?, {
-			let $k = $k.optional();
+			let $k = $k.get();
 			if $k.is_none() {
 				failures.push(concat!("'", stringify!($k), "'"));
 			}
@@ -435,7 +435,7 @@ impl<T> One<T> {
 		*self = One::Set(s, v);
 	}
 
-	fn optional(self) -> Option<T> {
+	fn get(self) -> Option<T> {
 		match self {
 			One::Empty => None,
 			One::Set(_, v) => Some(v),
@@ -462,7 +462,7 @@ impl<K: Ord, V> Many<K, V> {
 		self.0.insert(n, (s, v));
 	}
 
-	fn finish(self, f: impl Fn(K) -> usize) -> Vec<V> {
+	fn get(self, f: impl Fn(K) -> usize) -> Vec<V> {
 		let mut vs = Vec::with_capacity(self.0.len());
 		let mut expect = 0;
 		for (k, (s, v)) in self.0 {

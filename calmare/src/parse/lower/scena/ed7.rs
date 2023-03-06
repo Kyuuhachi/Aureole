@@ -40,7 +40,7 @@ struct ScenaBuild {
 	battles: Many<BattleId, Battle>,
 }
 
-pub fn lower(file: &File, lookup: Option<&dyn Lookup>) {
+pub fn lower(file: &File, lookup: Option<&dyn Lookup>) -> Result<Scena> {
 	let ctx = &Context::new(file, lookup);
 	let mut scena = ScenaBuild::default();
 	for decl in &file.decls {
@@ -54,8 +54,6 @@ pub fn lower(file: &File, lookup: Option<&dyn Lookup>) {
 		}
 	}
 
-	let scp = scena.chcp.finish(|a| a.0 as usize);
-
 	let misorder = scena.npcs_monsters.0.iter()
 		.skip_while(|a| matches!(&a.1.1, NpcOrMonster::Npc(_)))
 		.find(|a| matches!(&a.1.1, NpcOrMonster::Npc(_)));
@@ -68,22 +66,42 @@ pub fn lower(file: &File, lookup: Option<&dyn Lookup>) {
 
 	let mut npcs = Vec::new();
 	let mut monsters = Vec::new();
-	for m in scena.npcs_monsters.finish(|a| a.0 as usize) {
+	for m in scena.npcs_monsters.get(|a| a.0 as usize) {
 		match m {
 			NpcOrMonster::Npc(n) => npcs.push(n),
 			NpcOrMonster::Monster(m) => monsters.push(m),
 		}
 	}
-	let npcs = npcs;
-	let monsters = monsters;
+	let h = scena.header.get().ok_or_else(|| {
+		Diag::error(Span::new_at(0), "missing 'scena' block").emit();
+		Error
+	})?;
 
-	let look_points = scena.look_points.finish(|a| a.0 as usize);
-	let labels = scena.labels.finish(|a| a.0 as usize);
-	let animations = scena.animations.finish(|a| a.0 as usize);
-	let sepith = scena.sepith.finish(|a| a.0 as usize);
-	let at_rolls = scena.at_rolls.finish(|a| a.0 as usize);
-	let placements = scena.placements.finish(|a| a.0 as usize);
-	let battles = scena.battles.finish(|a| a.0 as usize);
+	Ok(Scena {
+		name1: h.name.0,
+		name2: h.name.1,
+		filename: h.name.2,
+		town: h.town,
+		bgm: h.bgm,
+		flags: h.flags,
+		includes: h.scp,
+		chcp: scena.chcp.get(|a| a.0 as usize),
+		labels: Some(scena.labels.get(|a| a.0 as usize)),
+		npcs,
+		monsters,
+		triggers: todo!(),
+		look_points: scena.look_points.get(|a| a.0 as usize),
+		animations: scena.animations.get(|a| a.0 as usize),
+		entry: scena.entry.get(),
+		functions: todo!(),
+		sepith: scena.sepith.get(|a| a.0 as usize),
+		at_rolls: scena.at_rolls.get(|a| a.0 as usize),
+		placements: scena.placements.get(|a| a.0 as usize),
+		battles: scena.battles.get(|a| a.0 as usize),
+		unk1: h.unk.0,
+		unk2: h.unk.1,
+		unk3: h.unk.2,
+	})
 }
 
 fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
@@ -107,7 +125,7 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 					Ok(())
 				}
 			});
-			let scp = scp.map(|a| a.optional().unwrap_or(FileId(0)));
+			let scp = scp.map(|a| a.get().unwrap_or(FileId(0)));
 			scena.header.set(d.head.span(), Header { name, town, bgm, flags, unk, scp });
 		}
 		"entry" => {
@@ -256,7 +274,7 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 				unk8 => fd!(14),
 				unk9 => fd!(15),
 			});
-			let values = values.map(|a| a.optional().unwrap_or_default());
+			let values = values.map(|a| a.get().unwrap_or_default());
 			scena.at_rolls.insert(d.head.key.0 | s, n, values);
 		}
 		"placement" => {

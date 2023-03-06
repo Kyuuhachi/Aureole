@@ -91,26 +91,6 @@ impl<'a> Parse<'a> {
 	}
 }
 
-fn parse_int(p: &mut Parse) -> Result<S<u64>> {
-	match p.next()? {
-		S(s, Token::Int(v)) => Ok(S(s, *v)),
-		S(s, _) => {
-			Diag::error(s, "expected integer").emit();
-			Err(Error)
-		}
-	}
-}
-
-fn parse_float(p: &mut Parse) -> Result<S<F64>> {
-	match p.next()? {
-		S(s, Token::Float(v)) => Ok(S(s, *v)),
-		S(s, _) => {
-			Diag::error(s, "expected float").emit();
-			Err(Error)
-		}
-	}
-}
-
 fn parse_ident(p: &mut Parse) -> Result<S<String>> {
 	match p.next()? {
 		S(s, Token::Ident(v)) => Ok(S(s, (*v).to_owned())),

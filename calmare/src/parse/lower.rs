@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use themelios::scena::*;
 use themelios::types::*;
+use themelios::util::array;
 use themelios_archive::Lookup;
 
 use super::diag::*;
@@ -135,6 +136,12 @@ impl<T: Val> Val for Vec<T> {
 			v.push(T::parse(p)?);
 		}
 		Ok(v)
+	}
+}
+
+impl<const N: usize, T: Val> Val for [T; N] {
+	fn parse(p: &mut Parse) -> Result<Self> {
+		array(|| T::parse(p))
 	}
 }
 

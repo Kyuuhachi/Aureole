@@ -5,6 +5,10 @@ use themelios::scena::ed7::*;
 themelios::util::newtype!(CharDefId, u16);
 newtype!(CharDefId, "char");
 
+newtype!(SepithId, "sepith");
+newtype!(AtRollId, "at_roll");
+newtype!(PlacementId, "placement");
+
 #[derive(Debug, Clone)]
 pub struct Header {
 	pub name: (String, String, String),
@@ -222,8 +226,38 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 			});
 		}
 		"sepith" => {
+			parse_data!(d, ctx => (S(s, n), values));
+			scena.sepith.insert(d.head.key.0 | s, n, values);
 		}
 		"at_roll" => {
+			let mut values = [(); 16].map(|_| One::<u8>::Empty);
+			macro fd($n:literal) {
+				|l: &Data| {
+					parse_data!(l, ctx => v);
+					values[$n].set(l.head.key.0, v);
+					Ok(())
+				}
+			}
+			parse_data!(d, ctx => S(s, n), {
+				none => fd!(0),
+				hp10 => fd!(1),
+				hp50 => fd!(2),
+				ep10 => fd!(3),
+				ep50 => fd!(4),
+				cp10 => fd!(5),
+				cp50 => fd!(6),
+				unk1 => fd!(7),
+				unk2 => fd!(8),
+				unk3 => fd!(9),
+				unk4 => fd!(10),
+				unk5 => fd!(11),
+				unk6 => fd!(12),
+				unk7 => fd!(13),
+				unk8 => fd!(14),
+				unk9 => fd!(15),
+			});
+			let values = values.map(|a| a.optional().unwrap_or_default());
+			scena.at_rolls.insert(d.head.key.0 | s, n, values);
 		}
 		"placement" => {
 		}

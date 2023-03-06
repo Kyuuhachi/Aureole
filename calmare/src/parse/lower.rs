@@ -206,11 +206,13 @@ impl Val for TString {
 	fn parse(p: &mut Parse) -> Result<Self> {
 		if let Some(Term::Text(s)) = p.peek() {
 			p.next()?;
-			if let [S(_, TextSegment::Text(s))] = s.as_slice() {
-				Ok(TString(s.to_owned()))
-			} else {
-				Diag::error(p.pos(), "expected short text").emit();
-				Err(Error)
+			match s.as_slice() {
+				[] => Ok(TString(String::new())),
+				[S(_, TextSegment::Text(s))] => Ok(TString(s.to_owned())),
+				_ => {
+					Diag::error(p.pos(), "expected short text").emit();
+					Err(Error)
+				}
 			}
 		} else {
 			Diag::error(p.pos(), "expected short text").emit();

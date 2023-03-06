@@ -306,6 +306,34 @@ impl Val for FileId {
 	}
 }
 
+impl Val for CharId {
+	fn parse(p: &mut Parse) -> Result<Self> {
+		if let Some(()) = p.term("self")? {
+			Ok(CharId(254))
+		} else if let Some(()) = p.term("null")? {
+			Ok(CharId(255))
+		} else if let Some(s) = p.term::<u16>("name")? {
+			Ok(CharId(s + 257))
+		} else if let Some(s) = p.term::<u16>("char")? {
+			Ok(CharId(s + if p.context.game.base() == BaseGame::Tc { 16 } else { 8 }))
+		} else if let Some(s) = p.term::<u16>("field_party")? {
+			Ok(CharId(s))
+		} else if let Some(s) = p.term::<u16>("party")? {
+			Ok(CharId(s + if p.context.game.base() == BaseGame::Sc { 246 } else { 238 }))
+		} else if let Some(s) = p.term::<u16>("custom")? {
+			if p.context.game.base() == BaseGame::Ao {
+				Ok(CharId(s + 244))
+			} else {
+				Diag::error(p.pos(), "'custom' is only supported on Azure").emit();
+				Err(Error)
+			}
+		} else {
+			Diag::error(p.pos(), "expected 'self', 'null', 'name', 'char', 'field_party', 'party', or 'custom'").emit();
+			Err(Error)
+		}
+	}
+}
+
 macro newtype($T:ident, $s:literal) {
 	impl Val for $T {
 		fn parse(p: &mut Parse) -> Result<Self> {

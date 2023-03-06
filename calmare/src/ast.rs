@@ -107,7 +107,7 @@ pub enum Expr {
 		Box<S<Expr>>,
 	),
 	Unop(S<Unop>, Box<S<Expr>>),
-	Term(Term),
+	Term(S<Term>),
 	Insn(KeyVal),
 }
 

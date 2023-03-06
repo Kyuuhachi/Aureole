@@ -1,4 +1,4 @@
-use themelios::scena::code::{FlatInsn, Insn, Expr as LExpr};
+use themelios::scena::code::{FlatInsn, Insn, Expr as LExpr, ExprBinop, ExprUnop};
 use themelios::scena::code::decompile::{recompile, TreeInsn};
 
 use super::*;
@@ -125,6 +125,71 @@ fn lower_assign(ctx: &Context, term: &S<Term>, op: S<Assop>, e: &S<Expr>) -> Ins
 }
 
 fn lower_expr(ctx: &Context, e: &S<Expr>) -> LExpr {
-	// println!("{:?}", e);
-	LExpr::Const(0)
+	match &e.1 {
+		Expr::Binop(a, o, b) => {
+			let a = lower_expr(ctx, a);
+			let b = lower_expr(ctx, b);
+			let o = match o.1 {
+				Binop::Eq      => ExprBinop::Eq,
+				Binop::Ne      => ExprBinop::Ne,
+				Binop::Lt      => ExprBinop::Lt,
+				Binop::Le      => ExprBinop::Le,
+				Binop::Gt      => ExprBinop::Gt,
+				Binop::Ge      => ExprBinop::Ge,
+				Binop::BoolAnd => ExprBinop::BoolAnd,
+				Binop::BoolOr  => ExprBinop::Or,
+				Binop::Add     => ExprBinop::Add,
+				Binop::Sub     => ExprBinop::Sub,
+				Binop::Mul     => ExprBinop::Mul,
+				Binop::Div     => ExprBinop::Div,
+				Binop::Mod     => ExprBinop::Mod,
+				Binop::Or      => ExprBinop::Or,
+				Binop::And     => ExprBinop::And,
+				Binop::Xor     => ExprBinop::Xor,
+			};
+			LExpr::Binop(o, Box::new(a), Box::new(b))
+		},
+		Expr::Unop(o, e) => {
+			let e = lower_expr(ctx, e);
+			let o = match o.1 {
+				Unop::Not => ExprUnop::Not,
+				Unop::Neg => ExprUnop::Neg,
+				Unop::Inv => ExprUnop::Inv,
+			};
+			LExpr::Unop(o, Box::new(e))
+		},
+		Expr::Term(S(s, kv)) => {
+			match kv {
+				Term::Int(S(_, i), _) => {
+					if *i < 0 {
+						LExpr::Unop(ExprUnop::Neg, Box::new(LExpr::Const(-*i as u32)))
+					} else {
+						LExpr::Const(*i as u32)
+					}
+				}
+				Term::Term(kv) => {
+					match kv.key.1.as_str() {
+						"flag"   => LExpr::Flag(Flag(kv.parse(ctx).unwrap_or_default())),
+						"var"    => LExpr::Var(Var(kv.parse(ctx).unwrap_or_default())),
+						"system" => LExpr::Attr(Attr(kv.parse(ctx).unwrap_or_default())),
+						"char_attr" => {
+							let (a, b) = kv.parse(ctx).unwrap_or((CharId(0), 0));
+							LExpr::CharAttr(CharAttr(a, b))
+						},
+						"global" => LExpr::Global(Global(kv.parse(ctx).unwrap_or_default())),
+						"random" => { kv.parse::<()>(ctx).unwrap_or_default(); LExpr::Rand },
+						_ => {
+							Diag::error(*s, "invalid expr").emit();
+							LExpr::Const(0)
+						}
+					}
+				},
+				_ => {
+					Diag::error(*s, "invalid expr").emit();
+					LExpr::Const(0)
+				},
+			}
+		},
+		Expr::Insn(i) => LExpr::Insn(Box::new(lower_insn(ctx, i))),
+	}
 }

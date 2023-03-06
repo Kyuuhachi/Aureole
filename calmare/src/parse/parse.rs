@@ -400,7 +400,7 @@ fn parse_atom(p: &mut Parse) -> Result<S<Expr>> {
 		_ => {
 			p.rewind();
 			if let Some(t) = try_parse_term(p)? {
-				Expr::Term(t.1)
+				Expr::Term(t)
 			} else {
 				let key = parse_insn_name(p)?;
 				let mut terms = Vec::new();

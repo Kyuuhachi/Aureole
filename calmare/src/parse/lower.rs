@@ -262,7 +262,7 @@ macro parse_data($d:expr, $c:expr => $head:pat, {
 	let c = $c;
 	let head = d.head.parse(c);
 
-	$($(let mut $k: Option<S<Option<$t>>> = None;)?)*
+	$($(let mut $k: One<Option<$t>> = One::Empty;)?)*
 	let Some(body) = &d.body else {
 		Diag::error(d.head.end, "a body is required here").emit();
 		Err(Error)?;
@@ -284,12 +284,7 @@ macro parse_data($d:expr, $c:expr => $head:pat, {
 
 				unless!($({
 					when!($t);
-					if let Some(prev) = &$k {
-						Diag::error(head.0, "duplicate key")
-							.note(prev.0, "previous here")
-							.emit();
-					}
-					$k = Some(S(head.0, _val.ok()));
+					$k.set(head.0, _val.ok());
 				})?, {
 					let _: Result<()> = _val;
 				});
@@ -305,6 +300,7 @@ macro parse_data($d:expr, $c:expr => $head:pat, {
 	}
 	let mut failures = Vec::new();
 	$($(when!($t);
+		let $k = $k.optional();
 		if $k.is_none() {
 			failures.push(concat!("'", stringify!($k), "'"));
 		}
@@ -319,7 +315,7 @@ macro parse_data($d:expr, $c:expr => $head:pat, {
 
 	#[allow(clippy::let_unit_value)]
 	let $head = head?;
-	$($(let Some($k): $t = $k.unwrap().1 else { Err(Error)?; unreachable!() };)?)*
+	$($(let Some($k): $t = $k.unwrap() else { Err(Error)?; unreachable!() };)?)*
 }
 
 fn no_body(d: &Data) {
@@ -337,6 +333,31 @@ pub fn lower(file: &File, lookup: Option<&dyn Lookup>) {
 				todo!();
 				// lower_ed6_scena(&file);
 			}
+		}
+	}
+}
+
+#[derive(Debug, Clone, Default)]
+enum One<T> {
+	#[default]
+	Empty,
+	Set(Span, T)
+}
+
+impl<T> One<T> {
+	fn set(&mut self, s: Span, v: T) {
+		if let One::Set(prev, _) = self {
+			Diag::error(s, "duplicate item")
+				.note(*prev, "previous here")
+				.emit();
+		}
+		*self = One::Set(s, v);
+	}
+
+	fn optional(self) -> Option<T> {
+		match self {
+			One::Empty => None,
+			One::Set(_, v) => Some(v),
 		}
 	}
 }
@@ -359,8 +380,15 @@ pub mod scena {
 			pub scp: [FileId; 6],
 		}
 
+		#[derive(Debug, Clone, Default)]
+		struct ScenaBuild {
+			header: One<Header>,
+			entry: One<Entry>,
+		}
+
 		pub fn lower(file: &File, lookup: Option<&dyn Lookup>) {
 			let ctx = &Context::new(file, lookup);
+			let mut scena = ScenaBuild::default();
 			for decl in &file.decls {
 				let _: Result<()> = try {
 					match decl {
@@ -370,7 +398,7 @@ pub mod scena {
 						Decl::Data(d) => {
 							match d.head.key.1.as_str() {
 								"scena" => {
-									let mut scp: [Option<S<FileId>>; 6] = [None; 6];
+									let mut scp: [One<FileId>; 6] = [(); 6].map(|_| One::Empty);
 									parse_data!(d, ctx => (), {
 										name: _,
 										town: _,
@@ -382,23 +410,14 @@ pub mod scena {
 											no_body(l);
 											if n >= 6 {
 												Diag::error(s, "only values 0-5 allowed").emit();
-												// Diag::error(d.head.span(), "missing fields")
-												// 	.note(d.head.span(), failures.join(", "))
-												// 	.emit();
 												return Err(Error)
 											}
-											let s = l.head.key.0 | s;
-											if let Some(prev) = scp[n as usize] {
-												Diag::error(s, "duplicate key")
-													.note(prev.0, "previous here")
-													.emit();
-											}
-											scp[n as usize] = Some(S(s, v));
+											scp[n as usize].set(l.head.key.0 | s, v);
 											Ok(())
 										}
 									});
-									let scp = scp.map(|a| a.map(|a| a.1).unwrap_or(FileId(0)));
-									println!("{:#?}", Header { name, town, bgm, flags, unk, scp });
+									let scp = scp.map(|a| a.optional().unwrap_or(FileId(0)));
+									scena.header.set(d.head.span(), Header { name, town, bgm, flags, unk, scp });
 								}
 								"entry" => {
 									parse_data!(d, ctx => (), {
@@ -417,7 +436,7 @@ pub mod scena {
 										init: _,
 										reinit: _,
 									});
-									println!("{:#?}", Entry {
+									scena.entry.set(d.head.span(), Entry {
 										pos, unk1, cam_from, cam_pers, unk2, cam_deg, cam_limit,
 										cam_at, unk3, unk4, flags, town, init, reinit,
 									});

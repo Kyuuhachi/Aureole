@@ -178,7 +178,7 @@ fn try_parse_term(p: &mut Parse) -> Result<Option<S<Term>>> {
 			Term::Int(n, unit)
 		}
 
-		Token::Paren(d) => Term::Tuple(parse_delim(S(t.0, String::new()), d, "parenthesis")?),
+		Token::Paren(d) => Term::Term(parse_delim(S(t.0, String::new()), d, "parenthesis")?),
 
 		Token::Brace(d) => {
 			let segs = d.tokens.iter().map(|t| Ok(S(t.0, match &t.1 {
@@ -202,7 +202,7 @@ fn try_parse_term(p: &mut Parse) -> Result<Option<S<Term>>> {
 			} else {
 				KeyVal { key, terms: Vec::new(), end: p.prev_span().at_start() }
 			};
-			Term::Struct(key_val)
+			Term::Term(key_val)
 		},
 
 		_ => {

@@ -66,7 +66,7 @@ impl<'a> Parse<'a> {
 	}
 
 	fn term<T: Val>(&mut self, name: &str) -> Result<Option<T>> {
-		if let Some(Term::Struct(s)) = self.peek() && s.key.1 == name {
+		if let Some(Term::Term(s)) = self.peek() && s.key.1 == name {
 			self.pos += 1;
 			Ok(Some(s.parse(self.context)?))
 		} else {
@@ -177,9 +177,7 @@ unit!(Angle, Deg, "deg");
 
 impl Val for Pos3 {
 	fn parse(p: &mut Parse) -> Result<Self> {
-		if let Some(Term::Tuple(s)) = p.peek() {
-			p.next()?;
-			let (x, y, z) = s.parse(p.context)?;
+		if let Some((x, y, z)) = p.term("")? {
 			Ok(Pos3(x, y, z))
 		} else {
 			Diag::error(p.pos(), "expected pos3").emit();

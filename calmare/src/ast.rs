@@ -57,8 +57,7 @@ pub struct Data {
 pub enum Term {
 	Int(S<i64>, S<Unit>),
 	String(String),
-	Tuple(KeyVal), // always empty string
-	Struct(KeyVal),
+	Term(KeyVal),
 	Text(Vec<S<TextSegment>>),
 }
 

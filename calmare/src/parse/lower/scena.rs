@@ -130,9 +130,24 @@ fn parse_tree(p: &mut Parse, can_break: bool, can_continue: bool) -> Vec<TreeIns
 }
 
 fn parse_insn(p: &mut Parse) -> Insn {
+	let _: Result<()> = try {
+		if let Some(i) = try_parse_insn(p)? {
+			return i
+		}
+		if let Some(i) = try_parse_assign(p)? {
+			return i
+		}
+		Diag::error(p.next_span(), "failed to parse insn").emit();
+	};
+	p.pos = p.tokens.len();
+	Insn::Return()
+}
+
+
+fn try_parse_insn(p: &mut Parse) -> Result<Option<Insn>> {
 	if p.pos == p.tokens.len() {
 		Diag::error(p.next_span(), "can't parse insn").emit();
-		return Insn::Return()
+		return Err(Error)
 	}
 	macro run {
 		([$(($ident:ident $(($_n:ident $($ty:tt)*))*))*]) => {
@@ -141,53 +156,37 @@ fn parse_insn(p: &mut Parse) -> Insn {
 					p.pos += 1;
 					run!($ident $(($_n $($ty)*))*);
 				})*
-				_ => return parse_assignment(p)
+				_ => return Ok(None)
 			}
 		},
 		($ident:ident ($v1:ident $_:ty) ($v2:ident Expr)) => {
 			Diag::error(p.prev_span(), "please use assignment syntax").emit();
 			p.pos = p.tokens.len();
-			return Insn::Return()
+			return Err(Error)
 		},
 		($ident:ident $(($_n:ident $ty:ty))*) => {
-			if let Ok::<Insn, Error>(i) = try {
-				Insn::$ident($(<$ty>::parse(p)?),*)
-			} {
-				return i
-			} else {
-				p.pos = p.tokens.len();
-				return Insn::Return()
-			}
+			return Ok(Some(Insn::$ident($(<$ty>::parse(p)?),*)))
 		}
 	}
 	themelios::scena::code::introspect!(run);
 }
 
-fn parse_assignment(p: &mut Parse) -> Insn {
+fn try_parse_assign(p: &mut Parse) -> Result<Option<Insn>> {
 	macro run {
 		([$(($ident:ident $(($_n:ident $($ty:tt)*))*))*]) => {
 			$(run!($ident $(($_n $($ty)*))*);)*
 		},
 		($ident:ident ($v1:ident $t:ty) ($v2:ident Expr)) => {
-			match <$t>::try_parse(p) {
-				Ok(Some(a)) => {
-					let e = parse_assignment_expr(p);
-					return Insn::$ident(a, e);
-				}
-				Ok(None) => {}
-				Err(_) => {
-					p.pos = p.tokens.len();
-					return Insn::Return()
-				}
+			if let Some(a) = <$t>::try_parse(p)? {
+				let e = parse_assignment_expr(p);
+				return Ok(Some(Insn::$ident(a, e)));
 			}
 		},
 		($ident:ident $($t:tt)*) => {}
 	}
 	themelios::scena::code::introspect!(run);
 
-	Diag::error(p.next_span(), "can't parse insn").emit();
-	p.pos = p.tokens.len();
-	Insn::Return()
+	Ok(None)
 }
 
 fn parse_expr(p: &mut Parse) -> Expr {
@@ -237,8 +236,11 @@ fn parse_atom(p: &mut Parse) -> Result<Expr> {
 			Expr::Global(v)
 		} else if p.term::<()>("random")?.is_some() {
 			Expr::Rand
+		} else if let Some(i) = try_parse_insn(p)? {
+			Expr::Insn(Box::new(i))
 		} else {
-			Expr::Insn(Box::new(parse_insn(p)))
+			Diag::error(p.next_span(), "invalid expression").emit();
+			return Err(Error)
 		}
 	}
 }

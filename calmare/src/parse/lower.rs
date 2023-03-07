@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use themelios::scena::*;
+use themelios::text::{Text, TextSegment};
 use themelios::types::*;
 use themelios::util::array;
 use themelios_archive::Lookup;
@@ -269,6 +270,11 @@ tuple!(A B C D E F G H);
 tuple!(A B C D E F G H I);
 tuple!(A B C D E F G H I J);
 tuple!(A B C D E F G H I J K);
+tuple!(A B C D E F G H I J K L);
+tuple!(A B C D E F G H I J K L M);
+tuple!(A B C D E F G H I J K L M N);
+tuple!(A B C D E F G H I J K L M N O);
+tuple!(A B C D E F G H I J K L M N O P);
 
 impl<T: Val> Val for Vec<T> {
 	fn parse(p: &mut Parse) -> Result<Self> {
@@ -386,8 +392,19 @@ int!(i8);
 int!(i16);
 int!(i32);
 int!(i64);
-int!(EntryFlags =>);
+
+int!(SystemFlags =>);
 int!(CharFlags =>);
+int!(QuestFlags =>);
+int!(ObjectFlags =>);
+int!(LookPointFlags =>);
+int!(TriggerFlags =>);
+int!(EntryFlags =>);
+
+int!(Color =>);
+int!(TcMembers =>);
+
+int!(QuestTask =>);
 
 impl Val for String {
 	fn parse(p: &mut Parse) -> Result<Self> {
@@ -418,6 +435,22 @@ impl Val for TString {
 	}
 }
 
+impl Val for Text {
+	fn parse(p: &mut Parse) -> Result<Self> {
+		if let Some(d) = p.next_if(f!(Token::Brace(s) => s)) {
+			let mut out = Vec::new();
+			while let Some(d) = p.next_if(f!(Token::Brace(s) => s)) {
+				out.push(TextSegment::Page);
+			}
+
+			Ok(Text(out))
+		} else {
+			Diag::error(p.next_span(), "expected dialogue text").emit();
+			Err(Error)
+		}
+	}
+}
+
 macro unit($T:ident, $unit:ident, $unit_str:literal) {
 	impl Val for $T {
 		fn parse(p: &mut Parse) -> Result<Self> {
@@ -438,7 +471,10 @@ macro unit($T:ident, $unit:ident, $unit_str:literal) {
 }
 
 unit!(Angle, Deg, "deg");
+unit!(Angle32, MDeg, "mdeg");
 unit!(Time, Ms, "ms");
+unit!(Length, Mm, "mm");
+unit!(Speed, MmPerS, "mm/s");
 
 impl Val for f32 {
 	fn parse(p: &mut Parse) -> Result<Self> {
@@ -465,6 +501,29 @@ impl Val for Pos3 {
 			Ok(Pos3(x, y, z))
 		} else {
 			Diag::error(p.next_span(), "expected pos3").emit();
+			Err(Error)
+		}
+	}
+}
+
+struct Null;
+impl Val for Null {
+	fn parse(p: &mut Parse) -> Result<Self> {
+		if let Some(()) = p.term("null")? {
+			Ok(Null)
+		} else {
+			Diag::error(p.next_span(), "expected 'null'").emit();
+			Err(Error)
+		}
+	}
+}
+
+impl Val for Pos2 {
+	fn parse(p: &mut Parse) -> Result<Self> {
+		if let Some((x, Null, z)) = p.tuple()? {
+			Ok(Pos2(x, z))
+		} else {
+			Diag::error(p.next_span(), "expected pos2").emit();
 			Err(Error)
 		}
 	}
@@ -505,6 +564,17 @@ impl Val for FileId {
 			Ok(FileId(s))
 		} else {
 			Diag::error(p.next_span(), "expected string, 'null', or 'file'").emit();
+			Err(Error)
+		}
+	}
+}
+
+impl Val for Emote {
+	fn parse(p: &mut Parse) -> Result<Self> {
+		if let Some((a, b, c)) = p.term("emote")? {
+			Ok(Emote(a, b, c))
+		} else {
+			Diag::error(p.next_span(), "expected 'emote'").emit();
 			Err(Error)
 		}
 	}
@@ -552,18 +622,34 @@ macro newtype($T:ident, $s:literal) {
 	}
 }
 
-newtype!(TownId, "town");
-newtype!(BgmId, "bgm");
-newtype!(ChcpId, "chcp");
-newtype!(BattleId, "battle");
 newtype!(Flag, "flag");
-newtype!(Var, "var");
 newtype!(Attr, "system");
+newtype!(Var, "var");
 newtype!(Global, "global");
-newtype!(AnimId, "anim");
+
+newtype!(NameId,   "name");
+newtype!(BgmId,    "bgm");
+newtype!(MagicId,  "magic");
+newtype!(QuestId,  "quest");
+newtype!(ShopId,   "shop");
+newtype!(SoundId,  "sound");
+newtype!(TownId,   "town");
+newtype!(BattleId, "battle");
+newtype!(ItemId,   "item");
+
 newtype!(LookPointId, "look_point");
-newtype!(LabelId, "label");
-newtype!(TriggerId, "trigger");
+newtype!(EntranceId,  "entrance");
+newtype!(ObjectId,    "object");
+newtype!(TriggerId,   "trigger");
+newtype!(LabelId,     "label");
+newtype!(AnimId,      "anim");
+
+newtype!(ChcpId,  "chcp");
+newtype!(VisId,   "vis");
+newtype!(ForkId,  "fork");
+newtype!(EffId,   "eff");
+newtype!(EffInstanceId, "eff_instance");
+newtype!(MenuId,  "menu");
 
 macro when {
 	($t1:tt) => {},
@@ -791,7 +877,7 @@ pub mod scena;
 
 #[test]
 fn main() {
-	let src = include_str!("/tmp/kiseki/ao_gf_en/a0000");
+	let src = include_str!("/tmp/kiseki/ao_gf_en/c1200");
 	let (v, diag) = super::diag::diagnose(|| {
 		let tok = crate::parse::lex::lex(src);
 		parse(&tok, None)

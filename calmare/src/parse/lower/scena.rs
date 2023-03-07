@@ -16,6 +16,16 @@ fn parse_func(p: &mut Parse) -> Bytecode {
 	}).unwrap_or_default()
 }
 
+impl Val for Vec<Insn> {
+	fn parse(p: &mut Parse) -> Result<Self> {
+		let mut out = Vec::new();
+		for line in p.body()? {
+			out.push(Parse::new(line, p.context).parse_with(parse_insn));
+		}
+		Ok(out)
+	}
+}
+
 fn parse_tree(p: &mut Parse, can_break: bool, can_continue: bool) -> Vec<TreeInsn> {
 	let mut out = Vec::new();
 	let mut last_if = None;
@@ -120,113 +130,40 @@ fn parse_tree(p: &mut Parse, can_break: bool, can_continue: bool) -> Vec<TreeIns
 }
 
 fn parse_insn(p: &mut Parse) -> Insn {
-	Insn::Return()
+	if p.pos == p.tokens.len() {
+		Diag::error(p.next_span(), "can't parse insn").emit();
+		return Insn::Return()
+	}
+	macro run {
+		([$(($ident:ident $(($_n:ident $($ty:tt)*))*))*]) => {
+			match p.tokens[p.pos].1 {
+				$(Token::Ident(stringify!($ident)) => {
+					p.pos += 1;
+					run!($ident $(($_n $($ty)*))*);
+				})*
+				_ => {
+					Diag::error(p.next_span(), "can't parse insn").emit();
+					p.pos = p.tokens.len();
+					return Insn::Return()
+				}
+			}
+		},
+		($ident:ident ($v1:ident $_:ty) ($v2:ident Expr)) => {
+			Diag::error(p.prev_span(), "please use assignment syntax").emit();
+			p.pos = p.tokens.len();
+			return Insn::Return()
+		},
+		($ident:ident $(($_n:ident $ty:ty))*) => {
+			if let Ok(($($_n,)*)) = Val::parse(p) {
+				return Insn::$ident($($_n),*)
+			} else {
+				p.pos = p.tokens.len();
+				return Insn::Return()
+			}
+		}
+	}
+	themelios::scena::code::introspect!(run);
 }
-
-// fn lower_assign(ctx: &Context, term: &S<Term>, o: S<Assop>, e: &S<Expr>) -> Insn {
-// 	let e = lower_expr(ctx, e);
-// 	let o = match o.1 {
-// 		Assop::Assign => ExprUnop::Ass,
-// 		Assop::Add => ExprUnop::AddAss,
-// 		Assop::Sub => ExprUnop::SubAss,
-// 		Assop::Mul => ExprUnop::MulAss,
-// 		Assop::Div => ExprUnop::DivAss,
-// 		Assop::Mod => ExprUnop::ModAss,
-// 		Assop::Or  => ExprUnop::OrAss,
-// 		Assop::And => ExprUnop::AndAss,
-// 		Assop::Xor => ExprUnop::XorAss,
-// 	};
-// 	let e = LExpr::Unop(o, Box::new(e));
-//
-// 	if let Term::Term(kv) = &term.1 {
-// 		match kv.key.1.as_str() {
-// 			"var"    => Insn::Var(Var(kv.parse(ctx).unwrap_or_default()), e),
-// 			"system" => Insn::Attr(Attr(kv.parse(ctx).unwrap_or_default()), e),
-// 			"char_attr" => {
-// 				let (a, b) = kv.parse(ctx).unwrap_or((CharId(0), 0));
-// 				Insn::CharAttr(CharAttr(a, b), e)
-// 			},
-// 			"global" => Insn::Global(Global(kv.parse(ctx).unwrap_or_default()), e),
-// 			_ => {
-// 				Diag::error(term.0, "invalid assignment target").emit();
-// 				Insn::Return()
-// 			}
-// 		}
-// 	} else {
-// 		Diag::error(term.0, "invalid assignment target").emit();
-// 		Insn::Return()
-// 	}
-// }
-
-// fn parse_exprq(p: &mut Parse) -> Expr {
-// 	match &e.1 {
-// 		Expr::Binop(a, o, b) => {
-// 			let a = lower_expr(ctx, a);
-// 			let b = lower_expr(ctx, b);
-// 			let o = match o.1 {
-// 				Binop::Eq      => ExprBinop::Eq,
-// 				Binop::Ne      => ExprBinop::Ne,
-// 				Binop::Lt      => ExprBinop::Lt,
-// 				Binop::Le      => ExprBinop::Le,
-// 				Binop::Gt      => ExprBinop::Gt,
-// 				Binop::Ge      => ExprBinop::Ge,
-// 				Binop::BoolAnd => ExprBinop::BoolAnd,
-// 				Binop::BoolOr  => ExprBinop::Or,
-// 				Binop::Add     => ExprBinop::Add,
-// 				Binop::Sub     => ExprBinop::Sub,
-// 				Binop::Mul     => ExprBinop::Mul,
-// 				Binop::Div     => ExprBinop::Div,
-// 				Binop::Mod     => ExprBinop::Mod,
-// 				Binop::Or      => ExprBinop::Or,
-// 				Binop::And     => ExprBinop::And,
-// 				Binop::Xor     => ExprBinop::Xor,
-// 			};
-// 			LExpr::Binop(o, Box::new(a), Box::new(b))
-// 		},
-// 		Expr::Unop(o, e) => {
-// 			let e = lower_expr(ctx, e);
-// 			let o = match o.1 {
-// 				Unop::Not => ExprUnop::Not,
-// 				Unop::Neg => ExprUnop::Neg,
-// 				Unop::Inv => ExprUnop::Inv,
-// 			};
-// 			LExpr::Unop(o, Box::new(e))
-// 		},
-// 		Expr::Term(S(s, kv)) => {
-// 			match kv {
-// 				Term::Int(S(_, i), _) => {
-// 					if *i < 0 {
-// 						LExpr::Unop(ExprUnop::Neg, Box::new(LExpr::Const(-*i as u32)))
-// 					} else {
-// 						LExpr::Const(*i as u32)
-// 					}
-// 				}
-// 				Term::Term(kv) => {
-// 					match kv.key.1.as_str() {
-// 						"flag"   => LExpr::Flag(Flag(kv.parse(ctx).unwrap_or_default())),
-// 						"var"    => LExpr::Var(Var(kv.parse(ctx).unwrap_or_default())),
-// 						"system" => LExpr::Attr(Attr(kv.parse(ctx).unwrap_or_default())),
-// 						"char_attr" => {
-// 							let (a, b) = kv.parse(ctx).unwrap_or((CharId(0), 0));
-// 							LExpr::CharAttr(CharAttr(a, b))
-// 						},
-// 						"global" => LExpr::Global(Global(kv.parse(ctx).unwrap_or_default())),
-// 						"random" => { kv.parse::<()>(ctx).unwrap_or_default(); LExpr::Rand },
-// 						_ => {
-// 							Diag::error(*s, "invalid expr").emit();
-// 							LExpr::Const(0)
-// 						}
-// 					}
-// 				},
-// 				_ => {
-// 					Diag::error(*s, "invalid expr").emit();
-// 					LExpr::Const(0)
-// 				},
-// 			}
-// 		},
-// 		Expr::Insn(i) => LExpr::Insn(Box::new(lower_insn(ctx, i))),
-// 	}
-// }
 
 fn parse_expr(p: &mut Parse) -> Expr {
 	parse_expr0(p, 10).unwrap_or(Expr::Const(0))

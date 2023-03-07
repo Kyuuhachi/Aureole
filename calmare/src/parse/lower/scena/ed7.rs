@@ -129,12 +129,12 @@ pub fn parse(lines: &[Line], ctx: &Context) -> Result<Scena> {
 }
 
 fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
-	let Some(key) = p.next_if(f!(Token::Ident(a) => a)) else {
+	let Some(key) = test!(p, Token::Ident(a) => a) else {
 		Diag::error(p.next_span(), "expected word").emit();
 		p.pos = p.tokens.len();
 		return Err(Error);
 	};
-	if p.next_if(f!(Token::Bracket(_) => ())).is_some() {
+	if test!(p, Token::Bracket(_)) {
 		p.pos -= 2;
 	}
 	match *key {

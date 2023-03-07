@@ -730,7 +730,7 @@ impl<T> One<T> {
 }
 
 #[derive(Debug, Clone)]
-struct Many<K, V>(BTreeMap<K, (Span, V)>);
+struct Many<K, V>(BTreeMap<K, (Span, Option<V>)>);
 
 impl<K, V> Default for Many<K, V> {
 	fn default() -> Self {
@@ -739,13 +739,21 @@ impl<K, V> Default for Many<K, V> {
 }
 
 impl<K: Ord, V> Many<K, V> {
-	fn insert(&mut self, s: Span, n: K, v: V) {
+	fn mark(&mut self, s: Span, n: K) {
 		if let Some((prev, _)) = self.0.get(&n) {
 			Diag::error(s, "duplicate item")
 				.note(*prev, "previous here")
 				.emit();
 		}
-		self.0.insert(n, (s, v));
+		self.0.insert(n, (s, None));
+	}
+
+	fn insert(&mut self, n: K, v: V) {
+		if let Some((_, q)) = self.0.get_mut(&n) {
+			*q = Some(v)
+		} else {
+			panic!("not marked")
+		}
 	}
 
 	fn get(self, f: impl Fn(K) -> usize) -> Vec<V> {
@@ -759,7 +767,7 @@ impl<K: Ord, V> Many<K, V> {
 					.emit();
 			}
 			expect = k + 1;
-			vs.push(v)
+			vs.extend(v)
 		}
 		vs
 	}

@@ -64,8 +64,8 @@ pub fn parse(lines: &[Line], ctx: &Context) -> Result<Scena> {
 	}
 
 	let misorder = scena.npcs_monsters.0.iter()
-		.skip_while(|a| matches!(&a.1.1, NpcOrMonster::Npc(_)))
-		.find(|a| matches!(&a.1.1, NpcOrMonster::Npc(_)));
+		.skip_while(|a| !matches!(&a.1.1, Some(NpcOrMonster::Monster(_))))
+		.find(|a| matches!(&a.1.1, Some(NpcOrMonster::Npc(_))));
 	if let Some((k, (s, _))) = misorder {
 		let (_, (prev, _)) = scena.npcs_monsters.0.range(..k).last().unwrap();
 		Diag::error(*prev, "monsters must come after npcs")
@@ -123,11 +123,10 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 	}
 	match *key {
 		"fn" => {
-			let id = FuncId::parse(p);
+			let S(s, n) = Val::parse(p)?;
+			scena.functions.mark(p.tokens[0].0 | s, n);
 			let f = parse_func(p);
-			if let Ok(id) = id {
-				scena.functions.insert(p.head_span(), id, f);
-			}
+			scena.functions.insert(n, f);
 		}
 		"scena" => {
 			let mut scp: [One<FileId>; 6] = [(); 6].map(|_| One::Empty);
@@ -175,10 +174,12 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 		}
 		"chcp" => {
 			let (S(s, n), v) = Val::parse(p)?;
-			scena.chcp.insert(p.tokens[0].0 | s, n, v);
+			scena.chcp.mark(p.tokens[0].0 | s, n);
+			scena.chcp.insert(n, v);
 		}
 		"npc" => {
 			let S(s, n) = Val::parse(p)?;
+			scena.npcs_monsters.mark(p.tokens[0].0 | s, n);
 			parse_data!(p => {
 				name,
 				pos,
@@ -190,13 +191,14 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 				talk,
 				unk4,
 			});
-			scena.npcs_monsters.insert(p.tokens[0].0 | s, n, NpcOrMonster::Npc(Npc {
+			scena.npcs_monsters.insert(n, NpcOrMonster::Npc(Npc {
 				name, pos, angle, flags, unk2,
 				chcp, init, talk, unk4,
 			}));
 		}
 		"monster" => {
 			let S(s, n) = Val::parse(p)?;
+			scena.npcs_monsters.mark(p.tokens[0].0 | s, n);
 			parse_data!(p => {
 				pos,
 				angle,
@@ -208,13 +210,14 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 				stand_anim,
 				walk_anim,
 			});
-			scena.npcs_monsters.insert(p.tokens[0].0 | s, n, NpcOrMonster::Monster(Monster {
+			scena.npcs_monsters.insert(n, NpcOrMonster::Monster(Monster {
 				pos, angle, flags, battle, flag,
 				chcp, unk2, stand_anim, walk_anim,
 			}));
 		}
 		"trigger" => {
 			let S(s, n) = Val::parse(p)?;
+			scena.triggers.mark(p.tokens[0].0 | s, n);
 			parse_data!(p => {
 				pos,
 				radius,
@@ -229,7 +232,7 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 			});
 			let FPos3(x, y, z) = pos;
 			let radius: f32 = radius;
-			scena.triggers.insert(p.tokens[0].0 | s, n, Trigger {
+			scena.triggers.insert(n, Trigger {
 				pos: (x / 1000., y / 1000., z / 1000.),
 				radius: radius / 1000.,
 				transform,
@@ -244,6 +247,7 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 		}
 		"look_point" => {
 			let S(s, n) = Val::parse(p)?;
+			scena.look_points.mark(p.tokens[0].0 | s, n);
 			parse_data!(p => {
 				pos,
 				radius,
@@ -254,7 +258,7 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 				unk3,
 				unk4,
 			});
-			scena.look_points.insert(p.tokens[0].0 | s, n, LookPoint {
+			scena.look_points.insert(n, LookPoint {
 				pos,
 				radius,
 				bubble_pos,
@@ -267,6 +271,7 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 		}
 		"label" => {
 			let S(s, n) = Val::parse(p)?;
+			scena.labels.mark(p.tokens[0].0 | s, n);
 			parse_data!(p => {
 				name,
 				pos,
@@ -274,7 +279,7 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 				unk2,
 			});
 			let FPos3(x, y, z) = pos;
-			scena.labels.insert(p.tokens[0].0 | s, n, Label {
+			scena.labels.insert(n, Label {
 				name,
 				pos: (x / 1000., y / 1000., z / 1000.),
 				unk1,
@@ -283,16 +288,20 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 		}
 		"anim" => {
 			let (S(s, n), speed, frames) = Val::parse(p)?;
-			scena.animations.insert(p.tokens[0].0 | s, n, Animation {
+			scena.animations.mark(p.tokens[0].0 | s, n);
+			scena.animations.insert(n, Animation {
 				speed,
 				frames,
 			});
 		}
 		"sepith" => {
 			let (S(s, n), values) = Val::parse(p)?;
-			scena.sepith.insert(p.tokens[0].0 | s, n, values);
+			scena.sepith.mark(p.tokens[0].0 | s, n);
+			scena.sepith.insert(n, values);
 		}
 		"at_roll" => {
+			let S(s, n) = Val::parse(p)?;
+			scena.at_rolls.mark(p.tokens[0].0 | s, n);
 			let mut values = [(); 16].map(|_| One::<u8>::Empty);
 			macro fd($n:literal) {
 				|p: &mut Parse| {
@@ -300,7 +309,6 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 					Ok(())
 				}
 			}
-			let S(s, n) = Val::parse(p)?;
 			parse_data!(p => {
 				none => fd!(0),
 				hp10 => fd!(1),
@@ -320,10 +328,11 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 				unk9 => fd!(15),
 			});
 			let values = values.map(|a| a.get().unwrap_or_default());
-			scena.at_rolls.insert(p.tokens[0].0 | s, n, values);
+			scena.at_rolls.insert(n, values);
 		}
 		"placement" => {
 			let S(s, n) = Val::parse(p)?;
+			scena.placements.mark(p.tokens[0].0 | s, n);
 			let mut vs = Vec::new();
 			parse_data!(p => {
 				pos => |p: &mut Parse| {
@@ -332,14 +341,14 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 				}
 			});
 			if let Ok(vs) = vs.try_into() {
-				scena.placements.insert(p.tokens[0].0 | s, n, vs);
+				scena.placements.insert(n, vs);
 			} else {
-				scena.placements.insert(p.tokens[0].0 | s, n, [(0,0,Angle(180));8]);
 				Diag::error(p.head_span(), "needs exactly 8 'pos'").emit();
 			}
 		}
 		"battle" => {
 			let S(s, n) = Val::parse(p)?;
+			scena.battles.mark(p.tokens[0].0 | s, n);
 			let mut setups = Vec::new();
 			parse_data!(p => {
 				flags, level, unk1, vision_range, move_range,
@@ -367,7 +376,7 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 					Ok(())
 				}
 			});
-			scena.battles.insert(p.tokens[0].0 | s, n, Battle {
+			scena.battles.insert(n, Battle {
 				flags, level, unk1, vision_range, move_range,
 				can_move, move_speed, unk2, battlefield, sepith,
 				setups,

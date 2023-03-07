@@ -66,7 +66,7 @@ fn parse_tree(p: &mut Parse, can_break: bool, can_continue: bool) -> Vec<TreeIns
 				last_if = None;
 				let e = parse_expr(p);
 				let mut cases = Vec::new();
-				let mut seen = Many::default(); // only used for duplicate checking, not order
+				let mut seen = Many::<Option<u16>, ()>::default(); // only used for duplicate checking, not order
 				for l in p.body().unwrap_or_default() {
 					Parse::new(l, p.context).parse_with(|p| {
 						let span = p.next_span();
@@ -81,7 +81,7 @@ fn parse_tree(p: &mut Parse, can_break: bool, can_continue: bool) -> Vec<TreeIns
 						};
 						let b = parse_tree(p, true, can_continue);
 						if let Ok(i) = i {
-							seen.insert(span, i, ());
+							seen.mark(span, i);
 							cases.push((i, b))
 						}
 					});

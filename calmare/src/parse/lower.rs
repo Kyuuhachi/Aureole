@@ -442,13 +442,74 @@ impl TryVal for Text {
 	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
 		if let Some(d) = test!(p, Token::Brace(s) => s) {
 			let mut out = Vec::new();
+			parse_text_chunk(&mut out, p.context, &d.tokens);
 			while let Some(d) = test!(p, Token::Brace(s) => s) {
 				out.push(TextSegment::Page);
+				parse_text_chunk(&mut out, p.context, &d.tokens);
 			}
 
 			Ok(Some(Text(out)))
 		} else {
 			Ok(None)
+		}
+	}
+}
+
+fn parse_text_chunk(out: &mut Vec<TextSegment>, ctx: &Context, d: &[S<TextToken>]) {
+	for S(_, t) in d {
+		match t {
+			TextToken::Text(s) => {
+				out.push(TextSegment::String(s.to_owned()))
+			}
+			TextToken::Newline(b) => {
+				out.push(if *b { TextSegment::Line2 } else { TextSegment::Line } )
+			}
+			TextToken::Brace(d) => {
+				Parse::new_inner(&d.tokens, d.close, ctx).parse_with(|p| {
+					if p.pos == p.tokens.len() {
+						return
+					}
+
+					if let Some(n) = test!(p, Token::Int(a) => *a) {
+						match n.try_into() {
+							Ok(n) => out.push(TextSegment::Byte(n)),
+							Err(e) => Diag::error(p.prev_span(), e).emit()
+						}
+						return
+					}
+
+					let Some(key) = test!(p, Token::Ident(a) => a) else {
+						Diag::error(p.next_span(), "expected word").emit();
+						p.pos = p.tokens.len();
+						return;
+					};
+					if test!(p, Token::Bracket(_)) {
+						p.pos -= 2;
+					}
+
+					match *key {
+						"wait" => {
+							out.push(TextSegment::Wait)
+						}
+						"color" => {
+							if let Some(c) = test!(p, Token::Int(i) if *i <= 255 => *i) {
+								out.push(TextSegment::Color(c as u8))
+							} else {
+								Diag::error(p.next_span(), "expected u8").emit();
+								p.pos = p.tokens.len();
+							}
+						}
+						"item" => {
+							if let Ok(c) = ItemId::parse(p) {
+								out.push(TextSegment::Item(c))
+							}
+						}
+						_ => {
+							Diag::error(p.prev_span(), "expected u8, 'wait', 'color', 'item'").emit();
+						}
+					}
+				})
+			}
 		}
 	}
 }

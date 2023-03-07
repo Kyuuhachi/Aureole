@@ -67,6 +67,9 @@ pub fn print_diags(filename: &str, source: &str, diags: &[Diag]) {
 	let mut files = SimpleFiles::new();
 	let file_id = files.add(filename, source);
 
+	let mut diags = diags.to_owned();
+	diags.sort_by_key(|a| (a.text.0.start, a.text.0.end));
+
 	for d in diags {
 		let mut l = vec![
 			Label::primary(file_id, d.text.0.as_range()).with_message(&d.text.1),

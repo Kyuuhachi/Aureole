@@ -213,31 +213,34 @@ fn parse_expr0(p: &mut Parse, prec: usize) -> Result<Expr> {
 }
 
 fn parse_atom(p: &mut Parse) -> Result<Expr> {
-	if p.pos == p.tokens.len() {
-		Diag::error(p.eol, "expected expression").emit();
-		return Err(Error)
-	}
-	macro c($e:expr => $p:pat in $o:expr) {
-		if let Some($p) = $e {
-			return Ok($o)
+	try {
+		if let Some(d) = test!(p, Token::Paren(d) => d) {
+			Parse::new_inner(&d.tokens, d.close, p.context)
+				.parse_with(|p| parse_expr0(p, 10))?
+		} else if test!(p, Token::Minus) {
+			Expr::Unop(ExprUnop::Neg, Box::new(parse_atom(p)?))
+		} else if test!(p, Token::Excl) {
+			Expr::Unop(ExprUnop::Not, Box::new(parse_atom(p)?))
+		} else if test!(p, Token::Tilde) {
+			Expr::Unop(ExprUnop::Inv, Box::new(parse_atom(p)?))
+		} else if let Some(v) = TryVal::try_parse(p)? {
+			Expr::Const(v)
+		} else if let Some(v) = TryVal::try_parse(p)? {
+			Expr::Flag(v)
+		} else if let Some(v) = TryVal::try_parse(p)? {
+			Expr::Var(v)
+		} else if let Some(v) = TryVal::try_parse(p)? {
+			Expr::Attr(v)
+		} else if let Some(v) = TryVal::try_parse(p)? {
+			Expr::CharAttr(v)
+		} else if let Some(v) = TryVal::try_parse(p)? {
+			Expr::Global(v)
+		} else if p.term::<()>("random")?.is_some() {
+			Expr::Rand
+		} else {
+			Expr::Insn(Box::new(parse_insn(p)))
 		}
 	}
-	c!(test!(p, Token::Paren(d) => d) => d in
-		Parse::new_inner(&d.tokens, d.close, p.context).parse_with(|p| parse_expr0(p, 10))?);
-	c!(test!(p, Token::Minus => ()) => () in
-		Expr::Unop(ExprUnop::Neg, Box::new(parse_atom(p)?)));
-	c!(test!(p, Token::Excl => ()) => () in
-		Expr::Unop(ExprUnop::Not, Box::new(parse_atom(p)?)));
-	c!(test!(p, Token::Tilde => ()) => () in
-		Expr::Unop(ExprUnop::Inv, Box::new(parse_atom(p)?)));
-	c!(TryVal::try_parse(p)? => v in Expr::Const(v));
-	c!(TryVal::try_parse(p)? => v in Expr::Flag(v));
-	c!(TryVal::try_parse(p)? => v in Expr::Var(v));
-	c!(TryVal::try_parse(p)? => v in Expr::Attr(v));
-	c!(TryVal::try_parse(p)? => v in Expr::CharAttr(v));
-	c!(TryVal::try_parse(p)? => v in Expr::Global(v));
-	c!(p.term("random")? => () in Expr::Rand);
-	Ok(Expr::Insn(Box::new(parse_insn(p))))
 }
 
 macro op($p:ident; $t1:ident $($t:ident)* => $op:expr) {

@@ -79,7 +79,7 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 			type IS = #game_ty;
 			match (#game_expr, __insn) {
 				#(#write)*
-				(_is, _i) => return Err(format!("`{}` is not supported on `{:?}`", _i.name(), _is).into())
+				(_is, _i) => return Err(format!("'{}' is not supported on '{:?}'", _i.name(), _is).into())
 			}
 			Ok(())
 		}
@@ -390,7 +390,7 @@ fn get_games(attrs: &mut DefAttributes, all_games: &[Ident], n: &mut [usize], nu
 		if let Some(n) = all_games.iter().position(|a| a == game) {
 			Some(n)
 		} else {
-			Diagnostic::spanned(game.span().unwrap(), Level::Error, format!("unknown game `{game}`")).emit();
+			Diagnostic::spanned(game.span().unwrap(), Level::Error, format!("unknown game '{game}'")).emit();
 			None
 		}
 	}).collect();

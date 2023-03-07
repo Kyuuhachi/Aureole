@@ -24,6 +24,24 @@ impl std::fmt::Debug for Label {
 	}
 }
 
+// TODO make this one stricter so it does not permit duplicate labels
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Bytecode(pub Vec<FlatInsn>);
+
+impl std::ops::Deref for Bytecode {
+	type Target = Vec<FlatInsn>;
+
+	fn deref(&self) -> &Self::Target {
+		&self.0
+	}
+}
+
+impl Bytecode {
+	pub fn push(&mut self, value: FlatInsn) {
+		self.0.push(value)
+	}
+}
+
 // I *could* make this generic over <Expr, Insn, Label, LabelDef>, but honestly, no.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FlatInsn {
@@ -51,7 +69,7 @@ enum RawOInsn<'a> {
 	Label(HLabelDef),
 }
 
-pub fn read<'a>(f: &mut (impl Read<'a> + Dump), game: Game, end: Option<usize>) -> Result<Vec<FlatInsn>, ReadError> {
+pub fn read<'a>(f: &mut (impl Read<'a> + Dump), game: Game, end: Option<usize>) -> Result<Bytecode, ReadError> {
 	let mut insns = Vec::new();
 	let mut extent = f.pos();
 	loop {
@@ -127,7 +145,7 @@ pub fn read<'a>(f: &mut (impl Read<'a> + Dump), game: Game, end: Option<usize>) 
 		})
 	}
 
-	Ok(insns2)
+	Ok(Bytecode(insns2))
 }
 
 fn read_raw_insn<'a>(f: &mut impl Read<'a>, game: Game) -> Result<RawIInsn, ReadError> {
@@ -172,7 +190,7 @@ fn read_raw_insn<'a>(f: &mut impl Read<'a>, game: Game) -> Result<RawIInsn, Read
 	Ok(insn)
 }
 
-pub fn write(f: &mut impl Write, game: Game, insns: &[FlatInsn]) -> Result<(), WriteError> {
+pub fn write(f: &mut impl Write, game: Game, insns: &Bytecode) -> Result<(), WriteError> {
 	let mut labels = HashMap::new();
 	let mut labeldefs = HashMap::new();
 	let mut label = |k| {
@@ -183,7 +201,7 @@ pub fn write(f: &mut impl Write, game: Game, insns: &[FlatInsn]) -> Result<(), W
 		}
 	};
 
-	for insn in insns {
+	for insn in &insns.0 {
 		match insn {
 			FlatInsn::Unless(_, target) => {
 				label(*target);
@@ -202,7 +220,7 @@ pub fn write(f: &mut impl Write, game: Game, insns: &[FlatInsn]) -> Result<(), W
 		}
 	}
 
-	for insn in insns {
+	for insn in &insns.0 {
 		write_raw_insn(f, game, match insn {
 			FlatInsn::Unless(e, l) => RawOInsn::Unless(e, labels[l].clone()),
 			FlatInsn::Goto(l) => RawOInsn::Goto(labels[l].clone()),

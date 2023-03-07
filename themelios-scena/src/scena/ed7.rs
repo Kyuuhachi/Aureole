@@ -5,6 +5,7 @@ use crate::types::*;
 use crate::util::*;
 
 use super::*;
+use super::code::Bytecode;
 
 newtype!(SepithId, u16);
 newtype!(PlacementId, u16);
@@ -28,7 +29,7 @@ pub struct Scena {
 	pub look_points: Vec<LookPoint>,
 	pub animations: Vec<Animation>,
 	pub entry: Option<Entry>,
-	pub functions: Vec<Vec<code::FlatInsn>>,
+	pub functions: Vec<Bytecode>,
 
 	/// The first five, if present, are always the same nonsensical values.
 	pub sepith: Vec<[u8; 8]>,
@@ -397,7 +398,7 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 		mons.battle = btl.get_battle(&mut f.clone().at(mons.battle.0 as usize)?)?;
 	}
 	for func in &mut functions {
-		for insn in func {
+		for insn in &mut func.0 {
 			if let code::FlatInsn::Insn(code::Insn::ED7Battle { 0: battle, .. }) = insn {
 				*battle = btl.get_battle(&mut f.clone().at(battle.0 as usize)?)?;
 			}

@@ -1,6 +1,6 @@
 use super::*;
 
-use themelios::scena::{ed7::*, code::FlatInsn};
+use themelios::scena::{ed7::*, code::Bytecode};
 
 themelios::util::newtype!(CharDefId, u16);
 newtype!(CharDefId, "char");
@@ -54,7 +54,7 @@ struct ScenaBuild {
 	at_rolls: Many<AtRollId, [u8; 16]>,
 	placements: Many<PlacementId, [(u8, u8, Angle); 8]>,
 	battles: Many<BattleId, Battle>,
-	functions: Many<FuncId, Vec<FlatInsn>>,
+	functions: Many<FuncId, Bytecode>,
 }
 
 pub fn lower(file: &File, lookup: Option<&dyn Lookup>) -> Result<Scena> {

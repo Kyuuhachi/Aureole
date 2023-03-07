@@ -5,6 +5,7 @@ use crate::types::*;
 use crate::util::*;
 
 use super::*;
+use super::code::Bytecode;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Scena {
@@ -24,7 +25,7 @@ pub struct Scena {
 	pub triggers: Vec<Trigger>,
 	pub look_points: Vec<LookPoint>,
 	pub entries: Vec<Entry>,
-	pub functions: Vec<Vec<code::FlatInsn>>,
+	pub functions: Vec<Bytecode>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

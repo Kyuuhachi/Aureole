@@ -1,4 +1,4 @@
-use themelios::scena::code::{FlatInsn, Insn, Expr as LExpr, ExprBinop, ExprUnop};
+use themelios::scena::code::{Bytecode, Insn, Expr as LExpr, ExprBinop, ExprUnop};
 use themelios::scena::code::decompile::{recompile, TreeInsn};
 
 use super::*;
@@ -6,7 +6,7 @@ use crate::span::{Spanned as S, Span};
 
 pub mod ed7;
 
-fn lower_func(ctx: &Context, body: &FnBody) -> Result<Vec<FlatInsn>> {
+fn lower_func(ctx: &Context, body: &FnBody) -> Result<Bytecode> {
 	match body {
 		FnBody::Code(insns) => {
 			let tree = lower_tree(ctx, insns.as_slice(), false, false);

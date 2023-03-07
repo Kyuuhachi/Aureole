@@ -329,7 +329,6 @@ pub enum TextToken<'a> {
 	Text(String),
 	// NISA's ed7 have two newlines (01 and 0D), which here are differentiated by a backslash.
 	Newline(bool),
-	Hex(u8),
 	Brace(Delimited<Token<'a>>),
 }
 
@@ -392,7 +391,6 @@ impl std::fmt::Debug for TextToken<'_> {
 		match self {
 			Self::Text(v)    => { write!(f, "Text(")?;    v.fmt(f)?; write!(f, ")") }
 			Self::Newline(v) => { write!(f, "Newline(")?; v.fmt(f)?; write!(f, ")") }
-			Self::Hex(v)     => { write!(f, "Hex(")?;     v.fmt(f)?; write!(f, ")") }
 			Self::Brace(v)   => { write!(f, "Brace(")?;   v.fmt(f)?; write!(f, ")") }
 		}
 	}

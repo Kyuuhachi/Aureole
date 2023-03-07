@@ -576,7 +576,7 @@ macro unless {
 
 macro parse_data($d:ident => { $($k:ident $(=> $e:expr)?),* $(,)? }) {
 	$(unless!($({when!($e);})?, {
-		let mut $k = One::Empty;
+		let mut $k = One::default();
 	});)*
 
 	let body = $d.body()?;
@@ -595,11 +595,11 @@ macro parse_data($d:ident => { $($k:ident $(=> $e:expr)?),* $(,)? }) {
 							p.pos = p.tokens.len();
 						}
 					})?, {
-						let v = Val::parse(p);
-						if v.is_err() {
-							p.pos = p.tokens.len();
+						$k.mark(p.prev_span());
+						match Val::parse(p) {
+							Ok(v) => $k.set(v),
+							Err(_) => p.pos = p.tokens.len()
 						}
-						$k.set(p.prev_span(), v.ok());
 					});
 				})*
 				_ => {
@@ -609,6 +609,7 @@ macro parse_data($d:ident => { $($k:ident $(=> $e:expr)?),* $(,)? }) {
 					Diag::error(p.prev_span(), "unknown field")
 						.note(p.prev_span(), format_args!("allowed fields are {}", &fields.join(", ")))
 						.emit();
+					p.pos = p.tokens.len();
 				}
 			}
 		})
@@ -617,8 +618,7 @@ macro parse_data($d:ident => { $($k:ident $(=> $e:expr)?),* $(,)? }) {
 	#[allow(unused_mut)]
 	let mut failures: Vec<&str> = Vec::new();
 	$(unless!($({when!($e);})?, {
-		let $k = $k.get();
-		if $k.is_none() {
+		if !$k.is_present() {
 			failures.push(concat!("'", stringify!($k), "'"));
 		}
 	});)*
@@ -632,7 +632,7 @@ macro parse_data($d:ident => { $($k:ident $(=> $e:expr)?),* $(,)? }) {
 	}
 
 	$(unless!($({when!($e);})?, {
-		let Some($k) = $k.unwrap() else { Err(Error)?; unreachable!() };
+		let Some($k) = $k.get() else { Err(Error)?; unreachable!() };
 	});)*
 }
 
@@ -704,33 +704,47 @@ pub fn parse(lines: &[Line], lookup: Option<&dyn Lookup>) -> Result<()> {
 	}
 }
 
-#[derive(Debug, Clone, Default)]
-enum One<T> {
-	#[default]
-	Empty,
-	Set(Span, T)
+#[derive(Debug, Clone)]
+struct One<T>(Option<S<Option<T>>>);
+
+impl<T> Default for One<T> {
+	fn default() -> Self {
+		Self(None)
+	}
 }
 
 impl<T> One<T> {
-	fn set(&mut self, s: Span, v: T) {
-		if let One::Set(prev, _) = self {
+	fn mark(&mut self, s: Span) {
+		if let Some(S(prev, _)) = &self.0 {
 			Diag::error(s, "duplicate item")
 				.note(*prev, "previous here")
 				.emit();
 		}
-		*self = One::Set(s, v);
+		self.0 = Some(S(s, None));
+	}
+
+	fn set(&mut self, v: T) {
+		if let Some(S(_, q)) = &mut self.0 {
+			*q = Some(v)
+		} else {
+			panic!("not marked")
+		}
+	}
+
+	fn is_present(&self) -> bool {
+		self.0.is_some()
 	}
 
 	fn get(self) -> Option<T> {
-		match self {
-			One::Empty => None,
-			One::Set(_, v) => Some(v),
+		match self.0 {
+			Some(S(_, Some(v))) => Some(v),
+			_ => None,
 		}
 	}
 }
 
 #[derive(Debug, Clone)]
-struct Many<K, V>(BTreeMap<K, (Span, Option<V>)>);
+struct Many<K, V>(BTreeMap<K, S<Option<V>>>);
 
 impl<K, V> Default for Many<K, V> {
 	fn default() -> Self {
@@ -740,16 +754,16 @@ impl<K, V> Default for Many<K, V> {
 
 impl<K: Ord, V> Many<K, V> {
 	fn mark(&mut self, s: Span, n: K) {
-		if let Some((prev, _)) = self.0.get(&n) {
+		if let Some(S(prev, _)) = self.0.get(&n) {
 			Diag::error(s, "duplicate item")
 				.note(*prev, "previous here")
 				.emit();
 		}
-		self.0.insert(n, (s, None));
+		self.0.insert(n, S(s, None));
 	}
 
 	fn insert(&mut self, n: K, v: V) {
-		if let Some((_, q)) = self.0.get_mut(&n) {
+		if let Some(S(_, q)) = self.0.get_mut(&n) {
 			*q = Some(v)
 		} else {
 			panic!("not marked")
@@ -759,7 +773,7 @@ impl<K: Ord, V> Many<K, V> {
 	fn get(self, f: impl Fn(K) -> usize) -> Vec<V> {
 		let mut vs = Vec::with_capacity(self.0.len());
 		let mut expect = 0;
-		for (k, (s, v)) in self.0 {
+		for (k, S(s, v)) in self.0 {
 			let k = f(k);
 			if k != expect {
 				Diag::error(s, "gap in list")

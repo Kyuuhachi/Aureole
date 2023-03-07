@@ -66,8 +66,8 @@ pub fn parse(lines: &[Line], ctx: &Context) -> Result<Scena> {
 	let misorder = scena.npcs_monsters.0.iter()
 		.skip_while(|a| !matches!(&a.1.1, Some(NpcOrMonster::Monster(_))))
 		.find(|a| matches!(&a.1.1, Some(NpcOrMonster::Npc(_))));
-	if let Some((k, (s, _))) = misorder {
-		let (_, (prev, _)) = scena.npcs_monsters.0.range(..k).last().unwrap();
+	if let Some((k, S(s, _))) = misorder {
+		let (_, S(prev, _)) = scena.npcs_monsters.0.range(..k).last().unwrap();
 		Diag::error(*prev, "monsters must come after npcs")
 			.note(*s, "is before this npc")
 			.emit();
@@ -81,10 +81,24 @@ pub fn parse(lines: &[Line], ctx: &Context) -> Result<Scena> {
 			NpcOrMonster::Monster(m) => monsters.push(m),
 		}
 	}
-	let h = scena.header.get().ok_or_else(|| {
+
+	if !scena.header.is_present() {
 		Diag::error(Span::new_at(0), "missing 'scena' block").emit();
-		Error
-	})?;
+	}
+
+	let chcp = scena.chcp.get(|a| a.0 as usize);
+	let labels = Some(scena.labels.get(|a| a.0 as usize));
+	let triggers = scena.triggers.get(|a| a.0 as usize);
+	let look_points = scena.look_points.get(|a| a.0 as usize);
+	let animations = scena.animations.get(|a| a.0 as usize);
+	let entry = scena.entry.get();
+	let functions = scena.functions.get(|a| a.0 as usize);
+	let sepith = scena.sepith.get(|a| a.0 as usize);
+	let at_rolls = scena.at_rolls.get(|a| a.0 as usize);
+	let placements = scena.placements.get(|a| a.0 as usize);
+	let battles = scena.battles.get(|a| a.0 as usize);
+
+	let h = scena.header.get().ok_or(Error)?;
 
 	Ok(Scena {
 		name1: h.name.0,
@@ -94,19 +108,19 @@ pub fn parse(lines: &[Line], ctx: &Context) -> Result<Scena> {
 		bgm: h.bgm,
 		flags: h.flags,
 		includes: h.scp,
-		chcp: scena.chcp.get(|a| a.0 as usize),
-		labels: Some(scena.labels.get(|a| a.0 as usize)),
+		chcp,
+		labels,
 		npcs,
 		monsters,
-		triggers: scena.triggers.get(|a| a.0 as usize),
-		look_points: scena.look_points.get(|a| a.0 as usize),
-		animations: scena.animations.get(|a| a.0 as usize),
-		entry: scena.entry.get(),
-		functions: scena.functions.get(|a| a.0 as usize),
-		sepith: scena.sepith.get(|a| a.0 as usize),
-		at_rolls: scena.at_rolls.get(|a| a.0 as usize),
-		placements: scena.placements.get(|a| a.0 as usize),
-		battles: scena.battles.get(|a| a.0 as usize),
+		triggers,
+		look_points,
+		animations,
+		entry,
+		functions,
+		sepith,
+		at_rolls,
+		placements,
+		battles,
 		unk1: h.unk.0,
 		unk2: h.unk.1,
 		unk3: h.unk.2,
@@ -129,7 +143,8 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 			scena.functions.insert(n, f);
 		}
 		"scena" => {
-			let mut scp: [One<FileId>; 6] = [(); 6].map(|_| One::Empty);
+			scena.header.mark(p.head_span());
+			let mut scp = <[One<FileId>; 6]>::default();
 			parse_data!(p => {
 				name,
 				town,
@@ -137,20 +152,23 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 				flags,
 				unk,
 				scp => |p: &mut Parse| {
-					let (S(s, n), v) = Val::parse(p)?;
+					let S(s, n) = Val::parse(p)?;
 					let n: u32 = n;
 					if n >= 6 {
 						Diag::error(s, "only values 0-5 allowed").emit();
 						return Err(Error)
 					}
-					scp[n as usize].set(p.tokens[0].0 | s, v);
+					scp[n as usize].mark(p.tokens[0].0 | s);
+					let v = Val::parse(p)?;
+					scp[n as usize].set(v);
 					Ok(())
 				}
 			});
 			let scp = scp.map(|a| a.get().unwrap_or(FileId(0)));
-			scena.header.set(p.head_span(), Header { name, town, bgm, flags, unk, scp });
+			scena.header.set(Header { name, town, bgm, flags, unk, scp });
 		}
 		"entry" => {
+			scena.entry.mark(p.tokens[0].0);
 			parse_data!(p => {
 				pos,
 				unk1,
@@ -167,7 +185,7 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 				init,
 				reinit,
 			});
-			scena.entry.set(p.tokens[0].0, Entry {
+			scena.entry.set(Entry {
 				pos, unk1, cam_from, cam_pers, unk2, cam_deg, cam_limit,
 				cam_at, unk3, unk4, flags, town, init, reinit,
 			});
@@ -302,10 +320,11 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 		"at_roll" => {
 			let S(s, n) = Val::parse(p)?;
 			scena.at_rolls.mark(p.tokens[0].0 | s, n);
-			let mut values = [(); 16].map(|_| One::<u8>::Empty);
+			let mut values = <[One::<u8>; 16]>::default();
 			macro fd($n:literal) {
 				|p: &mut Parse| {
-					values[$n].set(p.tokens[0].0, Val::parse(p)?);
+					values[$n].mark(p.tokens[0].0);
+					values[$n].set(Val::parse(p)?);
 					Ok(())
 				}
 			}

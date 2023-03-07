@@ -1,7 +1,7 @@
 pub mod diag;
 pub mod lex;
-#[allow(clippy::module_inception)]
-pub mod parse;
+// #[allow(clippy::module_inception)]
+// pub mod parse;
 pub mod lower;
 
 pub use diag::Diag;

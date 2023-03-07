@@ -265,7 +265,6 @@ impl<T: std::fmt::Debug> std::fmt::Debug for Delimited<T> {
 #[derive(Clone, PartialEq, Eq)]
 pub enum Token<'a> {
 	Ident(&'a str),
-	Insn(&'a str),
 	Int(u64),
 	Float(F64),
 	String(String),
@@ -298,7 +297,6 @@ impl std::fmt::Debug for Token<'_> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::Ident(v)   => { write!(f, "Ident(")?;   v.fmt(f)?; write!(f, ")") }
-			Self::Insn(v)    => { write!(f, "Insn(")?;    v.fmt(f)?; write!(f, ")") }
 			Self::Int(v)     => { write!(f, "Int(")?;     v.fmt(f)?; write!(f, ")") }
 			Self::Float(v)   => { write!(f, "Float(")?;   v.fmt(f)?; write!(f, ")") }
 			Self::String(v)  => { write!(f, "String(")?;  v.fmt(f)?; write!(f, ")") }
@@ -352,13 +350,7 @@ fn tokens<'a>(indent: Indent, i: &mut Lex<'a>) -> Option<Vec<Spanned<Token<'a>>>
 
 	i.clear_space();
 	while continue_line(indent, i) {
-		test!(ident(i) => |s: &'a str| {
-			if s.chars().next().unwrap().is_lowercase() {
-				Token::Ident(s)
-			} else {
-				Token::Insn(s)
-			}
-		});
+		test!(ident(i) => Token::Ident);
 		test!(number(i) => |s| match s {
 			Number::Int(x) => Token::Int(x),
 			Number::Float(x) => Token::Float(x),

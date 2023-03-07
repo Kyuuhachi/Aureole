@@ -31,7 +31,7 @@ pub enum NpcOrMonster {
 struct FPos3(f32, f32, f32);
 impl Val for FPos3 {
 	fn parse(p: &mut Parse) -> Result<Self> {
-		if let Some((x, y, z)) = p.term("")? {
+		if let Some((x, y, z)) = p.tuple()? {
 			Ok(FPos3(x, y, z))
 		} else {
 			Diag::error(p.next_span(), "expected fpos3").emit();
@@ -60,7 +60,7 @@ struct ScenaBuild {
 pub fn parse(lines: &[Line], ctx: &Context) -> Result<Scena> {
 	let mut scena = ScenaBuild::default();
 	for line in lines {
-		let _ = Parse::parse_with(line, ctx, |p| parse_line(&mut scena, p));
+		let _ = Parse::new(line, ctx).parse_with(|p| parse_line(&mut scena, p));
 	}
 
 	let misorder = scena.npcs_monsters.0.iter()
@@ -123,10 +123,11 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 	}
 	match *key {
 		"fn" => {
-			// let f = lower_func(ctx, &func.body).unwrap_or_default();
-			// if let Ok(id1) = func.head.parse(ctx) {
-			// 	scena.functions.insert(func.head.span(), id1, f);
-			// }
+			let id = FuncId::parse(p);
+			let f = parse_func(p);
+			if let Ok(id) = id {
+				scena.functions.insert(p.head_span(), id, f);
+			}
 		}
 		"scena" => {
 			let mut scp: [One<FileId>; 6] = [(); 6].map(|_| One::Empty);

@@ -4,7 +4,6 @@ use themelios::scena::*;
 use themelios::types::*;
 use themelios::util::array;
 use themelios_archive::Lookup;
-use total_float::F64;
 
 use super::diag::*;
 use super::lex::{Line, Token, TextToken};
@@ -14,15 +13,6 @@ use crate::span::{Spanned as S, Span};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileType {
 	Scena,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Term<'a> {
-	Int(S<i64>, S<Unit>),
-	Float(S<F64>, S<Unit>),
-	String(String),
-	Term(Vec<S<Token<'a>>>),
-	Text(Vec<S<TextToken<'a>>>),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -36,10 +26,10 @@ pub enum Unit {
 }
 
 #[derive(Clone, Copy)]
-struct Context<'a> {
-	game: Game,
-	ty: FileType,
-	lookup: &'a dyn Lookup,
+pub struct Context<'a> {
+	pub game: Game,
+	pub ty: FileType,
+	pub lookup: &'a dyn Lookup,
 }
 
 impl<'a> std::fmt::Debug for Context<'a> {
@@ -82,11 +72,7 @@ pub struct Parse<'a> {
 }
 
 impl<'a> Parse<'a> {
-	fn parse<T: Val>(line: &Line, context: &Context) -> Result<T> {
-		Self::parse_with(line, context, T::parse)
-	}
-
-	fn parse_with<T>(line: &Line, context: &Context<'a>, f: impl FnOnce(&mut Parse) -> Result<T>) -> Result<T> {
+	fn new(line: &'a Line, context: &'a Context) -> Self {
 		Parse {
 			tokens: &line.head,
 			pos: 0,
@@ -94,12 +80,22 @@ impl<'a> Parse<'a> {
 			context,
 			eol: line.eol,
 			commas: false,
-		}.do_parse(f)
+		}
 	}
 
-	fn do_parse<T>(mut self, f: impl FnOnce(&mut Parse) -> Result<T>) -> Result<T> {
-		let v = f(&mut self)?;
+	fn parse<T: Val>(mut self) -> Result<T> {
+		let v = T::parse(&mut self)?;
+		self.finish();
+		Ok(v)
+	}
 
+	fn parse_with<T>(mut self, f: impl FnOnce(&mut Parse) -> T) -> T {
+		let v = f(&mut self);
+		self.finish();
+		v
+	}
+
+	fn finish(&self) {
 		if self.pos < self.tokens.len() {
 			Diag::error(self.tokens[self.pos].0, "expected end of data").emit();
 		}
@@ -107,8 +103,6 @@ impl<'a> Parse<'a> {
 		if self.body.is_some() {
 			Diag::error(self.eol, "body not expected here").emit();
 		}
-
-		Ok(v)
 	}
 
 	fn body(&mut self) -> Result<&'a [Line<'a>]> {
@@ -123,6 +117,7 @@ impl<'a> Parse<'a> {
 
 	fn space(&self) -> Option<Span> {
 		if self.pos == 0 { return None }
+		if self.pos == self.tokens.len() { return None }
 		let s0 = self.tokens[self.pos-1].0;
 		let s1 = self.tokens[self.pos].0;
 		if s0.connects(s1) {
@@ -148,11 +143,11 @@ impl<'a> Parse<'a> {
 		self.tokens.get(self.pos).map_or(self.eol, |a| a.0)
 	}
 
-	fn next(&mut self) -> Option<&'a Token> {
-		self.next_if(|a| Some(a))
+	fn next(&mut self) -> Option<&'a Token<'a>> {
+		self.next_if(Some)
 	}
 
-	fn next_if<T>(&self, f: impl FnOnce(&Token) -> Option<T>) -> Option<T> {
+	fn next_if<T>(&mut self, f: impl FnOnce(&'a Token<'a>) -> Option<T>) -> Option<T> {
 		if let Some(S(_, t)) = self.tokens.get(self.pos) && let Some(x) = f(t) {
 			self.pos += 1;
 			Some(x)
@@ -170,7 +165,7 @@ impl<'a> Parse<'a> {
 				context: self.context,
 				eol: d.close,
 				commas: true,
-			}.do_parse(T::parse).map(Some)
+			}.parse().map(Some)
 		} else {
 			Ok(None)
 		}
@@ -183,10 +178,11 @@ impl<'a> Parse<'a> {
 	fn term<T: Val>(&mut self, name: &str) -> Result<Option<T>> {
 		let span = self.next_span().at_end();
 		if self.word(name) {
-			if let Some(s) = self.space() {
-				Diag::error(s, "no space allowed here").emit()
-			}
+			let space = self.space();
 			if let Some(d) = self.next_if(f!(Token::Bracket(d) => d)) {
+				if let Some(s) = space {
+					Diag::error(s, "no space allowed here").emit()
+				}
 				if d.tokens.is_empty() {
 					Diag::error(d.open | d.close, "this cannot be empty")
 						.note(d.open | d.close, "maybe remove the brackets?")
@@ -198,8 +194,8 @@ impl<'a> Parse<'a> {
 					body: None,
 					context: self.context,
 					eol: d.close,
-					commas: false,
-				}.do_parse(T::parse)
+					commas: true,
+				}.parse().map(Some)
 			} else {
 				Parse {
 					tokens: &[],
@@ -207,9 +203,9 @@ impl<'a> Parse<'a> {
 					body: None,
 					context: self.context,
 					eol: span,
-					commas: false,
-				}.do_parse(T::parse)
-			}.map(Some)
+					commas: true,
+				}.parse().map(Some)
+			}
 		} else {
 			Ok(None)
 		}
@@ -332,7 +328,6 @@ fn parse_unit(p: &mut Parse) -> Result<S<Unit>> {
 }
 
 fn parse_int(p: &mut Parse) -> Result<Option<(S<i64>, S<Unit>)>> {
-	let pos = p.pos;
 	match p.remaining() {
 		[S(s, Token::Int(n)), ..] => {
 			p.pos += 1;
@@ -349,7 +344,6 @@ fn parse_int(p: &mut Parse) -> Result<Option<(S<i64>, S<Unit>)>> {
 }
 
 fn parse_float(p: &mut Parse) -> Result<Option<(S<f64>, S<Unit>)>> {
-	let pos = p.pos;
 	match p.remaining() {
 		[S(s, Token::Float(n)), ..] => {
 			p.pos += 1;
@@ -467,7 +461,7 @@ impl Val for f32 {
 
 impl Val for Pos3 {
 	fn parse(p: &mut Parse) -> Result<Self> {
-		if let Some((x, y, z)) = p.term("")? {
+		if let Some((x, y, z)) = p.tuple()? {
 			Ok(Pos3(x, y, z))
 		} else {
 			Diag::error(p.next_span(), "expected pos3").emit();
@@ -482,6 +476,17 @@ impl Val for FuncRef {
 			Ok(FuncRef(a, b))
 		} else {
 			Diag::error(p.next_span(), "expected 'fn'").emit();
+			Err(Error)
+		}
+	}
+}
+
+impl Val for CharAttr {
+	fn parse(p: &mut Parse) -> Result<Self> {
+		if let Some((a, b)) = p.term("char_attr")? {
+			Ok(CharAttr(a, b))
+		} else {
+			Diag::error(p.next_span(), "expected 'char_attr'").emit();
 			Err(Error)
 		}
 	}
@@ -552,6 +557,9 @@ newtype!(BgmId, "bgm");
 newtype!(ChcpId, "chcp");
 newtype!(BattleId, "battle");
 newtype!(Flag, "flag");
+newtype!(Var, "var");
+newtype!(Attr, "system");
+newtype!(Global, "global");
 newtype!(AnimId, "anim");
 newtype!(LookPointId, "look_point");
 newtype!(LabelId, "label");
@@ -566,67 +574,66 @@ macro unless {
 	({$($t:tt)*},{$($v:tt)*}) => { $($t)* },
 }
 
-macro parse_data {
-	($d:expr => {
-		$($k:ident $(=> $e:expr)?),* $(,)?
-	}) => {
-		let d = $d;
+macro parse_data($d:ident => { $($k:ident $(=> $e:expr)?),* $(,)? }) {
+	$(unless!($({when!($e);})?, {
+		let mut $k = One::Empty;
+	});)*
 
-		$(unless!($({when!($e);})?, {
-			let mut $k = One::Empty;
-		});)*
+	let body = $d.body()?;
 
-		let body = d.body()?;
-
-		for line in body {
-			let Some(key) = d.next_if(f!(Token::Ident(a) => a)) else {
-				Diag::error(d.next_span(), "expected word").emit();
-				Err(Error)?;
-				unreachable!();
+	for line in body {
+		Parse::new(line, $d.context).parse_with(|p| {
+			let Some(key) = p.next_if(f!(Token::Ident(a) => a)) else {
+				Diag::error(p.next_span(), "expected word").emit();
+				return
 			};
 			match *key {
 				$(stringify!($k) => {
 					unless!($({
-						let _: Result<()> = Parse::parse_with(line, d.context, $e);
-					})?, {
-						if line.body.is_some() {
-							Diag::error(d.eol, "body is not allowed here").emit();
+						let v: Result<()> = $e(p);
+						if v.is_err() {
+							p.pos = p.tokens.len();
 						}
-						$k.set(d.prev_span(), Parse::parse(line, d.context).ok());
+					})?, {
+						let v = Val::parse(p);
+						if v.is_err() {
+							p.pos = p.tokens.len();
+						}
+						$k.set(p.prev_span(), v.ok());
 					});
 				})*
 				_ => {
 					let fields: &[&str] = &[
 						$(concat!("'", stringify!($k), "'"),)*
 					];
-					Diag::error(d.prev_span(), "unknown field")
-						.note(d.prev_span(), format_args!("allowed fields are {}", &fields.join(", ")))
+					Diag::error(p.prev_span(), "unknown field")
+						.note(p.prev_span(), format_args!("allowed fields are {}", &fields.join(", ")))
 						.emit();
 				}
 			}
-		}
-
-		#[allow(unused_mut)]
-		let mut failures: Vec<&str> = Vec::new();
-		$(unless!($({when!($e);})?, {
-			let $k = $k.get();
-			if $k.is_none() {
-				failures.push(concat!("'", stringify!($k), "'"));
-			}
-		});)*
-
-		if !failures.is_empty() {
-			Diag::error(d.head_span(), "missing fields")
-				.note(d.head_span(), failures.join(", "))
-				.emit();
-			Err(Error)?;
-			unreachable!()
-		}
-
-		$(unless!($({when!($e);})?, {
-			let Some($k) = $k.unwrap() else { Err(Error)?; unreachable!() };
-		});)*
+		})
 	}
+
+	#[allow(unused_mut)]
+	let mut failures: Vec<&str> = Vec::new();
+	$(unless!($({when!($e);})?, {
+		let $k = $k.get();
+		if $k.is_none() {
+			failures.push(concat!("'", stringify!($k), "'"));
+		}
+	});)*
+
+	if !failures.is_empty() {
+		Diag::error($d.head_span(), "missing fields")
+			.note($d.head_span(), failures.join(", "))
+			.emit();
+		Err(Error)?;
+		unreachable!()
+	}
+
+	$(unless!($({when!($e);})?, {
+		let Some($k) = $k.unwrap() else { Err(Error)?; unreachable!() };
+	});)*
 }
 
 fn parse_type(line: &Line) -> Result<(Game, FileType)> {
@@ -635,7 +642,7 @@ fn parse_type(line: &Line) -> Result<(Game, FileType)> {
 		ty: FileType::Scena,
 		lookup: &themelios_archive::NullLookup,
 	};
-	Parse::parse_with(line, dummy_ctx, |p| {
+	Parse::new(line, dummy_ctx).parse_with(|p| {
 		// TODO just remove this word, it doesn't do any good
 		if !p.word("type") {
 			Diag::error(p.prev_span(), "expected 'type'").emit();
@@ -765,7 +772,6 @@ fn main() {
 	let src = include_str!("/tmp/kiseki/ao_gf_en/a0000");
 	let (v, diag) = super::diag::diagnose(|| {
 		let tok = crate::parse::lex::lex(src);
-		let ast = crate::parse::parse::parse(&tok).unwrap();
 		parse(&tok, None)
 	});
 	println!("{:#?}", v);

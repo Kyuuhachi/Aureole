@@ -9,8 +9,8 @@ pub mod ed7;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[derive(derive_more::DebugCustom)]
-#[debug(fmt = "FuncRef({_0}, {_1})")]
-pub struct FuncRef(pub u16, pub u16);
+#[debug(fmt = "FuncId({_0}, {_1})")]
+pub struct FuncId(pub u16, pub u16);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[derive(derive_more::DebugCustom)]

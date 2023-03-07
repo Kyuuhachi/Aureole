@@ -43,7 +43,7 @@ themelios_macros::bytecode! {
 		skip!(1), // null
 		Return(), // [return]
 		skip!(3), // control flow
-		Call(FuncRef via func_ref),
+		Call(FuncId via func_id),
 
 		/// Loads another scena.
 		///
@@ -188,9 +188,9 @@ themelios_macros::bytecode! {
 		EventEnd(u8),
 
 		// I'm not certain about these two. Could be EntranceId or TriggerId.
-		_1B(u8 as u16 as LookPointId, FuncRef via func_ref_u8_u16),
+		_1B(u8 as u16 as LookPointId, FuncId via func_id_u8_u16),
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)]
-		_1C(u8 as u16 as ObjectId, FuncRef via func_ref_u8_u16),
+		_1C(u8 as u16 as ObjectId, FuncId via func_id_u8_u16),
 		#[game(Zero, Ao, AoEvo)]
 		ED7_1C(u8, u8 as u16 as ObjectId, u8, u8, u8, u8, u16 as Flag, u16),
 
@@ -291,14 +291,14 @@ themelios_macros::bytecode! {
 		PartyEquip(u8 as u16 as NameId, u16 as ItemId, if game.base() == BaseGame::Fc && !(600..=799).contains(&_1.0) { const 0u8 } else { u8 }),
 		PartyPosition(u8 as u16 as NameId),
 
-		ForkFunc(u16 as CharId, u8 as u16 as ForkId, FuncRef via func_ref), // [execute]
+		ForkFunc(u16 as CharId, u8 as u16 as ForkId, FuncId via func_id), // [execute]
 		ForkQuit(u16 as CharId, u8 as u16 as ForkId), // [terminate]
 		Fork(    u16 as CharId, if game.is_ed7() { u8 as u16 } else { u16 } as ForkId, Vec<Insn> via fork), // [preset]? In t0311, only used with a single instruction inside
 		ForkLoop(u16 as CharId, if game.is_ed7() { u8 as u16 } else { u16 } as ForkId, Vec<Insn> via fork_loop),
 		ForkWait(u16 as CharId, if game.is_ed7() { u8 as u16 } else { u16 } as ForkId), // [wait_terminate]
 		NextFrame(), // [next_frame]
 
-		Event(FuncRef via func_ref), // [event] Not sure how this differs from Call
+		Event(FuncId via func_id), // [event] Not sure how this differs from Call
 
 		_Char4A(u16 as CharId, u8), // Argument is almost always 255, but sometimes 0, and in a single case 1
 		_Char4B(u16 as CharId, u8),
@@ -1084,19 +1084,19 @@ pub(super) mod char_attr {
 	}
 }
 
-mod func_ref {
+mod func_id {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>, game: Game) -> Result<FuncRef, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl Read<'a>, game: Game) -> Result<FuncId, ReadError> {
 		let a = f.u8()? as u16;
 		let b = if game.is_ed7() {
 			f.u8()? as u16
 		} else {
 			f.u16()?
 		};
-		Ok(FuncRef(a, b))
+		Ok(FuncId(a, b))
 	}
 
-	pub(super) fn write(f: &mut impl Write, game: Game, &FuncRef(a, b): &FuncRef) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Write, game: Game, &FuncId(a, b): &FuncId) -> Result<(), WriteError> {
 		f.u8(cast(a)?);
 		if game.is_ed7() {
 			f.u8(cast(b)?)
@@ -1107,15 +1107,15 @@ mod func_ref {
 	}
 }
 
-mod func_ref_u8_u16 {
+mod func_id_u8_u16 {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>, _: Game) -> Result<FuncRef, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl Read<'a>, _: Game) -> Result<FuncId, ReadError> {
 		let a = f.u8()? as u16;
 		let b = f.u16()?;
-		Ok(FuncRef(a, b))
+		Ok(FuncId(a, b))
 	}
 
-	pub(super) fn write(f: &mut impl Write, _: Game, &FuncRef(a, b): &FuncRef) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Write, _: Game, &FuncId(a, b): &FuncId) -> Result<(), WriteError> {
 		f.u8(cast(a)?);
 		f.u16(b);
 		Ok(())

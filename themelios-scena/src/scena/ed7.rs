@@ -58,8 +58,8 @@ pub struct Npc {
 	pub flags: CharFlags,
 	pub unk2: u16,
 	pub chcp: ChcpId,
-	pub init: FuncRef,
-	pub talk: FuncRef,
+	pub init: FuncId,
+	pub talk: FuncId,
 	pub unk4: u32,
 }
 
@@ -83,7 +83,7 @@ pub struct Trigger {
 	pub transform: [[f32; 4]; 4],
 	pub unk1: u8,
 	pub unk2: u16,
-	pub function: FuncRef,
+	pub function: FuncId,
 	pub unk3: u8,
 	pub unk4: u16,
 	pub unk5: u32,
@@ -97,7 +97,7 @@ pub struct LookPoint {
 	pub bubble_pos: Pos3,
 	pub unk1: u8,
 	pub unk2: u16,
-	pub function: FuncRef,
+	pub function: FuncId,
 	pub unk3: u8,
 	pub unk4: u16,
 }
@@ -118,8 +118,8 @@ pub struct Entry {
 
 	pub flags: EntryFlags,
 	pub town: TownId,
-	pub init: FuncRef,
-	pub reinit: FuncRef,
+	pub init: FuncId,
+	pub reinit: FuncId,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -205,8 +205,8 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 			unk4: f.u16()?,
 			flags: EntryFlags(f.u16()?),
 			town: TownId(f.u16()?),
-			init: FuncRef(f.u8()? as u16, f.u8()? as u16),
-			reinit: FuncRef(f.u8()? as u16, f.u8()? as u16),
+			init: FuncId(f.u8()? as u16, f.u8()? as u16),
+			reinit: FuncId(f.u8()? as u16, f.u8()? as u16),
 		})
 	} else {
 		None
@@ -257,8 +257,8 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 		flags: CharFlags(g.u16()?),
 		unk2: g.u16()?,
 		chcp: ChcpId(g.u16()?),
-		init: FuncRef(g.u8()? as u16, g.u8()? as u16),
-		talk: FuncRef(g.u8()? as u16, g.u8()? as u16),
+		init: FuncId(g.u8()? as u16, g.u8()? as u16),
+		talk: FuncId(g.u8()? as u16, g.u8()? as u16),
 		unk4: g.u32()?,
 	})).strict()?;
 
@@ -284,7 +284,7 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 		}).strict()?),
 		unk1: g.u8()?,
 		unk2: g.u16()?,
-		function: FuncRef(g.u8()? as u16, g.u8()? as u16),
+		function: FuncId(g.u8()? as u16, g.u8()? as u16),
 		unk3: g.u8()?,
 		unk4: g.u16()?,
 		unk5: g.u32()?,
@@ -298,7 +298,7 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 		bubble_pos: g.pos3()?,
 		unk1: g.u8()?,
 		unk2: g.u16()?,
-		function: FuncRef(g.u8()? as u16, g.u8()? as u16),
+		function: FuncId(g.u8()? as u16, g.u8()? as u16),
 		unk3: g.u8()?,
 		unk4: g.u16()?,
 	})).strict()?;

@@ -13,7 +13,7 @@ pub struct Scena {
 	pub map: String, // [Map; マップファイル]
 	pub town: TownId, // [Town; 町名]
 	pub bgm: BgmId, // [BGM; BGM 番号]
-	pub item: FuncRef, // [Item; アイテム使用時イベント]
+	pub item: FuncId, // [Item; アイテム使用時イベント]
 	pub includes: [FileId; 8], // [Scp0..7; スクリプト(１つだけは必須), これ以降は必要な場合のみ定義する]
 
 	// The script puts cp before ch.
@@ -44,8 +44,8 @@ pub struct Entry {  // [Entry]
 
 	pub flags: EntryFlags,   // [Flag]
 	pub town: TownId, // [Place; 地名]
-	pub init: FuncRef, // [Init; 初期化用イベント]
-	pub reinit: FuncRef, // [ReInit; ロード後の再初期化用イベント]
+	pub init: FuncId, // [Init; 初期化用イベント]
+	pub reinit: FuncId, // [ReInit; ロード後の再初期化用イベント]
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,8 +59,8 @@ pub struct Npc { // [Player]
 	pub frame: u16, // [No]
 	pub ch: ChcpId, // [Bs]
 	pub flags: CharFlags, // [BXPNAWTDS]
-	pub init: FuncRef, // [MOVE_FUNC]
-	pub talk: FuncRef, // [EVENT_FUNC]
+	pub init: FuncId, // [MOVE_FUNC]
+	pub talk: FuncId, // [EVENT_FUNC]
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -81,7 +81,7 @@ pub struct Trigger { // [Event]
 	pub pos1: Pos3, // [X, Y, Z]
 	pub pos2: Pos3, // [X, Y, Z]
 	pub flags: TriggerFlags, // [  SN6428]
-	pub func: FuncRef, // [Scp:Func]
+	pub func: FuncId, // [Scp:Func]
 	pub unk1: u16, // (absent)
 }
 
@@ -91,7 +91,7 @@ pub struct LookPoint { // [LookPoint]
 	pub radius: Length, // [R],
 	pub bubble_pos: Pos3, // (absent)
 	pub flags: LookPointFlags, // [_N____],
-	pub func: FuncRef, // [Scp:Func]
+	pub func: FuncId, // [Scp:Func]
 	pub unk1: u16, // (absent)
 }
 
@@ -102,7 +102,7 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 	let map = f.sized_string::<14>()?;
 	let town = TownId(f.u16()?);
 	let bgm = BgmId(f.u16()?);
-	let item = FuncRef(f.u16()?, f.u16()?);
+	let item = FuncId(f.u16()?, f.u16()?);
 	let includes = array(|| Ok(FileId(match f.u32()? { 0xFFFFFFFF => 0, a => a}))).strict()?;
 	f.check_u16(0)?;
 
@@ -140,8 +140,8 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 		frame: g.u16()?,
 		ch: ChcpId(g.u16()?),
 		flags: CharFlags(g.u16()?),
-		init: FuncRef(g.u16()?, g.u16()?),
-		talk: FuncRef(g.u16()?, g.u16()?),
+		init: FuncId(g.u16()?, g.u16()?),
+		talk: FuncId(g.u16()?, g.u16()?),
 	})).strict()?;
 
 	let (mut g, n) = monsters;
@@ -162,7 +162,7 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 		pos1: g.pos3()?,
 		pos2: g.pos3()?,
 		flags: TriggerFlags(g.u16()?),
-		func: FuncRef(g.u16()?, g.u16()?),
+		func: FuncId(g.u16()?, g.u16()?),
 		unk1: g.u16()?,
 	})).strict()?;
 
@@ -172,7 +172,7 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 		radius: Length(g.i32()?),
 		bubble_pos: g.pos3()?,
 		flags: LookPointFlags(cast(g.u16()?)?),
-		func: FuncRef(g.u16()?, g.u16()?),
+		func: FuncId(g.u16()?, g.u16()?),
 		unk1: g.u16()?,
 	})).strict()?;
 
@@ -197,8 +197,8 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 			north: Angle(f.i16()?),
 			flags: EntryFlags(f.u16()?),
 			town: TownId(f.u16()?),
-			init: FuncRef(f.u16()?, f.u16()?),
-			reinit: FuncRef(f.u16()?, f.u16()?),
+			init: FuncId(f.u16()?, f.u16()?),
+			reinit: FuncId(f.u16()?, f.u16()?),
 		});
 	}
 	ensure!(f.pos() == head_end, "overshot with entries");

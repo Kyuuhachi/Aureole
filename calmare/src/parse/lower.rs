@@ -592,12 +592,12 @@ impl TryVal for Pos2 {
 	}
 }
 
-impl TryVal for FuncRef {
+impl TryVal for FuncId {
 	fn desc() -> String { "'fn'".to_owned() }
 
 	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
 		if let Some((a, b)) = p.term("fn")? {
-			Ok(Some(FuncRef(a, b)))
+			Ok(Some(FuncId(a, b)))
 		} else {
 			Ok(None)
 		}

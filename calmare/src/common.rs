@@ -408,7 +408,7 @@ impl Val for Text {
 	}
 }
 
-impl Val for FuncRef {
+impl Val for FuncId {
 	fn write(&self, f: &mut Context) -> Result<()> {
 		write!(f, "fn[{},{}]", self.0, self.1)
 	}

@@ -141,11 +141,7 @@ fn parse_insn(p: &mut Parse) -> Insn {
 					p.pos += 1;
 					run!($ident $(($_n $($ty)*))*);
 				})*
-				_ => {
-					Diag::error(p.next_span(), "can't parse insn").emit();
-					p.pos = p.tokens.len();
-					return Insn::Return()
-				}
+				_ => return parse_assignment(p)
 			}
 		},
 		($ident:ident ($v1:ident $_:ty) ($v2:ident Expr)) => {
@@ -167,8 +163,38 @@ fn parse_insn(p: &mut Parse) -> Insn {
 	themelios::scena::code::introspect!(run);
 }
 
+fn parse_assignment(p: &mut Parse) -> Insn {
+	macro run {
+		([$(($ident:ident $(($_n:ident $($ty:tt)*))*))*]) => {
+			$(run!($ident $(($_n $($ty)*))*);)*
+		},
+		($ident:ident ($v1:ident $t:ty) ($v2:ident Expr)) => {
+			if let Ok(a) = <$t>::parse(p) {
+				let e = parse_assignment_expr(p);
+				println!("{:?}", (&a, &e));
+				return Insn::$ident(a, e);
+			}
+		},
+		($ident:ident $($t:tt)*) => {}
+	}
+
+	themelios::scena::code::introspect!(run);
+	Diag::error(p.next_span(), "can't parse insn").emit();
+	p.pos = p.tokens.len();
+	Insn::Return()
+}
+
 fn parse_expr(p: &mut Parse) -> Expr {
 	parse_expr0(p, 10).unwrap_or(Expr::Const(0))
+}
+
+fn parse_assignment_expr(p: &mut Parse) -> Expr {
+	let op = parse_assop(p).unwrap_or_else(|| {
+		Diag::error(p.next_span(), "expected assignment operator").emit();
+		ExprUnop::Ass
+	});
+	let e = parse_expr(p);
+	Expr::Unop(op, Box::new(e))
 }
 
 fn parse_expr0(p: &mut Parse, prec: usize) -> Result<Expr> {
@@ -187,13 +213,7 @@ fn parse_atom(p: &mut Parse) -> Result<Expr> {
 	}
 	match p.next().unwrap() {
 		Token::Paren(d) => {
-			Parse {
-				tokens: &d.tokens,
-				pos: 0,
-				body: None,
-				context: p.context,
-				eol: d.close,
-			}.parse_with(|p| parse_expr0(p, 10))
+			Parse::new_inner(&d.tokens, d.close, p.context).parse_with(|p| parse_expr0(p, 10))
 		}
 		Token::Minus => Ok(Expr::Unop(ExprUnop::Neg, Box::new(parse_atom(p)?))),
 		Token::Excl  => Ok(Expr::Unop(ExprUnop::Not, Box::new(parse_atom(p)?))),

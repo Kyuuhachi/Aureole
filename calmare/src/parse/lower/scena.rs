@@ -169,15 +169,22 @@ fn parse_assignment(p: &mut Parse) -> Insn {
 			$(run!($ident $(($_n $($ty)*))*);)*
 		},
 		($ident:ident ($v1:ident $t:ty) ($v2:ident Expr)) => {
-			if let Ok(a) = <$t>::parse(p) {
-				let e = parse_assignment_expr(p);
-				return Insn::$ident(a, e);
+			match <$t>::try_parse(p) {
+				Ok(Some(a)) => {
+					let e = parse_assignment_expr(p);
+					return Insn::$ident(a, e);
+				}
+				Ok(None) => {}
+				Err(_) => {
+					p.pos = p.tokens.len();
+					return Insn::Return()
+				}
 			}
 		},
 		($ident:ident $($t:tt)*) => {}
 	}
-
 	themelios::scena::code::introspect!(run);
+
 	Diag::error(p.next_span(), "can't parse insn").emit();
 	p.pos = p.tokens.len();
 	Insn::Return()
@@ -210,43 +217,27 @@ fn parse_atom(p: &mut Parse) -> Result<Expr> {
 		Diag::error(p.eol, "expected expression").emit();
 		return Err(Error)
 	}
-	match p.next().unwrap() {
-		Token::Paren(d) => {
-			Parse::new_inner(&d.tokens, d.close, p.context).parse_with(|p| parse_expr0(p, 10))
-		}
-		Token::Minus => Ok(Expr::Unop(ExprUnop::Neg, Box::new(parse_atom(p)?))),
-		Token::Excl  => Ok(Expr::Unop(ExprUnop::Not, Box::new(parse_atom(p)?))),
-		Token::Tilde => Ok(Expr::Unop(ExprUnop::Inv, Box::new(parse_atom(p)?))),
-		Token::Int(..) => {
-			p.pos -= 1;
-			Ok(Expr::Const(Val::parse(p)?))
-		}
-		Token::Ident("flag") => {
-			p.pos -= 1;
-			Val::parse(p).map(Expr::Flag)
-		}
-		Token::Ident("var") => {
-			p.pos -= 1;
-			Val::parse(p).map(Expr::Var)
-		}
-		Token::Ident("system") => {
-			p.pos -= 1;
-			Val::parse(p).map(Expr::Attr)
-		}
-		Token::Ident("char_attr") => {
-			p.pos -= 1;
-			Val::parse(p).map(Expr::CharAttr)
-		}
-		Token::Ident("global") => {
-			p.pos -= 1;
-			Val::parse(p).map(Expr::Global)
-		}
-		Token::Ident("random") => Ok(Expr::Rand),
-		_ => {
-			p.pos -= 1;
-			Ok(Expr::Insn(Box::new(parse_insn(p))))
+	macro c($e:expr => $p:pat in $o:expr) {
+		if let Some($p) = $e {
+			return Ok($o)
 		}
 	}
+	c!(p.next_if(f!(Token::Paren(d) => d)) => d in
+		Parse::new_inner(&d.tokens, d.close, p.context).parse_with(|p| parse_expr0(p, 10))?);
+	c!(p.next_if(f!(Token::Minus => ())) => () in
+		Expr::Unop(ExprUnop::Neg, Box::new(parse_atom(p)?)));
+	c!(p.next_if(f!(Token::Excl => ())) => () in
+		Expr::Unop(ExprUnop::Not, Box::new(parse_atom(p)?)));
+	c!(p.next_if(f!(Token::Tilde => ())) => () in
+		Expr::Unop(ExprUnop::Inv, Box::new(parse_atom(p)?)));
+	c!(TryVal::try_parse(p)? => v in Expr::Const(v));
+	c!(TryVal::try_parse(p)? => v in Expr::Flag(v));
+	c!(TryVal::try_parse(p)? => v in Expr::Var(v));
+	c!(TryVal::try_parse(p)? => v in Expr::Attr(v));
+	c!(TryVal::try_parse(p)? => v in Expr::CharAttr(v));
+	c!(TryVal::try_parse(p)? => v in Expr::Global(v));
+	c!(p.term("random")? => () in Expr::Rand);
+	Ok(Expr::Insn(Box::new(parse_insn(p))))
 }
 
 macro op($p:ident; $t1:ident $($t:ident)* => $op:expr) {

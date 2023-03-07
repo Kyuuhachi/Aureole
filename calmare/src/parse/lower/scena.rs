@@ -154,8 +154,10 @@ fn parse_insn(p: &mut Parse) -> Insn {
 			return Insn::Return()
 		},
 		($ident:ident $(($_n:ident $ty:ty))*) => {
-			if let Ok(($($_n,)*)) = Val::parse(p) {
-				return Insn::$ident($($_n),*)
+			if let Ok::<Insn, Error>(i) = try {
+				Insn::$ident($(<$ty>::parse(p)?),*)
+			} {
+				return i
 			} else {
 				p.pos = p.tokens.len();
 				return Insn::Return()
@@ -191,7 +193,6 @@ fn parse_atom(p: &mut Parse) -> Result<Expr> {
 				body: None,
 				context: p.context,
 				eol: d.close,
-				commas: false,
 			}.parse_with(|p| parse_expr0(p, 10))
 		}
 		Token::Minus => Ok(Expr::Unop(ExprUnop::Neg, Box::new(parse_atom(p)?))),

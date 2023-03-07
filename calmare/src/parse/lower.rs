@@ -69,7 +69,6 @@ pub struct Parse<'a> {
 	body: Option<&'a [Line<'a>]>,
 	context: &'a Context<'a>,
 	eol: Span,
-	commas: bool,
 }
 
 impl<'a> Parse<'a> {
@@ -80,12 +79,17 @@ impl<'a> Parse<'a> {
 			body: line.body.as_deref(),
 			context,
 			eol: line.eol,
-			commas: false,
 		}
 	}
 
 	fn parse<T: Val>(mut self) -> Result<T> {
 		let v = T::parse(&mut self)?;
+		self.finish();
+		Ok(v)
+	}
+
+	fn parse_comma<T: ValComma>(mut self) -> Result<T> {
+		let v = T::parse_comma(&mut self)?;
 		self.finish();
 		Ok(v)
 	}
@@ -157,7 +161,11 @@ impl<'a> Parse<'a> {
 		}
 	}
 
-	fn tuple<T: Val>(&mut self) -> Result<Option<T>> {
+	fn word(&mut self, name: &str) -> bool {
+		self.next_if(f!(Token::Ident(a) if *a == name => ())).is_some()
+	}
+
+	fn tuple<T: ValComma>(&mut self) -> Result<Option<T>> {
 		if let Some(d) = self.next_if(f!(Token::Paren(d) => d)) {
 			Parse {
 				tokens: &d.tokens,
@@ -165,18 +173,13 @@ impl<'a> Parse<'a> {
 				body: None,
 				context: self.context,
 				eol: d.close,
-				commas: true,
-			}.parse().map(Some)
+			}.parse_comma().map(Some)
 		} else {
 			Ok(None)
 		}
 	}
 
-	fn word(&mut self, name: &str) -> bool {
-		self.next_if(f!(Token::Ident(a) if *a == name => ())).is_some()
-	}
-
-	fn term<T: Val>(&mut self, name: &str) -> Result<Option<T>> {
+	fn term<T: ValComma>(&mut self, name: &str) -> Result<Option<T>> {
 		let span = self.next_span().at_end();
 		if self.word(name) {
 			let space = self.space();
@@ -195,8 +198,7 @@ impl<'a> Parse<'a> {
 					body: None,
 					context: self.context,
 					eol: d.close,
-					commas: true,
-				}.parse().map(Some)
+				}.parse_comma().map(Some)
 			} else {
 				Parse {
 					tokens: &[],
@@ -204,20 +206,10 @@ impl<'a> Parse<'a> {
 					body: None,
 					context: self.context,
 					eol: span,
-					commas: true,
-				}.parse().map(Some)
+				}.parse_comma().map(Some)
 			}
 		} else {
 			Ok(None)
-		}
-	}
-
-	fn sep(&mut self) {
-		if self.pos < self.tokens.len() && self.commas {
-			let span = self.prev_span().at_end();
-			if self.next_if(f!(Token::Comma => ())).is_none() {
-				Diag::error(span, "expected comma").emit();
-			}
 		}
 	}
 
@@ -228,6 +220,10 @@ impl<'a> Parse<'a> {
 
 trait Val: Sized {
 	fn parse(p: &mut Parse) -> Result<Self>;
+}
+
+trait ValComma: Sized {
+	fn parse_comma(p: &mut Parse) -> Result<Self>;
 }
 
 impl<T: Val> Val for S<T> {
@@ -244,16 +240,22 @@ impl<T: Val> Val for S<T> {
 	}
 }
 
-fn parse_and_comma<T: Val>(p: &mut Parse) -> Result<T> {
-	let a = T::parse(p)?;
-	p.sep();
-	Ok(a)
-}
-
 macro tuple($($T:ident)*) {
 	impl<$($T: Val),*> Val for ($($T,)*) {
 		fn parse(_p: &mut Parse) -> Result<Self> {
-			Ok(($(parse_and_comma::<$T>(_p)?,)*))
+			Ok(($($T::parse(_p)?,)*))
+		}
+	}
+
+	impl<$($T: Val),*> ValComma for ($($T,)*) {
+		fn parse_comma(_p: &mut Parse) -> Result<Self> {
+			Ok(($({
+				let a = $T::parse(_p)?;
+				if _p.pos < _p.tokens.len() && _p.next_if(f!(Token::Comma => ())).is_none() {
+					Diag::error(_p.next_span().at_start(), "expected comma").emit();
+				}
+				a
+			},)*))
 		}
 	}
 }
@@ -263,24 +265,12 @@ tuple!(A);
 tuple!(A B);
 tuple!(A B C);
 tuple!(A B C D);
-tuple!(A B C D E);
-tuple!(A B C D E F);
-tuple!(A B C D E F G);
-tuple!(A B C D E F G H);
-tuple!(A B C D E F G H I);
-tuple!(A B C D E F G H I J);
-tuple!(A B C D E F G H I J K);
-tuple!(A B C D E F G H I J K L);
-tuple!(A B C D E F G H I J K L M);
-tuple!(A B C D E F G H I J K L M N);
-tuple!(A B C D E F G H I J K L M N O);
-tuple!(A B C D E F G H I J K L M N O P);
 
 impl<T: Val> Val for Vec<T> {
 	fn parse(p: &mut Parse) -> Result<Self> {
 		let mut v = Vec::new();
 		while p.pos < p.tokens.len() {
-			v.push(parse_and_comma::<T>(p)?);
+			v.push(T::parse(p)?);
 		}
 		Ok(v)
 	}
@@ -288,7 +278,7 @@ impl<T: Val> Val for Vec<T> {
 
 impl<const N: usize, T: Val> Val for [T; N] {
 	fn parse(p: &mut Parse) -> Result<Self> {
-		array(|| parse_and_comma::<T>(p))
+		array(|| T::parse(p))
 	}
 }
 
@@ -560,7 +550,7 @@ impl Val for FileId {
 			})))
 		} else if let Some(()) = p.term("null")? {
 			Ok(FileId(0))
-		} else if let Some(s) = p.term("file")? {
+		} else if let Some((s,)) = p.term("file")? {
 			Ok(FileId(s))
 		} else {
 			Diag::error(p.next_span(), "expected string, 'null', or 'file'").emit();
@@ -587,15 +577,15 @@ impl Val for CharId {
 			Ok(CharId(254))
 		} else if let Some(()) = p.term("null")? {
 			Ok(CharId(255))
-		} else if let Some(s) = p.term::<u16>("name")? {
+		} else if let Some((s,)) = p.term::<(u16,)>("name")? {
 			Ok(CharId(s + 257))
-		} else if let Some(s) = p.term::<u16>("char")? {
+		} else if let Some((s,)) = p.term::<(u16,)>("char")? {
 			Ok(CharId(s + if p.context.game.base() == BaseGame::Tc { 16 } else { 8 }))
-		} else if let Some(s) = p.term::<u16>("field_party")? {
+		} else if let Some((s,)) = p.term::<(u16,)>("field_party")? {
 			Ok(CharId(s))
-		} else if let Some(s) = p.term::<u16>("party")? {
+		} else if let Some((s,)) = p.term::<(u16,)>("party")? {
 			Ok(CharId(s + if p.context.game.base() == BaseGame::Sc { 246 } else { 238 }))
-		} else if let Some(s) = p.term::<u16>("custom")? {
+		} else if let Some((s,)) = p.term::<(u16,)>("custom")? {
 			if p.context.game.base() == BaseGame::Ao {
 				Ok(CharId(s + 244))
 			} else {
@@ -612,7 +602,7 @@ impl Val for CharId {
 macro newtype($T:ident, $s:literal) {
 	impl Val for $T {
 		fn parse(p: &mut Parse) -> Result<Self> {
-			if let Some(v) = p.term($s)? {
+			if let Some((v,)) = p.term($s)? {
 				Ok(Self(v))
 			} else {
 				Diag::error(p.next_span(), format_args!("expected '{}'", $s)).emit();

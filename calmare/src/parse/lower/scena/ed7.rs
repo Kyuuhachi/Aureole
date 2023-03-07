@@ -192,8 +192,9 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 			});
 		}
 		"chcp" => {
-			let (S(s, n), v) = Val::parse(p)?;
+			let S(s, n) = Val::parse(p)?;
 			scena.chcp.mark(p.tokens[0].0 | s, n);
+			let v = Val::parse(p)?;
 			scena.chcp.insert(n, v);
 		}
 		"npc" => {
@@ -306,16 +307,19 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 			});
 		}
 		"anim" => {
-			let (S(s, n), speed, frames) = Val::parse(p)?;
+			let S(s, n) = Val::parse(p)?;
 			scena.animations.mark(p.tokens[0].0 | s, n);
+			let speed = Val::parse(p)?;
+			let frames = Val::parse(p)?;
 			scena.animations.insert(n, Animation {
 				speed,
 				frames,
 			});
 		}
 		"sepith" => {
-			let (S(s, n), values) = Val::parse(p)?;
+			let S(s, n) = Val::parse(p)?;
 			scena.sepith.mark(p.tokens[0].0 | s, n);
+			let values = Val::parse(p)?;
 			scena.sepith.insert(n, values);
 		}
 		"at_roll" => {
@@ -356,7 +360,7 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 			let mut vs = Vec::new();
 			parse_data!(p => {
 				pos => |p: &mut Parse| {
-					vs.push(Val::parse(p)?);
+					vs.push((Val::parse(p)?, Val::parse(p)?, Val::parse(p)?));
 					Ok(())
 				}
 			});

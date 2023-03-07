@@ -132,17 +132,25 @@ fn parse_tree(p: &mut Parse, can_break: bool, can_continue: bool) -> Vec<TreeIns
 fn parse_insn(p: &mut Parse) -> Insn {
 	let _: Result<()> = try {
 		if let Some(i) = try_parse_insn(p)? {
+			validate_insn(p, &i);
 			return i
 		}
 		if let Some(i) = try_parse_assign(p)? {
+			validate_insn(p, &i);
 			return i
 		}
-		Diag::error(p.next_span(), "failed to parse insn").emit();
+		Diag::error(p.next_span(), "unknown instruction").emit();
 	};
 	p.pos = p.tokens.len();
 	Insn::Return()
 }
 
+fn validate_insn(p: &Parse, i: &Insn) {
+	if let Err(e) = Insn::validate(p.context.game, i) {
+		let span = p.tokens.first().map_or(p.eol, |a| a.0);
+		Diag::error(span, format!("invalid instruction: {}", e)).emit();
+	}
+}
 
 fn try_parse_insn(p: &mut Parse) -> Result<Option<Insn>> {
 	if p.pos == p.tokens.len() {
@@ -237,6 +245,7 @@ fn parse_atom(p: &mut Parse) -> Result<Expr> {
 		} else if p.term::<()>("random")?.is_some() {
 			Expr::Rand
 		} else if let Some(i) = try_parse_insn(p)? {
+			validate_insn(p, &i);
 			Expr::Insn(Box::new(i))
 		} else {
 			Diag::error(p.next_span(), "invalid expression").emit();

@@ -853,20 +853,24 @@ themelios_macros::bytecode! {
 	]
 }
 
-macro make_args(
-	// Names need to be passed from outside for hygiene. Ugh.
-	{ $name:ident }
-	[$(($ident:ident $(($_n:ident $ty:ty))*))*]
-) {
-	impl Insn {
-		pub fn $name(&self) -> &'static str {
-			match self {
+
+impl Insn {
+	pub fn name(&self) -> &'static str {
+		macro run(
+			[$(($ident:ident $(($_n:ident $ty:ty))*))*]
+		) {
+			return match self {
 				$(Self::$ident(..) => stringify!($ident),)*
 			}
 		}
+		introspect!(run);
+	}
+
+	pub fn validate(game: Game, i: &Insn) -> Result<(), WriteError> {
+		let mut w = Writer::new();
+		Self::write(&mut w, game, i)
 	}
 }
-introspect!(make_args {name});
 
 trait Arg: Sized {
 	fn read<'a>(f: &mut impl Read<'a>, _: Game) -> Result<Self, ReadError>;

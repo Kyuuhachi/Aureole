@@ -82,6 +82,16 @@ impl<'a> Parse<'a> {
 		}
 	}
 
+	fn new_inner(tokens: &'a [S<Token<'a>>], eol: Span, context: &'a Context) -> Self {
+		Parse {
+			tokens,
+			pos: 0,
+			body: None,
+			context,
+			eol,
+		}
+	}
+
 	fn parse<T: Val>(mut self) -> Result<T> {
 		let v = T::parse(&mut self)?;
 		self.finish();
@@ -167,20 +177,13 @@ impl<'a> Parse<'a> {
 
 	fn tuple<T: ValComma>(&mut self) -> Result<Option<T>> {
 		if let Some(d) = self.next_if(f!(Token::Paren(d) => d)) {
-			Parse {
-				tokens: &d.tokens,
-				pos: 0,
-				body: None,
-				context: self.context,
-				eol: d.close,
-			}.parse_comma().map(Some)
+			Parse::new_inner(&d.tokens, d.close, self.context).parse_comma().map(Some)
 		} else {
 			Ok(None)
 		}
 	}
 
 	fn term<T: ValComma>(&mut self, name: &str) -> Result<Option<T>> {
-		let span = self.next_span().at_end();
 		if self.word(name) {
 			let space = self.space();
 			if let Some(d) = self.next_if(f!(Token::Bracket(d) => d)) {
@@ -192,21 +195,9 @@ impl<'a> Parse<'a> {
 						.note(d.open | d.close, "maybe remove the brackets?")
 						.emit()
 				}
-				Parse {
-					tokens: &d.tokens,
-					pos: 0,
-					body: None,
-					context: self.context,
-					eol: d.close,
-				}.parse_comma().map(Some)
+				Parse::new_inner(&d.tokens, d.close, self.context).parse_comma().map(Some)
 			} else {
-				Parse {
-					tokens: &[],
-					pos: 0,
-					body: None,
-					context: self.context,
-					eol: span,
-				}.parse_comma().map(Some)
+				Parse::new_inner(&[], self.prev_span().at_end(), self.context).parse_comma().map(Some)
 			}
 		} else {
 			Ok(None)

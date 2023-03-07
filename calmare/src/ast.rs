@@ -1,3 +1,4 @@
+#![deprecated]
 pub use themelios::types::Game;
 use total_float::F64;
 

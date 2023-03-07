@@ -34,7 +34,7 @@ impl Val for FPos3 {
 		if let Some((x, y, z)) = p.term("")? {
 			Ok(FPos3(x, y, z))
 		} else {
-			Diag::error(p.pos(), "expected fpos3").emit();
+			Diag::error(p.next_span(), "expected fpos3").emit();
 			Err(Error)
 		}
 	}
@@ -57,21 +57,10 @@ struct ScenaBuild {
 	functions: Many<FuncId, Bytecode>,
 }
 
-pub fn lower(file: &File, lookup: Option<&dyn Lookup>) -> Result<Scena> {
-	let ctx = &Context::new(file, lookup);
+pub fn parse(lines: &[Line], ctx: &Context) -> Result<Scena> {
 	let mut scena = ScenaBuild::default();
-	for decl in &file.decls {
-		match decl {
-			Decl::Function(func) => {
-				let f = lower_func(ctx, &func.body).unwrap_or_default();
-				if let Ok(id1) = func.head.parse(ctx) {
-					scena.functions.insert(func.head.span(), id1, f);
-				}
-			}
-			Decl::Data(d) => {
-				let _ = lower_data(&mut scena, ctx, d);
-			},
-		}
+	for line in lines {
+		let _ = Parse::parse_with(line, ctx, |p| parse_line(&mut scena, p));
 	}
 
 	let misorder = scena.npcs_monsters.0.iter()
@@ -124,32 +113,45 @@ pub fn lower(file: &File, lookup: Option<&dyn Lookup>) -> Result<Scena> {
 	})
 }
 
-fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
-	match d.head.key.1.as_str() {
+fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
+	let Some(key) = p.next_if(f!(Token::Ident(a) => a)) else {
+		Diag::error(p.next_span(), "expected word").emit();
+		return Err(Error);
+	};
+	if p.next_if(f!(Token::Bracket(_) => ())).is_some() {
+		p.pos -= 2;
+	}
+	match *key {
+		"fn" => {
+			// let f = lower_func(ctx, &func.body).unwrap_or_default();
+			// if let Ok(id1) = func.head.parse(ctx) {
+			// 	scena.functions.insert(func.head.span(), id1, f);
+			// }
+		}
 		"scena" => {
 			let mut scp: [One<FileId>; 6] = [(); 6].map(|_| One::Empty);
-			parse_data!(d, ctx => (), {
+			parse_data!(p => {
 				name,
 				town,
 				bgm,
 				flags,
 				unk,
-				scp => |l: &Data| {
-					parse_data!(l, ctx => (S(s, n), v));
+				scp => |p: &mut Parse| {
+					let (S(s, n), v) = Val::parse(p)?;
 					let n: u32 = n;
 					if n >= 6 {
 						Diag::error(s, "only values 0-5 allowed").emit();
 						return Err(Error)
 					}
-					scp[n as usize].set(l.head.key.0 | s, v);
+					scp[n as usize].set(p.tokens[0].0 | s, v);
 					Ok(())
 				}
 			});
 			let scp = scp.map(|a| a.get().unwrap_or(FileId(0)));
-			scena.header.set(d.head.span(), Header { name, town, bgm, flags, unk, scp });
+			scena.header.set(p.head_span(), Header { name, town, bgm, flags, unk, scp });
 		}
 		"entry" => {
-			parse_data!(d, ctx => (), {
+			parse_data!(p => {
 				pos,
 				unk1,
 				cam_from,
@@ -165,17 +167,18 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 				init,
 				reinit,
 			});
-			scena.entry.set(d.head.key.0, Entry {
+			scena.entry.set(p.tokens[0].0, Entry {
 				pos, unk1, cam_from, cam_pers, unk2, cam_deg, cam_limit,
 				cam_at, unk3, unk4, flags, town, init, reinit,
 			});
 		}
 		"chcp" => {
-			parse_data!(d, ctx => (S(s, n), v));
-			scena.chcp.insert(d.head.key.0 | s, n, v);
+			let (S(s, n), v) = Val::parse(p)?;
+			scena.chcp.insert(p.tokens[0].0 | s, n, v);
 		}
 		"npc" => {
-			parse_data!(d, ctx => S(s, n), {
+			let S(s, n) = Val::parse(p)?;
+			parse_data!(p => {
 				name,
 				pos,
 				angle,
@@ -186,13 +189,14 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 				talk,
 				unk4,
 			});
-			scena.npcs_monsters.insert(d.head.key.0 | s, n, NpcOrMonster::Npc(Npc {
+			scena.npcs_monsters.insert(p.tokens[0].0 | s, n, NpcOrMonster::Npc(Npc {
 				name, pos, angle, flags, unk2,
 				chcp, init, talk, unk4,
 			}));
 		}
 		"monster" => {
-			parse_data!(d, ctx => S(s, n), {
+			let S(s, n) = Val::parse(p)?;
+			parse_data!(p => {
 				pos,
 				angle,
 				flags,
@@ -203,13 +207,14 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 				stand_anim,
 				walk_anim,
 			});
-			scena.npcs_monsters.insert(d.head.key.0 | s, n, NpcOrMonster::Monster(Monster {
+			scena.npcs_monsters.insert(p.tokens[0].0 | s, n, NpcOrMonster::Monster(Monster {
 				pos, angle, flags, battle, flag,
 				chcp, unk2, stand_anim, walk_anim,
 			}));
 		}
 		"trigger" => {
-			parse_data!(d, ctx => S(s, n), {
+			let S(s, n) = Val::parse(p)?;
+			parse_data!(p => {
 				pos,
 				radius,
 				transform,
@@ -223,7 +228,7 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 			});
 			let FPos3(x, y, z) = pos;
 			let radius: f32 = radius;
-			scena.triggers.insert(d.head.key.0 | s, n, Trigger {
+			scena.triggers.insert(p.tokens[0].0 | s, n, Trigger {
 				pos: (x / 1000., y / 1000., z / 1000.),
 				radius: radius / 1000.,
 				transform,
@@ -237,7 +242,8 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 			});
 		}
 		"look_point" => {
-			parse_data!(d, ctx => S(s, n), {
+			let S(s, n) = Val::parse(p)?;
+			parse_data!(p => {
 				pos,
 				radius,
 				bubble_pos,
@@ -247,7 +253,7 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 				unk3,
 				unk4,
 			});
-			scena.look_points.insert(d.head.key.0 | s, n, LookPoint {
+			scena.look_points.insert(p.tokens[0].0 | s, n, LookPoint {
 				pos,
 				radius,
 				bubble_pos,
@@ -259,14 +265,15 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 			});
 		}
 		"label" => {
-			parse_data!(d, ctx => S(s, n), {
+			let S(s, n) = Val::parse(p)?;
+			parse_data!(p => {
 				name,
 				pos,
 				unk1,
 				unk2,
 			});
 			let FPos3(x, y, z) = pos;
-			scena.labels.insert(d.head.key.0 | s, n, Label {
+			scena.labels.insert(p.tokens[0].0 | s, n, Label {
 				name,
 				pos: (x / 1000., y / 1000., z / 1000.),
 				unk1,
@@ -274,26 +281,26 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 			});
 		}
 		"anim" => {
-			parse_data!(d, ctx => (S(s, n), speed, frames));
-			scena.animations.insert(d.head.key.0 | s, n, Animation {
+			let (S(s, n), speed, frames) = Val::parse(p)?;
+			scena.animations.insert(p.tokens[0].0 | s, n, Animation {
 				speed,
 				frames,
 			});
 		}
 		"sepith" => {
-			parse_data!(d, ctx => (S(s, n), values));
-			scena.sepith.insert(d.head.key.0 | s, n, values);
+			let (S(s, n), values) = Val::parse(p)?;
+			scena.sepith.insert(p.tokens[0].0 | s, n, values);
 		}
 		"at_roll" => {
 			let mut values = [(); 16].map(|_| One::<u8>::Empty);
 			macro fd($n:literal) {
-				|l: &Data| {
-					parse_data!(l, ctx => v);
-					values[$n].set(l.head.key.0, v);
+				|p: &mut Parse| {
+					values[$n].set(p.tokens[0].0, Val::parse(p)?);
 					Ok(())
 				}
 			}
-			parse_data!(d, ctx => S(s, n), {
+			let S(s, n) = Val::parse(p)?;
+			parse_data!(p => {
 				none => fd!(0),
 				hp10 => fd!(1),
 				hp50 => fd!(2),
@@ -312,37 +319,39 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 				unk9 => fd!(15),
 			});
 			let values = values.map(|a| a.get().unwrap_or_default());
-			scena.at_rolls.insert(d.head.key.0 | s, n, values);
+			scena.at_rolls.insert(p.tokens[0].0 | s, n, values);
 		}
 		"placement" => {
+			let S(s, n) = Val::parse(p)?;
 			let mut vs = Vec::new();
-			parse_data!(d, ctx => S(s, n), {
-				pos => |l: &Data| {
-					parse_data!(l, ctx => v);
-					vs.push(v);
+			parse_data!(p => {
+				pos => |p: &mut Parse| {
+					vs.push(Val::parse(p)?);
 					Ok(())
 				}
 			});
 			if let Ok(vs) = vs.try_into() {
-				scena.placements.insert(d.head.key.0 | s, n, vs);
+				scena.placements.insert(p.tokens[0].0 | s, n, vs);
 			} else {
-				scena.placements.insert(d.head.key.0 | s, n, [(0,0,Angle(180));8]);
-				Diag::error(d.head.span(), "needs exactly 8 'pos'").emit();
+				scena.placements.insert(p.tokens[0].0 | s, n, [(0,0,Angle(180));8]);
+				Diag::error(p.head_span(), "needs exactly 8 'pos'").emit();
 			}
 		}
 		"battle" => {
+			let S(s, n) = Val::parse(p)?;
 			let mut setups = Vec::new();
-			parse_data!(d, ctx => S(s, n), {
+			parse_data!(p => {
 				flags, level, unk1, vision_range, move_range,
 				can_move, move_speed, unk2, battlefield, sepith,
-				setup => |l: &Data| {
-					parse_data!(l, ctx => weight, {
+				setup => |p: &mut Parse| {
+					let weight = Val::parse(p)?;
+					parse_data!(p => {
 						enemies, placement, bgm, at_roll
 					});
 					let (placement, placement_ambush) = placement;
 					let (bgm, bgm_ambush) = bgm;
 					if setups.len() >= 4 {
-						Diag::error(l.head.span(), "only up to 4 setups allowed").emit();
+						Diag::error(p.head_span(), "only up to 4 setups allowed").emit();
 						return Err(Error)
 					}
 					setups.push(BattleSetup {
@@ -357,15 +366,15 @@ fn lower_data(scena: &mut ScenaBuild, ctx: &Context, d: &Data) -> Result<()> {
 					Ok(())
 				}
 			});
-			scena.battles.insert(d.head.key.0 | s, n, Battle {
+			scena.battles.insert(p.tokens[0].0 | s, n, Battle {
 				flags, level, unk1, vision_range, move_range,
 				can_move, move_speed, unk2, battlefield, sepith,
 				setups,
 			});
 		}
 		_ => {
-			Diag::error(d.head.key.0, "unknown declaration")
-				.note(d.head.key.0, "expected \
+			Diag::error(p.tokens[0].0, "unknown declaration")
+				.note(p.tokens[0].0, "expected \
 					'scena', 'entry', 'chcp', 'npc', 'monster', \
 					'trigger', 'look_point', 'label', 'anim', \
 					'sepith', 'at_roll', 'placement', 'battle', 'fn'")

@@ -1,3 +1,4 @@
+#![deprecated]
 use total_float::F64;
 
 use super::lex::*;

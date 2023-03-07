@@ -4,25 +4,42 @@ use themelios::scena::*;
 use themelios::types::*;
 use themelios::util::array;
 use themelios_archive::Lookup;
+use total_float::F64;
 
 use super::diag::*;
-use crate::ast::*;
+use super::lex::{Line, Token, TextToken};
+// use crate::ast::*;
 use crate::span::{Spanned as S, Span};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FileType {
+	Scena,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Term<'a> {
+	Int(S<i64>, S<Unit>),
+	Float(S<F64>, S<Unit>),
+	String(String),
+	Term(Vec<S<Token<'a>>>),
+	Text(Vec<S<TextToken<'a>>>),
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum Unit {
+	None,
+	Mm,
+	MmPerS,
+	Ms,
+	Deg,
+	MDeg,
+}
 
 #[derive(Clone, Copy)]
 struct Context<'a> {
 	game: Game,
 	ty: FileType,
 	lookup: &'a dyn Lookup,
-}
-impl<'a> Context<'a> {
-    fn new(file: &File, lookup: Option<&'a dyn Lookup>) -> Self {
-		Context {
-			game: file.game,
-			ty: file.ty,
-			lookup: lookup.unwrap_or_else(|| crate::util::default_lookup(file.game)),
-		}
-    }
 }
 
 impl<'a> std::fmt::Debug for Context<'a> {
@@ -39,57 +56,176 @@ impl<'a> std::fmt::Debug for Context<'a> {
 pub struct Error;
 type Result<T, E=Error> = std::result::Result<T, E>;
 
+pub macro f {
+	($p:pat $(if $e:expr)? => $v:expr) => { |_a| {
+		match _a {
+			$p $(if $e)? => Some($v),
+			_ => None
+		}
+	} },
+	($p:pat $(if $e:expr)? ) => { |_a| {
+		match _a {
+			$p $(if $e)? => true,
+			_ => false
+		}
+	} },
+}
+
 #[derive(Clone, Debug)]
 pub struct Parse<'a> {
-	key_val: &'a KeyVal,
+	tokens: &'a [S<Token<'a>>],
 	pos: usize,
+	body: Option<&'a [Line<'a>]>,
 	context: &'a Context<'a>,
+	eol: Span,
+	commas: bool,
 }
 
 impl<'a> Parse<'a> {
-	fn new(key_val: &'a KeyVal, context: &'a Context<'a>) -> Self {
-		Parse { key_val, pos: 0, context }
+	fn parse<T: Val>(line: &Line, context: &Context) -> Result<T> {
+		Self::parse_with(line, context, T::parse)
 	}
 
-	fn pos(&self) -> Span {
-		self.key_val.terms.get(self.pos).map_or(self.key_val.end, |a| a.0)
+	fn parse_with<T>(line: &Line, context: &Context<'a>, f: impl FnOnce(&mut Parse) -> Result<T>) -> Result<T> {
+		Parse {
+			tokens: &line.head,
+			pos: 0,
+			body: line.body.as_deref(),
+			context,
+			eol: line.eol,
+			commas: false,
+		}.do_parse(f)
 	}
 
-	fn next(&mut self) -> Result<&'a Term> {
-		if let Some(t) = self.peek() {
-			self.pos += 1;
-			Ok(t)
-		} else {
-			Err(Error)
+	fn do_parse<T>(mut self, f: impl FnOnce(&mut Parse) -> Result<T>) -> Result<T> {
+		let v = f(&mut self)?;
+
+		if self.pos < self.tokens.len() {
+			Diag::error(self.tokens[self.pos].0, "expected end of data").emit();
+		}
+
+		if self.body.is_some() {
+			Diag::error(self.eol, "body not expected here").emit();
+		}
+
+		Ok(v)
+	}
+
+	fn body(&mut self) -> Result<&'a [Line<'a>]> {
+		match self.body.take() {
+			Some(a) => Ok(a),
+			None => {
+				Diag::error(self.eol, "expected a body").emit();
+				Err(Error)
+			},
 		}
 	}
 
-	fn peek(&self) -> Option<&'a Term> {
-		self.key_val.terms.get(self.pos).map(|a| &a.1)
+	fn space(&self) -> Option<Span> {
+		if self.pos == 0 { return None }
+		let s0 = self.tokens[self.pos-1].0;
+		let s1 = self.tokens[self.pos].0;
+		if s0.connects(s1) {
+			None
+		} else {
+			Some(s0.at_end() | s1.at_start())
+		}
 	}
 
-	fn term<T: Val>(&mut self, name: &str) -> Result<Option<T>> {
-		if let Some(Term::Term(s)) = self.peek() && s.key.1 == name {
+	fn head_span(&self) -> Span {
+		self.tokens.get(0).map_or(self.eol, |a| a.0 | self.eol)
+	}
+
+	fn prev_span(&self) -> Span {
+		if self.pos == 0 {
+			self.next_span().at_start()
+		} else {
+			self.tokens[self.pos-1].0
+		}
+	}
+
+	fn next_span(&self) -> Span {
+		self.tokens.get(self.pos).map_or(self.eol, |a| a.0)
+	}
+
+	fn next(&mut self) -> Option<&'a Token> {
+		self.next_if(|a| Some(a))
+	}
+
+	fn next_if<T>(&self, f: impl FnOnce(&Token) -> Option<T>) -> Option<T> {
+		if let Some(S(_, t)) = self.tokens.get(self.pos) && let Some(x) = f(t) {
 			self.pos += 1;
-			Ok(Some(s.parse(self.context)?))
+			Some(x)
+		} else {
+			None
+		}
+	}
+
+	fn tuple<T: Val>(&mut self) -> Result<Option<T>> {
+		if let Some(d) = self.next_if(f!(Token::Paren(d) => d)) {
+			Parse {
+				tokens: &d.tokens,
+				pos: 0,
+				body: None,
+				context: self.context,
+				eol: d.close,
+				commas: true,
+			}.do_parse(T::parse).map(Some)
 		} else {
 			Ok(None)
 		}
 	}
-}
 
-impl KeyVal {
-	fn parse<V: Val>(&self, context: &Context) -> Result<V> {
-		self.parse_with(context, V::parse)
+	fn word(&mut self, name: &str) -> bool {
+		self.next_if(f!(Token::Ident(a) if *a == name => ())).is_some()
 	}
 
-	fn parse_with<V>(&self, context: &Context, f: impl FnOnce(&mut Parse) -> Result<V>) -> Result<V> {
-		let mut a = Parse::new(self, context);
-		let v = f(&mut a)?;
-		if a.peek().is_some() {
-			Diag::error(a.pos(), "expected end of data").emit();
+	fn term<T: Val>(&mut self, name: &str) -> Result<Option<T>> {
+		let span = self.next_span().at_end();
+		if self.word(name) {
+			if let Some(s) = self.space() {
+				Diag::error(s, "no space allowed here").emit()
+			}
+			if let Some(d) = self.next_if(f!(Token::Bracket(d) => d)) {
+				if d.tokens.is_empty() {
+					Diag::error(d.open | d.close, "this cannot be empty")
+						.note(d.open | d.close, "maybe remove the brackets?")
+						.emit()
+				}
+				Parse {
+					tokens: &d.tokens,
+					pos: 0,
+					body: None,
+					context: self.context,
+					eol: d.close,
+					commas: false,
+				}.do_parse(T::parse)
+			} else {
+				Parse {
+					tokens: &[],
+					pos: 0,
+					body: None,
+					context: self.context,
+					eol: span,
+					commas: false,
+				}.do_parse(T::parse)
+			}.map(Some)
+		} else {
+			Ok(None)
 		}
-		Ok(v)
+	}
+
+	fn sep(&mut self) {
+		if self.pos < self.tokens.len() && self.commas {
+			let span = self.prev_span().at_end();
+			if self.next_if(f!(Token::Comma => ())).is_none() {
+				Diag::error(span, "expected comma").emit();
+			}
+		}
+	}
+
+	fn remaining(&self) -> &'a [S<Token<'a>>] {
+		&self.tokens[self.pos..]
 	}
 }
 
@@ -99,23 +235,28 @@ trait Val: Sized {
 
 impl<T: Val> Val for S<T> {
 	fn parse(p: &mut Parse) -> Result<Self> {
-		let s1 = p.pos().at_start();
+		let s1 = p.next_span().at_start();
 		let p1 = p.pos;
 		let v = T::parse(p)?;
 		let p2 = p.pos;
 		if p1 == p2 {
 			Ok(S(s1, v))
 		} else {
-			Ok(S(p.key_val.terms[p1].0 | p.key_val.terms[p2-1].0, v))
+			Ok(S(p.tokens[p1].0 | p.tokens[p2-1].0, v))
 		}
 	}
 }
 
+fn parse_and_comma<T: Val>(p: &mut Parse) -> Result<T> {
+	let a = T::parse(p)?;
+	p.sep();
+	Ok(a)
+}
 
 macro tuple($($T:ident)*) {
 	impl<$($T: Val),*> Val for ($($T,)*) {
 		fn parse(_p: &mut Parse) -> Result<Self> {
-			Ok(($($T::parse(_p)?,)*))
+			Ok(($(parse_and_comma::<$T>(_p)?,)*))
 		}
 	}
 }
@@ -136,8 +277,8 @@ tuple!(A B C D E F G H I J K);
 impl<T: Val> Val for Vec<T> {
 	fn parse(p: &mut Parse) -> Result<Self> {
 		let mut v = Vec::new();
-		while p.peek().is_some() {
-			v.push(T::parse(p)?);
+		while p.pos < p.tokens.len() {
+			v.push(parse_and_comma::<T>(p)?);
 		}
 		Ok(v)
 	}
@@ -145,7 +286,7 @@ impl<T: Val> Val for Vec<T> {
 
 impl<const N: usize, T: Val> Val for [T; N] {
 	fn parse(p: &mut Parse) -> Result<Self> {
-		array(|| T::parse(p))
+		array(|| parse_and_comma::<T>(p))
 	}
 }
 
@@ -159,11 +300,75 @@ impl<T: Val> Val for Option<T> {
 	}
 }
 
+fn parse_unit(p: &mut Parse) -> Result<S<Unit>> {
+	let s0 = p.prev_span().at_end();
+	let (s, u1, u2) = match p.remaining() {
+		[S(s1, Token::Ident(u1)), S(s2, Token::Slash), S(s3, Token::Ident(u2)), ..]
+		if s0.connects(*s1) && s1.connects(*s2) && s2.connects(*s3) => {
+			let v = (*s1 | *s3, *u1, Some(*u2)); 
+			p.pos += 3;
+			v
+		}
+		[S(s1, Token::Ident(u1)), ..]
+		if s0.connects(*s1) => {
+			let v = (*s1, *u1, None);
+			p.pos += 1;
+			v
+		}
+		_ => return Ok(S(s0, Unit::None))
+	};
+	let u = match (u1, u2) {
+		("mm", None) => Unit::Mm,
+		("mm", Some("s")) => Unit::MmPerS,
+		("ms", None) => Unit::Ms,
+		("deg", None) => Unit::Deg,
+		("mdeg", None) => Unit::MDeg,
+		_ => {
+			Diag::error(s, "invalid unit").emit();
+			return Err(Error)
+		}
+	};
+	Ok(S(s, u))
+}
+
+fn parse_int(p: &mut Parse) -> Result<Option<(S<i64>, S<Unit>)>> {
+	let pos = p.pos;
+	match p.remaining() {
+		[S(s, Token::Int(n)), ..] => {
+			p.pos += 1;
+			Ok(Some((S(*s, *n as i64), parse_unit(p)?)))
+		}
+		[S(s1, Token::Minus), S(s, Token::Int(n)), ..] if s1.connects(*s) => {
+			p.pos += 2;
+			Ok(Some((S(*s1 | *s, -(*n as i64)), parse_unit(p)?)))
+		}
+		_ => {
+			Ok(None)
+		}
+	}
+}
+
+fn parse_float(p: &mut Parse) -> Result<Option<(S<f64>, S<Unit>)>> {
+	let pos = p.pos;
+	match p.remaining() {
+		[S(s, Token::Float(n)), ..] => {
+			p.pos += 1;
+			Ok(Some((S(*s, n.0), parse_unit(p)?)))
+		}
+		[S(s1, Token::Minus), S(s, Token::Float(n)), ..] if s1.connects(*s) => {
+			p.pos += 2;
+			Ok(Some((S(*s1 | *s, -n.0), parse_unit(p)?)))
+		}
+		_ => {
+			Ok(None)
+		}
+	}
+}
+
 macro int($T:ident $(=> $(#$CONV:ident)?)?) {
 	impl Val for $T {
 		fn parse(p: &mut Parse) -> Result<Self> {
-			if let Some(Term::Int(s, u)) = p.peek() {
-				p.next()?;
+			if let Some((s, u)) = parse_int(p)? {
 				if u.1 != Unit::None {
 					Diag::warn(u.0, "this should be unitless").emit();
 				}
@@ -172,7 +377,7 @@ macro int($T:ident $(=> $(#$CONV:ident)?)?) {
 					Error
 				}).map(unless!($({$($CONV)? $T})?, {|a| a}))
 			} else {
-				Diag::error(p.pos(), "expected int").emit();
+				Diag::error(p.next_span(), "expected int").emit();
 				Err(Error)
 			}
 		}
@@ -192,11 +397,10 @@ int!(CharFlags =>);
 
 impl Val for String {
 	fn parse(p: &mut Parse) -> Result<Self> {
-		if let Some(Term::String(s)) = p.peek() {
-			p.next()?;
+		if let Some(s) = p.next_if(f!(Token::String(s) => s)) {
 			Ok(s.to_owned())
 		} else {
-			Diag::error(p.pos(), "expected string").emit();
+			Diag::error(p.next_span(), "expected string").emit();
 			Err(Error)
 		}
 	}
@@ -204,18 +408,17 @@ impl Val for String {
 
 impl Val for TString {
 	fn parse(p: &mut Parse) -> Result<Self> {
-		if let Some(Term::Text(s)) = p.peek() {
-			p.next()?;
-			match s.as_slice() {
+		if let Some(d) = p.next_if(f!(Token::Brace(s) => s)) {
+			match d.tokens.as_slice() {
 				[] => Ok(TString(String::new())),
-				[S(_, TextSegment::Text(s))] => Ok(TString(s.to_owned())),
+				[S(_, TextToken::Text(s))] => Ok(TString(s.to_owned())),
 				_ => {
-					Diag::error(p.pos(), "expected short text").emit();
+					Diag::error(p.next_span(), "expected short text").emit();
 					Err(Error)
 				}
 			}
 		} else {
-			Diag::error(p.pos(), "expected short text").emit();
+			Diag::error(p.next_span(), "expected short text").emit();
 			Err(Error)
 		}
 	}
@@ -224,8 +427,7 @@ impl Val for TString {
 macro unit($T:ident, $unit:ident, $unit_str:literal) {
 	impl Val for $T {
 		fn parse(p: &mut Parse) -> Result<Self> {
-			if let Some(Term::Int(s, u)) = p.peek() {
-				p.next()?;
+			if let Some((s, u)) = parse_int(p)? {
 				if u.1 != Unit::$unit {
 					Diag::warn(u.0, format_args!("unit should be '{}'", $unit_str)).emit();
 				}
@@ -234,7 +436,7 @@ macro unit($T:ident, $unit:ident, $unit_str:literal) {
 					Error
 				}).map(Self)
 			} else {
-				Diag::error(p.pos(), format_args!("expected '{}' number", $unit_str)).emit();
+				Diag::error(p.next_span(), format_args!("expected '{}' number", $unit_str)).emit();
 				Err(Error)
 			}
 		}
@@ -246,32 +448,29 @@ unit!(Time, Ms, "ms");
 
 impl Val for f32 {
 	fn parse(p: &mut Parse) -> Result<Self> {
-		if let Some(Term::Float(s, u)) = p.peek() {
-			p.next()?;
+		if let Some((s, u)) = parse_float(p)? {
 			if u.1 != Unit::None {
 				Diag::warn(u.0, "this should be unitless").emit();
 			}
-			Ok(s.1.0 as f32)
-		} else if let Some(Term::Int(s, u)) = p.peek() {
-			p.next()?;
+			Ok(s.1 as f32)
+		} else if let Some((s, u)) = parse_int(p)? {
 			if u.1 != Unit::None {
 				Diag::warn(u.0, "this should be unitless").emit();
 			}
 			Ok(s.1 as f32)
 		} else {
-			Diag::error(p.pos(), "expected int").emit();
+			Diag::error(p.next_span(), "expected float").emit();
 			Err(Error)
 		}
 	}
 }
-
 
 impl Val for Pos3 {
 	fn parse(p: &mut Parse) -> Result<Self> {
 		if let Some((x, y, z)) = p.term("")? {
 			Ok(Pos3(x, y, z))
 		} else {
-			Diag::error(p.pos(), "expected pos3").emit();
+			Diag::error(p.next_span(), "expected pos3").emit();
 			Err(Error)
 		}
 	}
@@ -282,7 +481,7 @@ impl Val for FuncRef {
 		if let Some((a, b)) = p.term("fn")? {
 			Ok(FuncRef(a, b))
 		} else {
-			Diag::error(p.pos(), "expected 'fn'").emit();
+			Diag::error(p.next_span(), "expected 'fn'").emit();
 			Err(Error)
 		}
 	}
@@ -290,11 +489,9 @@ impl Val for FuncRef {
 
 impl Val for FileId {
 	fn parse(p: &mut Parse) -> Result<Self> {
-		if let Some(Term::String(s)) = p.peek() {
-			let pos = p.pos();
-			p.next()?;
+		if let Some(s) = p.next_if(f!(Token::String(s) => s)) {
 			Ok(FileId(p.context.lookup.index(s).unwrap_or_else(|| {
-				Diag::error(pos, "could not resolve file id").emit();
+				Diag::error(p.prev_span(), "could not resolve file id").emit();
 				0x00000000
 			})))
 		} else if let Some(()) = p.term("null")? {
@@ -302,7 +499,7 @@ impl Val for FileId {
 		} else if let Some(s) = p.term("file")? {
 			Ok(FileId(s))
 		} else {
-			Diag::error(p.pos(), "expected string, 'null', or 'file'").emit();
+			Diag::error(p.next_span(), "expected string, 'null', or 'file'").emit();
 			Err(Error)
 		}
 	}
@@ -310,6 +507,7 @@ impl Val for FileId {
 
 impl Val for CharId {
 	fn parse(p: &mut Parse) -> Result<Self> {
+		let span = p.next_span();
 		if let Some(()) = p.term("self")? {
 			Ok(CharId(254))
 		} else if let Some(()) = p.term("null")? {
@@ -326,11 +524,11 @@ impl Val for CharId {
 			if p.context.game.base() == BaseGame::Ao {
 				Ok(CharId(s + 244))
 			} else {
-				Diag::error(p.pos(), "'custom' is only supported on Azure").emit();
+				Diag::error(span, "'custom' is only supported on Azure").emit();
 				Err(Error)
 			}
 		} else {
-			Diag::error(p.pos(), "expected 'self', 'null', 'name', 'char', 'field_party', 'party', or 'custom'").emit();
+			Diag::error(span, "expected 'self', 'null', 'name', 'char', 'field_party', 'party', or 'custom'").emit();
 			Err(Error)
 		}
 	}
@@ -342,7 +540,7 @@ macro newtype($T:ident, $s:literal) {
 			if let Some(v) = p.term($s)? {
 				Ok(Self(v))
 			} else {
-				Diag::error(p.pos(), format_args!("expected '{}'", $s)).emit();
+				Diag::error(p.next_span(), format_args!("expected '{}'", $s)).emit();
 				Err(Error)
 			}
 		}
@@ -369,47 +567,40 @@ macro unless {
 }
 
 macro parse_data {
-	($d:expr, $c:expr => $head:pat) => {
-		let d = $d;
-		let c = $c;
-		if d.body.is_some() {
-			Diag::error(d.head.end, "a body is not allowed here").emit();
-		}
-		let $head = d.head.parse(c)?;
-	},
-	($d:expr, $c:expr => $head:pat, {
+	($d:expr => {
 		$($k:ident $(=> $e:expr)?),* $(,)?
 	}) => {
 		let d = $d;
-		let c = $c;
-		let head = d.head.parse(c);
 
-		$(unless!($({when!($e);})?, { let mut $k = One::Empty; });)*
-		let Some(body) = &d.body else {
-			Diag::error(d.head.end, "a body is required here").emit();
-			Err(Error)?;
-			unreachable!()
-		};
+		$(unless!($({when!($e);})?, {
+			let mut $k = One::Empty;
+		});)*
+
+		let body = d.body()?;
 
 		for line in body {
-			let head = &line.head.key;
-			match head.1.as_str() {
+			let Some(key) = d.next_if(f!(Token::Ident(a) => a)) else {
+				Diag::error(d.next_span(), "expected word").emit();
+				Err(Error)?;
+				unreachable!();
+			};
+			match *key {
 				$(stringify!($k) => {
 					unless!($({
-						let _: Result<()> = $e(line);
+						let _: Result<()> = Parse::parse_with(line, d.context, $e);
 					})?, {
 						if line.body.is_some() {
-							Diag::error(d.head.end, "body is not allowed here").emit();
+							Diag::error(d.eol, "body is not allowed here").emit();
 						}
-						$k.set(head.0, line.head.parse(c).ok());
+						$k.set(d.prev_span(), Parse::parse(line, d.context).ok());
 					});
 				})*
 				_ => {
 					let fields: &[&str] = &[
 						$(concat!("'", stringify!($k), "'"),)*
 					];
-					Diag::error(head.0, "unknown field")
-						.note(head.0, format_args!("allowed fields are {}", &fields.join(", ")))
+					Diag::error(d.prev_span(), "unknown field")
+						.note(d.prev_span(), format_args!("allowed fields are {}", &fields.join(", ")))
 						.emit();
 				}
 			}
@@ -425,26 +616,79 @@ macro parse_data {
 		});)*
 
 		if !failures.is_empty() {
-			Diag::error(d.head.span(), "missing fields")
-				.note(d.head.span(), failures.join(", "))
+			Diag::error(d.head_span(), "missing fields")
+				.note(d.head_span(), failures.join(", "))
 				.emit();
 			Err(Error)?;
 			unreachable!()
 		}
 
-		#[allow(clippy::let_unit_value)]
-		let $head = head?;
 		$(unless!($({when!($e);})?, {
 			let Some($k) = $k.unwrap() else { Err(Error)?; unreachable!() };
 		});)*
 	}
 }
 
-pub fn lower(file: &File, lookup: Option<&dyn Lookup>) {
-	match file.ty {
+fn parse_type(line: &Line) -> Result<(Game, FileType)> {
+	let dummy_ctx = &Context {
+		game: Game::Fc,
+		ty: FileType::Scena,
+		lookup: &themelios_archive::NullLookup,
+	};
+	Parse::parse_with(line, dummy_ctx, |p| {
+		// TODO just remove this word, it doesn't do any good
+		if !p.word("type") {
+			Diag::error(p.prev_span(), "expected 'type'").emit();
+			return Err(Error);
+		}
+		let Some(a) = p.next_if(f!(Token::Ident(a) => a)) else {
+			Diag::error(p.prev_span(), "expected a game").emit();
+			return Err(Error);
+		};
+		let Some(b) = p.next_if(f!(Token::Ident(a) => a)) else {
+			Diag::error(p.prev_span(), "expected a type").emit();
+			return Err(Error);
+		};
+		let game = match *a {
+			"fc" => Game::Fc, "fc_e" => Game::FcEvo, "fc_k" => Game::FcKai,
+			"sc" => Game::Sc, "sc_e" => Game::ScEvo, "sc_k" => Game::ScKai,
+			"tc" => Game::Tc, "tc_e" => Game::TcEvo, "tc_k" => Game::TcKai,
+			"zero" => Game::Zero, "zero_e" => Game::ZeroEvo, "zero_k" => Game::ZeroKai,
+			"ao" => Game::Ao, "ao_e" => Game::AoEvo, "ao_k" => Game::AoKai,
+			_ => {
+				Diag::error(p.prev_span(), "unknown game").emit();
+				return Err(Error);
+			}
+		};
+		let ty = match *b {
+			"scena" => FileType::Scena,
+			_ => {
+				Diag::error(p.prev_span(), "unknown file type").emit();
+				return Err(Error);
+			}
+		};
+		Ok((game, ty))
+	})
+}
+
+pub fn parse(lines: &[Line], lookup: Option<&dyn Lookup>) -> Result<()> {
+	if lines.is_empty() {
+		Diag::error(Span::new_at(0), "no type declaration").emit();
+		return Err(Error);
+	}
+
+	let (game, ty) = parse_type(&lines[0])?;
+	let ctx = &Context {
+		game,
+		ty,
+		lookup: lookup.unwrap_or_else(|| crate::util::default_lookup(game)),
+	};
+
+	match ty {
 		FileType::Scena => {
-			if file.game.is_ed7() {
-				scena::ed7::lower(file, lookup);
+			if game.is_ed7() {
+				let a = scena::ed7::parse(&lines[1..], ctx)?;
+				Ok(())
 			} else {
 				todo!();
 				// lower_ed6_scena(&file);
@@ -522,7 +766,7 @@ fn main() {
 	let (v, diag) = super::diag::diagnose(|| {
 		let tok = crate::parse::lex::lex(src);
 		let ast = crate::parse::parse::parse(&tok).unwrap();
-		lower(&ast, None)
+		parse(&tok, None)
 	});
 	println!("{:#?}", v);
 	super::diag::print_diags("<input>", src, &diag);

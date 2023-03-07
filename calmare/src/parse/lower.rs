@@ -91,12 +91,6 @@ impl<'a> Parse<'a> {
 		}
 	}
 
-	fn parse<T: Val>(mut self) -> Result<T> {
-		let v = T::parse(&mut self)?;
-		self.finish();
-		Ok(v)
-	}
-
 	fn parse_comma<T: ValComma>(mut self) -> Result<T> {
 		let v = T::parse_comma(&mut self)?;
 		self.finish();

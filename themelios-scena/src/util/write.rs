@@ -96,20 +96,6 @@ pub trait WriteStreamExt1: WriteStream {
 		self.array::<N>(buf);
 		Ok(())
 	}
-
-	#[deprecated]
-	fn name_desc(&mut self, nd: &super::NameDesc) -> Result<(), WriteError> where Self: Write {
-		let super::NameDesc { name, desc } = nd;
-		let (l1, l1_) = Label::new();
-		let (l2, l2_) = Label::new();
-		self.delay_u16(l1);
-		self.delay_u16(l2);
-		self.label(l1_);
-		self.string(name)?;
-		self.label(l2_);
-		self.string(desc)?;
-		Ok(())
-	}
 }
 impl<T: WriteStream + ?Sized> WriteStreamExt1 for T {}
 

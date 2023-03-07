@@ -118,16 +118,5 @@ pub trait ReadExt1<'a>: Read<'a> {
 		let buf = self.multiple::<N, _>(&[0], |a| Ok(a.u8()?))?;
 		Ok(decode(&buf)?)
 	}
-
-	#[deprecated]
-	fn name_desc(&mut self) -> Result<super::NameDesc, ReadError> {
-		let l1 = self.u16()? as usize;
-		let l2 = self.u16()? as usize;
-		ensure!(self.pos() == l1, "invalid NameDesc");
-		let name = self.string()?;
-		ensure!(self.pos() == l2, "invalid NameDesc");
-		let desc = self.string()?;
-		Ok(super::NameDesc { name, desc })
-	}
 }
 impl<'a, T: Read<'a>> ReadExt1<'a> for T {}

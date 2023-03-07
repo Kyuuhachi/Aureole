@@ -47,19 +47,18 @@ impl<'a> std::fmt::Debug for Context<'a> {
 pub struct Error;
 type Result<T, E=Error> = std::result::Result<T, E>;
 
-pub macro f {
-	($p:pat $(if $e:expr)? => $v:expr) => { |_a| {
-		match _a {
-			$p $(if $e)? => Some($v),
-			_ => None
-		}
-	} },
-	($p:pat $(if $e:expr)? ) => { |_a| {
-		match _a {
-			$p $(if $e)? => true,
-			_ => false
-		}
-	} },
+macro test {
+	($q:expr, $p:pat $(if $e:expr)? => $v:expr) => {
+		$q.next_if(|a| {
+			match a {
+				$p $(if $e)? => Some($v),
+				_ => None
+			}
+		})
+	},
+	($q:expr, $p:pat $(if $e:expr)? ) => {
+		test!($q, $p $(if $e)? => ()).is_some()
+	},
 }
 
 #[derive(Clone, Debug)]
@@ -158,10 +157,6 @@ impl<'a> Parse<'a> {
 		self.tokens.get(self.pos).map_or(self.eol, |a| a.0)
 	}
 
-	fn next(&mut self) -> Option<&'a Token<'a>> {
-		self.next_if(Some)
-	}
-
 	fn next_if<T>(&mut self, f: impl FnOnce(&'a Token<'a>) -> Option<T>) -> Option<T> {
 		if let Some(S(_, t)) = self.tokens.get(self.pos) && let Some(x) = f(t) {
 			self.pos += 1;
@@ -172,11 +167,11 @@ impl<'a> Parse<'a> {
 	}
 
 	fn word(&mut self, name: &str) -> bool {
-		self.next_if(f!(Token::Ident(a) if *a == name => ())).is_some()
+		test!(self, Token::Ident(a) if *a == name)
 	}
 
 	fn tuple<T: ValComma>(&mut self) -> Result<Option<T>> {
-		if let Some(d) = self.next_if(f!(Token::Paren(d) => d)) {
+		if let Some(d) = test!(self, Token::Paren(d) => d) {
 			Parse::new_inner(&d.tokens, d.close, self.context).parse_comma().map(Some)
 		} else {
 			Ok(None)
@@ -186,7 +181,7 @@ impl<'a> Parse<'a> {
 	fn term<T: ValComma>(&mut self, name: &str) -> Result<Option<T>> {
 		if self.word(name) {
 			let space = self.space();
-			if let Some(d) = self.next_if(f!(Token::Bracket(d) => d)) {
+			if let Some(d) = test!(self, Token::Bracket(d) => d) {
 				if let Some(s) = space {
 					Diag::error(s, "no space allowed here").emit()
 				}
@@ -263,7 +258,7 @@ macro tuple($($T:ident)*) {
 		fn parse_comma(_p: &mut Parse) -> Result<Self> {
 			$(
 				let $T = $T::parse(_p)?;
-				if _p.pos < _p.tokens.len() && _p.next_if(f!(Token::Comma => ())).is_none() {
+				if _p.pos < _p.tokens.len() && !test!(_p, Token::Comma) {
 					Diag::error(_p.next_span().at_start(), "expected comma").emit();
 				}
 			)*
@@ -417,7 +412,7 @@ impl TryVal for String {
 	fn desc() -> String { "string".to_owned() }
 
 	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
-		if let Some(s) = p.next_if(f!(Token::String(s) => s)) {
+		if let Some(s) = test!(p, Token::String(s) => s) {
 			Ok(Some(s.to_owned()))
 		} else {
 			Ok(None)
@@ -429,7 +424,7 @@ impl TryVal for TString {
 	fn desc() -> String { "short text".to_owned() }
 
 	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
-		if let Some(d) = p.next_if(f!(Token::Brace(s) => s)) {
+		if let Some(d) = test!(p, Token::Brace(s) => s) {
 			match d.tokens.as_slice() {
 				[] => Ok(Some(TString(String::new()))),
 				[S(_, TextToken::Text(s))] => Ok(Some(TString(s.to_owned()))),
@@ -445,9 +440,9 @@ impl TryVal for Text {
 	fn desc() -> String { "dialogue text".to_owned() }
 
 	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
-		if let Some(d) = p.next_if(f!(Token::Brace(s) => s)) {
+		if let Some(d) = test!(p, Token::Brace(s) => s) {
 			let mut out = Vec::new();
-			while let Some(d) = p.next_if(f!(Token::Brace(s) => s)) {
+			while let Some(d) = test!(p, Token::Brace(s) => s) {
 				out.push(TextSegment::Page);
 			}
 
@@ -570,7 +565,7 @@ impl TryVal for FileId {
 	fn desc() -> String { "string, 'null', 'file'".to_owned() }
 
 	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
-		if let Some(s) = p.next_if(f!(Token::String(s) => s)) {
+		if let Some(s) = test!(p, Token::String(s) => s) {
 			Ok(Some(FileId(p.context.lookup.index(s).unwrap_or_else(|| {
 				Diag::error(p.prev_span(), "could not resolve file id").emit();
 				0x00000000
@@ -686,7 +681,7 @@ macro parse_data($d:ident => { $($k:ident $(=> $e:expr)?),* $(,)? }) {
 
 	for line in body {
 		Parse::new(line, $d.context).parse_with(|p| {
-			let Some(key) = p.next_if(f!(Token::Ident(a) => a)) else {
+			let Some(key) = test!(p, Token::Ident(a) => a) else {
 				Diag::error(p.next_span(), "expected word").emit();
 				return
 			};
@@ -751,11 +746,11 @@ fn parse_type(line: &Line) -> Result<(Game, FileType)> {
 			Diag::error(p.prev_span(), "expected 'type'").emit();
 			return Err(Error);
 		}
-		let Some(a) = p.next_if(f!(Token::Ident(a) => a)) else {
+		let Some(a) = test!(p, Token::Ident(a) => a) else {
 			Diag::error(p.prev_span(), "expected a game").emit();
 			return Err(Error);
 		};
-		let Some(b) = p.next_if(f!(Token::Ident(a) => a)) else {
+		let Some(b) = test!(p, Token::Ident(a) => a) else {
 			Diag::error(p.prev_span(), "expected a type").emit();
 			return Err(Error);
 		};

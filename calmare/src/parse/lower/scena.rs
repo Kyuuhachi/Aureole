@@ -33,7 +33,7 @@ fn parse_tree(p: &mut Parse, can_break: bool, can_continue: bool) -> Vec<TreeIns
 		let p = &mut Parse::new(l, p.context);
 
 		let span = p.next_span();
-		let key = p.next_if(f!(Token::Ident(a) => *a)).unwrap_or_default();
+		let key = test!(p, Token::Ident(a) => *a).unwrap_or_default();
 
 		match key {
 			"if" => {
@@ -80,7 +80,7 @@ fn parse_tree(p: &mut Parse, can_break: bool, can_continue: bool) -> Vec<TreeIns
 				for l in p.body().unwrap_or_default() {
 					Parse::new(l, p.context).parse_with(|p| {
 						let span = p.next_span();
-						let key = p.next_if(f!(Token::Ident(a) => *a)).unwrap_or_default();
+						let key = test!(p, Token::Ident(a) => *a).unwrap_or_default();
 						let i = match key {
 							"case" => u16::parse(p).map(Some),
 							"default" => Ok(None),
@@ -222,13 +222,13 @@ fn parse_atom(p: &mut Parse) -> Result<Expr> {
 			return Ok($o)
 		}
 	}
-	c!(p.next_if(f!(Token::Paren(d) => d)) => d in
+	c!(test!(p, Token::Paren(d) => d) => d in
 		Parse::new_inner(&d.tokens, d.close, p.context).parse_with(|p| parse_expr0(p, 10))?);
-	c!(p.next_if(f!(Token::Minus => ())) => () in
+	c!(test!(p, Token::Minus => ()) => () in
 		Expr::Unop(ExprUnop::Neg, Box::new(parse_atom(p)?)));
-	c!(p.next_if(f!(Token::Excl => ())) => () in
+	c!(test!(p, Token::Excl => ()) => () in
 		Expr::Unop(ExprUnop::Not, Box::new(parse_atom(p)?)));
-	c!(p.next_if(f!(Token::Tilde => ())) => () in
+	c!(test!(p, Token::Tilde => ()) => () in
 		Expr::Unop(ExprUnop::Inv, Box::new(parse_atom(p)?)));
 	c!(TryVal::try_parse(p)? => v in Expr::Const(v));
 	c!(TryVal::try_parse(p)? => v in Expr::Flag(v));
@@ -242,7 +242,7 @@ fn parse_atom(p: &mut Parse) -> Result<Expr> {
 
 macro op($p:ident; $t1:ident $($t:ident)* => $op:expr) {
 	let pos = $p.pos;
-	if $p.next_if(f!(Token::$t1 => ())).is_some() $( && $p.space().is_none() && $p.next_if(f!(Token::$t => ())).is_some())* {
+	if test!($p, Token::$t1) $( && $p.space().is_none() && test!($p, Token::$t))* {
 		return Some($op)
 	}
 	$p.pos = pos;

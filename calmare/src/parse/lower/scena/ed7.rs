@@ -29,13 +29,14 @@ pub enum NpcOrMonster {
 }
 
 struct FPos3(f32, f32, f32);
-impl Val for FPos3 {
-	fn parse(p: &mut Parse) -> Result<Self> {
+impl TryVal for FPos3 {
+	fn desc() -> String { "fpos3".to_owned() }
+
+	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
 		if let Some((x, y, z)) = p.tuple()? {
-			Ok(FPos3(x, y, z))
+			Ok(Some(FPos3(x, y, z)))
 		} else {
-			Diag::error(p.next_span(), "expected fpos3").emit();
-			Err(Error)
+			Ok(None)
 		}
 	}
 }
@@ -360,7 +361,7 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 			let mut vs = Vec::new();
 			parse_data!(p => {
 				pos => |p: &mut Parse| {
-					vs.push((Val::parse(p)?, Val::parse(p)?, Val::parse(p)?));
+					vs.push(Val::parse(p)?);
 					Ok(())
 				}
 			});

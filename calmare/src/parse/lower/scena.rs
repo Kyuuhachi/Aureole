@@ -171,7 +171,6 @@ fn parse_assignment(p: &mut Parse) -> Insn {
 		($ident:ident ($v1:ident $t:ty) ($v2:ident Expr)) => {
 			if let Ok(a) = <$t>::parse(p) {
 				let e = parse_assignment_expr(p);
-				println!("{:?}", (&a, &e));
 				return Insn::$ident(a, e);
 			}
 		},

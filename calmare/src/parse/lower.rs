@@ -213,40 +213,61 @@ trait Val: Sized {
 	fn parse(p: &mut Parse) -> Result<Self>;
 }
 
-trait ValComma: Sized {
-	fn parse_comma(p: &mut Parse) -> Result<Self>;
+trait TryVal: Sized {
+	fn desc() -> String;
+
+	fn try_parse(p: &mut Parse) -> Result<Option<Self>>;
 }
 
-impl<T: Val> Val for S<T> {
+impl<T: TryVal> Val for T {
 	fn parse(p: &mut Parse) -> Result<Self> {
-		let s1 = p.next_span().at_start();
-		let p1 = p.pos;
-		let v = T::parse(p)?;
-		let p2 = p.pos;
-		if p1 == p2 {
-			Ok(S(s1, v))
+		if let Some(v) = Self::try_parse(p)? {
+			Ok(v)
 		} else {
-			Ok(S(p.tokens[p1].0 | p.tokens[p2-1].0, v))
+			Diag::error(p.next_span(), format_args!("expected {}", Self::desc())).emit();
+			Err(Error)
 		}
 	}
 }
 
+trait ValComma: Sized {
+	fn parse_comma(p: &mut Parse) -> Result<Self>;
+}
+
+impl<T: TryVal> TryVal for S<T> {
+	fn desc() -> String { T::desc() }
+
+	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
+		let p1 = p.pos;
+		let v = T::try_parse(p)?;
+		let p2 = p.pos;
+		let s = if p1 == p2 {
+			p.next_span().at_start()
+		} else {
+			p.tokens[p1].0 | p.tokens[p2-1].0
+		};
+		Ok(v.map(|a| S(s, a)))
+	}
+}
+
 macro tuple($($T:ident)*) {
+	#[allow(non_snake_case)]
 	impl<$($T: Val),*> Val for ($($T,)*) {
 		fn parse(_p: &mut Parse) -> Result<Self> {
 			Ok(($($T::parse(_p)?,)*))
 		}
 	}
 
+	#[allow(non_snake_case)]
 	impl<$($T: Val),*> ValComma for ($($T,)*) {
 		fn parse_comma(_p: &mut Parse) -> Result<Self> {
-			Ok(($({
-				let a = $T::parse(_p)?;
+			$(
+				let $T = $T::parse(_p)?;
 				if _p.pos < _p.tokens.len() && _p.next_if(f!(Token::Comma => ())).is_none() {
 					Diag::error(_p.next_span().at_start(), "expected comma").emit();
 				}
-				a
-			},)*))
+			)*
+			Ok(($($T,)*))
 		}
 	}
 }
@@ -257,11 +278,11 @@ tuple!(A B);
 tuple!(A B C);
 tuple!(A B C D);
 
-impl<T: Val> Val for Vec<T> {
+impl<T: TryVal> Val for Vec<T> {
 	fn parse(p: &mut Parse) -> Result<Self> {
 		let mut v = Vec::new();
-		while p.pos < p.tokens.len() {
-			v.push(T::parse(p)?);
+		while let Some(a) = T::try_parse(p)? {
+			v.push(a);
 		}
 		Ok(v)
 	}
@@ -273,12 +294,14 @@ impl<const N: usize, T: Val> Val for [T; N] {
 	}
 }
 
-impl<T: Val> Val for Option<T> {
-	fn parse(p: &mut Parse) -> Result<Self> {
+impl<T: TryVal> TryVal for Option<T> {
+	fn desc() -> String { format!("{}, 'null'", T::desc()) }
+
+	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
 		if let Some(()) = p.term("null")? {
 			Ok(None)
 		} else {
-			T::parse(p).map(Some)
+			T::try_parse(p).map(Some)
 		}
 	}
 }
@@ -347,19 +370,22 @@ fn parse_float(p: &mut Parse) -> Result<Option<(S<f64>, S<Unit>)>> {
 }
 
 macro int($T:ident $(=> $(#$CONV:ident)?)?) {
-	impl Val for $T {
-		fn parse(p: &mut Parse) -> Result<Self> {
+	impl TryVal for $T {
+		fn desc() -> String { "int".to_owned() }
+
+		fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
 			if let Some((s, u)) = parse_int(p)? {
 				if u.1 != Unit::None {
 					Diag::warn(u.0, "this should be unitless").emit();
 				}
-				s.1.try_into().map_err(|e| {
+				let v = s.1.try_into().map_err(|e| {
 					Diag::error(s.0, e).emit();
 					Error
-				}).map(unless!($({$($CONV)? $T})?, {|a| a}))
+				})?;
+				let v = unless!($({$($CONV)? $T(v)})?, {v});
+				Ok(Some(v))
 			} else {
-				Diag::error(p.next_span(), "expected int").emit();
-				Err(Error)
+				Ok(None)
 			}
 		}
 	}
@@ -387,65 +413,67 @@ int!(TcMembers =>);
 
 int!(QuestTask =>);
 
-impl Val for String {
-	fn parse(p: &mut Parse) -> Result<Self> {
+impl TryVal for String {
+	fn desc() -> String { "string".to_owned() }
+
+	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
 		if let Some(s) = p.next_if(f!(Token::String(s) => s)) {
-			Ok(s.to_owned())
+			Ok(Some(s.to_owned()))
 		} else {
-			Diag::error(p.next_span(), "expected string").emit();
-			Err(Error)
+			Ok(None)
 		}
 	}
 }
 
-impl Val for TString {
-	fn parse(p: &mut Parse) -> Result<Self> {
+impl TryVal for TString {
+	fn desc() -> String { "short text".to_owned() }
+
+	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
 		if let Some(d) = p.next_if(f!(Token::Brace(s) => s)) {
 			match d.tokens.as_slice() {
-				[] => Ok(TString(String::new())),
-				[S(_, TextToken::Text(s))] => Ok(TString(s.to_owned())),
-				_ => {
-					Diag::error(p.next_span(), "expected short text").emit();
-					Err(Error)
-				}
+				[] => Ok(Some(TString(String::new()))),
+				[S(_, TextToken::Text(s))] => Ok(Some(TString(s.to_owned()))),
+				_ => Ok(None)
 			}
 		} else {
-			Diag::error(p.next_span(), "expected short text").emit();
-			Err(Error)
+			Ok(None)
 		}
 	}
 }
 
-impl Val for Text {
-	fn parse(p: &mut Parse) -> Result<Self> {
+impl TryVal for Text {
+	fn desc() -> String { "dialogue text".to_owned() }
+
+	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
 		if let Some(d) = p.next_if(f!(Token::Brace(s) => s)) {
 			let mut out = Vec::new();
 			while let Some(d) = p.next_if(f!(Token::Brace(s) => s)) {
 				out.push(TextSegment::Page);
 			}
 
-			Ok(Text(out))
+			Ok(Some(Text(out)))
 		} else {
-			Diag::error(p.next_span(), "expected dialogue text").emit();
-			Err(Error)
+			Ok(None)
 		}
 	}
 }
 
 macro unit($T:ident, $unit:ident, $unit_str:literal) {
-	impl Val for $T {
-		fn parse(p: &mut Parse) -> Result<Self> {
+	impl TryVal for $T {
+		fn desc() -> String { format!("'{}' number", $unit_str) }
+
+		fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
 			if let Some((s, u)) = parse_int(p)? {
 				if u.1 != Unit::$unit {
 					Diag::warn(u.0, format_args!("unit should be '{}'", $unit_str)).emit();
 				}
-				s.1.try_into().map_err(|e| {
+				let v = s.1.try_into().map_err(|e| {
 					Diag::error(s.0, e).emit();
 					Error
-				}).map(Self)
+				})?;
+				Ok(Some(Self(v)))
 			} else {
-				Diag::error(p.next_span(), format_args!("expected '{}' number", $unit_str)).emit();
-				Err(Error)
+				Ok(None)
 			}
 		}
 	}
@@ -457,147 +485,155 @@ unit!(Time, Ms, "ms");
 unit!(Length, Mm, "mm");
 unit!(Speed, MmPerS, "mm/s");
 
-impl Val for f32 {
-	fn parse(p: &mut Parse) -> Result<Self> {
+impl TryVal for f32 {
+	fn desc() -> String { "float".to_owned() }
+
+	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
 		if let Some((s, u)) = parse_float(p)? {
 			if u.1 != Unit::None {
 				Diag::warn(u.0, "this should be unitless").emit();
 			}
-			Ok(s.1 as f32)
+			Ok(Some(s.1 as f32))
 		} else if let Some((s, u)) = parse_int(p)? {
 			if u.1 != Unit::None {
 				Diag::warn(u.0, "this should be unitless").emit();
 			}
-			Ok(s.1 as f32)
+			Ok(Some(s.1 as f32))
 		} else {
-			Diag::error(p.next_span(), "expected float").emit();
-			Err(Error)
+			Ok(None)
 		}
 	}
 }
 
-impl Val for Pos3 {
-	fn parse(p: &mut Parse) -> Result<Self> {
+impl TryVal for Pos3 {
+	fn desc() -> String { "pos3".to_owned() }
+
+	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
 		if let Some((x, y, z)) = p.tuple()? {
-			Ok(Pos3(x, y, z))
+			Ok(Some(Pos3(x, y, z)))
 		} else {
-			Diag::error(p.next_span(), "expected pos3").emit();
-			Err(Error)
+			Ok(None)
 		}
 	}
 }
 
 struct Null;
-impl Val for Null {
-	fn parse(p: &mut Parse) -> Result<Self> {
+impl TryVal for Null {
+	fn desc() -> String { "'null'".to_owned() }
+
+	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
 		if let Some(()) = p.term("null")? {
-			Ok(Null)
+			Ok(Some(Null))
 		} else {
-			Diag::error(p.next_span(), "expected 'null'").emit();
-			Err(Error)
+			Ok(None)
 		}
 	}
 }
 
-impl Val for Pos2 {
-	fn parse(p: &mut Parse) -> Result<Self> {
+impl TryVal for Pos2 {
+	fn desc() -> String { "pos2".to_owned() }
+
+	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
 		if let Some((x, Null, z)) = p.tuple()? {
-			Ok(Pos2(x, z))
+			Ok(Some(Pos2(x, z)))
 		} else {
-			Diag::error(p.next_span(), "expected pos2").emit();
-			Err(Error)
+			Ok(None)
 		}
 	}
 }
 
-impl Val for FuncRef {
-	fn parse(p: &mut Parse) -> Result<Self> {
+impl TryVal for FuncRef {
+	fn desc() -> String { "'fn'".to_owned() }
+
+	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
 		if let Some((a, b)) = p.term("fn")? {
-			Ok(FuncRef(a, b))
+			Ok(Some(FuncRef(a, b)))
 		} else {
-			Diag::error(p.next_span(), "expected 'fn'").emit();
-			Err(Error)
+			Ok(None)
 		}
 	}
 }
 
-impl Val for CharAttr {
-	fn parse(p: &mut Parse) -> Result<Self> {
+impl TryVal for CharAttr {
+	fn desc() -> String { "'char_attr'".to_owned() }
+
+	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
 		if let Some((a, b)) = p.term("char_attr")? {
-			Ok(CharAttr(a, b))
+			Ok(Some(CharAttr(a, b)))
 		} else {
-			Diag::error(p.next_span(), "expected 'char_attr'").emit();
-			Err(Error)
+			Ok(None)
 		}
 	}
 }
 
-impl Val for FileId {
-	fn parse(p: &mut Parse) -> Result<Self> {
+impl TryVal for FileId {
+	fn desc() -> String { "string, 'null', 'file'".to_owned() }
+
+	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
 		if let Some(s) = p.next_if(f!(Token::String(s) => s)) {
-			Ok(FileId(p.context.lookup.index(s).unwrap_or_else(|| {
+			Ok(Some(FileId(p.context.lookup.index(s).unwrap_or_else(|| {
 				Diag::error(p.prev_span(), "could not resolve file id").emit();
 				0x00000000
-			})))
+			}))))
 		} else if let Some(()) = p.term("null")? {
-			Ok(FileId(0))
+			Ok(Some(FileId(0)))
 		} else if let Some((s,)) = p.term("file")? {
-			Ok(FileId(s))
+			Ok(Some(FileId(s)))
 		} else {
-			Diag::error(p.next_span(), "expected string, 'null', or 'file'").emit();
-			Err(Error)
+			Ok(None)
 		}
 	}
 }
 
-impl Val for Emote {
-	fn parse(p: &mut Parse) -> Result<Self> {
+impl TryVal for Emote {
+	fn desc() -> String { "'emote'".to_owned() }
+
+	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
 		if let Some((a, b, c)) = p.term("emote")? {
-			Ok(Emote(a, b, c))
+			Ok(Some(Emote(a, b, c)))
 		} else {
-			Diag::error(p.next_span(), "expected 'emote'").emit();
-			Err(Error)
+			Ok(None)
 		}
 	}
 }
 
-impl Val for CharId {
-	fn parse(p: &mut Parse) -> Result<Self> {
+impl TryVal for CharId {
+	fn desc() -> String { "'self', 'null', 'name', 'char', 'field_party', 'party', 'custom'".to_owned() }
+
+	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
 		let span = p.next_span();
 		if let Some(()) = p.term("self")? {
-			Ok(CharId(254))
+			Ok(Some(CharId(254)))
 		} else if let Some(()) = p.term("null")? {
-			Ok(CharId(255))
+			Ok(Some(CharId(255)))
 		} else if let Some((s,)) = p.term::<(u16,)>("name")? {
-			Ok(CharId(s + 257))
+			Ok(Some(CharId(s + 257)))
 		} else if let Some((s,)) = p.term::<(u16,)>("char")? {
-			Ok(CharId(s + if p.context.game.base() == BaseGame::Tc { 16 } else { 8 }))
+			Ok(Some(CharId(s + if p.context.game.base() == BaseGame::Tc { 16 } else { 8 })))
 		} else if let Some((s,)) = p.term::<(u16,)>("field_party")? {
-			Ok(CharId(s))
+			Ok(Some(CharId(s)))
 		} else if let Some((s,)) = p.term::<(u16,)>("party")? {
-			Ok(CharId(s + if p.context.game.base() == BaseGame::Sc { 246 } else { 238 }))
+			Ok(Some(CharId(s + if p.context.game.base() == BaseGame::Sc { 246 } else { 238 })))
 		} else if let Some((s,)) = p.term::<(u16,)>("custom")? {
-			if p.context.game.base() == BaseGame::Ao {
-				Ok(CharId(s + 244))
-			} else {
+			if p.context.game.base() != BaseGame::Ao {
 				Diag::error(span, "'custom' is only supported on Azure").emit();
-				Err(Error)
 			}
+			Ok(Some(CharId(s + 244)))
 		} else {
-			Diag::error(span, "expected 'self', 'null', 'name', 'char', 'field_party', 'party', or 'custom'").emit();
-			Err(Error)
+			Ok(None)
 		}
 	}
 }
 
 macro newtype($T:ident, $s:literal) {
-	impl Val for $T {
-		fn parse(p: &mut Parse) -> Result<Self> {
+	impl TryVal for $T {
+		fn desc() -> String { format!("'{}'", $s) }
+
+		fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
 			if let Some((v,)) = p.term($s)? {
-				Ok(Self(v))
+				Ok(Some(Self(v)))
 			} else {
-				Diag::error(p.next_span(), format_args!("expected '{}'", $s)).emit();
-				Err(Error)
+				Ok(None)
 			}
 		}
 	}

@@ -132,24 +132,15 @@ fn parse_tree(p: &mut Parse, can_break: bool, can_continue: bool) -> Vec<TreeIns
 fn parse_insn(p: &mut Parse) -> Insn {
 	let _: Result<()> = try {
 		if let Some(i) = try_parse_insn(p)? {
-			validate_insn(p, &i);
 			return i
 		}
 		if let Some(i) = try_parse_assign(p)? {
-			validate_insn(p, &i);
 			return i
 		}
 		Diag::error(p.next_span(), "unknown instruction").emit();
 	};
 	p.pos = p.tokens.len();
 	Insn::Return()
-}
-
-fn validate_insn(p: &Parse, i: &Insn) {
-	if let Err(e) = Insn::validate(p.context.game, i) {
-		let span = p.tokens.first().map_or(p.eol, |a| a.0);
-		Diag::error(span, format!("invalid instruction: {}", e)).emit();
-	}
 }
 
 fn try_parse_insn(p: &mut Parse) -> Result<Option<Insn>> {
@@ -173,7 +164,10 @@ fn try_parse_insn(p: &mut Parse) -> Result<Option<Insn>> {
 			return Err(Error)
 		},
 		($ident:ident $(($_n:ident $ty:ty))*) => {
-			return Ok(Some(Insn::$ident($(<$ty>::parse(p)?),*)))
+			let s = p.prev_span();
+			let i = Insn::$ident($(<$ty>::parse(p)?),*);
+			validate_insn(p, s, &i);
+			return Ok(Some(i))
 		}
 	}
 	themelios::scena::code::introspect!(run);
@@ -185,9 +179,11 @@ fn try_parse_assign(p: &mut Parse) -> Result<Option<Insn>> {
 			$(run!($ident $(($_n $($ty)*))*);)*
 		},
 		($ident:ident ($v1:ident $t:ty) ($v2:ident Expr)) => {
-			if let Some(a) = <$t>::try_parse(p)? {
+			if let Some(S(s, a)) = <S<$t>>::try_parse(p)? {
 				let e = parse_assignment_expr(p);
-				return Ok(Some(Insn::$ident(a, e)));
+				let i = Insn::$ident(a, e);
+				validate_insn(p, s, &i);
+				return Ok(Some(i));
 			}
 		},
 		($ident:ident $($t:tt)*) => {}
@@ -195,6 +191,12 @@ fn try_parse_assign(p: &mut Parse) -> Result<Option<Insn>> {
 	themelios::scena::code::introspect!(run);
 
 	Ok(None)
+}
+
+fn validate_insn(p: &Parse, s: Span, i: &Insn) {
+	if let Err(e) = Insn::validate(p.context.game, i) {
+		Diag::error(s, format!("invalid instruction: {}", e)).emit();
+	}
 }
 
 fn parse_expr(p: &mut Parse) -> Expr {
@@ -245,7 +247,6 @@ fn parse_atom(p: &mut Parse) -> Result<Expr> {
 		} else if p.term::<()>("random")?.is_some() {
 			Expr::Rand
 		} else if let Some(i) = try_parse_insn(p)? {
-			validate_insn(p, &i);
 			Expr::Insn(Box::new(i))
 		} else {
 			Diag::error(p.next_span(), "invalid expression").emit();

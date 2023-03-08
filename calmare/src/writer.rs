@@ -1,4 +1,4 @@
-use std::io::{Write, Result};
+use std::io::Result;
 
 use themelios::types::Game;
 use themelios_archive::lookup::Lookup;
@@ -12,28 +12,32 @@ enum Space {
 
 pub struct Context<'a> {
 	pub game: Game,
-	pub decompile: bool, //  but then I'd have to reexport all the writing functions and that's a pain
+	pub decompile: bool,
 	indent: usize,
 	space: Space,
 	pub lookup: &'a dyn Lookup,
-	out: Box<dyn Write + 'a>,
+	out: String,
 }
 
 impl<'a> Context<'a> {
-	pub fn new(game: Game, lookup: Option<&'a dyn Lookup>, out: impl Write + 'a) -> Self {
+	pub fn new(game: Game, lookup: Option<&'a dyn Lookup>) -> Self {
 		Self {
 			game,
 			decompile: true,
 			indent: 0,
 			space: Space::None,
 			lookup: lookup.unwrap_or_else(|| crate::util::default_lookup(game)),
-			out: Box::new(out),
+			out: String::new(),
 		}
 	}
 
 	pub fn flat(mut self) -> Self {
 		self.decompile = false;
 		self
+	}
+
+	pub fn finish(self) -> String {
+		self.out
 	}
 }
 
@@ -42,11 +46,11 @@ impl<'a> Context<'a> {
 		match self.space {
 			Space::None => {}
 			Space::Space => {
-				write!(&mut self.out, " ")?;
+				self.out.push(' ');
 			}
 			Space::Newline => {
 				for _ in 0..self.indent {
-					write!(&mut self.out, "\t")?;
+					self.out.push('\t');
 				}
 			}
 		}
@@ -67,32 +71,33 @@ impl<'a> Context<'a> {
 
 	pub fn kw(&mut self, arg: &str) -> Result<&mut Self> {
 		self.put_space()?;
-		write!(&mut self.out, "{arg}")?;
+		self.out.push_str(arg);
 		self.space()?;
 		Ok(self)
 	}
 
 	pub fn pre(&mut self, arg: &str) -> Result<&mut Self> {
 		self.put_space()?;
-		write!(&mut self.out, "{arg}")?;
+		self.out.push_str(arg);
 		Ok(self)
 	}
 
 	pub fn suf(&mut self, arg: &str) -> Result<&mut Self> {
-		write!(&mut self.out, "{arg}")?;
+		self.out.push_str(arg);
 		self.space()?;
 		Ok(self)
 	}
 
 	pub fn line(&mut self) -> Result<&mut Self> {
-		writeln!(&mut self.out)?;
+		self.out.push('\n');
 		self.space = Space::Newline;
 		Ok(self)
 	}
 
 	pub fn write_fmt(&mut self, args: std::fmt::Arguments<'_>) -> Result<()> {
 		self.put_space()?;
-		self.out.write_fmt(args)
+		std::fmt::Write::write_fmt(&mut self.out, args).unwrap();
+		Ok(())
 	}
 
 	pub fn indent<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {

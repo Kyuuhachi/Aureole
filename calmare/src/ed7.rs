@@ -5,7 +5,7 @@ use themelios::types::BattleId;
 use crate::writer::Context;
 use crate::common::{self, Result, ContextExt};
 
-pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
+pub fn write(f: &mut Context, scena: &ed7::Scena) -> Result<()> {
 	let ed7::Scena {
 		name1,
 		name2,
@@ -303,7 +303,7 @@ pub fn write(mut f: Context, scena: &ed7::Scena) -> Result<()> {
 		if i != 0 {
 			f.line()?;
 		}
-		common::func(&mut f, i, func)?;
+		common::func(f, i, func)?;
 	}
 
 	Ok(())

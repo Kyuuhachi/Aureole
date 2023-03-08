@@ -499,8 +499,8 @@ fn expr(f: &mut Context, e: &Expr) -> Result<()> {
 					stack.push(E::Un(*op, Box::new(a)));
 				}
 				code::OpKind::Binary => {
-					let a = stack.pop().unwrap_or_default();
 					let b = stack.pop().unwrap_or_default();
+					let a = stack.pop().unwrap_or_default();
 					stack.push(E::Bin(*op, Box::new(a), Box::new(b)));
 				}
 				code::OpKind::Assign => {

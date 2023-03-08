@@ -112,7 +112,6 @@ version = "0.1.0"
 dependencies = [
  "codespan-reporting",
  "extend",
- "strict_result",
  "themelios",
  "themelios-archive",
  "themelios-archive-prebuilt",

@@ -1,5 +1,3 @@
-use std::io::Result;
-
 use themelios::types::Game;
 use themelios_archive::lookup::Lookup;
 
@@ -42,7 +40,7 @@ impl<'a> Context<'a> {
 }
 
 impl<'a> Context<'a> {
-	fn put_space(&mut self) -> Result<()> {
+	fn put_space(&mut self) {
 		match self.space {
 			Space::None => {}
 			Space::Space => {
@@ -55,49 +53,46 @@ impl<'a> Context<'a> {
 			}
 		}
 		self.space = Space::None;
-		Ok(())
 	}
 
-	pub fn space(&mut self) -> Result<&mut Self> {
-		// Cannot fail, but let's Result it for consistency.
+	pub fn space(&mut self) -> &mut Self {
 		self.space = Space::Space;
-		Ok(self)
+		self
 	}
 
-	pub fn no_space(&mut self) -> Result<&mut Self> {
+	pub fn no_space(&mut self) -> &mut Self {
 		self.space = Space::None;
-		Ok(self)
+		self
 	}
 
-	pub fn kw(&mut self, arg: &str) -> Result<&mut Self> {
-		self.put_space()?;
+	pub fn kw(&mut self, arg: &str) -> &mut Self {
+		self.put_space();
 		self.out.push_str(arg);
-		self.space()?;
-		Ok(self)
+		self.space();
+		self
 	}
 
-	pub fn pre(&mut self, arg: &str) -> Result<&mut Self> {
-		self.put_space()?;
+	pub fn pre(&mut self, arg: &str) -> &mut Self {
+		self.put_space();
 		self.out.push_str(arg);
-		Ok(self)
+		self
 	}
 
-	pub fn suf(&mut self, arg: &str) -> Result<&mut Self> {
+	pub fn suf(&mut self, arg: &str) -> &mut Self {
 		self.out.push_str(arg);
-		self.space()?;
-		Ok(self)
+		self.space();
+		self
 	}
 
-	pub fn line(&mut self) -> Result<&mut Self> {
+	pub fn line(&mut self) -> &mut Self {
 		self.out.push('\n');
 		self.space = Space::Newline;
-		Ok(self)
+		self
 	}
 
-	pub fn write_fmt(&mut self, args: std::fmt::Arguments<'_>) -> Result<()> {
-		self.put_space()?;
+	pub fn write_fmt(&mut self, args: std::fmt::Arguments<'_>) {
+		self.put_space();
 		std::fmt::Write::write_fmt(&mut self.out, args).unwrap();
-		Ok(())
 	}
 
 	pub fn indent<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {

@@ -3,28 +3,25 @@ use themelios::scena::code::{Expr, ExprTerm, ExprOp, FlatInsn, Label, Insn, Byte
 use themelios::scena::code::decompile::{decompile, TreeInsn};
 use themelios::scena::ed7::{SepithId, AtRollId, PlacementId};
 use themelios::text::{Text, TextSegment};
-use strict_result::Strict;
 use themelios::types::*;
 use crate::writer::Context;
 
-pub type Result<T, E = std::io::Error> = std::result::Result<T, E>;
-
 #[extend::ext(name = ContextExt)]
 pub(crate) impl Context<'_> {
-	fn val<I: Val>(&mut self, arg: &I) -> Result<&mut Self> {
-		arg.write(self)?;
-		self.space()?;
-		Ok(self)
+	fn val<I: Val>(&mut self, arg: &I) -> &mut Self {
+		arg.write(self);
+		self.space();
+		self
 	}
 
-	fn expr(&mut self, arg: &Expr) -> Result<&mut Self> {
-		expr(self, arg)?;
-		self.space()?;
-		Ok(self)
+	fn expr(&mut self, arg: &Expr) -> &mut Self {
+		expr(self, arg);
+		self.space();
+		self
 	}
 }
 
-pub fn func(f: &mut Context, n: usize, func: &Bytecode) -> Result<()> {
+pub fn func(f: &mut Context, n: usize, func: &Bytecode) {
 	let result = if f.decompile {
 		decompile(func).map_err(Some)
 	} else {
@@ -32,29 +29,28 @@ pub fn func(f: &mut Context, n: usize, func: &Bytecode) -> Result<()> {
 	};
 	match result {
 		Ok(result) => {
-			write!(f, "fn[{n}]")?;
-			f.suf(":")?
-				.line()?;
-			f.indent(|f| tree_func(f, &result))?;
+			write!(f, "fn[{n}]");
+			f.suf(":")
+				.line();
+			f.indent(|f| tree_func(f, &result));
 		}
 		Err(err) => {
-			write!(f, "fn[{n}]")?;
-			f.kw("flat")?
-				.suf(":")?;
+			write!(f, "fn[{n}]");
+			f.kw("flat")
+				.suf(":");
 			if let Some(err) = err {
-				write!(f, " // {err}")?;
+				write!(f, " // {err}");
 			}
-			f.line()?;
-			f.indent(|f| flat_func(f, func))?;
+			f.line();
+			f.indent(|f| flat_func(f, func));
 		}
 	}
-	Ok(())
 }
 
-pub fn flat_func(f: &mut Context, func: &[FlatInsn]) -> Result<()> {
+pub fn flat_func(f: &mut Context, func: &[FlatInsn]) {
 	#[extend::ext]
 	impl Context<'_> {
-		fn label(&mut self, l: &Label) -> Result<&mut Self> {
+		fn label(&mut self, l: &Label) -> &mut Self {
 			self.kw(&format!("L{}", l.0))
 		}
 	}
@@ -62,31 +58,30 @@ pub fn flat_func(f: &mut Context, func: &[FlatInsn]) -> Result<()> {
 	for i in func {
 		match i {
 			FlatInsn::Unless(e, l) => {
-				f.kw("Unless")?.expr(e)?.label(l)?.line()?;
+				f.kw("Unless").expr(e).label(l).line();
 			},
 			FlatInsn::Goto(l) => {
-				f.kw("Goto")?.label(l)?.line()?;
+				f.kw("Goto").label(l).line();
 			},
 			FlatInsn::Switch(e, cs, l) => {
-				f.kw("Switch")?.expr(e)?.suf("{")?;
+				f.kw("Switch").expr(e).suf("{");
 				for (v, l) in cs {
-					f.val(v)?.suf(":")?.label(l)?.suf(",")?;
+					f.val(v).suf(":").label(l).suf(",");
 				}
-				f.kw("default")?.suf(":")?.label(l)?;
-				f.pre("}")?.line()?;
+				f.kw("default").suf(":").label(l);
+				f.pre("}").line();
 			},
 			FlatInsn::Insn(i) => {
-				insn(f, i, true)?;
+				insn(f, i, true);
 			},
 			FlatInsn::Label(l) => {
-				f.pre("@")?.label(l)?.line()?;
+				f.pre("@").label(l).line();
 			},
 		}
 	}
-	Ok(())
 }
 
-pub fn tree_func(f: &mut Context, func: &[TreeInsn]) -> Result<()> {
+pub fn tree_func(f: &mut Context, func: &[TreeInsn]) {
 	for i in func {
 		match i {
 			TreeInsn::If(cs) => {
@@ -94,59 +89,57 @@ pub fn tree_func(f: &mut Context, func: &[TreeInsn]) -> Result<()> {
 				for (e, body) in cs {
 					match (first, e) {
 						(true, Some(e)) => {
-							f.kw("if")?.expr(e)?;
+							f.kw("if").expr(e);
 						},
 						(false, Some(e)) => {
-							f.kw("elif")?.expr(e)?;
+							f.kw("elif").expr(e);
 						},
 						(false, None) => {
-							f.kw("else")?;
+							f.kw("else");
 						},
 						(true, None) => panic!(),
 					}
 					first = false;
-					f.suf(":")?.line()?;
-					f.indent(|f| tree_func(f, body))?;
+					f.suf(":").line();
+					f.indent(|f| tree_func(f, body));
 				}
 			},
 			TreeInsn::Switch(e, cs) => {
-				f.kw("switch")?.expr(e)?.suf(":")?.line()?;
+				f.kw("switch").expr(e).suf(":").line();
 				f.indent(|f| {
 					for (v, body) in cs {
 						match v {
 							Some(v) => {
-								f.kw("case")?;
-								f.val(v)?;
+								f.kw("case");
+								f.val(v);
 							}
 							None => {
-								f.kw("default")?;
+								f.kw("default");
 							}
 						};
-						f.suf(":")?.line()?;
-						f.indent(|f| tree_func(f, body))?;
+						f.suf(":").line();
+						f.indent(|f| tree_func(f, body));
 					}
-					Ok(())
-				}).strict()?;
+				});
 			},
 			TreeInsn::While(e, body) => {
-				f.kw("while")?.expr(e)?.suf(":")?.line()?;
-				f.indent(|f| tree_func(f, body))?;
+				f.kw("while").expr(e).suf(":").line();
+				f.indent(|f| tree_func(f, body));
 			},
 			TreeInsn::Break => {
-				f.kw("break")?.line()?;
+				f.kw("break").line();
 			},
 			TreeInsn::Continue => {
-				f.kw("continue")?.line()?;
+				f.kw("continue").line();
 			},
 			TreeInsn::Insn(i) => {
-				insn(f, i, true)?;
+				insn(f, i, true);
 			},
 		}
 	}
-	Ok(())
 }
 
-fn insn(f: &mut Context, i: &Insn, mut line: bool) -> Result<()> {
+fn insn(f: &mut Context, i: &Insn, mut line: bool) {
 	macro run([$(($ident:ident $(($_n:ident $($ty:tt)*))*))*]) {
 		match i {
 			$(Insn::$ident($($_n),*) => {
@@ -158,10 +151,10 @@ fn insn(f: &mut Context, i: &Insn, mut line: bool) -> Result<()> {
 	macro insn {
 		($ident:ident ($v1:ident $($ty:tt)*) ($v2:ident Expr)) => {
 			op!($v1 $($ty)*);
-			f.expr($v2)?;
+			f.expr($v2);
 		},
 		($ident:ident $(($_n:ident $($ty:tt)*))*) => {
-			f.kw(stringify!($ident))?;
+			f.kw(stringify!($ident));
 			$(op!($_n $($ty)*);)*
 		}
 	}
@@ -169,57 +162,54 @@ fn insn(f: &mut Context, i: &Insn, mut line: bool) -> Result<()> {
 	macro op {
 		($_n:ident Vec<TString>) => {
 			if line {
-				f.line()?.indent(|f| {
+				f.line().indent(|f| {
 					for (i, line) in $_n.iter().enumerate() {
-						f.val(line)?;
-						write!(f, "// {i}")?;
-						f.line()?;
+						f.val(line);
+						write!(f, "// {i}");
+						f.line();
 					}
-					Ok(())
-				}).strict()?;
+				});
 				line = false;
 			} else {
-				f.val($_n)?;
+				f.val($_n);
 			}
 		},
 		($_n:ident Vec<Insn>) => {
-			f.suf(":")?.line()?.indent(|f| {
+			f.suf(":").line().indent(|f| {
 				for i in $_n {
-					insn(f, i, true)?;
+					insn(f, i, true);
 				}
-				Ok(())
-			}).strict()?;
+			});
 			line = false;
 		},
 		($_n:ident $($ty:tt)*) => {
-			f.val($_n)?;
+			f.val($_n);
 		}
 	}
 
 	match i {
 		Insn::VisSet(v, p@0..=2, a,b,c,d) => {
-			f.kw("VisSet")?.val(v)?.val(p)?.val(a)?.val(b)?.val(&Time(*c as u32))?.val(d)?;
+			f.kw("VisSet").val(v).val(p).val(a).val(b).val(&Time(*c as u32)).val(d);
 		}
 		Insn::VisSet(v, p@3, a,b,c,d) => {
-			f.kw("VisSet")?.val(v)?.val(p)?.val(&Color(*a as u32))?.val(&Time(*b as u32))?.val(c)?.val(d)?;
+			f.kw("VisSet").val(v).val(p).val(&Color(*a as u32)).val(&Time(*b as u32)).val(c).val(d);
 		}
 		_ => {
 			themelios::scena::code::introspect!(run);
 		}
 	}
 	if line {
-		f.line()?;
+		f.line();
 	}
-	Ok(())
 }
 
 pub(crate) trait Val {
-	fn write(&self, f: &mut Context) -> Result<()>;
+	fn write(&self, f: &mut Context);
 }
 
 macro prim_arg($t:ty, $fmt:literal) {
 	impl Val for $t {
-		fn write(&self, f: &mut Context) -> Result<()> {
+		fn write(&self, f: &mut Context) {
 			write!(f, $fmt, self)
 		}
 	}
@@ -227,14 +217,14 @@ macro prim_arg($t:ty, $fmt:literal) {
 
 macro nt_arg($t:ty, $fmt:literal) {
 	impl Val for $t {
-		fn write(&self, f: &mut Context) -> Result<()> {
+		fn write(&self, f: &mut Context) {
 			write!(f, $fmt, self.0)
 		}
 	}
 }
 
 impl<T: Val> Val for Option<T> {
-	fn write(&self, f: &mut Context) -> Result<()> {
+	fn write(&self, f: &mut Context) {
 		if let Some(a) = self {
 			a.write(f)
 		} else {
@@ -244,22 +234,21 @@ impl<T: Val> Val for Option<T> {
 }
 
 impl<T: Val> Val for [T] {
-	fn write(&self, f: &mut Context) -> Result<()> {
+	fn write(&self, f: &mut Context) {
 		for t in self {
-			f.val(t)?;
+			f.val(t);
 		}
-		Ok(())
 	}
 }
 
 impl<T: Val> Val for Vec<T> {
-	fn write(&self, f: &mut Context) -> Result<()> {
+	fn write(&self, f: &mut Context) {
 		self.as_slice().write(f)
 	}
 }
 
 impl<T: Val, const K: usize> Val for [T; K] {
-	fn write(&self, f: &mut Context) -> Result<()> {
+	fn write(&self, f: &mut Context) {
 		self.as_slice().write(f)
 	}
 }
@@ -296,7 +285,7 @@ nt_arg!(Color,          "0x{:08X}");
 nt_arg!(TcMembers,      "0x{:08X}");
 
 impl Val for QuestTask {
-	fn write(&self, f: &mut Context) -> Result<()> {
+	fn write(&self, f: &mut Context) {
 		if f.game.is_ed7() {
 			write!(f, "{}", self.0)
 		} else {
@@ -334,7 +323,7 @@ nt_arg!(AtRollId,  "at_roll[{}]");
 nt_arg!(PlacementId,  "placement[{}]");
 
 impl Val for FileId {
-	fn write(&self, f: &mut Context) -> Result<()> {
+	fn write(&self, f: &mut Context) {
 		if self.0 == 0 {
 			write!(f, "null")
 		} else if let Some(name) = f.lookup.name(self.0) {
@@ -346,18 +335,17 @@ impl Val for FileId {
 }
 
 impl Val for CharAttr {
-	fn write(&self, f: &mut Context) -> Result<()> {
-		write!(f, "char_attr[")?;
-		self.0.write(f)?;
-		write!(f, ",")?;
-		self.1.write(f)?;
-		write!(f, "]")?;
-		Ok(())
+	fn write(&self, f: &mut Context) {
+		write!(f, "char_attr[");
+		self.0.write(f);
+		write!(f, ",");
+		self.1.write(f);
+		write!(f, "]");
 	}
 }
 
 impl Val for CharId {
-	fn write(&self, f: &mut Context) -> Result<()> {
+	fn write(&self, f: &mut Context) {
 		let v = self.0;
 		match v {
 			257.. => NameId(v - 257).write(f),
@@ -378,43 +366,42 @@ impl Val for CharId {
 }
 
 impl Val for Emote {
-	fn write(&self, f: &mut Context) -> Result<()> {
-		write!(f, "emote[")?;
-		self.0.write(f)?;
-		write!(f, ",")?;
-		self.1.write(f)?;
-		write!(f, ",")?;
-		self.2.write(f)?;
-		write!(f, "]")?;
-		Ok(())
+	fn write(&self, f: &mut Context) {
+		write!(f, "emote[");
+		self.0.write(f);
+		write!(f, ",");
+		self.1.write(f);
+		write!(f, ",");
+		self.2.write(f);
+		write!(f, "]");
 	}
 }
 
 impl Val for Pos2 {
-	fn write(&self, f: &mut Context) -> Result<()> {
+	fn write(&self, f: &mut Context) {
 		write!(f, "({x}, null, {z})", x=self.0, z=self.1)
 	}
 }
 
 impl Val for Pos3 {
-	fn write(&self, f: &mut Context) -> Result<()> {
+	fn write(&self, f: &mut Context) {
 		write!(f, "({x}, {y}, {z})", x=self.0, y=self.1, z=self.2)
 	}
 }
 
 impl Val for Text {
-	fn write(&self, f: &mut Context) -> Result<()> {
+	fn write(&self, f: &mut Context) {
 		text(f, self)
 	}
 }
 
 impl Val for FuncId {
-	fn write(&self, f: &mut Context) -> Result<()> {
+	fn write(&self, f: &mut Context) {
 		write!(f, "fn[{},{}]", self.0, self.1)
 	}
 }
 
-fn expr(f: &mut Context, e: &Expr) -> Result<()> {
+fn expr(f: &mut Context, e: &Expr) {
 	#[derive(Default)]
 	enum E<'a> {
 		Atom(&'a ExprTerm),
@@ -425,44 +412,43 @@ fn expr(f: &mut Context, e: &Expr) -> Result<()> {
 		Error,
 	}
 
-	fn expr_prio(f: &mut Context, e: E, prio: u8) -> Result<()> {
+	fn expr_prio(f: &mut Context, e: E, prio: u8) {
 		match e {
 			E::Atom(a) => match a {
 				ExprTerm::Op(_)       => unreachable!(),
-				ExprTerm::Const(v)    => { f.val(v)?; }
-				ExprTerm::Insn(i)     => { insn(f, i, false)?; }
-				ExprTerm::Flag(v)     => { f.val(v)?; }
-				ExprTerm::Var(v)      => { f.val(v)?; }
-				ExprTerm::Attr(v)     => { f.val(v)?; }
-				ExprTerm::CharAttr(v) => { f.val(v)?; }
-				ExprTerm::Rand        => { f.kw("random")?; }
-				ExprTerm::Global(v)   => { f.val(v)?; }
+				ExprTerm::Const(v)    => { f.val(v); }
+				ExprTerm::Insn(i)     => { insn(f, i, false); }
+				ExprTerm::Flag(v)     => { f.val(v); }
+				ExprTerm::Var(v)      => { f.val(v); }
+				ExprTerm::Attr(v)     => { f.val(v); }
+				ExprTerm::CharAttr(v) => { f.val(v); }
+				ExprTerm::Rand        => { f.kw("random"); }
+				ExprTerm::Global(v)   => { f.val(v); }
 			},
 			E::Bin(op, a, b) => {
 				let (text, prio2) = op_str(op);
 				if prio2 < prio {
-					f.pre("(")?;
+					f.pre("(");
 				}
-				expr_prio(f, *a, prio2)?;
-				f.kw(text)?;
-				expr_prio(f, *b, prio2+1)?;
+				expr_prio(f, *a, prio2);
+				f.kw(text);
+				expr_prio(f, *b, prio2+1);
 				if prio2 < prio {
-					f.suf(")")?;
+					f.suf(")");
 				}
 			}
 			E::Un(op, a) => {
 				let (text, prio) = op_str(op);
-				f.pre(text)?;
-				expr_prio(f, *a, prio)?;
+				f.pre(text);
+				expr_prio(f, *a, prio);
 			}
 			E::Ass(op, a) => {
 				let (text, prio) = op_str(op);
-				f.kw(text)?;
-				expr_prio(f, *a, prio)?;
+				f.kw(text);
+				expr_prio(f, *a, prio);
 			},
-			E::Error => { write!(f, "(EXPR MISSING)")?; },
+			E::Error => { write!(f, "(EXPR MISSING)"); },
 		}
-		Ok(())
 	}
 
 	fn op_str(op: ExprOp) -> (&'static str, u8) {
@@ -523,25 +509,23 @@ fn expr(f: &mut Context, e: &Expr) -> Result<()> {
 	}
 
 	if stack.is_empty() {
-		write!(f, "(EXPR MISSING)")?;
+		write!(f, "(EXPR MISSING)");
 	} else {
 		for (i, e) in stack.into_iter().enumerate() {
 			if i != 0 {
-				f.kw("¤")?;
+				f.kw("¤");
 			}
-			expr_prio(f, e, 0)?;
+			expr_prio(f, e, 0);
 		}
 	}
-
-	Ok(())
 }
 
-fn text(f: &mut Context, v: &Text) -> Result<()> {
+fn text(f: &mut Context, v: &Text) {
 	let mut it = v.iter();
 	loop {
-		f.kw("{")?.line()?;
+		f.kw("{").line();
 		let cont = f.indent(|f| {
-			Ok(loop {
+			loop {
 				let Some(next) = it.next() else { break false };
 				match next {
 					TextSegment::String(s) => {
@@ -549,41 +533,40 @@ fn text(f: &mut Context, v: &Text) -> Result<()> {
 							.replace('\\', "\\\\")
 							.replace('{', "\\{")
 							.replace('}', "\\}");
-						write!(f, "{s}")?
+						write!(f, "{s}")
 					}
 					TextSegment::Line => {
-						f.line()?;
+						f.line();
 					}
 					TextSegment::Wait => {
-						write!(f, "{{wait}}")?
+						write!(f, "{{wait}}")
 					}
 					TextSegment::Page => {
 						break true
 					}
 					TextSegment::Color(n) => {
-						write!(f, "{{color {n}}}")?;
+						write!(f, "{{color {n}}}");
 					}
 					TextSegment::Line2 => {
-						write!(f, "\\")?;
-						f.line()?;
+						write!(f, "\\");
+						f.line();
 					}
 					TextSegment::Item(n) => {
-						write!(f, "{{item ")?;
-						f.val(n)?.no_space()?;
-						write!(f, "}}")?;
+						write!(f, "{{item ");
+						f.val(n).no_space();
+						write!(f, "}}");
 					}
 					TextSegment::Byte(n) => {
-						write!(f, "{{0x{n:02X}}}")?
+						write!(f, "{{0x{n:02X}}}")
 					}
 				}
-			})
-		}).strict()?;
-		f.line()?.kw("}")?;
+			}
+		});
+		f.line().kw("}");
 		if !cont {
 			break
 		}
 	}
-	Ok(())
 }
 
 pub(crate) fn game(game: Game) -> &'static str {

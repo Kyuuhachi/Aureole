@@ -1,6 +1,6 @@
 use super::*;
 
-use themelios::scena::{ed7::*, code::Bytecode};
+use themelios::scena::{ed7::*, code::Code};
 
 themelios::util::newtype!(CharDefId, u16);
 newtype!(CharDefId, "char");
@@ -55,7 +55,7 @@ struct ScenaBuild {
 	at_rolls: Many<AtRollId, [u8; 16]>,
 	placements: Many<PlacementId, [(u8, u8, Angle); 8]>,
 	battles: Many<BattleId, Battle>,
-	functions: Many<FuncId, Bytecode>,
+	functions: Many<FuncId, Code>,
 }
 
 pub fn parse(lines: &[Line], ctx: &Context) -> Result<Scena> {

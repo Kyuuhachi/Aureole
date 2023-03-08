@@ -5,7 +5,7 @@ use crate::types::*;
 use crate::util::*;
 
 use super::*;
-use super::code::Bytecode;
+use super::code::Code;
 
 newtype!(SepithId, u16);
 newtype!(PlacementId, u16);
@@ -29,7 +29,7 @@ pub struct Scena {
 	pub look_points: Vec<LookPoint>,
 	pub animations: Vec<Animation>,
 	pub entry: Option<Entry>,
-	pub functions: Vec<Bytecode>,
+	pub functions: Vec<Code>,
 
 	/// The first five, if present, are always the same nonsensical values.
 	pub sepith: Vec<[u8; 8]>,

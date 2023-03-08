@@ -1,5 +1,5 @@
 use themelios::scena::*;
-use themelios::scena::code::{Expr, ExprTerm, ExprOp, FlatInsn, Label, Insn, Bytecode};
+use themelios::scena::code::{Expr, ExprTerm, ExprOp, FlatInsn, Label, Insn, Code};
 use themelios::scena::code::decompile::{decompile, TreeInsn};
 use themelios::scena::ed7::{SepithId, AtRollId, PlacementId};
 use themelios::text::{Text, TextSegment};
@@ -21,7 +21,7 @@ pub(crate) impl Context<'_> {
 	}
 }
 
-pub fn func(f: &mut Context, n: usize, func: &Bytecode) {
+pub fn func(f: &mut Context, n: usize, func: &Code) {
 	let result = if f.decompile {
 		decompile(func).map_err(Some)
 	} else {

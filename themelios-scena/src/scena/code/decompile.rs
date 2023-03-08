@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use super::{FlatInsn, Insn, Expr, Label, Bytecode};
+use super::{FlatInsn, Insn, Expr, Label, Code};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TreeInsn {
@@ -50,7 +50,7 @@ impl<'a> Context<'a> {
 	}
 }
 
-pub fn decompile(insns: &Bytecode) -> Result<Vec<TreeInsn>, Error> {
+pub fn decompile(insns: &Code) -> Result<Vec<TreeInsn>, Error> {
 	let ctx = Context::new(&insns.0);
 	block(&ctx, &mut 0, ctx.len(), None, None)
 }
@@ -203,11 +203,11 @@ pub enum CompileError {
 	DuplicateCase { key: Option<u16> },
 }
 
-pub fn recompile(insns: &[TreeInsn]) -> Result<Bytecode, CompileError> {
+pub fn recompile(insns: &[TreeInsn]) -> Result<Code, CompileError> {
 	let mut out = Vec::new();
 	recompile0(insns, &mut out, &mut 0, None, None)?;
 	fixup_labels(&mut out);
-	Ok(Bytecode(out))
+	Ok(Code(out))
 }
 
 fn recompile0(insns: &[TreeInsn], out: &mut Vec<FlatInsn>, count: &mut usize, cont: Option<Label>, brk: Option<Label>) -> Result<(), CompileError> {

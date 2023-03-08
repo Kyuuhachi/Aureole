@@ -26,9 +26,9 @@ impl std::fmt::Debug for Label {
 
 // TODO make this one stricter so it does not permit duplicate labels
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct Bytecode(pub Vec<FlatInsn>);
+pub struct Code(pub Vec<FlatInsn>);
 
-impl std::ops::Deref for Bytecode {
+impl std::ops::Deref for Code {
 	type Target = Vec<FlatInsn>;
 
 	fn deref(&self) -> &Self::Target {
@@ -36,7 +36,7 @@ impl std::ops::Deref for Bytecode {
 	}
 }
 
-impl Bytecode {
+impl Code {
 	pub fn push(&mut self, value: FlatInsn) {
 		self.0.push(value)
 	}
@@ -69,7 +69,7 @@ enum RawOInsn<'a> {
 	Label(HLabelDef),
 }
 
-pub fn read<'a>(f: &mut (impl Read<'a> + Dump), game: Game, end: Option<usize>) -> Result<Bytecode, ReadError> {
+pub fn read<'a>(f: &mut (impl Read<'a> + Dump), game: Game, end: Option<usize>) -> Result<Code, ReadError> {
 	let mut insns = Vec::new();
 	let mut extent = f.pos();
 	loop {
@@ -145,7 +145,7 @@ pub fn read<'a>(f: &mut (impl Read<'a> + Dump), game: Game, end: Option<usize>) 
 		})
 	}
 
-	Ok(Bytecode(insns2))
+	Ok(Code(insns2))
 }
 
 fn read_raw_insn<'a>(f: &mut impl Read<'a>, game: Game) -> Result<RawIInsn, ReadError> {
@@ -190,7 +190,7 @@ fn read_raw_insn<'a>(f: &mut impl Read<'a>, game: Game) -> Result<RawIInsn, Read
 	Ok(insn)
 }
 
-pub fn write(f: &mut impl Write, game: Game, insns: &Bytecode) -> Result<(), WriteError> {
+pub fn write(f: &mut impl Write, game: Game, insns: &Code) -> Result<(), WriteError> {
 	let mut labels = HashMap::new();
 	let mut labeldefs = HashMap::new();
 	let mut label = |k| {

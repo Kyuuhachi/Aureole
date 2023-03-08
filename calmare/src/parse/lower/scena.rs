@@ -1,4 +1,4 @@
-use themelios::scena::code::{Bytecode, Insn, Expr, ExprTerm, ExprOp};
+use themelios::scena::code::{Code, Insn, Expr, ExprTerm, ExprOp};
 use themelios::scena::code::decompile::{recompile, TreeInsn};
 
 use super::*;
@@ -6,7 +6,7 @@ use crate::span::{Spanned as S, Span};
 
 pub mod ed7;
 
-fn parse_func(p: &mut Parse) -> Bytecode {
+fn parse_func(p: &mut Parse) -> Code {
 	let tree = parse_tree(p, false, false);
 	recompile(&tree).map_err(|e| {
 		Diag::error(p.head_span(), "unknown recompile error")

@@ -76,8 +76,7 @@ pub fn flat_func(f: &mut Context, func: &[FlatInsn]) -> Result<()> {
 				f.pre("}")?.line()?;
 			},
 			FlatInsn::Insn(i) => {
-				insn(f, i)?;
-				f.line()?;
+				insn(f, i, true)?;
 			},
 			FlatInsn::Label(l) => {
 				f.pre("@")?.label(l)?.line()?;
@@ -140,44 +139,64 @@ pub fn tree_func(f: &mut Context, func: &[TreeInsn]) -> Result<()> {
 				f.kw("continue")?.line()?;
 			},
 			TreeInsn::Insn(i) => {
-				insn(f, i)?;
-				f.line()?;
+				insn(f, i, true)?;
 			},
 		}
 	}
 	Ok(())
 }
 
-fn insn(f: &mut Context, i: &Insn) -> Result<()> {
-	macro run {
-		([$(($ident:ident $(($_n:ident $($ty:tt)*))*))*]) => {
-			match i {
-				$(Insn::$ident($($_n),*) => {
-					run!($ident $(($_n $($ty)*))*);
-				})*
+fn insn(f: &mut Context, i: &Insn, mut line: bool) -> Result<()> {
+	macro run([$(($ident:ident $(($_n:ident $($ty:tt)*))*))*]) {
+		match i {
+			$(Insn::$ident($($_n),*) => {
+				insn!($ident $(($_n $($ty)*))*);
+			})*
+		}
+	}
+
+	macro insn {
+		($ident:ident ($v1:ident $($ty:tt)*) ($v2:ident Expr)) => {
+			op!($v1 $($ty)*);
+			f.expr($v2)?;
+		},
+		($ident:ident $(($_n:ident $($ty:tt)*))*) => {
+			f.kw(stringify!($ident))?;
+			$(op!($_n $($ty)*);)*
+		}
+	}
+
+	macro op {
+		($_n:ident Vec<TString>) => {
+			if line {
+				f.line()?.indent(|f| {
+					for (i, line) in $_n.iter().enumerate() {
+						f.val(line)?;
+						write!(f, "// {i}")?;
+						f.line()?;
+					}
+					Ok(())
+				}).strict()?;
+				line = false;
+			} else {
+				f.val($_n)?;
 			}
 		},
-		($ident:ident ($v1:ident $_:ty) ($v2:ident Expr)) => {
-			f.val($v1)?.expr($v2)?
+		($_n:ident Vec<Insn>) => {
+			f.suf(":")?.line()?.indent(|f| {
+				for i in $_n {
+					insn(f, i, true)?;
+				}
+				Ok(())
+			}).strict()?;
+			line = false;
 		},
-		($ident:ident $(($_n:ident $ty:ty))*) => {
-			f.kw(stringify!($ident))?
-				$(.val($_n)?)*
+		($_n:ident $($ty:tt)*) => {
+			f.val($_n)?;
 		}
 	}
 
 	match i {
-		Insn::Menu(a, b, c, d, e) => {
-			f.kw("Menu")?.val(a)?.val(b)?.val(c)?.val(d)?;
-			f.indent(|f| {
-				for (i, line) in e.iter().enumerate() {
-					f.line()?;
-					f.val(line)?;
-					write!(f, "// {i}")?;
-				}
-				Ok(())
-			}).strict()?;
-		}
 		Insn::VisSet(v, p@0..=2, a,b,c,d) => {
 			f.kw("VisSet")?.val(v)?.val(p)?.val(a)?.val(b)?.val(&Time(*c as u32))?.val(d)?;
 		}
@@ -187,6 +206,9 @@ fn insn(f: &mut Context, i: &Insn) -> Result<()> {
 		_ => {
 			themelios::scena::code::introspect!(run);
 		}
+	}
+	if line {
+		f.line()?;
 	}
 	Ok(())
 }
@@ -239,19 +261,6 @@ impl<T: Val> Val for Vec<T> {
 impl<T: Val, const K: usize> Val for [T; K] {
 	fn write(&self, f: &mut Context) -> Result<()> {
 		self.as_slice().write(f)
-	}
-}
-
-impl Val for Vec<Insn> {
-	fn write(&self, f: &mut Context) -> Result<()> {
-		f.suf(":")?;
-		f.indent(|f| {
-			for line in self.iter() {
-				f.line()?;
-				insn(f, line)?;
-			}
-			Ok(())
-		})
 	}
 }
 
@@ -421,7 +430,7 @@ fn expr(f: &mut Context, e: &Expr) -> Result<()> {
 			E::Atom(a) => match a {
 				ExprTerm::Op(_)       => unreachable!(),
 				ExprTerm::Const(v)    => { f.val(v)?; }
-				ExprTerm::Insn(i)     => { insn(f, i)?; }
+				ExprTerm::Insn(i)     => { insn(f, i, false)?; }
 				ExprTerm::Flag(v)     => { f.val(v)?; }
 				ExprTerm::Var(v)      => { f.val(v)?; }
 				ExprTerm::Attr(v)     => { f.val(v)?; }

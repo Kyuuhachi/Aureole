@@ -1,4 +1,4 @@
-use themelios::scena::code::{Bytecode, Insn, Expr, ExprBinop, ExprUnop};
+use themelios::scena::code::{Bytecode, Insn, Expr, ExprTerm, ExprOp};
 use themelios::scena::code::decompile::{recompile, TreeInsn};
 
 use super::*;
@@ -200,59 +200,66 @@ fn validate_insn(p: &Parse, s: Span, i: &Insn) {
 }
 
 fn parse_expr(p: &mut Parse) -> Expr {
-	parse_expr0(p, 10).unwrap_or(Expr::Const(0))
+	let mut e = Vec::new();
+	if parse_expr0(p, &mut e, 10).is_err() {
+		p.pos = p.tokens.len();
+	};
+	Expr(e)
 }
 
 fn parse_assignment_expr(p: &mut Parse) -> Expr {
 	let op = parse_assop(p).unwrap_or_else(|| {
 		Diag::error(p.next_span(), "expected assignment operator").emit();
-		ExprUnop::Ass
+		ExprOp::Ass
 	});
-	let e = parse_expr(p);
-	Expr::Unop(op, Box::new(e))
+	let mut e = parse_expr(p);
+	e.0.push(ExprTerm::Op(op));
+	e
 }
 
-fn parse_expr0(p: &mut Parse, prec: usize) -> Result<Expr> {
-	let mut e = parse_atom(p)?;
+fn parse_expr0(p: &mut Parse, e: &mut Vec<ExprTerm>, prec: usize) -> Result<()> {
+	parse_atom(p, e)?;
 	while let Some(op) = parse_binop(p, prec) {
-		let e2 = parse_expr0(p, prec-1)?;
-		e = Expr::Binop(op, Box::new(e), Box::new(e2));
+		parse_expr0(p, e, prec-1)?;
+		e.push(ExprTerm::Op(op));
 	}
-	Ok(e)
+	Ok(())
 }
 
-fn parse_atom(p: &mut Parse) -> Result<Expr> {
-	try {
-		if let Some(d) = test!(p, Token::Paren(d) => d) {
-			Parse::new_inner(&d.tokens, d.close, p.context)
-				.parse_with(|p| parse_expr0(p, 10))?
-		} else if test!(p, Token::Minus) {
-			Expr::Unop(ExprUnop::Neg, Box::new(parse_atom(p)?))
-		} else if test!(p, Token::Excl) {
-			Expr::Unop(ExprUnop::Not, Box::new(parse_atom(p)?))
-		} else if test!(p, Token::Tilde) {
-			Expr::Unop(ExprUnop::Inv, Box::new(parse_atom(p)?))
-		} else if let Some(v) = TryVal::try_parse(p)? {
-			Expr::Const(v)
-		} else if let Some(v) = TryVal::try_parse(p)? {
-			Expr::Flag(v)
-		} else if let Some(v) = TryVal::try_parse(p)? {
-			Expr::Var(v)
-		} else if let Some(v) = TryVal::try_parse(p)? {
-			Expr::Attr(v)
-		} else if let Some(v) = TryVal::try_parse(p)? {
-			Expr::CharAttr(v)
-		} else if let Some(v) = TryVal::try_parse(p)? {
-			Expr::Global(v)
-		} else if p.term::<()>("random")?.is_some() {
-			Expr::Rand
-		} else if let Some(i) = try_parse_insn(p)? {
-			Expr::Insn(Box::new(i))
-		} else {
-			Diag::error(p.next_span(), "invalid expression").emit();
-			return Err(Error)
-		}
+fn parse_atom(p: &mut Parse, e: &mut Vec<ExprTerm>) -> Result<()> {
+	if let Some(d) = test!(p, Token::Paren(d) => d) {
+		Parse::new_inner(&d.tokens, d.close, p.context)
+			.parse_with(|p| parse_expr0(p, e, 10))?
+	} else if test!(p, Token::Minus) {
+		parse_atom(p, e)?;
+		e.push(ExprTerm::Op(ExprOp::Neg));
+	} else if test!(p, Token::Excl) {
+		parse_atom(p, e)?;
+		e.push(ExprTerm::Op(ExprOp::Not));
+	} else if test!(p, Token::Tilde) {
+		parse_atom(p, e)?;
+		e.push(ExprTerm::Op(ExprOp::Inv));
+	} else if let Some(v) = TryVal::try_parse(p)? {
+		e.push(ExprTerm::Const(v))
+	} else if let Some(v) = TryVal::try_parse(p)? {
+		e.push(ExprTerm::Flag(v))
+	} else if let Some(v) = TryVal::try_parse(p)? {
+		e.push(ExprTerm::Var(v))
+	} else if let Some(v) = TryVal::try_parse(p)? {
+		e.push(ExprTerm::Attr(v))
+	} else if let Some(v) = TryVal::try_parse(p)? {
+		e.push(ExprTerm::CharAttr(v))
+	} else if let Some(v) = TryVal::try_parse(p)? {
+		e.push(ExprTerm::Global(v))
+	} else if p.term::<()>("random")?.is_some() {
+		e.push(ExprTerm::Rand)
+	} else if let Some(i) = try_parse_insn(p)? {
+		e.push(ExprTerm::Insn(Box::new(i)))
+	} else {
+		Diag::error(p.next_span(), "invalid expression").emit();
+		return Err(Error)
 	}
+	Ok(())
 }
 
 macro op($p:ident; $t1:ident $($t:ident)* => $op:expr) {
@@ -263,44 +270,44 @@ macro op($p:ident; $t1:ident $($t:ident)* => $op:expr) {
 	$p.pos = pos;
 }
 
-fn parse_assop(p: &mut Parse) -> Option<ExprUnop> {
-	op!(p;         Eq => ExprUnop::Ass);
-	op!(p; Plus    Eq => ExprUnop::AddAss);
-	op!(p; Minus   Eq => ExprUnop::SubAss);
-	op!(p; Star    Eq => ExprUnop::MulAss);
-	op!(p; Slash   Eq => ExprUnop::DivAss);
-	op!(p; Percent Eq => ExprUnop::ModAss);
-	op!(p; Pipe    Eq => ExprUnop::OrAss);
-	op!(p; Amp     Eq => ExprUnop::AndAss);
-	op!(p; Caret   Eq => ExprUnop::XorAss);
+fn parse_assop(p: &mut Parse) -> Option<ExprOp> {
+	op!(p;         Eq => ExprOp::Ass);
+	op!(p; Plus    Eq => ExprOp::AddAss);
+	op!(p; Minus   Eq => ExprOp::SubAss);
+	op!(p; Star    Eq => ExprOp::MulAss);
+	op!(p; Slash   Eq => ExprOp::DivAss);
+	op!(p; Percent Eq => ExprOp::ModAss);
+	op!(p; Pipe    Eq => ExprOp::OrAss);
+	op!(p; Amp     Eq => ExprOp::AndAss);
+	op!(p; Caret   Eq => ExprOp::XorAss);
 
 	None
 }
 
-fn parse_binop(p: &mut Parse, prec: usize) -> Option<ExprBinop> {
+fn parse_binop(p: &mut Parse, prec: usize) -> Option<ExprOp> {
 	macro prio($prio:literal, $p:stmt) {
 		if prec >= $prio {
 			$p
 		}
 	}
-	prio!(4, op!(p; Eq Eq   => ExprBinop::Eq));
-	prio!(4, op!(p; Excl Eq => ExprBinop::Ne));
-	prio!(4, op!(p; Lt Eq   => ExprBinop::Le));
-	prio!(4, op!(p; Lt      => ExprBinop::Lt));
-	prio!(4, op!(p; Gt Eq   => ExprBinop::Ge));
-	prio!(4, op!(p; Gt      => ExprBinop::Gt));
+	prio!(4, op!(p; Eq Eq   => ExprOp::Eq));
+	prio!(4, op!(p; Excl Eq => ExprOp::Ne));
+	prio!(4, op!(p; Lt Eq   => ExprOp::Le));
+	prio!(4, op!(p; Lt      => ExprOp::Lt));
+	prio!(4, op!(p; Gt Eq   => ExprOp::Ge));
+	prio!(4, op!(p; Gt      => ExprOp::Gt));
 
-	prio!(1, op!(p; Pipe Pipe => ExprBinop::Or));
-	prio!(3, op!(p; Amp  Amp  => ExprBinop::BoolAnd));
+	prio!(1, op!(p; Pipe Pipe => ExprOp::Or));
+	prio!(3, op!(p; Amp  Amp  => ExprOp::BoolAnd));
 
-	prio!(5, op!(p; Plus    => ExprBinop::Add));
-	prio!(5, op!(p; Minus   => ExprBinop::Sub));
-	prio!(6, op!(p; Star    => ExprBinop::Mul));
-	prio!(6, op!(p; Slash   => ExprBinop::Div));
-	prio!(6, op!(p; Percent => ExprBinop::Mod));
-	prio!(1, op!(p; Pipe    => ExprBinop::Or));
-	prio!(3, op!(p; Amp     => ExprBinop::And));
-	prio!(2, op!(p; Caret   => ExprBinop::Xor));
+	prio!(5, op!(p; Plus    => ExprOp::Add));
+	prio!(5, op!(p; Minus   => ExprOp::Sub));
+	prio!(6, op!(p; Star    => ExprOp::Mul));
+	prio!(6, op!(p; Slash   => ExprOp::Div));
+	prio!(6, op!(p; Percent => ExprOp::Mod));
+	prio!(1, op!(p; Pipe    => ExprOp::Or));
+	prio!(3, op!(p; Amp     => ExprOp::And));
+	prio!(2, op!(p; Caret   => ExprOp::Xor));
 
 	None
 }

@@ -277,124 +277,116 @@ fn write_raw_insn(f: &mut impl Write, game: Game, insn: RawOInsn) -> Result<(), 
 	Ok(())
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(num_enum::TryFromPrimitive, num_enum::IntoPrimitive)]
-#[repr(u8)]
-pub enum ExprBinop {
-	Eq = 0x02,
-	Ne = 0x03,
-	Lt = 0x04,
-	Gt = 0x05,
-	Le = 0x06,
-	Ge = 0x07,
-
-	BoolAnd = 0x09,
-	And = 0x0A,
-	Or = 0x0B,
-
-	Add = 0x0C,
-	Sub = 0x0D,
-	Xor = 0x0F,
-	Mul = 0x10,
-	Div = 0x11,
-	Mod = 0x12,
+pub enum OpKind {
+	Unary,
+	Binary, // includes comparisons
+	Assign
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[derive(num_enum::TryFromPrimitive, num_enum::IntoPrimitive)]
 #[repr(u8)]
-pub enum ExprUnop {
-	Not = 0x08,
-	Neg = 0x0E,
-	Ass = 0x13,
-	MulAss = 0x14,
-	DivAss = 0x15,
-	ModAss = 0x16,
-	AddAss = 0x17,
-	SubAss = 0x18,
-	AndAss = 0x19,
-	XorAss = 0x1A,
-	OrAss = 0x1B,
-	Inv = 0x1D,
+pub enum ExprOp {
+	Eq      = 0x02, // ==
+	Ne      = 0x03, // !=
+	Lt      = 0x04, // <
+	Gt      = 0x05, // >
+	Le      = 0x06, // <=
+	Ge      = 0x07, // >=
+	Not     = 0x08, // !
+	BoolAnd = 0x09, // &&
+	And     = 0x0A, // &
+	Or      = 0x0B, // | and ||
+	Add     = 0x0C, // +
+	Sub     = 0x0D, // -
+	Neg     = 0x0E, // -
+	Xor     = 0x0F, // ^
+	Mul     = 0x10, // *
+	Div     = 0x11, // /
+	Mod     = 0x12, // %
+	Ass     = 0x13, // =
+	MulAss  = 0x14, // *=
+	DivAss  = 0x15, // /=
+	ModAss  = 0x16, // %=
+	AddAss  = 0x17, // +=
+	SubAss  = 0x18, // -=
+	AndAss  = 0x19, // &=
+	XorAss  = 0x1A, // ^=
+	OrAss   = 0x1B, // |=
+	Inv     = 0x1D, // ~
+}
+
+impl ExprOp {
+	pub fn kind(self) -> OpKind {
+		use ExprOp::*;
+		match self {
+			Not|Neg|Inv => OpKind::Unary,
+			Eq|Ne|Lt|Le|Gt|Ge => OpKind::Binary,
+			BoolAnd|And|Or|Add|Sub|Xor|Mul|Div|Mod => OpKind::Binary,
+			Ass|MulAss|DivAss|ModAss|AddAss|SubAss|AndAss|XorAss|OrAss => OpKind::Assign,
+		}
+	}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Expr {
-	Const(u32),
-	Binop(ExprBinop, Box<Expr>, Box<Expr>),
-	Unop(ExprUnop, Box<Expr>),
-	Insn(Box<Insn>),
-	Flag(Flag),
-	Var(Var),
-	Attr(Attr),
-	CharAttr(CharAttr),
-	/// Returns a 15-bit pseudorandom number
-	Rand,
-	/// Persistent integer variable.
-	///
-	/// Only available on SC onward.
-	Global(Global),
+#[repr(u8)]
+pub enum ExprTerm {
+	Const(u32)         = 0x00,
+	Op(ExprOp),
+	Insn(Box<Insn>)    = 0x1C,
+	Flag(Flag)         = 0x1E,
+	Var(Var)           = 0x1F,
+	Attr(Attr)         = 0x20,
+	CharAttr(CharAttr) = 0x21,
+	Rand               = 0x22, // random 15-bit number
+	Global(Global)     = 0x23,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Expr(pub Vec<ExprTerm>);
 
 mod expr {
 	use super::*;
 	pub(super) fn read<'a>(f: &mut impl Read<'a>, game: Game) -> Result<Expr, ReadError> {
-		let mut stack = Vec::new();
+		let mut terms = Vec::new();
 		loop {
 			let op = f.u8()?;
-			let expr = if let Ok(op) = ExprBinop::try_from(op) {
-				let r = Box::new(stack.pop().ok_or("empty stack")?);
-				let l = Box::new(stack.pop().ok_or("empty stack")?);
-				Expr::Binop(op, l, r)
-			} else if let Ok(op) = ExprUnop::try_from(op) {
-				let v = Box::new(stack.pop().ok_or("empty stack")?);
-				Expr::Unop(op, v)
+			let term = if let Ok(op) = ExprOp::try_from(op) {
+				ExprTerm::Op(op)
 			} else {
 				match op {
-					0x00 => Expr::Const(f.u32()?),
+					0x00 => ExprTerm::Const(f.u32()?),
 					0x01 => break,
-					0x1C => Expr::Insn(Box::new(Insn::read(f, game)?)),
-					0x1E => Expr::Flag(Flag(f.u16()?)),
-					0x1F => Expr::Var(Var(f.u16()?)),
-					0x20 => Expr::Attr(Attr(f.u8()?)),
-					0x21 => Expr::CharAttr(char_attr::read(f, game)?),
-					0x22 => Expr::Rand,
-					0x23 => Expr::Global(Global(f.u8()?)),
+					0x1C => ExprTerm::Insn(Box::new(Insn::read(f, game)?)),
+					0x1E => ExprTerm::Flag(Flag(f.u16()?)),
+					0x1F => ExprTerm::Var(Var(f.u16()?)),
+					0x20 => ExprTerm::Attr(Attr(f.u8()?)),
+					0x21 => ExprTerm::CharAttr(char_attr::read(f, game)?),
+					0x22 => ExprTerm::Rand,
+					0x23 => ExprTerm::Global(Global(f.u8()?)),
 					op => return Err(format!("unknown Expr: 0x{op:02X}").into())
 				}
 			};
-			stack.push(expr);
+			terms.push(term);
 		}
-		ensure!(stack.len() == 1, "invalid stack {stack:?}");
-		Ok(stack.pop().unwrap())
+		Ok(Expr(terms))
 	}
 
 	pub(super) fn write(f: &mut impl Write, game: Game, v: &Expr) -> Result<(), WriteError> {
-		fn write_node(f: &mut impl Write, game: Game, v: &Expr) -> Result<(), WriteError> {
-			match *v {
-				Expr::Binop(op, ref a, ref b) => {
-					write_node(f, game, a)?;
-					write_node(f, game, b)?;
-					f.u8(op.into());
-				},
-				Expr::Unop(op, ref v) => {
-					write_node(f, game, v)?;
-					f.u8(op.into());
-				},
-				Expr::Const(n)       => { f.u8(0x00); f.u32(n); },
-				// 0x01 handled below
-				Expr::Insn(ref insn) => { f.u8(0x1C); Insn::write(f, game, insn)?; },
-				Expr::Flag(v)        => { f.u8(0x1E); f.u16(v.0); },
-				Expr::Var(v)         => { f.u8(0x1F); f.u16(v.0); },
-				Expr::Attr(v)        => { f.u8(0x20); f.u8(v.0); },
-				Expr::CharAttr(v)    => { f.u8(0x21); char_attr::write(f, game, &v)?; },
-				Expr::Rand           => { f.u8(0x22); },
-				Expr::Global(v)      => { f.u8(0x23); f.u8(v.0); },
+		for term in &v.0 {
+			match *term {
+				ExprTerm::Const(n)       => { f.u8(0x00); f.u32(n); }
+				ExprTerm::Op(op)         => { f.u8(op.into()) }
+				ExprTerm::Insn(ref insn) => { f.u8(0x1C); Insn::write(f, game, insn)?; }
+				ExprTerm::Flag(v)        => { f.u8(0x1E); f.u16(v.0); }
+				ExprTerm::Var(v)         => { f.u8(0x1F); f.u16(v.0); }
+				ExprTerm::Attr(v)        => { f.u8(0x20); f.u8(v.0); }
+				ExprTerm::CharAttr(v)    => { f.u8(0x21); char_attr::write(f, game, &v)?; }
+				ExprTerm::Rand           => { f.u8(0x22); }
+				ExprTerm::Global(v)      => { f.u8(0x23); f.u8(v.0); }
 			}
-			Ok(())
 		}
-		write_node(f, game, v)?;
 		f.u8(0x01);
 		Ok(())
 	}

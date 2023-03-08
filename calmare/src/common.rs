@@ -1,5 +1,5 @@
 use themelios::scena::*;
-use themelios::scena::code::{Expr, ExprBinop, ExprUnop, FlatInsn, Label, Insn, Bytecode};
+use themelios::scena::code::{Expr, ExprTerm, ExprOp, FlatInsn, Label, Insn, Bytecode};
 use themelios::scena::code::decompile::{decompile, TreeInsn};
 use themelios::scena::ed7::{SepithId, AtRollId, PlacementId};
 use themelios::text::{Text, TextSegment};
@@ -415,83 +415,125 @@ impl Val for FuncId {
 }
 
 fn expr(f: &mut Context, e: &Expr) -> Result<()> {
-	fn expr_prio(f: &mut Context, e: &Expr, prio: u8) -> Result<()> {
-		match e {
-			Expr::Const(v)    => { f.val(v)?; }
-			Expr::Flag(v)     => { f.val(v)?; }
-			Expr::Var(v)      => { f.val(v)?; }
-			Expr::Attr(v)     => { f.val(v)?; }
-			Expr::CharAttr(v) => { f.val(v)?; }
-			Expr::Rand        => { f.kw("random")?; }
-			Expr::Global(v)   => { f.val(v)?; }
+	#[derive(Default)]
+	enum E<'a> {
+		Atom(&'a ExprTerm),
+		Bin(ExprOp, Box<E<'a>>, Box<E<'a>>),
+		Un(ExprOp, Box<E<'a>>),
+		Ass(ExprOp, Box<E<'a>>),
+		#[default]
+		Error,
+	}
 
-			Expr::Binop(op, a, b) => {
-				let (text, prio2) = binop(*op);
+	fn expr_prio(f: &mut Context, e: E, prio: u8) -> Result<()> {
+		match e {
+			E::Atom(a) => match a {
+				ExprTerm::Op(_)       => unreachable!(),
+				ExprTerm::Const(v)    => { f.val(v)?; }
+				ExprTerm::Insn(i)     => { insn(f, i)?; }
+				ExprTerm::Flag(v)     => { f.val(v)?; }
+				ExprTerm::Var(v)      => { f.val(v)?; }
+				ExprTerm::Attr(v)     => { f.val(v)?; }
+				ExprTerm::CharAttr(v) => { f.val(v)?; }
+				ExprTerm::Rand        => { f.kw("random")?; }
+				ExprTerm::Global(v)   => { f.val(v)?; }
+			},
+			E::Bin(op, a, b) => {
+				let (text, prio2) = op_str(op);
 				if prio2 < prio {
 					f.pre("(")?;
 				}
-				expr_prio(f, a, prio2)?;
+				expr_prio(f, *a, prio2)?;
 				f.kw(text)?;
-				expr_prio(f, b, prio2+1)?;
+				expr_prio(f, *b, prio2+1)?;
 				if prio2 < prio {
 					f.suf(")")?;
 				}
 			}
-
-			Expr::Unop(op, e) => {
-				let (text, is_assign) = unop(*op);
-				if is_assign {
-					f.kw(text)?;
-					expr_prio(f, e, 0)?;
-				} else {
-					f.pre(text)?;
-					expr_prio(f, e, 100)?;
-				}
+			E::Un(op, a) => {
+				let (text, prio) = op_str(op);
+				f.pre(text)?;
+				expr_prio(f, *a, prio)?;
 			}
-
-			Expr::Insn(i) => insn(f, i)?,
+			E::Ass(op, a) => {
+				let (text, prio) = op_str(op);
+				f.kw(text)?;
+				expr_prio(f, *a, prio)?;
+			},
+			E::Error => { write!(f, "(EXPR MISSING)")?; },
 		}
 		Ok(())
 	}
 
-	fn binop(op: ExprBinop) -> (&'static str, u8) {
+	fn op_str(op: ExprOp) -> (&'static str, u8) {
 		match op {
-			ExprBinop::Eq      => ("==", 4),
-			ExprBinop::Ne      => ("!=", 4),
-			ExprBinop::Lt      => ("<",  4),
-			ExprBinop::Gt      => (">",  4),
-			ExprBinop::Le      => ("<=", 4),
-			ExprBinop::Ge      => (">=", 4),
-			ExprBinop::BoolAnd => ("&&", 3),
-			ExprBinop::And     => ("&", 3),
-			ExprBinop::Or      => ("|", 1),
-			ExprBinop::Add     => ("+", 5),
-			ExprBinop::Sub     => ("-", 5),
-			ExprBinop::Xor     => ("^", 2),
-			ExprBinop::Mul     => ("*", 6),
-			ExprBinop::Div     => ("/", 6),
-			ExprBinop::Mod     => ("%", 6),
+			ExprOp::Eq      => ("==", 4),
+			ExprOp::Ne      => ("!=", 4),
+			ExprOp::Lt      => ("<",  4),
+			ExprOp::Gt      => (">",  4),
+			ExprOp::Le      => ("<=", 4),
+			ExprOp::Ge      => (">=", 4),
+			ExprOp::BoolAnd => ("&&", 3),
+			ExprOp::And     => ("&", 3),
+			ExprOp::Or      => ("|", 1),
+			ExprOp::Add     => ("+", 5),
+			ExprOp::Sub     => ("-", 5),
+			ExprOp::Xor     => ("^", 2),
+			ExprOp::Mul     => ("*", 6),
+			ExprOp::Div     => ("/", 6),
+			ExprOp::Mod     => ("%", 6),
+
+			ExprOp::Not    => ("!", 10),
+			ExprOp::Neg    => ("-", 10),
+			ExprOp::Inv    => ("~", 10),
+
+			ExprOp::Ass    => ("=",  0),
+			ExprOp::MulAss => ("*=", 0),
+			ExprOp::DivAss => ("/=", 0),
+			ExprOp::ModAss => ("%=", 0),
+			ExprOp::AddAss => ("+=", 0),
+			ExprOp::SubAss => ("-=", 0),
+			ExprOp::AndAss => ("&=", 0),
+			ExprOp::XorAss => ("^=", 0),
+			ExprOp::OrAss  => ("|=", 0),
 		}
 	}
 
-	fn unop(op: ExprUnop) -> (&'static str, bool) {
-		match op {
-			ExprUnop::Not    => ("!", false),
-			ExprUnop::Neg    => ("-", false),
-			ExprUnop::Inv    => ("~", false),
-			ExprUnop::Ass    => ("=",  true),
-			ExprUnop::MulAss => ("*=", true),
-			ExprUnop::DivAss => ("/=", true),
-			ExprUnop::ModAss => ("%=", true),
-			ExprUnop::AddAss => ("+=", true),
-			ExprUnop::SubAss => ("-=", true),
-			ExprUnop::AndAss => ("&=", true),
-			ExprUnop::XorAss => ("^=", true),
-			ExprUnop::OrAss  => ("|=", true),
+	let mut stack = Vec::new();
+	for t in &e.0 {
+		if let ExprTerm::Op(op) = t {
+			match op.kind() {
+				code::OpKind::Unary => {
+					let a = stack.pop().unwrap_or_default();
+					stack.push(E::Un(*op, Box::new(a)));
+				}
+				code::OpKind::Binary => {
+					let a = stack.pop().unwrap_or_default();
+					let b = stack.pop().unwrap_or_default();
+					stack.push(E::Bin(*op, Box::new(a), Box::new(b)));
+				}
+				code::OpKind::Assign => {
+					let a = stack.pop().unwrap_or_default();
+					stack.push(E::Ass(*op, Box::new(a)));
+				}
+			}
+		} else {
+			stack.push(E::Atom(t))
 		}
 	}
 
-	expr_prio(f, e, 0)
+	if stack.is_empty() {
+		write!(f, "(EXPR MISSING)")?;
+	} else {
+		for (i, e) in stack.into_iter().enumerate() {
+			if i != 0 {
+				f.kw("¤")?;
+			}
+			expr_prio(f, e, 0)?;
+		}
+	}
+
+	Ok(())
 }
 
 fn text(f: &mut Context, v: &Text) -> Result<()> {

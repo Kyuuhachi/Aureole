@@ -69,7 +69,7 @@ enum RawOInsn<'a> {
 	Label(HLabelDef),
 }
 
-pub fn read<'a>(f: &mut (impl Read<'a> + Dump), game: Game, end: Option<usize>) -> Result<Code, ReadError> {
+pub fn read<'a>(f: &mut impl Read<'a>, game: Game, end: Option<usize>) -> Result<Code, ReadError> {
 	let mut insns = Vec::new();
 	let mut extent = f.pos();
 	loop {
@@ -77,36 +77,17 @@ pub fn read<'a>(f: &mut (impl Read<'a> + Dump), game: Game, end: Option<usize>) 
 			ensure!(f.pos() == end, "overshot while reading function");
 			break
 		}
-		let pos = f.pos();
-		match read_raw_insn(f, game) {
-			Ok(insn) => {
-				insns.push((pos, insn));
-				match &insns.last().unwrap().1 {
-					RawIInsn::Insn(Insn::Return()) if end.is_none() && f.pos() > extent => break,
-					RawIInsn::Insn(_) => {}
-					RawIInsn::Unless(_, l) => extent = extent.max(*l),
-					RawIInsn::Goto(l) => extent = extent.max(*l),
-					RawIInsn::Switch(_, cs, l) => {
-						extent = cs.iter().map(|a| a.1)
-							.chain(Some(*l))
-							.chain(Some(extent))
-							.max().unwrap();
-					}
-				}
-			}
-			Err(err) => {
-				let start = pos.saturating_sub(48*2);
-				f.seek(start)?;
-				let mut d = f.dump().lines(4).mark(pos, 9).preview_encoding("sjis");
-				for (i, insn) in &insns {
-					if *i >= start {
-						d = d.mark(*i, 3);
-						println!("{i:04X} {insn:?}");
-					}
-				}
-				d.to_stderr();
-				f.seek(pos)?;
-				return Err(err)
+		insns.push((f.pos(), read_raw_insn(f, game)?));
+		match &insns.last().unwrap().1 {
+			RawIInsn::Insn(Insn::Return()) if end.is_none() && f.pos() > extent => break,
+			RawIInsn::Insn(_) => {}
+			RawIInsn::Unless(_, l) => extent = extent.max(*l),
+			RawIInsn::Goto(l) => extent = extent.max(*l),
+			RawIInsn::Switch(_, cs, l) => {
+				extent = cs.iter().map(|a| a.1)
+					.chain(Some(*l))
+					.chain(Some(extent))
+					.max().unwrap();
 			}
 		}
 	}

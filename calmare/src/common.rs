@@ -21,7 +21,7 @@ pub(crate) impl Context<'_> {
 	}
 }
 
-pub fn func(f: &mut Context, n: usize, func: &Code) {
+pub fn func(f: &mut Context, func: &Code) {
 	let result = if f.decompile {
 		decompile(func).map_err(Some)
 	} else {
@@ -29,15 +29,11 @@ pub fn func(f: &mut Context, n: usize, func: &Code) {
 	};
 	match result {
 		Ok(result) => {
-			write!(f, "fn[{n}]");
-			f.suf(":")
-				.line();
+			f.suf(":").line();
 			f.indent(|f| tree_func(f, &result));
 		}
 		Err(err) => {
-			write!(f, "fn[{n}]");
-			f.kw("flat")
-				.suf(":");
+			f.kw("flat").suf(":");
 			if let Some(err) = err {
 				write!(f, " // {err}");
 			}
@@ -174,12 +170,8 @@ fn insn(f: &mut Context, i: &Insn, mut line: bool) {
 				f.val($_n);
 			}
 		},
-		($_n:ident Vec<Insn>) => {
-			f.suf(":").line().indent(|f| {
-				for i in $_n {
-					insn(f, i, true);
-				}
-			});
+		($_n:ident Code) => {
+			func(f, $_n);
 			line = false;
 		},
 		($_n:ident $($ty:tt)*) => {

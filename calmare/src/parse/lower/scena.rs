@@ -16,13 +16,9 @@ fn parse_func(p: &mut Parse) -> Code {
 	}).unwrap_or_default()
 }
 
-impl Val for Vec<Insn> {
+impl Val for Code {
 	fn parse(p: &mut Parse) -> Result<Self> {
-		let mut out = Vec::new();
-		for line in p.body()? {
-			out.push(Parse::new(line, p.context).parse_with(parse_insn));
-		}
-		Ok(out)
+		Ok(parse_func(p))
 	}
 }
 

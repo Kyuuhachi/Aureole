@@ -288,6 +288,7 @@ pub fn write(f: &mut Context, scena: &ed7::Scena) {
 		if i != 0 {
 			f.line();
 		}
-		common::func(f, i, func);
+		write!(f, "fn[{i}]");
+		common::func(f, func);
 	}
 }

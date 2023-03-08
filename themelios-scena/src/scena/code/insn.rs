@@ -293,8 +293,8 @@ themelios_macros::bytecode! {
 
 		ForkFunc(u16 as CharId, u8 as u16 as ForkId, FuncId via func_id), // [execute]
 		ForkQuit(u16 as CharId, u8 as u16 as ForkId), // [terminate]
-		Fork(    u16 as CharId, if game.is_ed7() { u8 as u16 } else { u16 } as ForkId, Vec<Insn> via fork), // [preset]? In t0311, only used with a single instruction inside
-		ForkLoop(u16 as CharId, if game.is_ed7() { u8 as u16 } else { u16 } as ForkId, Vec<Insn> via fork_loop),
+		Fork(    u16 as CharId, if game.is_ed7() { u8 as u16 } else { u16 } as ForkId, Code via fork), // [preset]? In t0311, only used with a single instruction inside
+		ForkLoop(u16 as CharId, if game.is_ed7() { u8 as u16 } else { u16 } as ForkId, Code via fork_loop),
 		ForkWait(u16 as CharId, if game.is_ed7() { u8 as u16 } else { u16 } as ForkId), // [wait_terminate]
 		NextFrame(), // [next_frame]
 
@@ -981,28 +981,22 @@ mod quest_list {
 
 mod fork {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>, game: Game) -> Result<Vec<Insn>, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl Read<'a>, game: Game) -> Result<Code, ReadError> {
 		let len = f.u8()? as usize;
 		let pos = f.pos();
-		let mut insns = Vec::new();
-		while f.pos() < pos+len {
-			insns.push(Insn::read(f, game)?);
-		}
-		ensure!(f.pos() == pos+len, "overshot while reading fork");
+		let code = code::read(f, game, Some(pos+len))?;
 		if len > 0 {
 			f.check_u8(0)?;
 		}
-		Ok(insns)
+		Ok(code)
 	}
 
-	pub(super) fn write(f: &mut impl Write, game: Game, v: &[Insn]) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Write, game: Game, v: &Code) -> Result<(), WriteError> {
 		let (l1, l1_) = HLabel::new();
 		let (l2, l2_) = HLabel::new();
 		f.delay(move |l| Ok(u8::to_le_bytes(hamu::write::cast_usize(l(l2)? - l(l1)?)?)));
 		f.label(l1_);
-		for i in v {
-			Insn::write(f, game, i)?;
-		}
+		code::write(f, game, v)?;
 		f.label(l2_);
 		if !v.is_empty() {
 			f.u8(0);
@@ -1013,14 +1007,10 @@ mod fork {
 
 mod fork_loop {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>, game: Game) -> Result<Vec<Insn>, ReadError> {
+	pub(super) fn read<'a>(f: &mut impl Read<'a>, game: Game) -> Result<Code, ReadError> {
 		let len = f.u8()? as usize;
 		let pos = f.pos();
-		let mut insns = Vec::new();
-		while f.pos() < pos+len {
-			insns.push(Insn::read(f, game)?);
-		}
-		ensure!(f.pos() == pos+len, "overshot while reading fork loop");
+		let code = code::read(f, game, Some(pos+len))?;
 		let next = if game.is_ed7() {
 			Insn::NextFrame2()
 		} else {
@@ -1028,18 +1018,16 @@ mod fork_loop {
 		};
 		ensure!(read_raw_insn(f, game)? == RawIInsn::Insn(next), "invalid loop");
 		ensure!(read_raw_insn(f, game)? == RawIInsn::Goto(pos), "invalid loop");
-		Ok(insns)
+		Ok(code)
 	}
 
-	pub(super) fn write(f: &mut impl Write, game: Game, v: &[Insn]) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut impl Write, game: Game, v: &Code) -> Result<(), WriteError> {
 		let (l1, l1_) = HLabel::new();
 		let (l2, l2_) = HLabel::new();
 		let l1c = l1.clone();
 		f.delay(|l| Ok(u8::to_le_bytes(hamu::write::cast_usize(l(l2)? - l(l1)?)?)));
 		f.label(l1_);
-		for i in v {
-			Insn::write(f, game, i)?;
-		}
+		code::write(f, game, v)?;
 		f.label(l2_);
 		let next = if game.is_ed7() {
 			Insn::NextFrame2()

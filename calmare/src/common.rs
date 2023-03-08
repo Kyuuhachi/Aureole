@@ -262,16 +262,7 @@ prim_arg!(i8, "{}");
 prim_arg!(i16, "{}");
 prim_arg!(i32, "{}");
 prim_arg!(String, "{:?}");
-
-impl Val for TString {
-	fn write(&self, f: &mut Context) -> Result<()> {
-		let s = self.0
-			.replace('\\', "\\\\")
-			.replace('{', "\\{")
-			.replace('}', "\\}");
-		write!(f, "{{{s}}}")
-	}
-}
+nt_arg!(TString, "{:?}");
 
 nt_arg!(Time, "{}ms");
 nt_arg!(Angle, "{}deg");

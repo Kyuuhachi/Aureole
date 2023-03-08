@@ -415,15 +415,11 @@ impl TryVal for String {
 }
 
 impl TryVal for TString {
-	fn desc() -> String { "short text".to_owned() }
+	fn desc() -> String { "string".to_owned() }
 
 	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
-		if let Some(d) = test!(p, Token::Brace(s) => s) {
-			match d.tokens.as_slice() {
-				[] => Ok(Some(TString(String::new()))),
-				[S(_, TextToken::Text(s))] => Ok(Some(TString(s.to_owned()))),
-				_ => Ok(None)
-			}
+		if let Some(s) = test!(p, Token::String(s) => s) {
+			Ok(Some(TString(s.to_owned())))
 		} else {
 			Ok(None)
 		}

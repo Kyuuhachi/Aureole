@@ -113,7 +113,6 @@ dependencies = [
  "codespan-reporting",
  "extend",
  "themelios",
- "themelios-archive",
  "themelios-archive-prebuilt",
  "total-float",
  "unicode-xid",

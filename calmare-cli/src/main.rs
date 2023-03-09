@@ -4,7 +4,7 @@ use std::path::{PathBuf, Path};
 
 use calmare::parse::diag::Level;
 use clap::{Parser, ValueHint};
-use themelios::archive::Lookup;
+use themelios::lookup::Lookup;
 use themelios::types::Game;
 
 #[derive(Debug, Clone, Parser)]

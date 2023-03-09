@@ -4,7 +4,7 @@ use themelios::scena::*;
 use themelios::text::{Text, TextSegment};
 use themelios::types::*;
 use themelios::util::array;
-use themelios_archive::Lookup;
+use themelios::lookup::Lookup;
 
 use super::diag::*;
 use super::lex::{Line, Token, TextToken};
@@ -791,7 +791,7 @@ fn parse_type(line: &Line) -> Result<(Game, FileType)> {
 	let dummy_ctx = &Context {
 		game: Game::Fc,
 		ty: FileType::Scena,
-		lookup: &themelios_archive::NullLookup,
+		lookup: &themelios::lookup::NullLookup,
 	};
 	Parse::new(line, dummy_ctx).parse_with(|p| {
 		if !p.word("calmare") {

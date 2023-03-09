@@ -1,5 +1,5 @@
 use themelios::types::Game;
-use themelios_archive::lookup::{Lookup, ED7Lookup};
+use themelios::lookup::{Lookup, ED7Lookup};
 
 pub fn default_lookup(game: Game) -> &'static dyn Lookup {
 	use Game::*;

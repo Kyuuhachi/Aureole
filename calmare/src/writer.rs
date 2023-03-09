@@ -1,5 +1,5 @@
 use themelios::types::Game;
-use themelios_archive::lookup::Lookup;
+use themelios::lookup::Lookup;
 
 #[derive(Clone, Copy, Debug)]
 enum Space {

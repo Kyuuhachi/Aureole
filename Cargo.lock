@@ -127,6 +127,7 @@ dependencies = [
  "codespan-reporting",
  "eyre",
  "themelios",
+ "windows-sys",
 ]
 
 [[package]]

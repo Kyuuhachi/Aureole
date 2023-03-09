@@ -62,8 +62,37 @@ enum CliGame {
 	#[value(name = "ao_k")] AoKai,
 }
 
+#[cfg(target_os = "windows")]
+fn windows_wait() {
+	let process_count: u32 = unsafe {
+		windows_sys::Win32::System::Console::GetConsoleProcessList([0u32, 1].as_mut_ptr(), 1)
+	};
+
+	if process_count == 1 {
+		println!("\nPress any key to exit...");
+		let _ = std::io::stdin().read(&mut [0u8]);
+	}
+}
+
+#[cfg(not(target_os = "windows"))]
+fn windows_wait() { }
+
 fn main() -> eyre::Result<()> {
-	let cli = Cli::parse();
+	main_inner().map_err(|e| {
+		windows_wait();
+		e
+	})
+}
+
+fn main_inner() -> eyre::Result<()> {
+	let cli = match Cli::try_parse() {
+		Ok(cli) => cli,
+		Err(e) => {
+			e.print()?;
+			windows_wait();
+			std::process::exit(2);
+		},
+	};
 	let mut buf = Vec::new();
 	get_input(&cli.file)?.read_to_end(&mut buf)?;
 
@@ -106,6 +135,10 @@ fn main() -> eyre::Result<()> {
 				get_output(cli.output.as_deref(), &cli.file, "bin")?
 					.write_all(&data)?;
 			}
+		}
+
+		if !diags.is_empty() {
+			windows_wait();
 		}
 	} else {
 		let src = write_scena(cli.game, &buf, lookup)?;

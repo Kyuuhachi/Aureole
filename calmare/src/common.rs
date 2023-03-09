@@ -248,6 +248,7 @@ nt_arg!(Time, "{}ms");
 nt_arg!(Angle, "{}deg");
 nt_arg!(Angle32, "{}mdeg");
 nt_arg!(Speed, "{}mm/s");
+nt_arg!(AngularSpeed, "{}deg/s");
 nt_arg!(Length, "{}mm");
 
 nt_arg!(Flag, "flag[{}]");

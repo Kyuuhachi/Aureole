@@ -25,6 +25,7 @@ newtype!(Angle, i16);
 newtype!(Length, i32);
 newtype!(Time, u32);
 newtype!(Speed, u32);
+newtype!(AngularSpeed, u16);
 newtype!(Angle32, i32);
 
 // Translatable string

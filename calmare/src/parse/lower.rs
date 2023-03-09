@@ -25,6 +25,7 @@ pub enum Unit {
 	MmPerS,
 	Ms,
 	Deg,
+	DegPerS,
 	MDeg,
 }
 
@@ -319,6 +320,7 @@ fn parse_unit(p: &mut Parse) -> Result<S<Unit>> {
 		("mm", Some("s")) => Unit::MmPerS,
 		("ms", None) => Unit::Ms,
 		("deg", None) => Unit::Deg,
+		("deg", Some("s")) => Unit::DegPerS,
 		("mdeg", None) => Unit::MDeg,
 		_ => {
 			Diag::error(s, "invalid unit").emit();
@@ -528,6 +530,7 @@ macro unit($T:ident, $unit:ident, $unit_str:literal) {
 }
 
 unit!(Angle, Deg, "deg");
+unit!(AngularSpeed, Deg, "deg");
 unit!(Angle32, MDeg, "mdeg");
 unit!(Time, Ms, "ms");
 unit!(Length, Mm, "mm");

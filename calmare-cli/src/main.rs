@@ -93,9 +93,9 @@ fn main() -> eyre::Result<()> {
 		match val {
 			calmare::Content::ED6Scena(s) => {
 				let suffix = if matches!(game, Game::Fc|Game::Sc|Game::Tc) {
-					"._sn"
+					"_sn"
 				} else {
-					".bin"
+					"bin"
 				};
 				let data = themelios::scena::ed6::write(game, &s)?;
 				get_output(cli.output.as_deref(), &cli.file, suffix)?
@@ -103,13 +103,13 @@ fn main() -> eyre::Result<()> {
 			}
 			calmare::Content::ED7Scena(s) => {
 				let data = themelios::scena::ed7::write(game, &s)?;
-				get_output(cli.output.as_deref(), &cli.file, ".bin")?
+				get_output(cli.output.as_deref(), &cli.file, "bin")?
 					.write_all(&data)?;
 			}
 		}
 	} else {
 		let src = write_scena(cli.game, &buf, lookup)?;
-		get_output(cli.output.as_deref(), &cli.file, ".clm")?
+		get_output(cli.output.as_deref(), &cli.file, "clm")?
 			.write_all(src.as_bytes())?;
 	}
 

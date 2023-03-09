@@ -929,8 +929,7 @@ pub fn parse(lines: &[Line], lookup: Option<&dyn Lookup>) -> Result<(Game, crate
 			if game.is_ed7() {
 				Ok((game, crate::Content::ED7Scena(scena::ed7::parse(&lines[1..], ctx)?)))
 			} else {
-				todo!();
-				// lower_ed6_scena(&file);
+				Ok((game, crate::Content::ED6Scena(scena::ed6::parse(&lines[1..], ctx)?)))
 			}
 		}
 	}

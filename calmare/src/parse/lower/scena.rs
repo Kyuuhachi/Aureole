@@ -4,7 +4,43 @@ use themelios::scena::code::decompile::{recompile, TreeInsn};
 use super::*;
 use crate::span::{Spanned as S, Span};
 
+pub mod ed6;
 pub mod ed7;
+
+themelios::util::newtype!(CharDefId, u16);
+newtype!(CharDefId, "char");
+
+themelios::util::newtype!(FuncDefId, u16);
+newtype!(FuncDefId, "fn");
+
+#[derive(Debug, Clone)]
+pub enum NpcOrMonster<A, B> {
+	Npc(A),
+	Monster(B),
+}
+
+fn chars<A, B>(items: Many<CharDefId, NpcOrMonster<A, B>>) -> (Vec<A>, Vec<B>) {
+	let misorder = items.0.iter()
+		.skip_while(|a| !matches!(&a.1.1, Some(NpcOrMonster::Monster(_))))
+		.find(|a| matches!(&a.1.1, Some(NpcOrMonster::Npc(_))));
+	if let Some((k, S(s, _))) = misorder {
+		let (_, S(prev, _)) = items.0.range(..k).last().unwrap();
+		Diag::error(*prev, "monsters must come after npcs")
+			.note(*s, "is before this npc")
+			.emit();
+	}
+
+	let mut npcs = Vec::new();
+	let mut monsters = Vec::new();
+	for m in items.get(|a| a.0 as usize) {
+		match m {
+			NpcOrMonster::Npc(n) => npcs.push(n),
+			NpcOrMonster::Monster(m) => monsters.push(m),
+		}
+	}
+
+	(npcs, monsters)
+}
 
 fn parse_func(p: &mut Parse) -> Code {
 	let tree = parse_tree(p, false, false);

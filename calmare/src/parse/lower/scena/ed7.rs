@@ -2,12 +2,6 @@ use super::*;
 
 use themelios::scena::{ed7::*, code::Code};
 
-themelios::util::newtype!(CharDefId, u16);
-newtype!(CharDefId, "char");
-
-themelios::util::newtype!(FuncId, u16);
-newtype!(FuncId, "fn");
-
 newtype!(SepithId, "sepith");
 newtype!(AtRollId, "at_roll");
 newtype!(PlacementId, "placement");
@@ -20,12 +14,6 @@ pub struct Header {
 	pub flags: u32,
 	pub unk: (u8, u16, u8),
 	pub scp: [FileId; 6],
-}
-
-#[derive(Debug, Clone)]
-pub enum NpcOrMonster {
-	Npc(Npc),
-	Monster(Monster),
 }
 
 struct FPos3(f32, f32, f32);
@@ -46,7 +34,7 @@ struct ScenaBuild {
 	header: One<Header>,
 	entry: One<Entry>,
 	chcp: Many<ChcpId, FileId>,
-	npcs_monsters: Many<CharDefId, NpcOrMonster>,
+	chars: Many<CharDefId, NpcOrMonster<Npc, Monster>>,
 	triggers: Many<TriggerId, Trigger>,
 	look_points: Many<LookPointId, LookPoint>,
 	labels: Many<LabelId, Label>,
@@ -55,7 +43,7 @@ struct ScenaBuild {
 	at_rolls: Many<AtRollId, [u8; 16]>,
 	placements: Many<PlacementId, [(u8, u8, Angle); 8]>,
 	battles: Many<BattleId, Battle>,
-	functions: Many<FuncId, Code>,
+	functions: Many<FuncDefId, Code>,
 }
 
 pub fn parse(lines: &[Line], ctx: &Context) -> Result<Scena> {
@@ -64,30 +52,12 @@ pub fn parse(lines: &[Line], ctx: &Context) -> Result<Scena> {
 		let _ = Parse::new(line, ctx).parse_with(|p| parse_line(&mut scena, p));
 	}
 
-	let misorder = scena.npcs_monsters.0.iter()
-		.skip_while(|a| !matches!(&a.1.1, Some(NpcOrMonster::Monster(_))))
-		.find(|a| matches!(&a.1.1, Some(NpcOrMonster::Npc(_))));
-	if let Some((k, S(s, _))) = misorder {
-		let (_, S(prev, _)) = scena.npcs_monsters.0.range(..k).last().unwrap();
-		Diag::error(*prev, "monsters must come after npcs")
-			.note(*s, "is before this npc")
-			.emit();
-	}
-
-	let mut npcs = Vec::new();
-	let mut monsters = Vec::new();
-	for m in scena.npcs_monsters.get(|a| a.0 as usize) {
-		match m {
-			NpcOrMonster::Npc(n) => npcs.push(n),
-			NpcOrMonster::Monster(m) => monsters.push(m),
-		}
-	}
-
 	if !scena.header.is_present() {
 		Diag::error(Span::new_at(0), "missing 'scena' block").emit();
 	}
 
 	let chcp = scena.chcp.get(|a| a.0 as usize);
+	let (npcs, monsters) = chars(scena.chars);
 	let labels = Some(scena.labels.get(|a| a.0 as usize));
 	let triggers = scena.triggers.get(|a| a.0 as usize);
 	let look_points = scena.look_points.get(|a| a.0 as usize);
@@ -200,7 +170,7 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 		}
 		"npc" => {
 			let S(s, n) = Val::parse(p)?;
-			scena.npcs_monsters.mark(p.tokens[0].0 | s, n);
+			scena.chars.mark(p.tokens[0].0 | s, n);
 			parse_data!(p => {
 				name,
 				pos,
@@ -212,14 +182,14 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 				talk,
 				unk4,
 			});
-			scena.npcs_monsters.insert(n, NpcOrMonster::Npc(Npc {
+			scena.chars.insert(n, NpcOrMonster::Npc(Npc {
 				name, pos, angle, flags, unk2,
 				chcp, init, talk, unk4,
 			}));
 		}
 		"monster" => {
 			let S(s, n) = Val::parse(p)?;
-			scena.npcs_monsters.mark(p.tokens[0].0 | s, n);
+			scena.chars.mark(p.tokens[0].0 | s, n);
 			parse_data!(p => {
 				pos,
 				angle,
@@ -231,7 +201,7 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 				stand_anim,
 				walk_anim,
 			});
-			scena.npcs_monsters.insert(n, NpcOrMonster::Monster(Monster {
+			scena.chars.insert(n, NpcOrMonster::Monster(Monster {
 				pos, angle, flags, battle, flag,
 				chcp, unk2, stand_anim, walk_anim,
 			}));

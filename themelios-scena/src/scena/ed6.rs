@@ -224,60 +224,44 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 }
 
 pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
-	let &Scena {
-		ref path,
-		ref map,
-		town,
-		bgm,
-		item,
-		ref includes,
-		ref ch,
-		ref cp,
-		ref npcs,
-		ref monsters,
-		ref triggers,
-		ref look_points,
-		ref entries,
-		ref functions,
-	} = scena;
 	let mut f = Writer::new();
 	let mut g = Writer::new();
 	let mut func_table = Writer::new();
 	let mut strings = Writer::new();
 
-	f.sized_string::<10>(path)?;
-	f.sized_string::<14>(map)?;
-	f.u16(town.0);
-	f.u16(bgm.0);
-	f.u16(item.0); f.u16(item.1);
-	for i in includes {
+	f.sized_string::<10>(&scena.path)?;
+	f.sized_string::<14>(&scena.map)?;
+	f.u16(scena.town.0);
+	f.u16(scena.bgm.0);
+	f.u16(scena.item.0); f.u16(scena.item.1);
+	for i in scena.includes {
 		f.u32(match i.0 { 0 => 0xFFFFFFFF, a => a });
 	}
 	f.u16(0);
 
 	let (l_ch, l_ch_) = Label::new();
 	f.delay_u16(l_ch);
-	f.u16(cast(ch.len())?);
+	f.u16(cast(scena.ch.len())?);
 
 	let (l_cp, l_cp_) = Label::new();
 	f.delay_u16(l_cp);
-	f.u16(cast(cp.len())?);
+	f.u16(cast(scena.cp.len())?);
 
 	let (l_npcs, l_npcs_) = Label::new();
 	f.delay_u16(l_npcs);
-	f.u16(cast(npcs.len())?);
+	f.u16(cast(scena.npcs.len())?);
 
 	let (l_monsters, l_monsters_) = Label::new();
 	f.delay_u16(l_monsters);
-	f.u16(cast(monsters.len())?);
+	f.u16(cast(scena.monsters.len())?);
 
 	let (l_triggers, l_triggers_) = Label::new();
 	f.delay_u16(l_triggers);
-	f.u16(cast(triggers.len())?);
+	f.u16(cast(scena.triggers.len())?);
 
 	let (l_look_points, l_look_points_) = Label::new();
 	f.delay_u16(l_look_points);
-	f.u16(cast(look_points.len())?);
+	f.u16(cast(scena.look_points.len())?);
 
 	f.delay_u16(strings.here());
 	strings.string("@FileName")?;
@@ -287,89 +271,85 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	f.u16(0);
 	let (l_func_table, l_func_table_) = Label::new();
 	f.delay_u16(l_func_table);
-	f.u16(cast(functions.len() * 2)?);
+	f.u16(cast(scena.functions.len() * 2)?);
 
 	g.label(l_ch_);
-	for ch in ch { g.u32(ch.0); }
+	for ch in &scena.ch { g.u32(ch.0); }
 	g.u8(0xFF);
 
 	g.label(l_cp_);
-	for cp in cp { g.u32(cp.0); }
+	for cp in &scena.cp { g.u32(cp.0); }
 	g.u8(0xFF);
 
 	g.label(l_npcs_);
-	for &Npc { ref name, pos, angle, x, cp, frame, ch, flags, init, talk } in npcs {
-		strings.string(name.as_str())?;
-		g.pos3(pos);
-		g.i16(angle.0);
-		g.u16(x);
-		g.u16(cp.0);
-		g.u16(frame);
-		g.u16(ch.0);
-		g.u16(flags.0);
-		g.u16(init.0); g.u16(init.1);
-		g.u16(talk.0); g.u16(talk.1);
+	for npc in &scena.npcs {
+		strings.string(npc.name.as_str())?;
+		g.pos3(npc.pos);
+		g.i16(npc.angle.0);
+		g.u16(npc.x);
+		g.u16(npc.cp.0);
+		g.u16(npc.frame);
+		g.u16(npc.ch.0);
+		g.u16(npc.flags.0);
+		g.u16(npc.init.0); g.u16(npc.init.1);
+		g.u16(npc.talk.0); g.u16(npc.talk.1);
 	}
 
 	g.label(l_monsters_);
-	for &Monster { ref name, pos, angle, chcp, flags, unk2, battle, flag, unk3 } in monsters {
-		strings.string(name.as_str())?;
-		g.pos3(pos);
-		g.i16(angle.0);
-		g.u16(chcp.0);
-		g.u16(flags.0);
-		g.i32(unk2);
-		g.u16(cast(battle.0)?);
-		g.u16(flag.0);
-		g.u16(unk3);
+	for monster in &scena.monsters {
+		strings.string(monster.name.as_str())?;
+		g.pos3(monster.pos);
+		g.i16(monster.angle.0);
+		g.u16(monster.chcp.0);
+		g.u16(monster.flags.0);
+		g.i32(monster.unk2);
+		g.u16(cast(monster.battle.0)?);
+		g.u16(monster.flag.0);
+		g.u16(monster.unk3);
 	}
 
 	g.label(l_triggers_);
-	for &Trigger { pos1, pos2, flags, func, unk1 } in triggers {
-		g.pos3(pos1);
-		g.pos3(pos2);
-		g.u16(flags.0);
-		g.u16(func.0); g.u16(func.1);
-		g.u16(unk1);
+	for trigger in &scena.triggers {
+		g.pos3(trigger.pos1);
+		g.pos3(trigger.pos2);
+		g.u16(trigger.flags.0);
+		g.u16(trigger.func.0); g.u16(trigger.func.1);
+		g.u16(trigger.unk1);
 	}
 
 	g.label(l_look_points_);
-	for &LookPoint { pos, radius, bubble_pos, flags, func, unk1 } in look_points {
-		g.pos3(pos);
-		g.i32(radius.0);
-		g.pos3(bubble_pos);
-		g.u16(cast(flags.0)?);
-		g.u16(func.0); g.u16(func.1);
-		g.u16(unk1);
+	for lp in &scena.look_points {
+		g.pos3(lp.pos);
+		g.i32(lp.radius.0);
+		g.pos3(lp.bubble_pos);
+		g.u16(cast(lp.flags.0)?);
+		g.u16(lp.func.0); g.u16(lp.func.1);
+		g.u16(lp.unk1);
 	}
 
 	func_table.label(l_func_table_);
 	g.label(l_code_start_);
-	for func in functions.iter() {
+	for func in scena.functions.iter() {
 		func_table.delay_u16(g.here());
 		code::write(&mut g, game, func)?;
 	}
 
-	for &Entry {
-		pos, chr, angle,
-		cam_from, cam_at, cam_zoom, cam_pers, cam_deg, cam_limit, north,
-		flags, town, init, reinit,
-	} in entries {
-		f.pos3(pos);
-		f.u16(chr);
-		f.i16(angle.0);
-		f.pos3(cam_from);
-		f.pos3(cam_at);
-		f.i32(cam_zoom);
-		f.i32(cam_pers);
-		f.i16(cam_deg.0);
-		f.i16(cam_limit.0.0);
-		f.i16(cam_limit.1.0);
-		f.i16(north.0);
-		f.u16(flags.0);
-		f.u16(town.0);
-		f.u16(init.0); f.u16(init.1);
-		f.u16(reinit.0); f.u16(reinit.1);
+	for e in &scena.entries {
+		f.pos3(e.pos);
+		f.u16(e.chr);
+		f.i16(e.angle.0);
+		f.pos3(e.cam_from);
+		f.pos3(e.cam_at);
+		f.i32(e.cam_zoom);
+		f.i32(e.cam_pers);
+		f.i16(e.cam_deg.0);
+		f.i16(e.cam_limit.0.0);
+		f.i16(e.cam_limit.1.0);
+		f.i16(e.north.0);
+		f.u16(e.flags.0);
+		f.u16(e.town.0);
+		f.u16(e.init.0); f.u16(e.init.1);
+		f.u16(e.reinit.0); f.u16(e.reinit.1);
 	}
 
 	f.append(g);

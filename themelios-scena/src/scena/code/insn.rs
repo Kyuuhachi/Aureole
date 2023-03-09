@@ -449,7 +449,7 @@ themelios_macros::bytecode! {
 			1 => _1(Pos3),
 			2 => _2(u16 as CharId, u32, u8),
 		}),
-		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_A0(u16 as CharId, u16, u16),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_A0(u16 as CharId, u16 as u32 as Time, u8, u8),
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] CharAnimation(u16 as CharId, u8, u8, u32 as Time), // [chr_anime]
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7CharAnimation(u16 as CharId, u16 as u32 as Time, Vec<u8> via char_animation),
 		CharFlagsSet   (u16 as CharId, u16 as CharFlags), // [set_state]
@@ -614,9 +614,20 @@ themelios_macros::bytecode! {
 		VisShow(u8 as VisId, i16,i16,u16,u16, i16,i16,u16,u16, i16,i16,u16,u16, u32 as Color, u8, String),
 		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)]
 		/// Attribute 3 is color. The others are unknown, but probably include at least position, scale, and rotation.
-		VisSet(u8 as VisId, u8, i32, i32, i32, if matches!(game, Game::FcEvo|Game::Ao|Game::AoEvo) { u32 } else { const 0u32 }),
+		VisSet(u8 as VisId, match {
+			0 => _0(i32,             i32,         u32 as Time, if matches!(game, Game::FcEvo|Game::Ao|Game::AoEvo) { u32 } else { const 0u32 }),
+			1 => _1(i32,             i32,         u32 as Time, if matches!(game, Game::FcEvo|Game::Ao|Game::AoEvo) { u32 } else { const 0u32 }),
+			2 => _2(i32,             i32,         u32 as Time, if matches!(game, Game::FcEvo|Game::Ao|Game::AoEvo) { u32 } else { const 0u32 }),
+			3 => Color(u32 as Color, u32 as Time, u32,         if matches!(game, Game::FcEvo|Game::Ao|Game::AoEvo) { u32 } else { const 0u32 }),
+			4 => _4(u32,             u32,         u32,         if matches!(game, Game::FcEvo|Game::Ao|Game::AoEvo) { u32 } else { const 0u32 }),
+			5 => _5(u32,             u32,         u32,         if matches!(game, Game::FcEvo|Game::Ao|Game::AoEvo) { u32 } else { const 0u32 }),
+			6 => _6(u32,             u32,         u32,         if matches!(game, Game::FcEvo|Game::Ao|Game::AoEvo) { u32 } else { const 0u32 }),
+			7 => _7(u32,             u32,         u32,         if matches!(game, Game::FcEvo|Game::Ao|Game::AoEvo) { u32 } else { const 0u32 }),
+			8 => _8(u32,             u32,         u32,         if matches!(game, Game::FcEvo|Game::Ao|Game::AoEvo) { u32 } else { const 0u32 }),
+			9 => _9(u32,             u32,         u32,         if matches!(game, Game::FcEvo|Game::Ao|Game::AoEvo) { u32 } else { const 0u32 }),
+		}),
 		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Vis(match {
-			0 => Await(u8 as VisId, u8), // The argument is the same as for VisSet.
+			0 => Await(u8 as VisId, u8),
 			1 => Hide(u8 as VisId, u8),
 		}),
 

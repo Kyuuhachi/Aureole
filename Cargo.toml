@@ -15,8 +15,8 @@ members = [
 
 	"roundtrip",
 	"calmare",
-	"factoria",
-	# "tools",
+	"calmare-cli",
+	"factoria"
 ]
 
 [workspace.dependencies]

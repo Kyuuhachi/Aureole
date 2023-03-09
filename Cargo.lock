@@ -120,6 +120,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "calmare-cli"
+version = "0.1.0"
+dependencies = [
+ "calmare",
+ "clap",
+ "codespan-reporting",
+ "eyre",
+ "themelios",
+]
+
+[[package]]
 name = "cc"
 version = "1.0.79"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -953,6 +964,7 @@ dependencies = [
 name = "themelios"
 version = "0.1.0"
 dependencies = [
+ "themelios-archive",
  "themelios-scena",
  "themelios-tables",
 ]

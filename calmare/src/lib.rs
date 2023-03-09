@@ -13,3 +13,9 @@ pub use writer::Context;
 
 pub mod span;
 pub mod parse;
+
+#[derive(Debug, Clone)]
+pub enum Content {
+	ED6Scena(themelios::scena::ed6::Scena),
+	ED7Scena(themelios::scena::ed7::Scena),
+}

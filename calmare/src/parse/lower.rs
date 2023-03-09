@@ -11,6 +11,8 @@ use super::lex::{Line, Token, TextToken};
 // use crate::ast::*;
 use crate::span::{Spanned as S, Span};
 
+pub mod scena;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileType {
 	Scena,
@@ -826,32 +828,6 @@ fn parse_type(line: &Line) -> Result<(Game, FileType)> {
 	})
 }
 
-pub fn parse(lines: &[Line], lookup: Option<&dyn Lookup>) -> Result<()> {
-	if lines.is_empty() {
-		Diag::error(Span::new_at(0), "no type declaration").emit();
-		return Err(Error);
-	}
-
-	let (game, ty) = parse_type(&lines[0])?;
-	let ctx = &Context {
-		game,
-		ty,
-		lookup: lookup.unwrap_or_else(|| crate::util::default_lookup(game)),
-	};
-
-	match ty {
-		FileType::Scena => {
-			if game.is_ed7() {
-				let a = scena::ed7::parse(&lines[1..], ctx)?;
-				Ok(())
-			} else {
-				todo!();
-				// lower_ed6_scena(&file);
-			}
-		}
-	}
-}
-
 #[derive(Debug, Clone)]
 struct One<T>(Option<S<Option<T>>>);
 
@@ -935,7 +911,31 @@ impl<K: Ord, V> Many<K, V> {
 	}
 }
 
-pub mod scena;
+pub fn parse(lines: &[Line], lookup: Option<&dyn Lookup>) -> Result<(Game, crate::Content)> {
+	if lines.is_empty() {
+		Diag::error(Span::new_at(0), "no type declaration").emit();
+		return Err(Error);
+	}
+
+	let (game, ty) = parse_type(&lines[0])?;
+	let ctx = &Context {
+		game,
+		ty,
+		lookup: lookup.unwrap_or_else(|| crate::util::default_lookup(game)),
+	};
+
+	match ty {
+		FileType::Scena => {
+			if game.is_ed7() {
+				Ok((game, crate::Content::ED7Scena(scena::ed7::parse(&lines[1..], ctx)?)))
+			} else {
+				todo!();
+				// lower_ed6_scena(&file);
+			}
+		}
+	}
+}
+
 
 #[test]
 fn main() {

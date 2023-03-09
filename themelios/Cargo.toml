@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-themelios-scena = { path = "../themelios-scena" }
-themelios-tables = { path = "../themelios-tables" }
+themelios-scena.path = "../themelios-scena"
+themelios-tables.path = "../themelios-tables"
+themelios-archive.path = "../themelios-archive"

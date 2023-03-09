@@ -8,9 +8,9 @@ thread_local! {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Level {
-	Error,
-	Warning,
 	Info,
+	Warning,
+	Error,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,6 +46,10 @@ impl Diag {
 	pub fn emit(self) {
 		DIAGNOSTICS.with(|d| d.borrow_mut().push(self));
 	}
+
+	pub fn is_fatal(&self) -> bool {
+		self.level >= Level::Error
+	}
 }
 
 // Note that calling [`Diag::emit`] outside of [`diagnose`] will cause the diagnostic to be
@@ -57,6 +61,7 @@ pub fn diagnose<A>(f: impl FnOnce() -> A) -> (A, Vec<Diag>) {
 	(v, diag)
 }
 
+#[cfg(test)]
 pub fn print_diags(filename: &str, source: &str, diags: &[Diag]) {
 	use codespan_reporting::diagnostic::{Diagnostic, Label};
 	use codespan_reporting::files::SimpleFiles;

@@ -792,9 +792,8 @@ fn parse_type(line: &Line) -> Result<(Game, FileType)> {
 		lookup: &themelios_archive::NullLookup,
 	};
 	Parse::new(line, dummy_ctx).parse_with(|p| {
-		// TODO just remove this word, it doesn't do any good
-		if !p.word("type") {
-			Diag::error(p.prev_span(), "expected 'type'").emit();
+		if !p.word("calmare") {
+			Diag::error(p.prev_span(), "expected 'calmare'").emit();
 			return Err(Error);
 		}
 		let Some(a) = test!(p, Token::Ident(a) => a) else {

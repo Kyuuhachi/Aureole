@@ -38,7 +38,7 @@ pub fn write(f: &mut Context, scena: &ed7::Scena) {
 	// TODO: a lot of these declarations use nonstandard syntax. Will need to refine that later.
 
 	let g = common::game(f.game);
-	f.kw("type").kw(g).kw("scena").line();
+	f.kw("calmare").kw(g).kw("scena").line();
 
 	f.kw("scena").suf(":").line().indent(|f| {
 		f.kw("name").val(name1).val(name2).val(filename).line();

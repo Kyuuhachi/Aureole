@@ -23,7 +23,7 @@ pub fn write(f: &mut Context, scena: &ed6::Scena) {
 	} = scena;
 
 	let g = common::game(f.game);
-	f.kw("type").kw(g).kw("scena").line();
+	f.kw("calmare").kw(g).kw("scena").line();
 
 	f.kw("scena").suf(":").line().indent(|f| {
 		f.kw("name").val(path).val(map).line();

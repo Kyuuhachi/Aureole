@@ -946,7 +946,7 @@ arg!(Expr,
 
 arg!(Emote,
 	|f, _| Emote(f.u8()?, f.u8()?, Time(f.u32()?), f.u8()?),
-	|f, _, v| { f.u8(v.0); f.u8(v.1); f.u32(v.2.0); f.u8(f.3); },
+	|f, _, v| { f.u8(v.0); f.u8(v.1); f.u32(v.2.0); f.u8(v.3); },
 );
 
 mod color24 {

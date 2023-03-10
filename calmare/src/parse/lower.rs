@@ -530,7 +530,7 @@ macro unit($T:ident, $unit:ident, $unit_str:literal) {
 }
 
 unit!(Angle, Deg, "deg");
-unit!(AngularSpeed, Deg, "deg");
+unit!(AngularSpeed, DegPerS, "deg/s");
 unit!(Angle32, MDeg, "mdeg");
 unit!(Time, Ms, "ms");
 unit!(Length, Mm, "mm");

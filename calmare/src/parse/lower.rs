@@ -640,8 +640,8 @@ impl TryVal for Emote {
 	fn desc() -> String { "'emote'".to_owned() }
 
 	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
-		if let Some((a, b, c)) = p.term("emote")? {
-			Ok(Some(Emote(a, b, c)))
+		if let Some((a, b, c, d)) = p.term("emote")? {
+			Ok(Some(Emote(a, b, c, d)))
 		} else {
 			Ok(None)
 		}

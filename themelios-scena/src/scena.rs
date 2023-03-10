@@ -104,8 +104,8 @@ pub struct CharAttr(pub CharId, pub u8);
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[derive(derive_more::DebugCustom)]
-#[debug(fmt = "Emote({_0:?}, {_1}, {_2:?})")]
-pub struct Emote(pub u8, pub u8, pub Time);
+#[debug(fmt = "Emote({_0:?}, {_1}, {_2:?}, {_3})")]
+pub struct Emote(pub u8, pub u8, pub Time, pub u8);
 
 pub trait ReadStreamExt2: ReadStream {
 	fn pos2(&mut self) -> Result<Pos2, Self::Error> {

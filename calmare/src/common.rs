@@ -356,6 +356,8 @@ impl Val for Emote {
 		self.1.write(f);
 		write!(f, ",");
 		self.2.write(f);
+		write!(f, ",");
+		self.3.write(f);
 		write!(f, "]");
 	}
 }

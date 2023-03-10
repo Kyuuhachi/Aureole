@@ -331,7 +331,7 @@ themelios_macros::bytecode! {
 		TextSetName(TString), // [name]
 		CharName2(u16 as CharId), // [name2]
 
-		Emote(u16 as CharId, i32 as Length, i32 as Length, Emote, u8), // [emotion] mostly used through macros such as EMO_BIKKURI3(). Third argument is height.
+		Emote(u16 as CharId, i32 as Length, i32 as Length, Emote), // [emotion] mostly used through macros such as EMO_BIKKURI3(). Third argument is height.
 		EmoteStop(u16 as CharId), // [emotion_close]
 
 		LookPointFlagsSet(u8 as u16 as LookPointId, u16 as LookPointFlags),
@@ -945,8 +945,8 @@ arg!(Expr,
 );
 
 arg!(Emote,
-	|f, _| Emote(f.u8()?, f.u8()?, Time(f.u32()?)),
-	|f, _, v| { f.u8(v.0); f.u8(v.1); f.u32(v.2.0); },
+	|f, _| Emote(f.u8()?, f.u8()?, Time(f.u32()?), f.u8()?),
+	|f, _, v| { f.u8(v.0); f.u8(v.1); f.u32(v.2.0); f.u8(f.3); },
 );
 
 mod color24 {

@@ -425,8 +425,8 @@ themelios_macros::bytecode! {
 		EffUnload(u8 as EffId),
 		_85(u16 as CharId),
 
-		CharSetBase    (u16 as CharId, if game.is_ed7() { u8 as u16 } else { u16 } as ChcpId), // [set_chr_base]
-		CharSetPattern (u16 as CharId, if game.is_ed7() { u8 as u16 } else { u16 }), // [set_chr_ptn]
+		CharSetChipBase    (u16 as CharId, if game.is_ed7() { u8 as u16 } else { u16 } as ChipId), // [set_chr_base]
+		CharSetChipPattern (u16 as CharId, if game.is_ed7() { u8 as u16 } else { u16 }), // [set_chr_ptn]
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] CharSetName(u16 as CharId, TString), // debug script only
 		CharSetPos     (u16 as CharId, Pos3, i16 as Angle), // [set_pos]
 		CharSetPos2    (u16 as CharId, Pos3, i16 as Angle),
@@ -664,9 +664,9 @@ themelios_macros::bytecode! {
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_CF(u16 as CharId, u8, String), // something with skeleton animation
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_D0(i32 as Angle32, u32 as Time),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_D1(u16 as CharId, i32, i32, i32, u32 as Time), // something with camera?
-		#[game(Sc, ScEvo, Tc, TcEvo)] ED6LoadChcp(FileId, FileId, u8 as u16 as ChcpId),
-		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7LoadChcp(FileId, u8 as u16 as ChcpId),
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] UnloadChcp(u8 as u16 as ChcpId),
+		#[game(Sc, ScEvo, Tc, TcEvo)] ED6LoadChip(FileId, FileId, u8 as u16 as ChipId),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7LoadChip(FileId, u8 as u16 as ChipId),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] UnloadChip(u8 as u16 as ChipId),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] PartyGetAttr(u8 as u16 as NameId, u8),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] PartyGetEquipped(u8 as u16 as NameId, u8),
 

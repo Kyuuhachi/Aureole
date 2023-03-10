@@ -33,7 +33,7 @@ impl TryVal for FPos3 {
 struct ScenaBuild {
 	header: One<Header>,
 	entry: One<Entry>,
-	chcp: Many<ChcpId, FileId>,
+	chip: Many<ChipId, FileId>,
 	chars: Many<CharDefId, NpcOrMonster<Npc, Monster>>,
 	triggers: Many<TriggerId, Trigger>,
 	look_points: Many<LookPointId, LookPoint>,
@@ -56,7 +56,7 @@ pub fn parse(lines: &[Line], ctx: &Context) -> Result<Scena> {
 		Diag::error(Span::new_at(0), "missing 'scena' block").emit();
 	}
 
-	let chcp = scena.chcp.get(|a| a.0 as usize);
+	let chip = scena.chip.get(|a| a.0 as usize);
 	let (npcs, monsters) = chars(scena.chars);
 	let labels = Some(scena.labels.get(|a| a.0 as usize));
 	let triggers = scena.triggers.get(|a| a.0 as usize);
@@ -79,7 +79,7 @@ pub fn parse(lines: &[Line], ctx: &Context) -> Result<Scena> {
 		bgm: h.bgm,
 		flags: h.flags,
 		includes: h.scp,
-		chcp,
+		chip,
 		labels,
 		npcs,
 		monsters,
@@ -162,11 +162,11 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 				cam_at, unk3, unk4, flags, town, init, reinit,
 			});
 		}
-		"chcp" => {
+		"chip" => {
 			let S(s, n) = Val::parse(p)?;
-			scena.chcp.mark(p.tokens[0].0 | s, n);
+			scena.chip.mark(p.tokens[0].0 | s, n);
 			let v = Val::parse(p)?;
-			scena.chcp.insert(n, v);
+			scena.chip.insert(n, v);
 		}
 		"npc" => {
 			let S(s, n) = Val::parse(p)?;
@@ -177,14 +177,14 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 				angle,
 				flags,
 				unk2,
-				chcp,
+				chip,
 				init,
 				talk,
 				unk4,
 			});
 			scena.chars.insert(n, NpcOrMonster::Npc(Npc {
 				name, pos, angle, flags, unk2,
-				chcp, init, talk, unk4,
+				chip, init, talk, unk4,
 			}));
 		}
 		"monster" => {
@@ -196,14 +196,14 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 				flags,
 				battle,
 				flag,
-				chcp,
+				chip,
 				unk2,
 				stand_anim,
 				walk_anim,
 			});
 			scena.chars.insert(n, NpcOrMonster::Monster(Monster {
 				pos, angle, flags, battle, flag,
-				chcp, unk2, stand_anim, walk_anim,
+				chip, unk2, stand_anim, walk_anim,
 			}));
 		}
 		"trigger" => {
@@ -380,7 +380,7 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 		_ => {
 			Diag::error(p.tokens[0].0, "unknown declaration")
 				.note(p.tokens[0].0, "expected \
-					'scena', 'entry', 'chcp', 'npc', 'monster', \
+					'scena', 'entry', 'chip', 'npc', 'monster', \
 					'trigger', 'look_point', 'label', 'anim', \
 					'sepith', 'at_roll', 'placement', 'battle', 'fn'")
 				.emit();

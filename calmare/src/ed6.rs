@@ -41,14 +41,14 @@ pub fn write(f: &mut Context, scena: &ed6::Scena) {
 		f.line();
 	}
 
-	let mut chcp = (scena.ch.iter(), scena.cp.iter(), 0);
+	let mut chip = (scena.ch.iter(), scena.cp.iter(), 0);
 	loop {
-		let ch = chcp.0.next();
-		let cp = chcp.1.next();
+		let ch = chip.0.next();
+		let cp = chip.1.next();
 		if ch.is_none() && cp.is_none() {
 			break
 		}
-		f.val(&ChcpId(chcp.2));
+		f.val(&ChipId(chip.2));
 		if let Some(ch) = ch {
 			f.val(ch);
 		} else {
@@ -60,7 +60,7 @@ pub fn write(f: &mut Context, scena: &ed6::Scena) {
 			f.kw("null");
 		}
 		f.line();
-		chcp.2 += 1;
+		chip.2 += 1;
 	}
 	if !scena.ch.is_empty() || !scena.cp.is_empty() {
 		f.line();
@@ -90,7 +90,7 @@ pub fn write(f: &mut Context, scena: &ed6::Scena) {
 			f.kw("name").val(&monster.name).line();
 			f.kw("pos").val(&monster.pos).line();
 			f.kw("angle").val(&monster.angle).line();
-			f.kw("chcp").val(&monster.chcp).line();
+			f.kw("chip").val(&monster.chip).line();
 			f.kw("flags").val(&monster.flags).line();
 			f.kw("unk2").val(&monster.unk2).line();
 			f.kw("battle").val(&monster.battle).line();

@@ -19,7 +19,7 @@ pub fn write(f: &mut Context, scena: &ed7::Scena) {
 		includes,
 
 		entry,
-		chcp,
+		chip,
 		labels,
 		npcs,
 		monsters,
@@ -74,10 +74,10 @@ pub fn write(f: &mut Context, scena: &ed7::Scena) {
 		f.line();
 	}
 
-	for (i, chcp) in chcp.iter().enumerate() {
-		f.val(&ChcpId(i as u16)).val(chcp).line();
+	for (i, chip) in chip.iter().enumerate() {
+		f.val(&ChipId(i as u16)).val(chip).line();
 	}
-	if !chcp.is_empty() {
+	if !chip.is_empty() {
 		f.line();
 	}
 
@@ -90,7 +90,7 @@ pub fn write(f: &mut Context, scena: &ed7::Scena) {
 			f.kw("angle").val(&npc.angle).line();
 			f.kw("flags").val(&npc.flags).line();
 			f.kw("unk2").val(&npc.unk2).line();
-			f.kw("chcp").val(&npc.chcp).line();
+			f.kw("chip").val(&npc.chip).line();
 			f.kw("init").val(&npc.init).line();
 			f.kw("talk").val(&npc.talk).line();
 			f.kw("unk4").val(&npc.unk4).line();
@@ -106,7 +106,7 @@ pub fn write(f: &mut Context, scena: &ed7::Scena) {
 			f.kw("flags").val(&monster.flags).line();
 			f.kw("battle").val(&monster.battle).line();
 			f.kw("flag").val(&monster.flag).line();
-			f.kw("chcp").val(&monster.chcp).line();
+			f.kw("chip").val(&monster.chip).line();
 			f.kw("unk2").val(&monster.unk2).line();
 			f.kw("stand_anim").val(&monster.stand_anim).line();
 			f.kw("walk_anim").val(&monster.walk_anim).line();

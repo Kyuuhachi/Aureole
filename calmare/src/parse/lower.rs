@@ -712,7 +712,7 @@ newtype!(TriggerId,   "trigger");
 newtype!(LabelId,     "label");
 newtype!(AnimId,      "anim");
 
-newtype!(ChcpId,  "chcp");
+newtype!(ChipId,  "chip");
 newtype!(VisId,   "vis");
 newtype!(ForkId,  "fork");
 newtype!(EffId,   "eff");

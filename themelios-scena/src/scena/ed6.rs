@@ -55,9 +55,9 @@ pub struct Npc { // [Player]
 	pub pos: Pos3, // [X, Y, Z]
 	pub angle: Angle, // [ANG]
 	pub x: u16, // [X]
-	pub cp: ChcpId, // [Pt]
+	pub cp: ChipId, // [Pt]
 	pub frame: u16, // [No]
-	pub ch: ChcpId, // [Bs]
+	pub ch: ChipId, // [Bs]
 	pub flags: CharFlags, // [BXPNAWTDS]
 	pub init: FuncId, // [MOVE_FUNC]
 	pub talk: FuncId, // [EVENT_FUNC]
@@ -68,7 +68,7 @@ pub struct Monster { // [Monster]
 	pub name: TString,
 	pub pos: Pos3,
 	pub angle: Angle,
-	pub chcp: ChcpId, // This looks like a chcp index, but npcs have 4×u16 while this only has 1×u16?
+	pub chip: ChipId, // This looks like a chip index, but npcs have 4×u16 while this only has 1×u16?
 	pub flags: CharFlags,
 	pub unk2: i32, // Always -1
 	pub battle: BattleId,
@@ -136,9 +136,9 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 		pos: g.pos3()?,
 		angle: Angle(g.i16()?),
 		x: g.u16()?,
-		cp: ChcpId(g.u16()?),
+		cp: ChipId(g.u16()?),
 		frame: g.u16()?,
-		ch: ChcpId(g.u16()?),
+		ch: ChipId(g.u16()?),
 		flags: CharFlags(g.u16()?),
 		init: FuncId(g.u16()?, g.u16()?),
 		talk: FuncId(g.u16()?, g.u16()?),
@@ -149,7 +149,7 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 		name: TString(strings.string()?),
 		pos: g.pos3()?,
 		angle: Angle(g.i16()?),
-		chcp: ChcpId(g.u16()?),
+		chip: ChipId(g.u16()?),
 		flags: CharFlags(g.u16()?),
 		unk2: g.i32()?,
 		battle: BattleId(cast(g.u16()?)?),
@@ -300,7 +300,7 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		strings.string(monster.name.as_str())?;
 		g.pos3(monster.pos);
 		g.i16(monster.angle.0);
-		g.u16(monster.chcp.0);
+		g.u16(monster.chip.0);
 		g.u16(monster.flags.0);
 		g.i32(monster.unk2);
 		g.u16(cast(monster.battle.0)?);

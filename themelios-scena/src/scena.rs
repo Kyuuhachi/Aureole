@@ -82,7 +82,7 @@ newtype!(Global, u8);
 // 49 TownId for the next save, values include 19, 140, 302, 400, 401, 274, 259, 297, 296, 299
 newtype!(Attr, u8);
 
-newtype!(ChcpId, u16);
+newtype!(ChipId, u16);
 newtype!(CharId, u16);
 newtype!(LookPointId, u16);
 newtype!(ObjectId, u16);

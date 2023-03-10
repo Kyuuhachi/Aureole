@@ -15,8 +15,8 @@ pub struct Header {
 struct ScenaBuild {
 	header: One<Header>,
 	entries: Vec<Entry>,
-	ch: Many<ChcpId, FileId>,
-	cp: Many<ChcpId, FileId>,
+	ch: Many<ChipId, FileId>,
+	cp: Many<ChipId, FileId>,
 	chars: Many<CharDefId, NpcOrMonster<Npc, Monster>>,
 	triggers: Many<TriggerId, Trigger>,
 	look_points: Many<LookPointId, LookPoint>,
@@ -109,7 +109,7 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 				flags, town, init, reinit,
 			});
 		}
-		"chcp" => {
+		"chip" => {
 			let S(s, n) = Val::parse(p)?;
 			scena.ch.mark(p.tokens[0].0 | s, n);
 			scena.cp.mark(p.tokens[0].0 | s, n);
@@ -140,12 +140,12 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 			scena.chars.mark(p.tokens[0].0 | s, n);
 			parse_data!(p => {
 				name, pos, angle,
-				chcp, flags, unk2,
+				chip, flags, unk2,
 				battle, flag, unk3,
 			});
 			scena.chars.insert(n, NpcOrMonster::Monster(Monster {
 				name, pos, angle,
-				chcp, flags, unk2,
+				chip, flags, unk2,
 				battle, flag, unk3,
 			}));
 		}
@@ -172,7 +172,7 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 		_ => {
 			Diag::error(p.tokens[0].0, "unknown declaration")
 				.note(p.tokens[0].0, "expected \
-					'scena', 'entry', 'chcp', 'npc', 'monster', \
+					'scena', 'entry', 'chip', 'npc', 'monster', \
 					'trigger', 'look_point', 'fn'")
 				.emit();
 		}

@@ -294,7 +294,7 @@ nt_arg!(TriggerId,   "trigger[{}]");
 nt_arg!(LabelId,     "label[{}]");
 nt_arg!(AnimId,      "anim[{}]");
 
-nt_arg!(ChcpId,  "chcp[{}]");
+nt_arg!(ChipId,  "chip[{}]");
 nt_arg!(VisId,   "vis[{}]");
 nt_arg!(ForkId,  "fork[{}]");
 nt_arg!(EffId,   "eff[{}]");

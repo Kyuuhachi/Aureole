@@ -338,7 +338,7 @@ themelios_macros::bytecode! {
 		LookPointFlagsUnset(u8 as u16 as LookPointId, u16 as LookPointFlags),
 
 		CamChangeAxis(u16), // [camera_change_axis] 0 CAMERA_ABSOLUTE_MODE, 1 CAMERA_RELATIVE_MODE
-		CamMove(i32, i32, i32, u32 as Time), // [camera_move]
+		CamSetDistance(i32, i32, i32, u32 as Time), // [camera_move]
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] _Cam68(u8), // TODO this isn't in any scripts? Is it from the asm?
 		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_Cam69(u8, u16),
 		CamLookChar(u16 as CharId, u32 as Time), // [camera_look_chr]
@@ -438,8 +438,8 @@ themelios_macros::bytecode! {
 		CharWalkToPos2 (u16 as CharId, Pos3, u32 as Speed, u8),
 		_Char90        (u16 as CharId, i32, i32, i32, u32, u8),
 		_Char91        (u16 as CharId, i32, i32, i32, i32, u8),
-		CharWalkToChar (u16 as CharId, u16 as CharId, u32, u32 as Speed, u8), // [walk_to_chr]
-		CharWalkToChar2(u16 as CharId, u16 as CharId, u32, u32 as Speed, u8),
+		CharWalkToChar (u16 as CharId, u16 as CharId, i32 as Length, u32 as Speed, u8), // [walk_to_chr]
+		CharWalkToChar2(u16 as CharId, u16 as CharId, i32 as Length, u32 as Speed, u8),
 		_94        (u8, u16 as CharId, i16 as Angle, i32, u32 as Speed, u8),
 		CharJump       (u16 as CharId, i32, i32, i32, u32, u32 as Speed), // [jump]
 		_Char96        (u16 as CharId, Pos3, i32, i32),

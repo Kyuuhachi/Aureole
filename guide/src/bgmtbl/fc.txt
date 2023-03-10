@@ -1,0 +1,184 @@
+;===BGMテーブル===
+;---ファイル名は必ず６文字で---
+;曲番号定義
+
+#define			BGM_Nothing		00000		; 
+#define			BGM_Title		00001		; タイトル
+#define			BGM_Opening1	00002		; 前編オープニング
+#define			BGM_StaffRoll1	00003		; 前編スタッフロール
+#define			BGM_Chapter		00004		; 章間ビジュアル
+#define			BGM_Preview		00005		; 後編予告
+#define			BGM_Opening2	00006		; 後編オープニング
+#define			BGM_StaffRoll2	00007		; 後編スタッフロール
+#define			BGM_Logo		00008		; ロゴの音
+
+; 街関係
+#define			BGM_Town		00010		; 
+#define			BGM_Rolent		00010		; 地方都市ロレント・ブライト家
+#define			BGM_Bose		00011		; 商業都市ボース
+#define			BGM_Ruan		00012		; 海港都市ルーアン
+#define			BGM_Zeiss		00013		; 工房都市ツァイス
+#define			BGM_Grancel		00014		; 王都グランセル・王立学園
+#define			BGM_Village		00015		; 村、一軒家
+#define			BGM_Sekisyo		00016		; 関所
+#define			BGM_Castle		00017		; グランセル城
+#define			BGM_Arena		00018		; 王立競技場
+
+; 道関係
+#define			BGM_Field		00020		; 街道
+#define			BGM_Forest		00021		; 森
+#define			BGM_Mountain	00022		; 山、峡谷
+
+; ダンジョン関係
+#define			BGM_Cave		00030		; 洞窟系ダンジョン
+#define			BGM_Structure	00031		; 建物系ダンジョン
+#define			BGM_Cave2		00032		; 鍾乳洞
+#define			BGM_Tower		00033		; 塔
+#define			BGM_Fortress	00034		; レイストン要塞
+#define			BGM_SealArea	00035		; 地下封印区画（前編ラスダン）
+
+; 戦闘関係
+#define			BGM_Battle00	00040		; 通常戦闘
+#define			BGM_Battle10	00041		; 通常戦闘ピンチ
+#define			BGM_Battle20	00042		; 中ボス戦闘
+#define			BGM_Battle30	00043		; 大ボス戦闘
+#define			BGM_Battle40	00044		; 闘技場バトル
+#define			BGM_Battle41	00045		; 前編ラスボス戦闘
+#define			BGM_Battle42	00046		; 後編ラスボス戦闘
+#define			BGM_Battle50	00047		; 戦闘勝利
+#define			BGM_GameOver	00048		; ゲームオーバー
+
+
+#define			BGM_TakeOver	00060		; 引き継ぎ
+
+; イベント関係
+#define			BGM_Harmoni		00070		; ヨシュアのハーモニカ
+#define			BGM_ED6501		00071		; オリビエのリュート
+#define			BGM_ED6502		00072		; オリビエのピアノ
+#define			BGM_ED6503		00073		; 
+#define			BGM_ED6504		00074		; 星のありか（ハーモニカ長・別れ前）
+#define			BGM_ED6505		00075		; ？
+
+#define			BGM_Sadness		00080		; 悲哀イベント(火事、誘拐後など)
+#define			BGM_Plot		00081		; 陰謀、悪巧み、不安
+#define			BGM_Chase		00082		; 追跡、脱出、追撃など
+#define			BGM_Remember	00083		; 回想（ヨシュア以外）
+#define			BGM_Night		00084		; 夜のシーン
+
+#define			BGM_Tension		00086		; 緊迫、緊張
+#define			BGM_Airpirates	00087		; 空賊団のテーマ
+#define			BGM_Festival	00088		; お祭り、旅立ち
+#define			BGM_ErbeAttack	00089		; エルベ離宮急襲
+#define			BGM_Weissman	00090		; ワイスマンがヨシュアの暗示を解く
+#define			BGM_Joshua		00091		; ヨシュアのテーマ～別れ～
+#define			BGM_Gospel		00092		; 黒のオーブメント発動、封印解除
+#define			BGM_Army		00101		; 王国軍のテーマ
+
+#define			BGM_Drama1		00093		; 姫の悩み
+#define			BGM_Drama2		00094		; 騎士たちの嘆き
+#define			BGM_Drama3		00095		; それぞれの思惑
+#define			BGM_Drama4		00096		; 城
+#define			BGM_Drama5		00097		; コロシアム
+#define			BGM_Drama6		00098		; 決闘
+#define			BGM_Drama7		00099		; 姫の死
+#define			BGM_Drama8		00100		; 大団円
+
+                                  
+;---------------------------------------------------------------------
+
+
+//BGMテーブル定義
+
+;システム系
+//tbl	BGM_NO			  filename	 LOOP	LoopStart	  LoopEnd			Comment
+bgmtbl	BGM_Title			ed6001		1	 00562871	 03140411
+bgmtbl	BGM_Opening1		ed6002		0			0			0			;前編オープニング
+bgmtbl	BGM_StaffRoll1		ed6003		0			0			0			;前編スタッフロール
+bgmtbl	BGM_Chapter			ed6004		0			0			0			;章間ビジュアル
+bgmtbl	BGM_Preview			ed6005		0			0			0			;後編予告
+bgmtbl	BGM_Opening2		ed6006		0			0			0			;後編オープニング
+bgmtbl	BGM_StaffRoll2		ed6007		0			0			0			;後編スタッフロール
+bgmtbl	BGM_Logo			ed6008		0			0			0			;ロゴ
+													 
+;街関係												
+bgmtbl	BGM_Rolent			ed6100		1	 00021825	 06145560			;地方都市ロレント・ブライト家
+bgmtbl	BGM_Bose			ed6101		1	 00125210	 04358193			;商業都市ボース
+bgmtbl	BGM_Ruan			ed6102		1	 00256040	 04779868			;海港都市ルーアン
+bgmtbl	BGM_Zeiss			ed6103		1	 00585462	 05629787			;工房都市ツァイス
+bgmtbl	BGM_Grancel			ed6104		1	 00445158	 07620480			;王都グランセル・王立学園
+bgmtbl	BGM_Village			ed6105		1	 00177760	 06549752			;村、一軒家
+bgmtbl	BGM_Sekisyo			ed6106		1	 00139860	 05000310			;関所
+bgmtbl	BGM_Castle			ed6107		1	 00209832	 05312397			;グランセル城
+bgmtbl	BGM_Arena			ed6108		1	 00573440	 03933876			;王立競技場
+													 
+;道関係												
+bgmtbl	BGM_Field			ed6200		1	00103934	 06513551			;街道
+bgmtbl	BGM_Forest			ed6201		1	00131072	 02610720			;森
+bgmtbl	BGM_Mountain		ed6202		1	00626688	 02466175			;山、峡谷
+													 
+;ダンジョン関係										 
+bgmtbl	BGM_Cave			ed6300		1	00197561	04736550			;洞窟系ダンジョン
+bgmtbl	BGM_Structure		ed6301		1	00548864	03722338			;建物系ダンジョン
+bgmtbl	BGM_Cave2			ed6302		1	00101928	04524660			;鍾乳洞
+bgmtbl	BGM_Tower			ed6303		1	00107797	04803065			;塔
+bgmtbl	BGM_Fortress		ed6304		1	00262144	05699077			;レイストン要塞
+bgmtbl	BGM_SealArea		ed6305		1	00505412	12110652			;地下封印区画（前編ラスダン）
+													 
+;戦闘関係											
+bgmtbl	BGM_Battle00		ed6400		1	00172199	05629787			;通常戦闘０
+													 
+bgmtbl	BGM_Battle10		ed6410		1	00835516	04091456			;通常戦闘０ピンチ
+													 
+bgmtbl	BGM_Battle20		ed6402		1	00389298	04557007			;中ボス戦闘０
+													 
+bgmtbl	BGM_Battle30		ed6403		1	00391604	04884924			;大ボス戦闘０
+													 
+bgmtbl	BGM_Battle40		ed6404		1	00299275	04417670			;闘技場バトル
+bgmtbl	BGM_Battle41		ed6405		1	00324096	05412960			;前編ラスボス戦闘１
+bgmtbl	BGM_Battle42		ed6406		1	00947015	04536452			;前編ラスボス戦闘２
+													 
+bgmtbl	BGM_Battle50		ed6407		1	00308235	01644815			;戦闘勝利
+bgmtbl	BGM_GameOver		ed6408		1	00393216	03799004			;ゲームオーバー
+
+bgmtbl	BGM_TakeOver		ed6600		1			0			0			;引き継ぎ
+													 
+;イベント関係										 
+bgmtbl	BGM_Harmoni			ed6500		0	00000000	00000000			;ヨシュアのハーモニカ
+bgmtbl	BGM_ED6501			ed6501		0	00000000	00000000			;オリビエのリュート（ハミング付き）
+bgmtbl	BGM_ED6502			ed6502		0	00000000	00000000			;オリビエのピアノ
+bgmtbl	BGM_ED6503			ed6503		1	00020987	03000017			;オリビエのリュート（インスト）
+bgmtbl	BGM_ED6504			ed6504		1	00509184	03855360			;星のありか（ハーモニカ長・別れ前）
+bgmtbl	BGM_ED6505			ed6505		1	00859198	05137866			;学園祭、生誕祭
+													 
+bgmtbl	BGM_Sadness			ed6510		1	00176287	02787839			;悲哀イベント
+bgmtbl	BGM_Plot			ed6511		1	00306671	04536712			;陰謀、悪巧み、不安
+bgmtbl	BGM_Chase			ed6512		1	00275592	03739288			;追跡、脱出、追撃など
+bgmtbl	BGM_Remember		ed6513		1	01179648	03254045			;回想（ヨシュア以外）
+bgmtbl	BGM_Night			ed6514		1	00554988	04249189			;夜のシーン
+													 
+bgmtbl	BGM_Tension			ed6516		1	00240097	03928078			;緊迫、緊張
+bgmtbl	BGM_Airpirates		ed6517		1	00344064	03990689			;空賊団のテーマ
+bgmtbl	BGM_Festival		ed6518		1	00136808	03992196			;旅立ち
+bgmtbl	BGM_ErbeAttack		ed6519		1	00153494	05773171			;エルベ離宮急襲
+													 
+bgmtbl	BGM_Weissman		ed6520		1	00489216	06926592			;ワイスマンがヨシュアの暗示を解く
+bgmtbl	BGM_Joshua			ed6521		1	00022082	04859488			;ヨシュアのテーマ～別れ～
+bgmtbl	BGM_Gospel			ed6522		1	00021760	02121984			;黒のオーブメント発動、封印解除
+bgmtbl	BGM_Army			ed6523		1	00571392	03036672			;王国軍のテーマ
+													 
+bgmtbl	BGM_Drama1			ed6530		1	00022386	02116750			;姫の悩み
+bgmtbl	BGM_Drama2			ed6531		1	00021840	01852305			;騎士たちの嘆き
+bgmtbl	BGM_Drama3			ed6532		1	00022400	02647256			;それぞれの思惑
+bgmtbl	BGM_Drama4			ed6533		1	00022144	01476608			;城
+bgmtbl	BGM_Drama5			ed6534		1	00050592	01881504			;コロシアム
+bgmtbl	BGM_Drama6			ed6535		1	00239360	02102272			;決闘
+bgmtbl	BGM_Drama7			ed6536		1	00877725	03548160			;姫の死
+bgmtbl	BGM_Drama8			ed6537		1	00039675	00846699			;大団円
+
+													 
+;---------------------------------------------------------------------------------
+													 
+bgmtbl	BGM_Nothing			ed6999		0			0			0			;検索終了コード
+													 
+;---------------------------------------------------------------------------------
+													 

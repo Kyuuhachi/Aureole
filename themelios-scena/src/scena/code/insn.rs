@@ -430,9 +430,9 @@ themelios_macros::bytecode! {
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] CharSetName(u16 as CharId, TString), // debug script only
 		CharSetPos     (u16 as CharId, Pos3, i16 as Angle), // [set_pos]
 		CharSetPos2    (u16 as CharId, Pos3, i16 as Angle),
-		CharLookAtChar (u16 as CharId, u16 as CharId, u16 as AngularSpeed), // [look_to]
-		CharLookAtPos  (u16 as CharId, Pos2,          u16 as AngularSpeed),
-		CharTurn       (u16 as CharId, i16 as Angle,  u16 as AngularSpeed), // [turn_to]
+		CharTurnToChar (u16 as CharId, u16 as CharId, u16 as AngularSpeed), // [look_to]
+		CharTurnToPos  (u16 as CharId, Pos2,          u16 as AngularSpeed),
+		CharTurnTo     (u16 as CharId, i16 as Angle,  u16 as AngularSpeed), // [turn_to]
 		CharIdle       (u16 as CharId, Pos2, Pos2, u32 as Speed),
 		CharWalkToPos  (u16 as CharId, Pos3, u32 as Speed, u8), // [walk_to]
 		CharWalkToPos2 (u16 as CharId, Pos3, u32 as Speed, u8),

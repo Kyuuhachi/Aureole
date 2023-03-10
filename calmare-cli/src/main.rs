@@ -65,12 +65,12 @@ enum CliGame {
 #[cfg(target_os = "windows")]
 fn windows_wait() {
 	let process_count: u32 = unsafe {
-		windows_sys::Win32::System::Console::GetConsoleProcessList([0u32, 1].as_mut_ptr(), 1)
+		windows_sys::Win32::System::Console::GetConsoleProcessList([0].as_mut_ptr(), 1)
 	};
 
 	if process_count == 1 {
 		println!("\nPress any key to exit...");
-		let _ = std::io::stdin().read(&mut [0u8]);
+		let _ = std::io::stdin().read(&mut []);
 	}
 }
 

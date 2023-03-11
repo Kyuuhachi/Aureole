@@ -240,8 +240,26 @@ prim_arg!(u32, "{}");
 prim_arg!(i8, "{}");
 prim_arg!(i16, "{}");
 prim_arg!(i32, "{}");
-prim_arg!(String, "{:?}");
-nt_arg!(TString, "{:?}");
+
+impl Val for String {
+	fn write(&self, f: &mut Context) {
+		write!(f, "\"");
+		for c in self.chars() {
+			match c {
+				'\"' => write!(f, "\\\""),
+				'\\' => write!(f, "\\\\"),
+				c => write!(f, "{}", c),
+			}
+		}
+		write!(f, "\"");
+	}
+}
+
+impl Val for TString {
+	fn write(&self, f: &mut Context) {
+		self.0.write(f)
+	}
+}
 
 nt_arg!(Time, "{}ms");
 nt_arg!(Angle, "{}deg");

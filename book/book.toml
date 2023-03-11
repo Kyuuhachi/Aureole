@@ -1,6 +1,11 @@
 [book]
+title = "Aureole Handbook"
 authors = ["Kyuuhachi"]
 language = "en"
 multilingual = false
 src = "src"
-title = "Themelios"
+
+[output.html]
+git-repository-url = "https://github.com/Kyuuhachi/Aureole/tree/main/book"
+edit-url-template = "https://github.com/Kyuuhachi/Aureole/edit/main/book/{path}"
+default-theme = "navy"

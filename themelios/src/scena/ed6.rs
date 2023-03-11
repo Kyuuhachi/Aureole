@@ -2,10 +2,9 @@ use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
 use crate::types::*;
-use crate::util::*;
-
-use super::*;
-use super::code::Code;
+use themelios_scena::util::*;
+use super::code::{self, Code};
+use super::{ReadStreamExt2, WriteStreamExt2};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Scena {

@@ -2,10 +2,9 @@ use std::collections::HashMap;
 use hamu::read::le::*;
 use hamu::write::le::*;
 use crate::types::*;
-use crate::util::*;
-
-use super::*;
-use super::code::Code;
+use themelios_scena::util::*;
+use super::code::{self, Code};
+use super::{ReadStreamExt2, WriteStreamExt2};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Scena {
@@ -774,3 +773,4 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 fn transpose(x: [[f32; 4]; 4]) -> [[f32; 4]; 4] {
 	[0,1,2,3].map(|a| [0,1,2,3].map(|b| x[b][a]))
 }
+

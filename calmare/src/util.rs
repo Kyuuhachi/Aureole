@@ -3,7 +3,7 @@ use themelios::lookup::{Lookup, ED7Lookup};
 
 pub fn default_lookup(game: Game) -> &'static dyn Lookup {
 	use Game::*;
-	use themelios_archive_prebuilt as pb;
+	use themelios::lookup::prebuilt as pb;
 	match game {
 		Fc | FcKai => &*pb::FC,
 		FcEvo => &*pb::FC_EVO,

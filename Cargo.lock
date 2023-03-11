@@ -113,7 +113,6 @@ dependencies = [
  "codespan-reporting",
  "extend",
  "themelios",
- "themelios-archive-prebuilt",
  "total-float",
  "unicode-xid",
 ]
@@ -959,14 +958,7 @@ version = "0.1.0"
 dependencies = [
  "cp932",
  "hamu",
-]
-
-[[package]]
-name = "themelios-archive-prebuilt"
-version = "0.1.0"
-dependencies = [
  "lazy_static",
- "themelios-archive",
  "zstd",
 ]
 

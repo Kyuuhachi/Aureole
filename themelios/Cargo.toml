@@ -11,3 +11,7 @@ hamu.workspace = true
 strict_result = "1.1.0"
 thiserror = "1.0.0"
 num_enum = "0.5.7"
+
+[features]
+default = ["prebuilt-archives"]
+prebuilt-archives = ["themelios-archive/prebuilt"]

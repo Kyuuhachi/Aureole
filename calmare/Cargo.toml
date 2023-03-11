@@ -4,8 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-themelios = { path = "../themelios" }
-themelios-archive-prebuilt.path = "../themelios-archive-prebuilt"
+themelios.path = "../themelios"
 total-float.path = "../total-float"
 extend = "1.1.2"
 

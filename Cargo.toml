@@ -9,7 +9,6 @@ members = [
 	"themelios-scena",
 	"themelios-types",
 	"themelios-archive",
-	"themelios-archive-prebuilt",
 	"themelios",
 	"kagami",
 

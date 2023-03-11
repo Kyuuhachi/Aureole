@@ -114,12 +114,12 @@ impl<'a> Parse<'a> {
 		}
 	}
 
-	fn body(&mut self) -> Result<&'a [Line<'a>]> {
+	fn body(&mut self) -> &'a [Line<'a>] {
 		match self.body.take() {
-			Some(a) => Ok(a),
+			Some(a) => a,
 			None => {
 				Diag::error(self.eol, "expected a body").emit();
-				Err(Error)
+				&[]
 			},
 		}
 	}
@@ -731,9 +731,7 @@ macro parse_data($d:ident => { $($k:ident $(=> $e:expr)?),* $(,)? }) {
 		let mut $k = One::default();
 	});)*
 
-	let body = $d.body()?;
-
-	for line in body {
+	for line in $d.body() {
 		Parse::new(line, $d.context).parse_with(|p| {
 			let Some(key) = test!(p, Token::Ident(a) => a) else {
 				Diag::error(p.next_span(), "expected word").emit();

@@ -61,7 +61,7 @@ impl Val for Code {
 fn parse_tree(p: &mut Parse, can_break: bool, can_continue: bool) -> Vec<TreeInsn> {
 	let mut out = Vec::new();
 	let mut last_if = None;
-	for l in p.body().unwrap_or_default() {
+	for l in p.body() {
 		let p = &mut Parse::new(l, p.context);
 
 		let span = p.next_span();
@@ -109,7 +109,7 @@ fn parse_tree(p: &mut Parse, can_break: bool, can_continue: bool) -> Vec<TreeIns
 				let e = parse_expr(p);
 				let mut cases = Vec::new();
 				let mut seen = Many::<Option<u16>, ()>::default(); // only used for duplicate checking, not order
-				for l in p.body().unwrap_or_default() {
+				for l in p.body() {
 					Parse::new(l, p.context).parse_with(|p| {
 						let span = p.next_span();
 						let key = test!(p, Token::Ident(a) => *a).unwrap_or_default();

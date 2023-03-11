@@ -989,7 +989,7 @@ mod fork {
 	pub(super) fn read<'a>(f: &mut impl Read<'a>, game: Game) -> Result<Code, ReadError> {
 		let len = f.u8()? as usize;
 		let pos = f.pos();
-		let code = code::read(f, game, Some(pos+len))?;
+		let code = super::read(f, game, Some(pos+len))?;
 		if len > 0 {
 			f.check_u8(0)?;
 		}
@@ -1001,7 +1001,7 @@ mod fork {
 		let (l2, l2_) = HLabel::new();
 		f.delay(move |l| Ok(u8::to_le_bytes(hamu::write::cast_usize(l(l2)? - l(l1)?)?)));
 		f.label(l1_);
-		code::write(f, game, v)?;
+		super::write(f, game, v)?;
 		f.label(l2_);
 		if !v.is_empty() {
 			f.u8(0);
@@ -1015,7 +1015,7 @@ mod fork_loop {
 	pub(super) fn read<'a>(f: &mut impl Read<'a>, game: Game) -> Result<Code, ReadError> {
 		let len = f.u8()? as usize;
 		let pos = f.pos();
-		let code = code::read(f, game, Some(pos+len))?;
+		let code = super::read(f, game, Some(pos+len))?;
 		let next = if game.is_ed7() {
 			Insn::NextFrame2()
 		} else {
@@ -1032,7 +1032,7 @@ mod fork_loop {
 		let l1c = l1.clone();
 		f.delay(|l| Ok(u8::to_le_bytes(hamu::write::cast_usize(l(l2)? - l(l1)?)?)));
 		f.label(l1_);
-		code::write(f, game, v)?;
+		super::write(f, game, v)?;
 		f.label(l2_);
 		let next = if game.is_ed7() {
 			Insn::NextFrame2()

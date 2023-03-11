@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 
-use themelios::scena::*;
 use themelios::text::{Text, TextSegment};
 use themelios::types::*;
 use themelios::lookup::Lookup;

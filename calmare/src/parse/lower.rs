@@ -3,7 +3,6 @@ use std::collections::BTreeMap;
 use themelios::scena::*;
 use themelios::text::{Text, TextSegment};
 use themelios::types::*;
-use themelios::util::array;
 use themelios::lookup::Lookup;
 
 use super::diag::*;
@@ -282,7 +281,7 @@ impl<T: TryVal> Val for Vec<T> {
 
 impl<const N: usize, T: Val> Val for [T; N] {
 	fn parse(p: &mut Parse) -> Result<Self> {
-		array(|| T::parse(p))
+		[(); N].try_map(|()| T::parse(p))
 	}
 }
 

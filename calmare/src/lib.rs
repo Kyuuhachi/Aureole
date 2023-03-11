@@ -2,6 +2,7 @@
 #![feature(pattern)]
 #![feature(decl_macro)]
 #![feature(try_blocks)]
+#![feature(array_try_map)]
 
 pub mod ed6;
 pub mod ed7;

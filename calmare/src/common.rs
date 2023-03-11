@@ -532,6 +532,9 @@ fn text(f: &mut Context, v: &Text) {
 				let Some(next) = it.next() else { break false };
 				match next {
 					TextSegment::String(s) => {
+						if s.starts_with(' ') {
+							write!(f, "{{}}")
+						}
 						let s = s
 							.replace('\\', "\\\\")
 							.replace('{', "\\{")

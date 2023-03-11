@@ -273,7 +273,7 @@ pub fn write(f: &mut Context, scena: &Scena) {
 					}
 					f.line();
 					f.kw("placement").val(&setup.placement).val(&setup.placement_ambush).line();
-					f.kw("bgm").val(&setup.bgm).val(&setup.bgm).line();
+					f.kw("bgm").val(&setup.bgm).val(&setup.bgm_ambush).line();
 					f.kw("at_roll").val(&setup.at_roll).line();
 				});
 			}

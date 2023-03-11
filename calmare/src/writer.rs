@@ -24,7 +24,7 @@ impl<'a> Context<'a> {
 			decompile: true,
 			indent: 0,
 			space: Space::None,
-			lookup: lookup.unwrap_or_else(|| crate::util::default_lookup(game)),
+			lookup: lookup.unwrap_or_else(|| themelios::lookup::default_for(game)),
 			out: String::new(),
 		}
 	}

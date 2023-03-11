@@ -3,9 +3,6 @@
 mod ed6;
 pub use ed6::ED6Lookup;
 
-#[cfg(feature = "prebuilt")]
-pub mod prebuilt;
-
 /// The main lookup trait.
 pub trait Lookup {
 	/// Given a file id, return the corresponding filename, if any.

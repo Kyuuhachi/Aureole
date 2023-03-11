@@ -944,12 +944,14 @@ name = "themelios"
 version = "0.1.0"
 dependencies = [
  "hamu",
+ "lazy_static",
  "num_enum",
  "strict_result",
  "themelios-archive",
  "themelios-scena",
  "themelios-types",
  "thiserror",
+ "zstd",
 ]
 
 [[package]]
@@ -958,8 +960,6 @@ version = "0.1.0"
 dependencies = [
  "cp932",
  "hamu",
- "lazy_static",
- "zstd",
 ]
 
 [[package]]

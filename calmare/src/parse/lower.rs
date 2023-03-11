@@ -924,7 +924,7 @@ pub fn parse(lines: &[Line], lookup: Option<&dyn Lookup>) -> Result<(Game, crate
 	let ctx = &Context {
 		game,
 		ty,
-		lookup: lookup.unwrap_or_else(|| crate::util::default_lookup(game)),
+		lookup: lookup.unwrap_or_else(|| themelios::lookup::default_for(game)),
 	};
 
 	match ty {

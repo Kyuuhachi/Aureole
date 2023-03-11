@@ -66,9 +66,7 @@ pub struct Spanned<T>(pub Span, pub T);
 
 impl<T: std::fmt::Debug> std::fmt::Debug for Spanned<T> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		if f.alternate() {
-			self.0.fmt(f)?;
-		}
+		self.0.fmt(f)?;
 		f.write_str("@")?;
 		self.1.fmt(f)
 	}

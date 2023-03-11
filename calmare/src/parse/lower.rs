@@ -289,7 +289,7 @@ impl<T: TryVal> TryVal for Option<T> {
 
 	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
 		if let Some(()) = p.term("null")? {
-			Ok(None)
+			Ok(Some(None))
 		} else {
 			T::try_parse(p).map(Some)
 		}

@@ -10,35 +10,29 @@ enum ISet {
 	Ao, AoEvo,
 }
 
-impl Game {
-	fn iset(self) -> ISet {
-		match self {
-			Game::Fc => ISet::Fc,
-			Game::FcEvo => ISet::FcEvo,
-			Game::FcKai => ISet::Fc,
-			Game::Sc    => ISet::Sc,
-			Game::ScEvo => ISet::ScEvo,
-			Game::ScKai => ISet::Sc,
-			Game::Tc    => ISet::Tc,
-			Game::TcEvo => ISet::TcEvo,
-			Game::TcKai => ISet::Tc,
-			Game::Zero    => ISet::Zero,
-			Game::ZeroEvo => ISet::ZeroEvo,
-			Game::ZeroKai => ISet::Zero,
-			Game::Ao    => ISet::Ao,
-			Game::AoEvo => ISet::AoEvo,
-			Game::AoKai => ISet::Ao,
-		}
-	}
-
-	fn is_ed7_kai(self) -> bool {
-		matches!(self, Game::ZeroKai|Game::AoKai)
+fn iset(g: Game) -> ISet {
+	match g {
+		Game::Fc => ISet::Fc,
+		Game::FcEvo => ISet::FcEvo,
+		Game::FcKai => ISet::Fc,
+		Game::Sc    => ISet::Sc,
+		Game::ScEvo => ISet::ScEvo,
+		Game::ScKai => ISet::Sc,
+		Game::Tc    => ISet::Tc,
+		Game::TcEvo => ISet::TcEvo,
+		Game::TcKai => ISet::Tc,
+		Game::Zero    => ISet::Zero,
+		Game::ZeroEvo => ISet::ZeroEvo,
+		Game::ZeroKai => ISet::Zero,
+		Game::Ao    => ISet::Ao,
+		Game::AoEvo => ISet::AoEvo,
+		Game::AoKai => ISet::Ao,
 	}
 }
 
 themelios_macros::bytecode! {
 	(game: Game)
-	#[games(game.iset() => ISet::{Fc, FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo})]
+	#[games(iset(game) => ISet::{Fc, FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo})]
 	[
 		skip!(1), // null
 		Return(), // [return]
@@ -211,7 +205,7 @@ themelios_macros::bytecode! {
 		BgmWait(), // [wait_bgm]
 
 		SoundPlay(
-			if game.is_ed7_kai() { u32 } else { u16 as u32 } as SoundId,
+			if matches!(game, Game::ZeroKai|Game::AoKai) { u32 } else { u16 as u32 } as SoundId,
 			u8,
 			if game.is_ed7() { u8 } else { const 0u8 },
 			u8,

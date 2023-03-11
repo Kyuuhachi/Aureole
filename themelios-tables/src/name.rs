@@ -1,7 +1,7 @@
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
-use themelios_scena::types::*;
+use crate::types::*;
 use themelios_scena::util::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -7,10 +7,6 @@ use crate::util::*;
 use super::*;
 use super::code::Code;
 
-newtype!(SepithId, u16);
-newtype!(PlacementId, u16);
-newtype!(AtRollId, u16);
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Scena {
 	pub name1: String,

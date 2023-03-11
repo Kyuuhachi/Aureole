@@ -3,8 +3,8 @@ use std::collections::BTreeSet;
 use hamu::read::coverage::Coverage;
 use hamu::read::le::*;
 use hamu::write::le::*;
+use crate::types::*;
 use themelios_scena::text::Text;
-use themelios_scena::types::*;
 use themelios_scena::util::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

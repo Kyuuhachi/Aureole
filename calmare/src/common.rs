@@ -1,7 +1,6 @@
 use themelios::scena::*;
 use themelios::scena::code::{Expr, ExprTerm, ExprOp, FlatInsn, Label, Insn, Code};
 use themelios::scena::code::decompile::{decompile, TreeInsn};
-use themelios::scena::ed7::{SepithId, AtRollId, PlacementId};
 use themelios::text::{Text, TextSegment};
 use themelios::types::*;
 use crate::writer::Context;

@@ -1,10 +1,9 @@
-use themelios::scena::*;
-use themelios::scena::ed6;
-use themelios::types::BaseGame;
+use themelios::scena::ed6::Scena;
+use themelios::types::*;
 use crate::writer::Context;
 use crate::common::{self, ContextExt};
 
-pub fn write(f: &mut Context, scena: &ed6::Scena) {
+pub fn write(f: &mut Context, scena: &Scena) {
 	let g = common::game(f.game);
 	f.kw("calmare").kw(g).kw("scena").line();
 

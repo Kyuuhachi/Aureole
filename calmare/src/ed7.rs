@@ -1,11 +1,10 @@
-use themelios::scena::*;
-use themelios::scena::ed7::{self, PlacementId, AtRollId, SepithId};
-use themelios::types::BattleId;
+use themelios::scena::ed7::Scena;
+use themelios::types::*;
 use crate::writer::Context;
 use crate::common::{self, ContextExt};
 
-pub fn write(f: &mut Context, scena: &ed7::Scena) {
-	let ed7::Scena {
+pub fn write(f: &mut Context, scena: &Scena) {
+	let Scena {
 		name1,
 		name2,
 		filename,
@@ -34,8 +33,6 @@ pub fn write(f: &mut Context, scena: &ed7::Scena) {
 
 		functions,
 	} = scena;
-
-	// TODO: a lot of these declarations use nonstandard syntax. Will need to refine that later.
 
 	let g = common::game(f.game);
 	f.kw("calmare").kw(g).kw("scena").line();

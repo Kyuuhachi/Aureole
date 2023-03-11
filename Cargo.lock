@@ -967,6 +967,7 @@ dependencies = [
  "themelios-archive",
  "themelios-scena",
  "themelios-tables",
+ "themelios-types",
 ]
 
 [[package]]
@@ -1008,6 +1009,7 @@ dependencies = [
  "num_enum",
  "strict_result",
  "themelios-macros",
+ "themelios-types",
  "thiserror",
 ]
 
@@ -1021,8 +1023,13 @@ dependencies = [
  "num_enum",
  "strict_result",
  "themelios-scena",
+ "themelios-types",
  "thiserror",
 ]
+
+[[package]]
+name = "themelios-types"
+version = "0.1.0"
 
 [[package]]
 name = "thiserror"

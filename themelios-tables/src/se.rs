@@ -1,6 +1,6 @@
 use hamu::read::le::*;
 use hamu::write::le::*;
-use themelios_scena::types::SoundId;
+use crate::types::SoundId;
 use themelios_scena::util::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

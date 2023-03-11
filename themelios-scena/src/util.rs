@@ -1,7 +1,7 @@
-use std::ops::*;
-
 pub mod read;
 pub mod write;
+
+use std::ops::{Residual, Try};
 
 pub use read::*;
 pub use write::*;
@@ -65,40 +65,6 @@ macro_rules! __bail {
 	}
 }
 pub use __bail as bail;
-
-#[macro_export]
-macro_rules! __newtype {
-	($name:ident, $ty:ty) => {
-		#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-		pub struct $name(pub $ty);
-
-		impl From<$ty> for $name {
-			fn from(v: $ty) -> $name {
-				$name(v)
-			}
-		}
-
-		impl From<$name> for $ty {
-			fn from(v: $name) -> $ty {
-				v.0
-			}
-		}
-
-		// For some reason DebugCustom doesn't work, probably because I want to include $name
-		impl std::fmt::Debug for $name where $ty: std::fmt::Debug {
-			fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-				write!(f, "{}({:?})", stringify!($name), &self.0)
-			}
-		}
-	};
-}
-pub use __newtype as newtype;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NameDesc {
-	pub name: String,
-	pub desc: String,
-}
 
 pub fn array<const N: usize, R: Try>(
 	mut f: impl FnMut() -> R,

@@ -3,7 +3,8 @@
 #![feature(let_chains)]
 #![feature(decl_macro)]
 
+use ::themelios_types as types;
+
 pub mod util;
 pub mod scena;
 pub mod text;
-pub mod types;

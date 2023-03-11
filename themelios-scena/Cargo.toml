@@ -5,8 +5,9 @@ edition = "2021"
 
 [dependencies]
 hamu.workspace = true
-themelios-macros = { path = "../themelios-macros" }
-cp932 = { path = "../cp932" }
+themelios-macros.path = "../themelios-macros"
+themelios-types.path = "../themelios-types"
+cp932.path = "../cp932"
 strict_result = "1.1.0"
 
 thiserror = "1.0.0"

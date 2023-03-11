@@ -65,10 +65,8 @@ fn parse_tree(p: &mut Parse, can_break: bool, can_continue: bool) -> Vec<TreeIns
 		let p = &mut Parse::new(l, p.context);
 
 		let span = p.next_span();
-		let key = test!(p, Token::Ident(a) => *a).unwrap_or_default();
-
-		match key {
-			"if" => {
+		match test!(p, Token::Ident(a) => *a) {
+			Some("if") => {
 				let e = parse_expr(p);
 				let b = parse_tree(p, can_break, can_continue);
 				out.push(TreeInsn::If(vec![(Some(e), b)]));
@@ -76,7 +74,7 @@ fn parse_tree(p: &mut Parse, can_break: bool, can_continue: bool) -> Vec<TreeIns
 				last_if = Some(a);
 			}
 
-			"elif" => {
+			Some("elif") => {
 				let e = parse_expr(p);
 				let b = parse_tree(p, can_break, can_continue);
 				if let Some(a) = last_if {
@@ -87,7 +85,7 @@ fn parse_tree(p: &mut Parse, can_break: bool, can_continue: bool) -> Vec<TreeIns
 				}
 			},
 
-			"else" => {
+			Some("else") => {
 				let b = parse_tree(p, can_break, can_continue);
 				if let Some(a) = last_if {
 					a.push((None, b));
@@ -97,14 +95,14 @@ fn parse_tree(p: &mut Parse, can_break: bool, can_continue: bool) -> Vec<TreeIns
 				}
 			}
 
-			"while" => {
+			Some("while") => {
 				last_if = None;
 				let e = parse_expr(p);
 				let b = parse_tree(p, true, true);
 				out.push(TreeInsn::While(e, b));
 			}
 
-			"switch" => {
+			Some("switch") => {
 				last_if = None;
 				let e = parse_expr(p);
 				let mut cases = Vec::new();
@@ -112,10 +110,9 @@ fn parse_tree(p: &mut Parse, can_break: bool, can_continue: bool) -> Vec<TreeIns
 				for l in p.body() {
 					Parse::new(l, p.context).parse_with(|p| {
 						let span = p.next_span();
-						let key = test!(p, Token::Ident(a) => *a).unwrap_or_default();
-						let i = match key {
-							"case" => u16::parse(p).map(Some),
-							"default" => Ok(None),
+						let i = match test!(p, Token::Ident(a) => *a) {
+							Some("case") => u16::parse(p).map(Some),
+							Some("default") => Ok(None),
 							_ => {
 								Diag::error(span, "expected 'case' or 'default'").emit();
 								Err(Error)
@@ -131,7 +128,7 @@ fn parse_tree(p: &mut Parse, can_break: bool, can_continue: bool) -> Vec<TreeIns
 				out.push(TreeInsn::Switch(e, cases));
 			}
 
-			"break" => {
+			Some("break") => {
 				last_if = None;
 				if can_break {
 					out.push(TreeInsn::Break);
@@ -140,7 +137,7 @@ fn parse_tree(p: &mut Parse, can_break: bool, can_continue: bool) -> Vec<TreeIns
 				}
 			}
 
-			"continue" => {
+			Some("continue") => {
 				last_if = None;
 				if can_continue {
 					out.push(TreeInsn::Continue);
@@ -149,11 +146,12 @@ fn parse_tree(p: &mut Parse, can_break: bool, can_continue: bool) -> Vec<TreeIns
 				}
 			}
 
-			_ => {
-				p.pos -= 1;
+			a => {
+				if a.is_some() {
+					p.pos -= 1;
+				}
 				last_if = None;
-				let insn = parse_insn(p);
-				out.push(TreeInsn::Insn(insn));
+				out.push(TreeInsn::Insn(parse_insn(p)));
 			}
 		}
 		p.finish();

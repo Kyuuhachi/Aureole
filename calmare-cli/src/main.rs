@@ -108,7 +108,7 @@ fn main_inner() -> eyre::Result<()> {
 
 	if let Some(src) = src {
 		let src = src?;
-		let (val, diags) = calmare::parse::compile(src, lookup);
+		let (val, diags) = calmare::parse(src, lookup);
 		let filename = if cli.file.as_os_str() == "-" {
 			"<stdin>".into()
 		} else {
@@ -153,17 +153,12 @@ fn write_scena(game: Option<CliGame>, buf: &[u8], lookup: Option<&dyn Lookup>) -
 	match game {
 		Some(game) => {
 			let game = cli_game(game);
-			if game.is_ed7() {
-				let scena = themelios::scena::ed7::read(game, buf)?;
-				let mut ctx = calmare::Context::new(game, lookup);
-				calmare::ed7::write(&mut ctx, &scena);
-				Ok(ctx.finish())
+			let c = if game.is_ed7() {
+				calmare::Content::ED7Scena(themelios::scena::ed7::read(game, buf)?)
 			} else {
-				let scena = themelios::scena::ed6::read(game, buf)?;
-				let mut ctx = calmare::Context::new(game, lookup);
-				calmare::ed6::write(&mut ctx, &scena);
-				Ok(ctx.finish())
-			}
+				calmare::Content::ED6Scena(themelios::scena::ed6::read(game, buf)?)
+			};
+			Ok(calmare::to_string(game, &c, lookup))
 		},
 		None => {
 			for game in [
@@ -173,15 +168,11 @@ fn write_scena(game: Option<CliGame>, buf: &[u8], lookup: Option<&dyn Lookup>) -
 			] {
 				if game.is_ed7() {
 					if let Ok(scena) = themelios::scena::ed7::read(game, buf) {
-						let mut ctx = calmare::Context::new(game, lookup);
-						calmare::ed7::write(&mut ctx, &scena);
-						return Ok(ctx.finish())
+						return Ok(calmare::to_string(game, &calmare::Content::ED7Scena(scena), lookup))
 					}
 				} else {
 					if let Ok(scena) = themelios::scena::ed6::read(game, buf) {
-						let mut ctx = calmare::Context::new(game, lookup);
-						calmare::ed6::write(&mut ctx, &scena);
-						return Ok(ctx.finish())
+						return Ok(calmare::to_string(game, &calmare::Content::ED6Scena(scena), lookup))
 					}
 				}
 			}

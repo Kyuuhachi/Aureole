@@ -6,5 +6,5 @@
 use ::themelios_types as types;
 
 pub mod util;
-pub mod scena;
+pub mod code;
 pub mod text;

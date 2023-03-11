@@ -3,7 +3,7 @@ use hamu::write::le::*;
 use crate::types::*;
 
 #[doc(inline)]
-pub use themelios_scena::scena::code;
+pub use themelios_scena::code;
 pub mod ed6;
 pub mod ed7;
 

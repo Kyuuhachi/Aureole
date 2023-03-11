@@ -359,7 +359,8 @@ impl Val for CharId {
 			238.. => write!(f, "party[{}]", v-238),
 			16..  if f.game.base() == BaseGame::Tc
 			      => write!(f, "char[{}]", v - 16),
-			8..   => write!(f, "char[{}]", v - 8),
+			8..   if f.game.base() != BaseGame::Tc
+			      => write!(f, "char[{}]", v - 8),
 			0..   => write!(f, "field_party[{}]", v),
 		}
 	}

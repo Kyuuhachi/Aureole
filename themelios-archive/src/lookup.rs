@@ -1,6 +1,5 @@
-//! Contains everything related to file id lookups.
-//!
-//! Everything here is reexported at the crate root, so there's little reason to interact with this module directly.
+//! Provides conversion between 32-bit file ids and filenames.
+
 mod ed6;
 pub use ed6::ED6Lookup;
 

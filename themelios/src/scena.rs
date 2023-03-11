@@ -7,6 +7,8 @@ pub use themelios_scena::scena::code;
 pub mod ed6;
 pub mod ed7;
 
+pub mod decompile;
+
 trait ReadStreamExt2: ReadStream {
 	fn pos2(&mut self) -> Result<Pos2, Self::Error> {
 		Ok(Pos2(self.i32()?, self.i32()?))

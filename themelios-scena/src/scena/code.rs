@@ -10,8 +10,7 @@ use crate::util::*;
 use crate::text::Text;
 
 mod insn;
-pub use insn::*;
-pub mod decompile;
+pub use insn::{Insn, introspect};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Label(pub usize);
@@ -366,7 +365,7 @@ mod expr {
 					0x1E => ExprTerm::Flag(Flag(f.u16()?)),
 					0x1F => ExprTerm::Var(Var(f.u16()?)),
 					0x20 => ExprTerm::Attr(Attr(f.u8()?)),
-					0x21 => ExprTerm::CharAttr(char_attr::read(f, game)?),
+					0x21 => ExprTerm::CharAttr(insn::char_attr::read(f, game)?),
 					0x22 => ExprTerm::Rand,
 					0x23 => ExprTerm::Global(Global(f.u8()?)),
 					op => return Err(format!("unknown Expr: 0x{op:02X}").into())
@@ -386,7 +385,7 @@ mod expr {
 				ExprTerm::Flag(v)        => { f.u8(0x1E); f.u16(v.0); }
 				ExprTerm::Var(v)         => { f.u8(0x1F); f.u16(v.0); }
 				ExprTerm::Attr(v)        => { f.u8(0x20); f.u8(v.0); }
-				ExprTerm::CharAttr(v)    => { f.u8(0x21); char_attr::write(f, game, &v)?; }
+				ExprTerm::CharAttr(v)    => { f.u8(0x21); insn::char_attr::write(f, game, &v)?; }
 				ExprTerm::Rand           => { f.u8(0x22); }
 				ExprTerm::Global(v)      => { f.u8(0x23); f.u8(v.0); }
 			}

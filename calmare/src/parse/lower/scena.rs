@@ -1,5 +1,5 @@
 use themelios::scena::code::{Code, Insn, Expr, ExprTerm, ExprOp};
-use themelios::scena::code::decompile::{recompile, TreeInsn};
+use themelios::scena::decompile::{recompile, TreeInsn};
 
 use super::*;
 use crate::span::{Spanned as S, Span};

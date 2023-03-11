@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use super::{FlatInsn, Insn, Expr, Label, Code};
+use super::code::{FlatInsn, Insn, Expr, Label, Code};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TreeInsn {
@@ -24,9 +24,7 @@ pub enum Error<'a> {
 	Block { range: Range, brk: Option<&'a Label>, next: Box<Error<'a>>},
 }
 
-#[derive(derive_more::Deref)]
 struct Context<'a> {
-	#[deref]
 	insns: &'a [FlatInsn],
 	labels: HashMap<&'a Label, usize>,
 }
@@ -52,7 +50,7 @@ impl<'a> Context<'a> {
 
 pub fn decompile(insns: &Code) -> Result<Vec<TreeInsn>, Error> {
 	let ctx = Context::new(&insns.0);
-	block(&ctx, &mut 0, ctx.len(), None, None)
+	block(&ctx, &mut 0, ctx.insns.len(), None, None)
 }
 
 fn block<'a>(ctx: &Context<'a>, pos: &mut usize, end: usize, cont: Option<&'a Label>, brk: Option<&'a Label>) -> Result<Vec<TreeInsn>, Error<'a>> {
@@ -74,14 +72,14 @@ fn block0<'a>(ctx: &Context<'a>, pos: &mut usize, end: usize, cont: Option<&'a L
 	let mut out = Vec::new();
 	let mut label = None;
 	while *pos < end {
-		let this = &ctx[*pos];
+		let this = &ctx.insns[*pos];
 		*pos += 1;
 		match this {
 			FlatInsn::Unless(e, l1) => {
 				let target = ctx.label(*pos..end, l1)?;
 
 				let is_loop = matches!(
-					ctx[*pos..target].last(),
+					ctx.insns[*pos..target].last(),
 					Some(FlatInsn::Goto(jump)) if Some(jump) == label,
 				);
 
@@ -124,7 +122,7 @@ fn block0<'a>(ctx: &Context<'a>, pos: &mut usize, end: usize, cont: Option<&'a L
 				let mut brk = None;
 				for case_end in ends.clone() {
 					let case_end = ctx.label(*pos..end, case_end)?;
-					if let Some(FlatInsn::Goto(label)) = ctx[*pos..case_end].last() {
+					if let Some(FlatInsn::Goto(label)) = ctx.insns[*pos..case_end].last() {
 						if ctx.label(case_end..end, label).is_ok() {
 							brk = Some(label);
 						}
@@ -147,7 +145,7 @@ fn block0<'a>(ctx: &Context<'a>, pos: &mut usize, end: usize, cont: Option<&'a L
 					}
 					None => {
 						let (mut body, jump) = block_partial(ctx, pos, end, cont, None)?;
-						if jump.is_some() && jump != brk_ && *pos < ctx.len() && ctx[*pos] == FlatInsn::Label(*jump.unwrap()) {
+						if jump.is_some() && jump != brk_ && *pos < ctx.insns.len() && ctx.insns[*pos] == FlatInsn::Label(*jump.unwrap()) {
 							body.push(TreeInsn::Break);
 							arms.push((last_case.0, body));
 							out.push(TreeInsn::Switch(e.clone(), arms));
@@ -359,6 +357,7 @@ fn fixup_labels(insns: &mut Vec<FlatInsn>) {
 	}
 }
 
+/*
 pub fn fixup_eddec(vanilla: &[FlatInsn], eddec: &[FlatInsn]) -> Option<Vec<FlatInsn>> {
 	use FlatInsn as F;
 
@@ -482,6 +481,7 @@ pub fn fixup_eddec(vanilla: &[FlatInsn], eddec: &[FlatInsn]) -> Option<Vec<FlatI
 	fixup_labels(&mut eddec);
 	Some(eddec)
 }
+*/
 
 pub fn to_d2(code: &[FlatInsn], mut f: impl std::io::Write) -> std::io::Result<()> {
 	fn label(l: Label, n: usize) -> String {
@@ -535,3 +535,4 @@ pub fn to_d2(code: &[FlatInsn], mut f: impl std::io::Write) -> std::io::Result<(
 	}
 	Ok(())
 }
+

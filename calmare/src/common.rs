@@ -1,6 +1,6 @@
 use themelios::scena::*;
 use themelios::scena::code::{Expr, ExprTerm, ExprOp, FlatInsn, Label, Insn, Code};
-use themelios::scena::code::decompile::{decompile, TreeInsn};
+use themelios::scena::decompile::{decompile, TreeInsn};
 use themelios::text::{Text, TextSegment};
 use themelios::types::*;
 use crate::writer::Context;

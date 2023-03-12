@@ -2,7 +2,6 @@ use std::str::pattern::Pattern;
 use crate::span::{Spanned, Span};
 use super::diag::Diag;
 
-use total_float::F64;
 use unicode_xid::UnicodeXID;
 
 // from https://github.com/rust-lang/rfcs/pull/2796
@@ -149,7 +148,7 @@ impl<'a> Lex<'a> {
 
 enum Number {
 	Int(u64),
-	Float(F64),
+	Float(f64),
 }
 
 fn number(i: &mut Lex) -> Option<Number> {
@@ -171,10 +170,10 @@ fn number(i: &mut Lex) -> Option<Number> {
 			i.pat_mul(|a| char::is_ascii_digit(&a));
 			let s = i.span_text(i0|i.pos());
 			match s.parse::<f64>() {
-				Ok(v) => Number::Float(F64(v)),
+				Ok(v) => Number::Float(v),
 				Err(e) => {
 					Diag::error(i0 | i.pos(), e).emit();
-					Number::Float(F64(0.))
+					Number::Float(0.)
 				}
 			}
 		} else {
@@ -222,7 +221,7 @@ fn string(i: &mut Lex) -> Option<String> {
 	Some(s)
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Line<'a> {
 	pub span: Span,
 	pub head: Vec<Spanned<Token<'a>>>,
@@ -240,7 +239,7 @@ impl Line<'_> {
 	}
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq)]
 pub struct Delimited<T> {
 	pub open: Span,
 	pub tokens: Vec<Spanned<T>>,
@@ -262,11 +261,11 @@ impl<T: std::fmt::Debug> std::fmt::Debug for Delimited<T> {
 	}
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq)]
 pub enum Token<'a> {
 	Ident(&'a str),
 	Int(u64),
-	Float(F64),
+	Float(f64),
 	String(String),
 	Var(&'a str),
 
@@ -324,7 +323,7 @@ impl std::fmt::Debug for Token<'_> {
 	}
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq)]
 pub enum TextToken<'a> {
 	Text(String),
 	// NISA's ed7 have two newlines (01 and 0D), which here are differentiated by a backslash.

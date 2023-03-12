@@ -348,11 +348,11 @@ fn parse_float(p: &mut Parse) -> Result<Option<(S<f64>, S<Unit>)>> {
 	match p.remaining() {
 		[S(s, Token::Float(n)), ..] => {
 			p.pos += 1;
-			Ok(Some((S(*s, n.0), parse_unit(p)?)))
+			Ok(Some((S(*s, *n), parse_unit(p)?)))
 		}
 		[S(s1, Token::Minus), S(s, Token::Float(n)), ..] if s1.connects(*s) => {
 			p.pos += 2;
-			Ok(Some((S(*s1 | *s, -n.0), parse_unit(p)?)))
+			Ok(Some((S(*s1 | *s, -*n), parse_unit(p)?)))
 		}
 		_ => {
 			Ok(None)

@@ -2,7 +2,6 @@
 members = [
 	"choubun",
 	"cp932",
-	"total-float",
 
 	"decompress",
 	"themelios-macros",

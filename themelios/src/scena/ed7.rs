@@ -336,7 +336,7 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 		code_end = g.pos();
 	}
 
-	let labels = if p_labels == 0 {
+	let labels = if p_labels == 0 || !is_vanilla && n_labels == 0 {
 		None
 	} else {
 		let mut g = f.clone().at(p_labels)?;

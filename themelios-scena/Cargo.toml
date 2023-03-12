@@ -13,4 +13,3 @@ strict_result = "1.1.0"
 thiserror = "1.0.0"
 num_enum = "0.5.7"
 extend = "1.1.2"
-derive_more = { version = "0.99.17", default-features = false, features = ["deref", "deref_mut", "display", "from", "into"] }

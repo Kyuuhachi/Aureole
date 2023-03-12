@@ -3,15 +3,20 @@ use hamu::write::le::*;
 use crate::util::*;
 use crate::types::ItemId;
 
-#[derive(Clone, PartialEq, Eq, derive_more::Deref, derive_more::DerefMut)]
-pub struct Text(#[deref] #[deref_mut] pub Vec<TextSegment>);
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Text(pub Vec<TextSegment>);
 
-impl std::fmt::Debug for Text {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.write_str("Text(")?;
-		self.0.fmt(f)?;
-		f.write_str(")")?;
-		Ok(())
+impl std::ops::Deref for Text {
+	type Target = Vec<TextSegment>;
+
+	fn deref(&self) -> &Self::Target {
+		&self.0
+	}
+}
+
+impl std::ops::DerefMut for Text {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut self.0
 	}
 }
 

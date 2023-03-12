@@ -954,7 +954,7 @@ mod color24 {
 
 	pub(super) fn write(f: &mut impl Write, _: Game, v: &Color) -> Result<(), WriteError> {
 		let [r, g, b, a] = u32::to_le_bytes(v.0);
-		ensure!(a == 0xFF, "alpha must be zero");
+		ensure!(a == 0xFF, "alpha must be opaque");
 		f.u8(r);
 		f.u8(g);
 		f.u8(b);

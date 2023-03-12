@@ -114,11 +114,11 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 			scena.ch.mark(p.tokens[0].0 | s, n);
 			scena.cp.mark(p.tokens[0].0 | s, n);
 			let (ch, cp) = Val::parse(p)?;
-			if let Some(v) = ch {
-				scena.ch.insert(n, v);
+			if ch != FileId(0) {
+				scena.ch.insert(n, ch);
 			}
-			if let Some(v) = cp {
-				scena.cp.insert(n, v);
+			if cp != FileId(0) {
+				scena.cp.insert(n, cp);
 			}
 		}
 		"npc" => {

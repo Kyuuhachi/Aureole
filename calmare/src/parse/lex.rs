@@ -326,8 +326,7 @@ impl std::fmt::Debug for Token<'_> {
 #[derive(Clone, PartialEq)]
 pub enum TextToken<'a> {
 	Text(String),
-	// NISA's ed7 have two newlines (01 and 0D), which here are differentiated by a backslash.
-	Newline(bool),
+	Newline,
 	Brace(Delimited<Token<'a>>),
 }
 
@@ -388,9 +387,9 @@ fn tokens<'a>(indent: Indent, i: &mut Lex<'a>) -> Option<Vec<Spanned<Token<'a>>>
 impl std::fmt::Debug for TextToken<'_> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Self::Text(v)    => { write!(f, "Text(")?;    v.fmt(f)?; write!(f, ")") }
-			Self::Newline(v) => { write!(f, "Newline(")?; v.fmt(f)?; write!(f, ")") }
-			Self::Brace(v)   => { write!(f, "Brace(")?;   v.fmt(f)?; write!(f, ")") }
+			Self::Text(v)    => { write!(f, "Text(")?; v.fmt(f)?; write!(f, ")") }
+			Self::Newline    => { write!(f, "Newline") }
+			Self::Brace(v)   => { write!(f, "Brace(")?; v.fmt(f)?; write!(f, ")") }
 		}
 	}
 }
@@ -450,7 +449,7 @@ fn text_tokens<'a>(indent: Indent, i: &mut Lex<'a>) -> Option<Vec<Spanned<TextTo
 			if i.clone().pat('}').is_some() {
 				break
 			}
-			out.push(Spanned(i1 | i.pos(), TextToken::Newline(false)));
+			out.push(Spanned(i1 | i.pos(), TextToken::Newline));
 		}
 
 		if i.clone().pat_('\\').is_some() {
@@ -460,13 +459,11 @@ fn text_tokens<'a>(indent: Indent, i: &mut Lex<'a>) -> Option<Vec<Spanned<TextTo
 			if let Some(s2) = i.pat(['\\', '{', '}']) {
 				s.push_str(s2)
 			} else if i.pat('\n').is_some() {
-				push!();
 				i.last_indent = Some(Indent(i.pat_mul([' ', '\t'])));
 				i0 = i.pos();
 				if i.clone().pat('}').is_some() {
 					break
 				}
-				out.push(Spanned(i1 | i.pos(), TextToken::Newline(true)));
 				i0 = i.pos();
 			} else {
 				Diag::error(i1 | i.pos(), "invalid escape").emit();

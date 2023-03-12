@@ -524,7 +524,7 @@ fn expr(f: &mut Context, e: &Expr) {
 }
 
 fn text(f: &mut Context, v: &Text) {
-	let mut it = v.iter();
+	let mut it = v.iter().peekable();
 	loop {
 		f.kw("{").line();
 		let cont = f.indent(|f| {
@@ -553,17 +553,17 @@ fn text(f: &mut Context, v: &Text) {
 					TextSegment::Color(n) => {
 						write!(f, "{{color {n}}}");
 					}
-					TextSegment::Line2 => {
-						write!(f, "\\");
-						f.line();
-					}
 					TextSegment::Item(n) => {
 						write!(f, "{{item ");
 						f.val(n).no_space();
 						write!(f, "}}");
 					}
 					TextSegment::Byte(n) => {
-						write!(f, "{{0x{n:02X}}}")
+						write!(f, "{{0x{n:02X}}}");
+						if *n == 0x0D && !matches!(it.peek(), None|Some(TextSegment::Line)) {
+							write!(f, "\\");
+							f.line();
+						}
 					}
 				}
 			}

@@ -24,7 +24,6 @@ impl std::ops::DerefMut for Text {
 pub enum TextSegment {
 	String(String),
 	Line,
-	Line2,
 	Wait,
 	Page,
 	Color(u8),
@@ -37,7 +36,6 @@ impl std::fmt::Debug for TextSegment {
 		match self {
 			Self::String(v) => v.fmt(f),
 			Self::Line => write!(f, "Line"),
-			Self::Line2 => write!(f, "Line2"),
 			Self::Wait => write!(f, "Wait"),
 			Self::Page => write!(f, "Page"),
 			Self::Color(v) => f.debug_tuple("Color").field(v).finish(),
@@ -58,9 +56,8 @@ impl Text {
 				0x02 => TextSegment::Wait,
 				0x03 => TextSegment::Page,
 				0x07 => TextSegment::Color(f.u8()?),
-				0x0D => TextSegment::Line2,
 				0x1F => TextSegment::Item(ItemId(f.u16()?)),
-				ch@(0x05 | 0x06 | 0x09 | 0x18) => TextSegment::Byte(ch),
+				ch@(0x05 | 0x06 | 0x09 | 0x0D | 0x18) => TextSegment::Byte(ch),
 				ch@(0x0A | 0x0C) => TextSegment::Byte(ch), // Geofront Azure only
 				ch@(0x00..=0x1F) => bail!("b{:?}", char::from(ch)),
 				0x20.. => {
@@ -83,7 +80,6 @@ impl Text {
 				TextSegment::Wait => f.u8(0x02),
 				TextSegment::Page => f.u8(0x03),
 				TextSegment::Color(n) => { f.u8(0x07); f.u8(*n); }
-				TextSegment::Line2 => f.u8(0x0D),
 				TextSegment::Item(n) => { f.u8(0x1F); f.u16(n.0); }
 				TextSegment::Byte(n) => f.u8(*n),
 			}

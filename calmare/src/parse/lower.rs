@@ -453,8 +453,8 @@ fn parse_text_chunk(out: &mut Vec<TextSegment>, ctx: &Context, d: &[S<TextToken>
 			TextToken::Text(s) => {
 				out.push(TextSegment::String(s.to_owned()))
 			}
-			TextToken::Newline(b) => {
-				out.push(if *b { TextSegment::Line2 } else { TextSegment::Line } )
+			TextToken::Newline => {
+				out.push(TextSegment::Line)
 			}
 			TextToken::Brace(d) => {
 				Parse::new_inner(&d.tokens, d.close, ctx).parse_with(|p| {

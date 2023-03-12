@@ -175,6 +175,7 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 					'scena', 'entry', 'chip', 'npc', 'monster', \
 					'trigger', 'look_point', 'fn'")
 				.emit();
+			p.pos = p.tokens.len();
 		}
 	}
 	Ok(())

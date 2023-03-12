@@ -384,6 +384,7 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 					'trigger', 'look_point', 'label', 'anim', \
 					'sepith', 'at_roll', 'placement', 'battle', 'fn'")
 				.emit();
+			p.pos = p.tokens.len();
 		}
 	}
 	Ok(())

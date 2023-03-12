@@ -125,7 +125,18 @@ pub fn write(f: &mut Context, scena: &Scena) {
 			f.kw("transform");
 			f.line().indent(|f| {
 				for r in &tr.transform {
-					write!(f, "{:?} {:?} {:?} {:?}", r[0], r[1], r[2], r[3]);
+					for (i, c) in r.iter().enumerate() {
+						if i != 0 {
+							write!(f, " ");
+						}
+						// Why is there no way to do this by default
+						let s = format!("{:?}", c);
+						if s.contains('e') {
+							write!(f, "{}", c);
+						} else {
+							write!(f, "{}", s);
+						}
+					}
 					f.line();
 				}
 			});

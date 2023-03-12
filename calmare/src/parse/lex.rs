@@ -462,6 +462,11 @@ fn text_tokens<'a>(indent: Indent, i: &mut Lex<'a>) -> Option<Vec<Spanned<TextTo
 				s.push_str(s2)
 			} else if i.pat('\n').is_some() {
 				push!();
+				i.last_indent = Some(Indent(i.pat_mul([' ', '\t'])));
+				i0 = i.pos();
+				if i.clone().pat('}').is_some() {
+					break
+				}
 				out.push(Spanned(i1 | i.pos(), TextToken::Newline(true)));
 				i0 = i.pos();
 			} else {

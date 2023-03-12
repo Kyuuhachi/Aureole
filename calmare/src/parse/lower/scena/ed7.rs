@@ -37,6 +37,7 @@ struct ScenaBuild {
 	chars: Many<CharDefId, NpcOrMonster<Npc, Monster>>,
 	triggers: Many<TriggerId, Trigger>,
 	look_points: Many<LookPointId, LookPoint>,
+	no_labels: bool,
 	labels: Many<LabelId, Label>,
 	animations: Many<AnimId, Animation>,
 	sepith: Many<SepithId, [u8; 8]>,
@@ -58,7 +59,7 @@ pub fn parse(lines: &[Line], ctx: &Context) -> Result<Scena> {
 
 	let chip = scena.chip.get(|a| a.0 as usize);
 	let (npcs, monsters) = chars(scena.chars);
-	let labels = Some(scena.labels.get(|a| a.0 as usize));
+	let labels = scena.labels.get(|a| a.0 as usize);
 	let triggers = scena.triggers.get(|a| a.0 as usize);
 	let look_points = scena.look_points.get(|a| a.0 as usize);
 	let animations = scena.animations.get(|a| a.0 as usize);
@@ -68,6 +69,14 @@ pub fn parse(lines: &[Line], ctx: &Context) -> Result<Scena> {
 	let at_rolls = scena.at_rolls.get(|a| a.0 as usize);
 	let placements = scena.placements.get(|a| a.0 as usize);
 	let battles = scena.battles.get(|a| a.0 as usize);
+
+	let labels = if scena.no_labels {
+		Some(Vec::new())
+	} else if labels.is_empty() {
+		None
+	} else {
+		Some(labels)
+	};
 
 	let h = scena.header.get().ok_or(Error)?;
 
@@ -261,6 +270,11 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 			});
 		}
 		"label" => {
+			if test!(p, Token::Ident("blank")) {
+				scena.labels.mark(p.tokens[0].0 | p.prev_span(), LabelId(0));
+				scena.no_labels = true;
+				return Ok(())
+			}
 			let S(s, n) = Val::parse(p)?;
 			scena.labels.mark(p.tokens[0].0 | s, n);
 			parse_data!(p => {

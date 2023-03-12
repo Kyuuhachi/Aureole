@@ -168,6 +168,13 @@ pub fn write(f: &mut Context, scena: &Scena) {
 	}
 
 	if let Some(labels) = labels {
+		if labels.is_empty() {
+			// need to keep this for roundtripping
+			write!(f, "// NB: this line is meaningless, it's just here for roundtripping.");
+			f.line();
+			write!(f, "label blank");
+			f.line().line();
+		}
 		for (i, lb) in labels.iter().enumerate() {
 			f.val(&LabelId(i as u16)).suf(":").line().indent(|f| {
 				f.kw("name").val(&lb.name).line();
@@ -181,9 +188,6 @@ pub fn write(f: &mut Context, scena: &Scena) {
 			});
 			f.line();
 		}
-	} else {
-		// need to keep this for roundtripping
-		f.kw("labels").kw("null").line().line();
 	}
 
 	for (i, anim) in animations.iter().enumerate() {

@@ -116,6 +116,10 @@ fn block0<'a>(ctx: &Context<'a>, pos: &mut usize, end: usize, cont: Option<&'a L
 					.collect::<Vec<_>>();
 				cases.sort_by_key(|a| ctx.labels.get(a.1));
 
+				if ctx.insns[*pos] != FlatInsn::Label(*cases[0].1) {
+					return Err(Error::MissingLabel { label: cases[0].1, range: *pos..end })
+				}
+
 				let ends = cases.iter().map(|a| &a.1).skip(1);
 
 				let last_case = cases.last().unwrap();

@@ -877,12 +877,11 @@ impl<K, V> Default for Many<K, V> {
 
 impl<K: Ord, V> Many<K, V> {
 	fn mark(&mut self, s: Span, n: K) {
-		if let Some(S(prev, _)) = self.0.get(&n) {
+		if let Some(S(prev, _)) = self.0.insert(n, S(s, None)) {
 			Diag::error(s, "duplicate item")
-				.note(*prev, "previous here")
+				.note(prev, "previous here")
 				.emit();
 		}
-		self.0.insert(n, S(s, None));
 	}
 
 	fn insert(&mut self, n: K, v: V) {

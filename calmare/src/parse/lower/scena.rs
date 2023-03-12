@@ -106,7 +106,7 @@ fn parse_tree(p: &mut Parse, can_break: bool, can_continue: bool) -> Vec<TreeIns
 				last_if = None;
 				let e = parse_expr(p);
 				let mut cases = Vec::new();
-				let mut seen = Many::<Option<u16>, ()>::default(); // only used for duplicate checking, not order
+				let mut seen = BTreeMap::<Option<u16>, Span>::default();
 				for l in p.body() {
 					Parse::new(l, p.context).parse_with(|p| {
 						let span = p.next_span();
@@ -120,7 +120,12 @@ fn parse_tree(p: &mut Parse, can_break: bool, can_continue: bool) -> Vec<TreeIns
 						};
 						let b = parse_tree(p, true, can_continue);
 						if let Ok(i) = i {
-							seen.mark(span, i);
+							if let Some(prev) = seen.insert(i, span) {
+								// I'd have this as an error, but the vanilla scripts do it, so...
+								Diag::warn(span, "duplicate case")
+									.note(prev, "previous here")
+									.emit();
+							}
 							cases.push((i, b))
 						}
 					});

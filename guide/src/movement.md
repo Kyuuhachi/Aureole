@@ -76,17 +76,16 @@ of code won't do anything -- it is just text to make it easier for you to read
 your code! In this case, it is here to be a reference for the second line of
 code.
 
-Now, for the second line of code, we've changed the second parameter, the
-X position. As we've decreased the X position, we should expect our character,
-Estelle, to move further down the X axis. Let's see what happens!
+Now, for the second line of code, we've changed the second parameter, the X
+position. As we've decreased the X position, we should expect our character,
+Estelle, to move in some direction. Let's see what happens!
 
 ![After the dialogue, Estelle moves slightly to the top left, and faces toward the top right.](./img/movement1.webp)
 
 As expected, Estelle has moved! More specifically, Estelle has moved up to the
-top-left and has rotated to face the top right. This indicates to us that
-moving downward along the X-axis corresponds to moving towards the top-left. 0°
-rotation corresponds to looking at the top right. This will be useful to keep
-in mind!
+top left and has rotated to face the top right. This indicates to us that
+negative X points to the top left. 0° rotation corresponds to looking at the
+top right. This will be useful to keep in mind!
 
 Next, let's modify the second line of code again. We'll change the X-position
 back to what it was before, and we'll change the Z position to a lower value.
@@ -155,7 +154,7 @@ Estelle walk to Joshua? Let's examine the code!
 ```
 
 There used to be a mess here, but our maintenance team finally finished at
-Russel's and had time to look this over. So now it's up to us to create a new
+Russell's and had time to look this over. So now it's up to us to create a new
 mess of our own. Let's change that `2000mm/s` to make Estelle walk faster!
 
 ```clm
@@ -170,8 +169,13 @@ actually compare the two different clips to see how much faster she is moving:
 ![The above two animations, side by side.](./img/movement6.webp)
 
 Indeed, now that we've changed the movement speed, Estelle moves a lot faster!
+You may also notice that Estelle uses a different running animation here.
+That's certainly convenient, since if a character moves at running speed we
+generally do want them to have a running animation. The threshold for this is
+not yet known, though.
+
 Combined with our previous knowledge of how to figure out our coordinates, we
-can now have our characters walk to any point at any speed…
+can now have our characters walk to any point at any speed...
 
 ...Except, of course, if we ask our characters to move to a place they can't
 physically walk to. Whether it be walking outside the map or walking into a

@@ -68,7 +68,7 @@ reaches this part of the script, Estelle will say this dialogue.
 Most of this should be fairly self-explanatory, but there are a number of things to note:
 
 - `name[0]` refers to Estelle. What each number there refers to is defined in a
-  file named `t_name._dt`, but for now, just remember thta `name[0]` is Estelle
+  file named `t_name._dt`, but for now, just remember that `name[0]` is Estelle
   and `name[1]` is Joshua.
 
 - Line breaks inside the dialogue are kept as-is.

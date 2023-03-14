@@ -55,7 +55,7 @@ could also be effectful sometimes.
 
 `BgmWait` is similar to `FadeWait`, as discussed in the previous chapter. It
 makes the script wait until the `BgmStop` has finished -- it may otherwise
-feel janky to have the scene progress while the audio is still fading. out.
+feel janky to have the scene progress while the audio is still fading out.
 
 Finally, `BgmPlay` tell the game to start playing a new track. The way these
 IDs map to filenames is done through a file called `t_bgmtbl._dt`. Calmare does

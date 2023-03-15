@@ -14,7 +14,8 @@ members = [
 	"roundtrip",
 	"calmare",
 	"calmare-cli",
-	"factoria"
+	"factoria",
+	"cradle",
 ]
 
 [workspace.dependencies]
@@ -31,6 +32,10 @@ package.themelios-macros.opt-level = 3
 package.syn.opt-level = 3
 package.quote.opt-level = 3
 package.proc-macro2.opt-level = 3
+
+package.png.opt-level = 3
+package.miniz_oxide.opt-level = 3
+package.adler.opt-level = 3
 
 [profile.release]
 debug = true

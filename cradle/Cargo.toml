@@ -1,0 +1,12 @@
+[package]
+name = "cradle"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hamu.workspace = true
+thiserror = "1.0.0"
+image = { version = "0.24.5", default-features = false }
+
+[dev-dependencies]
+image = { version = "0.24.5", default-features = false, features = ["png"] }

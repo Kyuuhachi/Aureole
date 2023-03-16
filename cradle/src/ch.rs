@@ -1,11 +1,9 @@
 #![allow(clippy::unusual_byte_groupings, clippy::identity_op)]
 
-use crate::error::Error;
 use hamu::write::le::*;
 use hamu::read::le::*;
-use image::GenericImageView;
-use image::Rgba;
-use image::RgbaImage;
+use image::{RgbaImage, GenericImageView, Rgba};
+use crate::util::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
@@ -69,10 +67,13 @@ pub(crate) fn to8888(Rgba([r, g, b, a]): Rgba<u8>) -> u32 {
 }
 
 pub fn read(mode: Mode, width: usize, ch: &[u8]) -> Result<RgbaImage, Error> {
-	let height = ch.len().checked_div(width * mode.bytes_per()).ok_or(Error::Size)?;
+	let stride = width * mode.bytes_per();
+	if stride == 0 || ch.len() % stride != 0 {
+		return Err(Error::Invalid("invalid width".to_owned()))
+	}
 
+	let mut img = RgbaImage::new(width as u32, (ch.len() / stride) as u32);
 	let mut ch = Reader::new(ch);
-	let mut img = RgbaImage::new(width as u32, height as u32);
 	for p in img.pixels_mut() {
 		match mode {
 			Mode::Argb1555 => *p = from1555(ch.u16()?),
@@ -97,3 +98,28 @@ pub fn write<I>(mode: Mode, img: &I) -> Result<Vec<u8>, Error> where
 	}
 	Ok(ch.finish()?)
 }
+
+
+#[test]
+fn test() -> Result<(), Box<dyn std::error::Error>> {
+	let d = std::fs::read("../data/fc.extract/03/mt4301._ch")?;
+	read(Mode::Argb4444, 1024, &d)?.save("/tmp/ch0.png")?;
+
+	let d = std::fs::read("../data/fc.extract/04/c_vis020._ch")?;
+	read(Mode::Argb1555, 768, &d)?.save("/tmp/ch1.png")?;
+
+	let d = std::fs::read("../data/fc.extract/04/h_vis020._ch")?;
+	read(Mode::Argb1555, 1536, &d)?.save("/tmp/ch2.png")?;
+
+	let d = std::fs::read("../data/fc.extract/04/w_vis020._ch")?;
+	read(Mode::Argb1555, 2048, &d)?.save("/tmp/ch3.png")?;
+
+	let d = std::fs::read("../data/fc.extract/00/c_stchr0._ch")?;
+	read(Mode::Argb8888, 512, &d)?.save("/tmp/ch4.png")?;
+
+	let d = std::fs::read("../data/fc.extract/00/h_stchr0._ch")?;
+	read(Mode::Argb8888, 1024, &d)?.save("/tmp/ch5.png")?;
+
+	Ok(())
+}
+

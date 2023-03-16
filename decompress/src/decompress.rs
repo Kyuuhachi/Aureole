@@ -42,7 +42,7 @@ impl<'a> OutBuf<'a> {
 		Ok(())
 	}
 
-	fn repeat(&mut self, n: usize, o: usize, f: &mut Reader) -> Result<(), Error> {
+	fn repeat(&mut self, n: usize, o: usize, _f: &mut Reader) -> Result<(), Error> {
 		if !(1..=self.out.len()-self.start).contains(&o) {
 			return Err(Error::BadRepeat { count: n, offset: o, len: self.out.len() })
 		}
@@ -167,7 +167,7 @@ fn decompress2(data: &[u8], w: &mut OutBuf) -> Result<(), Error> {
 	Ok(())
 }
 
-pub fn decompress_chunk(data: &[u8], w: &mut Vec<u8>) -> Result<(), Error> {
+pub fn decompress(data: &[u8], w: &mut Vec<u8>) -> Result<(), Error> {
 	let w = &mut OutBuf::new(w);
 	if data.first() == Some(&0) {
 		decompress1(data, w)

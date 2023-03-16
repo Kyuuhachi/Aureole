@@ -244,6 +244,7 @@ version = "0.1.0"
 name = "cradle"
 version = "0.1.0"
 dependencies = [
+ "decompress",
  "hamu",
  "image",
  "thiserror",

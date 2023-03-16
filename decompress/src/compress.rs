@@ -16,7 +16,7 @@ pub fn compress_chunk_noop(data: &[u8]) -> Vec<u8> {
 	f
 }
 
-pub use py::compress_chunk;
+pub use py::compress_chunk as compress;
 
 #[allow(unused)]
 pub(crate) use py::compress_chunk as compress_chunk_py;
@@ -54,9 +54,8 @@ mod test {
 	}
 
 	fn check_compress(name: &'static str, d: &[u8], c: &[u8]) {
-		use super::super::decompress::decompress_chunk as decompress;
 		let mut d2 = Vec::with_capacity(d.len());
-		decompress(c, &mut d2).unwrap();
+		crate::decompress(c, &mut d2).unwrap();
 		assert!(d2 == d, "\n[[[\n\n{}\n\n===\n\n{}\n\n]]]", String::from_utf8_lossy(d), String::from_utf8_lossy(&d2));
 		println!("{name}: {}", c.len() as f32 / d.len() as f32);
 	}

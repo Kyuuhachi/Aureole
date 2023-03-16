@@ -26,48 +26,50 @@ fn image(w: usize, h: usize, pixels: Vec<u8>) -> Result<GrayImage, Error> {
 }
 
 pub fn read(data: &[u8]) -> Result<Itp, Error> {
-	read0(&mut Reader::new(data))
-}
-
-pub(crate) fn read0(f: &mut Reader) -> Result<Itp, Error> {
-	match f.u32()? {
-		1000 => read1000(f),
-		1002 => read1002(f),
-		1004 => read1004(f),
-		1005 => read1005(f),
-		1006 => read1006(f),
+	match Reader::new(data).u32()? {
+		1000 => read1000(data),
+		1002 => read1002(data),
+		1004 => read1004(data),
+		1005 => read1005(data),
+		1006 => read1006(data),
 		_ => Err(Error::Invalid("invalid itp type".to_owned()))
 	}
 }
 
-fn read1000(f: &mut Reader) -> Result<Itp, Error> {
+pub fn read1000(data: &[u8]) -> Result<Itp, Error> {
+	let mut f = Reader::new(data);
+	f.check_u32(1000)?;
 	let w = f.u32()? as usize;
 	let h = f.u32()? as usize;
-	let palette = read_palette(256, f)?;
+	let palette = read_palette(256, &mut f)?;
 	let pixels = f.slice(w * h)?.to_owned();
 	Ok(Itp { palette, image: image(w, h, pixels)? })
 }
 
-fn read1002(f: &mut Reader) -> Result<Itp, Error> {
+pub fn read1002(data: &[u8]) -> Result<Itp, Error> {
+	let mut f = Reader::new(data);
+	f.check_u32(1002)?;
 	let w = f.u32()? as usize;
 	let h = f.u32()? as usize;
-	let palette = read_palette(256, &mut Reader::new(&decompress(f)?))?;
-	let pixels = decompress(f)?;
+	let palette = read_palette(256, &mut Reader::new(&decompress(&mut f)?))?;
+	let pixels = decompress(&mut f)?;
 	Ok(Itp { palette, image: image(w, h, pixels)? })
 }
 
-fn read1004(f: &mut Reader) -> Result<Itp, Error> {
+pub fn read1004(data: &[u8]) -> Result<Itp, Error> {
+	let mut f = Reader::new(data);
+	f.check_u32(1004)?;
 	let w = f.u32()? as usize;
 	let h = f.u32()? as usize;
-	let palette = read_palette(f.u32()?, &mut Reader::new(&decompress(f)?))?;
-	let mut pixels = decompress(f)?;
+	let palette = read_palette(f.u32()?, &mut Reader::new(&decompress(&mut f)?))?;
+	let mut pixels = decompress(&mut f)?;
 
 	let mut c = pixels.clone();
 	swizzle(&mut pixels, &mut c, w, 16, 8);
 	Ok(Itp { palette, image: image(w, h, pixels)? })
 }
 
-fn read1005(f: &mut Reader) -> Result<Itp, Error> {
+pub fn read1005(data: &[u8]) -> Result<Itp, Error> {
 	fn nibbles(f: &mut Reader, out: &mut [u8]) -> Result<(), hamu::read::Error> {
 		for i in 0..out.len()/2 {
 			let x = f.u8()?;
@@ -77,12 +79,15 @@ fn read1005(f: &mut Reader) -> Result<Itp, Error> {
 		Ok(())
 	}
 
+	let mut f = Reader::new(data);
+	f.check_u32(1005)?;
+
 	let w = f.u32()? as usize;
 	let h = f.u32()? as usize;
 
 	let palette = {
 		let pal_size = f.u32()?;
-		let g = decompress(f)?;
+		let g = decompress(&mut f)?;
 		let mut g = Reader::new(&g);
 		let mut palette = Vec::with_capacity(pal_size as usize);
 		let mut val = 0u32;
@@ -94,7 +99,7 @@ fn read1005(f: &mut Reader) -> Result<Itp, Error> {
 	};
 
 	let size = f.u32()? as usize;
-	let d = decompress(f)?;
+	let d = decompress(&mut f)?;
 	if d.len() != size {
 		return Err(Error::Invalid("wrong decompressed size".to_owned()))
 	}
@@ -127,7 +132,9 @@ fn read1005(f: &mut Reader) -> Result<Itp, Error> {
 	Ok(Itp { palette, image: image(w, h, pixels)? })
 }
 
-fn read1006(f: &mut Reader) -> Result<Itp, Error> {
+pub fn read1006(data: &[u8]) -> Result<Itp, Error> {
+	let mut f = Reader::new(data);
+	f.check_u32(1006)?;
 	let size = f.u32()? as usize;
 	f.check(b"CCPI")?;
 	// usually 7, but 6 in a few of 3rd Evo's.
@@ -145,8 +152,10 @@ fn read1006(f: &mut Reader) -> Result<Itp, Error> {
 	}
 
 	let data = if flags & 0x8000 != 0 {
-		let d = decompress(f)?;
-		assert_eq!(d.len(), size-16);
+		let d = decompress(&mut f)?;
+		if d.len() != size-16 {
+			return Err(Error::Invalid("invalid ccpi size".to_owned()))
+		}
 		Cow::Owned(d)
 	} else {
 		Cow::Borrowed(f.slice(size-16)?)

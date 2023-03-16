@@ -102,10 +102,19 @@ impl ED6Lookup {
 		dir.read_dir()?;
 
 		fn txt(lines: &mut Vec<String>, path: std::path::PathBuf, format: impl Fn(&str) -> String) -> std::io::Result<()> {
-			use std::io::BufRead;
-			if let Ok(file) = std::fs::File::open(path) {
-				for line in std::io::BufReader::new(file).lines() {
-					lines.push(format(&line?.to_lowercase()));
+			if let Ok(text) = std::fs::read_to_string(path) {
+				for line in text.lines() {
+					lines.push(format(&line.to_lowercase()));
+				}
+			}
+			Ok(())
+		}
+
+		fn bin(lines: &mut Vec<String>, path: std::path::PathBuf, format: impl Fn(&str) -> String) -> std::io::Result<()> {
+			if let Ok(text) = std::fs::read(path) {
+				for line in text.chunks_exact(8) {
+					let line = std::str::from_utf8(line).unwrap();
+					lines.push(format(&line.trim_matches(' ').to_lowercase()));
 				}
 			}
 			Ok(())
@@ -139,6 +148,9 @@ impl ED6Lookup {
 		txt(&mut x[0x27], dir.join("chr/npl2_pt.txt"),  chcp("npl2"))?;
 		txt(&mut x[0x09], dir.join("chr/mons_pt.txt"),  chcp("mons"))?;
 		txt(&mut x[0x29], dir.join("chr/mons2_pt.txt"), chcp("mons2"))?;
+
+		bin(&mut x[0x04], dir.join("visual/dt4.txt"), suf("_ch"))?;
+		bin(&mut x[0x24], dir.join("visual/dt24.txt"), suf("_ch"))?;
 
 		// There is also visual/dt[02]4.txt (which is a binary file), but I don't know if there are any file refs for those.
 		// And also system/chrpt[12].txt, not sure what that is for.

@@ -4,4 +4,5 @@
 pub mod ch;
 pub mod chcp;
 pub mod itp;
+pub mod itc;
 pub mod util;

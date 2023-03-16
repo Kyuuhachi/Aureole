@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use hamu::read::le::*;
+use hamu::write::le::*;
 use image::{GrayImage, Rgba, RgbaImage};
 use crate::util::{Error, swizzle, decompress};
 
@@ -205,9 +206,15 @@ fn read1006(f: &mut Reader) -> Result<Itp, Error> {
 pub(crate) fn read_palette(pal_size: u32, g: &mut Reader) -> Result<Vec<Rgba<u8>>, Error> {
 	let mut palette = Vec::with_capacity(pal_size as usize);
 	for _ in 0..pal_size {
-		palette.push(Rgba(u32::to_le_bytes(g.u32()?)));
+		palette.push(Rgba(g.array()?));
 	}
 	Ok(palette)
+}
+
+pub(crate) fn write_palette(pal: &[Rgba<u8>], g: &mut Writer) {
+	for p in pal {
+		g.array(p.0);
+	}
 }
 
 #[test]

@@ -63,47 +63,20 @@ fn main() -> Result<()> {
 		b"DDS " => {
 			let dds = ddsfile::Dds::read(Cursor::new(&data))?;
 			if let Some(Dxgi::BC7_Typeless|Dxgi::BC7_UNorm|Dxgi::BC7_UNorm_sRGB) = dds.get_dxgi_format() {
-				let width = dds.get_width() as usize;
-				let height = dds.get_height() as usize;
-
-				let mut it = dds.data
-					.chunks_exact(16)
-					.map(|a| u128::from_le_bytes(a.try_into().unwrap()));
-
-				let levels = (0..dds.get_num_mipmap_levels() as u16).map(|level| {
-					let level_size = (width >> level) * (height >> level);
-					it.by_ref().take(level_size >> 4).collect()
-				}).collect();
-				w!("itp", to_raw_itp32(&Itp32 { width, height, levels })?);
+				w!("itp", write_itp32(&dds_to_itp32(&dds))?);
 			} else {
 				let img = image::load(Cursor::new(&data), IF::Dds)?.to_rgba8();
-				w!("itp", to_itp32(img)?);
+				w!("itp", write_itp32(&rgba_to_itp32(img))?);
 			}
 		}
 
 		b"\x89PNG" => {
-			let mut png = png::Decoder::new(Cursor::new(&data))
-				.read_info()?;
-			println!("{:?}", png.info());
-			if let Some(pal) = &png.info().palette {
-				let width = png.info().width as usize;
-				let height = png.info().height as usize;
-				let palette = if let Some(trns) = &png.info().trns {
-					pal.chunks_exact(3).zip(trns.iter())
-						.map(|(a, b)| Rgba([a[0], a[1], a[2], *b]))
-						.collect()
-				} else {
-					pal.chunks_exact(3)
-						.map(|a| Rgba([a[0], a[1], a[2], 0xFF]))
-						.collect()
-				};
-				let mut data = vec![0; width * height];
-				png.next_frame(&mut data)?;
-				let image = cradle::util::image(width, height, data)?;
-				w!("itp", to_indexed_itp(&Itp { palette, image })?);
+			let png = png::Decoder::new(Cursor::new(&data)).read_info()?;
+			if png.info().color_type == png::ColorType::Indexed {
+				w!("itp", write_itp(&indexed_png_to_itp(png)?)?);
 			} else {
 				let img = image::load(Cursor::new(&data), IF::Png)?.to_rgba8();
-				w!("itp", to_itp32(img)?);
+				w!("itp", write_itp32(&rgba_to_itp32(img))?);
 			}
 		}
 
@@ -119,17 +92,43 @@ fn main() -> Result<()> {
 	Ok(())
 }
 
-fn to_image(format: IF, img: RgbaImage) -> Result<Vec<u8>> {
-	let mut f = Cursor::new(Vec::new());
-	img.write_to(&mut f, format)?;
-	Ok(f.into_inner())
+fn indexed_png_to_itp<T: std::io::Read>(mut png: png::Reader<T>) -> Result<Itp> {
+	let Some(pal) = &png.info().palette else {
+		cradle::util::bail!("no palette?")
+	};
+	let width = png.info().width as usize;
+	let height = png.info().height as usize;
+	let palette = if let Some(trns) = &png.info().trns {
+		pal.chunks_exact(3).zip(trns.iter())
+			.map(|(a, b)| Rgba([a[0], a[1], a[2], *b]))
+			.collect()
+	} else {
+		pal.chunks_exact(3)
+			.map(|a| Rgba([a[0], a[1], a[2], 0xFF]))
+			.collect()
+	};
+	let mut data = vec![0; width * height];
+	png.next_frame(&mut data)?;
+	let image = cradle::util::image(width, height, data)?;
+	Ok(Itp { palette, image })
 }
 
-fn to_indexed_itp(itp: &Itp) -> Result<Vec<u8>> {
-	Ok(cradle::itp::write1004(itp)?)
+fn dds_to_itp32(dds: &ddsfile::Dds) -> Itp32 {
+	let width = dds.get_width() as usize;
+	let height = dds.get_height() as usize;
+
+	let mut it = dds.data
+		.chunks_exact(16)
+		.map(|a| u128::from_le_bytes(a.try_into().unwrap()));
+
+	let levels = (0..dds.get_num_mipmap_levels() as u16).map(|level| {
+		let level_size = (width >> level) * (height >> level);
+		it.by_ref().take(level_size >> 4).collect()
+	}).collect();
+	Itp32 { width, height, levels }
 }
 
-fn to_itp32(img: RgbaImage) -> Result<Vec<u8>> {
+fn rgba_to_itp32(img: RgbaImage) -> Itp32 {
 	let a = intel_tex_2::bc7::compress_blocks(
 		&intel_tex_2::bc7::alpha_very_fast_settings(),
 		&intel_tex_2::RgbaSurface {
@@ -143,14 +142,24 @@ fn to_itp32(img: RgbaImage) -> Result<Vec<u8>> {
 		.chunks_exact(16)
 		.map(|a| u128::from_le_bytes(a.try_into().unwrap()))
 		.collect();
-	to_raw_itp32(&Itp32 {
+	Itp32 {
 		width: img.width() as usize,
 		height: img.height() as usize,
 		levels: vec![data],
-	})
+	}
 }
 
-fn to_raw_itp32(itp: &Itp32) -> Result<Vec<u8>> {
+fn to_image(format: IF, img: RgbaImage) -> Result<Vec<u8>> {
+	let mut f = Cursor::new(Vec::new());
+	img.write_to(&mut f, format)?;
+	Ok(f.into_inner())
+}
+
+fn write_itp(itp: &Itp) -> Result<Vec<u8>> {
+	Ok(cradle::itp::write1004(itp)?)
+}
+
+fn write_itp32(itp: &Itp32) -> Result<Vec<u8>> {
 	todo!()
 }
 

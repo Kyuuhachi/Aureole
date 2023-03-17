@@ -1,7 +1,7 @@
-use std::{path::{PathBuf, Path}, io::Cursor};
+use std::{path::PathBuf, io::Cursor, collections::BTreeMap};
 
 use clap::{Parser, ValueHint};
-use cradle::{itp::Itp, itp32::Itp32};
+use cradle::{itp::Itp, itp32::Itp32, itc::Itc};
 use ddsfile::DxgiFormat as Dxgi;
 use eyre::Result;
 use image::{RgbaImage, ImageFormat as IF, Rgba};
@@ -80,15 +80,51 @@ fn main() -> Result<()> {
 			wtr.serialize(ItcFrame {
 				filename: name,
 				unknown: frame.unknown,
-				x_offset: frame.x_offset*w as f32,
-				y_offset: frame.y_offset*h as f32,
+				x_offset: frame.x_offset * w as f32,
+				y_offset: frame.y_offset * h as f32,
 				x_scale: frame.x_scale.recip(),
 				y_scale: frame.y_scale.recip(),
 			})?;
 		}
 
 	} else if name == "itc.csv" || name.ends_with(".itc.csv") {
-		todo!()
+		let mut rdr = csv::Reader::from_path(&cli.file)?;
+		let frames: Vec<ItcFrame> = rdr.deserialize().collect::<Result<_, _>>()?;
+		let mut images = BTreeMap::new();
+		for f in &frames {
+			if !images.contains_key(&f.filename) {
+				let path = cli.file.parent().unwrap().join(&f.filename);
+				let data = std::fs::read(&path)?;
+				images.insert(f.filename.clone(), convert_image(&data)?);
+			}
+		}
+
+		let itc = Itc {
+			frames: frames.iter().map(|f| {
+				let (index, (_, &(_, w, h))) = images.iter().enumerate().find(|a| a.1.0 == &f.filename).unwrap();
+				cradle::itc::Frame {
+					index,
+					unknown: f.unknown,
+					x_offset: f.x_offset / w as f32,
+					y_offset: f.y_offset / h as f32,
+					x_scale: f.x_scale.recip(),
+					y_scale: f.y_scale.recip(),
+				}
+			}).collect(),
+			content: images.values().map(|a| a.0.as_slice()).collect(),
+			palette: None,
+		};
+
+		let out = if let Some(i) = cli.output.clone() {
+			i
+		} else if name == "itc.csv" {
+			PathBuf::from(cli.file.parent().unwrap().to_str().unwrap().to_owned() + ".itc")
+		} else { // *.itc.csv
+			cli.file.with_extension("")
+		};
+
+		let data = cradle::itc::write(&itc)?;
+		std::fs::write(out, data)?;
 
 	} else {
 		eyre::bail!("could not infer file type");

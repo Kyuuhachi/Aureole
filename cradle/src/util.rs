@@ -81,20 +81,17 @@ pub fn decompress(f: &mut Reader) -> Result<Vec<u8>, Error> {
 	f.check_u32(0x06000006)?;
 	f.slice(3)?; // unknown
 
-	if f.pos()-start != csize {
-		return Err(Error::Invalid(format!("wrong compressed length: expected {}, got {}", csize, f.pos()-start)))
-	}
-
-	if out.len() != usize {
-		return Err(Error::Invalid(format!("wrong uncompressed length: expected {}, got {}", usize, out.len())))
-	}
+	ensure!(csize == f.pos()-start, "wrong compressed length: expected {}, got {}", csize, f.pos()-start);
+	ensure!(usize == out.len(), "wrong uncompressed length: expected {}, got {}", usize, out.len());
 
 	Ok(out)
 }
 
 pub fn compress(f: &mut Writer, data: &[u8]) {
-	let (csize_r, csize_w) = Label::new();
-	f.delay(|l| Ok(u32::to_le_bytes(hamu::write::cast_usize::<u32>(l(csize_r)?)? - 4)));
+	let (start_r, start_w) = Label::new();
+	let (end_r, end_w) = Label::new();
+	f.delay(|l| Ok(u32::to_le_bytes((l(end_r)? - l(start_r)?) as u32)));
+	f.label(start_w);
 	f.u32(data.len() as u32);
 	f.u32(1+data.chunks(0xFFF0).count() as u32);
 	for chunk in data.chunks(0xFFF0) {
@@ -105,5 +102,5 @@ pub fn compress(f: &mut Writer, data: &[u8]) {
 	}
 	f.u32(0x06000006);
 	f.slice(&[0,0,0]);
-	f.label(csize_w);
+	f.label(end_w);
 }

@@ -3,8 +3,7 @@ use std::collections::BTreeSet;
 use hamu::read::le::*;
 use hamu::write::le::*;
 use image::Rgba;
-
-use crate::util::Error;
+use crate::util::*;
 
 pub struct Frame {
 	pub index: usize,
@@ -28,7 +27,7 @@ pub fn read(data: &[u8]) -> Result<Itc, Error> {
 	let has_palette = match &f.array()? {
 		b"V101" => false,
 		b"V102" => true,
-		_ => return Err(Error::Invalid("invalid itc header".to_owned()))
+		_ => bail!("itc: invalid header")
 	};
 
 	let mut slice    = [(0, 0); 128];
@@ -69,8 +68,9 @@ pub fn read(data: &[u8]) -> Result<Itc, Error> {
 
 	let mut content = Vec::with_capacity(points.len()-1);
 	for (start, end) in points.iter().zip(points.iter().skip(1)) {
-		let c = data.get(*start..*end)
-			.ok_or_else(|| Error::Invalid("invalid itc offset".to_owned()))?;
+		let Some(c) = data.get(*start..*end) else {
+			bail!("itc: invalid offset")
+		};
 		content.push(c)
 	}
 

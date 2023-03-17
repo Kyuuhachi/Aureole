@@ -25,8 +25,10 @@ pub macro bail($str:literal $($arg:tt)*) {
 }
 
 pub fn image<P: image::Pixel>(w: usize, h: usize, pixels: Vec<P::Subpixel>) -> Result<ImageBuffer<P, Vec<P::Subpixel>>, Error> {
-	ImageBuffer::from_vec(w as u32, h as u32, pixels)
-		.ok_or(Error::Invalid("wrong number of pixels".to_owned()))
+	let Some(img) = ImageBuffer::from_vec(w as u32, h as u32, pixels) else {
+		bail!("wrong number of pixels")
+	};
+	Ok(img)
 }
 
 pub fn tile<I>(
@@ -72,7 +74,7 @@ pub fn decompress(f: &mut Reader) -> Result<Vec<u8>, Error> {
 	let mut out = Vec::with_capacity(usize);
 	for _ in 1..f.u32()? {
 		let Some(chunklen) = (f.u16()? as usize).checked_sub(2) else {
-			return Err(Error::Invalid("bad chunk length".to_owned()))
+			bail!("bad chunk length")
 		};
 		decompress::decompress(f.slice(chunklen)?, &mut out)?;
 		f.check_u8(1)?;

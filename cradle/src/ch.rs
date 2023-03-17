@@ -3,7 +3,7 @@
 use hamu::write::le::*;
 use hamu::read::le::*;
 use image::{RgbaImage, GenericImageView, Rgba};
-use crate::util::Error;
+use crate::util::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
@@ -68,9 +68,7 @@ pub(crate) fn to8888(Rgba([r, g, b, a]): Rgba<u8>) -> u32 {
 
 pub fn read(mode: Mode, width: usize, ch: &[u8]) -> Result<RgbaImage, Error> {
 	let stride = width * mode.bytes_per();
-	if stride == 0 || ch.len() % stride != 0 {
-		return Err(Error::Invalid("invalid width".to_owned()))
-	}
+	ensure!(stride != 0 && ch.len() % stride == 0, "invalid width");
 
 	let mut img = RgbaImage::new(width as u32, (ch.len() / stride) as u32);
 	let mut ch = Reader::new(ch);

@@ -5,7 +5,7 @@ use image::RgbaImage;
 use hamu::read::le::*;
 use hamu::write::le::*;
 use crate::ch;
-use crate::util::Error;
+use crate::util::*;
 
 pub fn read(ch: &[u8], cp: &[u8]) -> Result<Vec<RgbaImage>, Error> {
 	let mut ch = Reader::new(ch);
@@ -28,9 +28,7 @@ pub fn read(ch: &[u8], cp: &[u8]) -> Result<Vec<RgbaImage>, Error> {
 			for x in 0..16 {
 				let ix = cp.u16()? as usize;
 				if ix != 0xFFFF {
-					if ix >= n_tiles {
-						return Err(Error::Invalid("too big tile id".to_owned()))
-					}
+					ensure!(ix < n_tiles, "chcp: invalid tile id");
 					frame.copy_from(&base[ix], x * 16, y * 16).unwrap()
 				}
 			}
@@ -48,9 +46,7 @@ pub fn write<I>(frames: &[I]) -> Result<(Vec<u8>, Vec<u8>), Error> where
 	let mut pat = vec![[[0xFFFF; 16]; 16]; frames.len()];
 
 	for f in frames {
-		if f.dimensions() != (256, 256) {
-			return Err(Error::Invalid("must be 256x256".to_owned()));
-		}
+		ensure!(f.dimensions() == (256, 256), "chcp: must be 256x256");
 	}
 
 	for (p, f) in pat.iter_mut().zip(frames.iter()) {

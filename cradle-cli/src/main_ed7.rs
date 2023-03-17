@@ -1,4 +1,4 @@
-use std::{path::PathBuf, io::Cursor};
+use std::{path::{PathBuf, Path}, io::Cursor};
 
 use clap::{Parser, ValueHint};
 use cradle::{itp::Itp, itp32::Itp32};
@@ -24,7 +24,7 @@ struct Cli {
 #[derive(Debug, Clone, PartialEq)]
 #[derive(serde::Serialize, serde::Deserialize)]
 struct ItcFrame {
-	filename: PathBuf,
+	filename: String,
 	unknown: u16,
 	x_offset: f32,
 	y_offset: f32,
@@ -84,7 +84,45 @@ fn main() -> Result<()> {
 		}
 
 	} else if name.ends_with(".itc") {
-		todo!()
+		let itc = cradle::itc::read(&data)?;
+		let outdir = cli.output.clone().unwrap_or_else(|| cli.file.with_extension(""));
+		std::fs::create_dir_all(&outdir)?;
+
+		let nd = itc.content.len().to_string().len();
+		let mut images = Vec::with_capacity(itc.content.len());
+		for (i, data) in itc.content.iter().enumerate() {
+			let (ext, data, w, h) = if data.starts_with(b"ITP\xFF") {
+				let itp = cradle::itp32::read(data)?;
+				if itp.has_mipmaps() {
+					("dds", to_raw_dds(&itp)?, itp.width as u32, itp.height as u32)
+				} else {
+					("png", to_image(IF::Png, itp.to_rgba(0))?, itp.width as u32, itp.height as u32)
+				}
+			} else {
+				let mut itp = cradle::itp::read(data)?;
+				if let Some(pal) = &itc.palette {
+					itp.palette = pal.clone();
+				}
+				("png", to_indexed_png(&itp)?, itp.image.width(), itp.image.height())
+			};
+			let name = format!("{i:0nd$}.{ext}");
+			std::fs::write(outdir.join(&name), &data)?;
+			images.push((name, w, h));
+		}
+
+		let f = std::fs::File::create(outdir.join("itc.csv"))?;
+		let mut wtr = csv::Writer::from_writer(f);
+		for frame in &itc.frames {
+			let (name, w, h) = images[frame.index].clone();
+			wtr.serialize(ItcFrame {
+				filename: name,
+				unknown: frame.unknown,
+				x_offset: frame.x_offset*w as f32,
+				y_offset: frame.y_offset*h as f32,
+				x_scale: frame.x_scale.recip(),
+				y_scale: frame.y_scale.recip(),
+			})?;
+		}
 
 	} else if name == "itc.csv" || name.ends_with(".itc.csv") {
 		todo!()
@@ -100,6 +138,7 @@ fn indexed_png_to_itp<T: std::io::Read>(mut png: png::Reader<T>) -> Result<Itp> 
 	let Some(pal) = &png.info().palette else {
 		eyre::bail!("no palette?")
 	};
+	eyre::ensure!(png.info().bit_depth == png::BitDepth::Eight, "only 8-bit palette supported");
 	let width = png.info().width as usize;
 	let height = png.info().height as usize;
 	let palette = if let Some(trns) = &png.info().trns {

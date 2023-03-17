@@ -5,6 +5,7 @@ use hamu::write::le::*;
 use image::Rgba;
 use crate::util::*;
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Frame {
 	pub index: usize,
 	pub unknown: u16,
@@ -14,6 +15,7 @@ pub struct Frame {
 	pub y_scale: f32,
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Itc<'a> {
 	pub frames: Vec<Frame>,
 	pub content: Vec<&'a [u8]>,

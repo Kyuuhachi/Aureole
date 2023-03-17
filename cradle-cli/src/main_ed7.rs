@@ -1,5 +1,3 @@
-#![feature(decl_macro, let_chains)]
-
 use std::{path::PathBuf, io::Cursor};
 
 use clap::{Parser, ValueHint};
@@ -38,51 +36,52 @@ fn main() -> Result<()> {
 	let cli = Cli::parse();
 	let data = std::fs::read(&cli.file)?;
 
-	macro w($ext:literal, $e:expr) {
-		{
-			let out = cli.output.clone()
-				.unwrap_or_else(|| cli.file.with_extension($ext));
-			std::fs::write(out, $e)?
-		}
-	}
+	let w = |ext: &str, val: &[u8]| {
+		let out = cli.output.clone()
+			.unwrap_or_else(|| cli.file.with_extension(ext));
+		std::fs::write(out, val)
+	};
 
 	match data.get(..4).unwrap_or_default() {
 		&[a,b,c,d] if (1000..=1006).contains(&u32::from_le_bytes([a,b,c,d])) => {
 			let itp = cradle::itp::read(&data)?;
-			w!("png", to_indexed_png(&itp)?);
+			w("png", &to_indexed_png(&itp)?)?;
 		}
 
 		b"ITP\xFF" => {
 			let itp = cradle::itp32::read(&data)?;
-			match () {
-				() if itp.has_mipmaps() => w!("dds", to_raw_dds(&itp)?),
-				()                      => w!("png", to_image(IF::Png, itp.to_rgba(0))?),
+
+			if itp.has_mipmaps() {
+				w("dds", &to_raw_dds(&itp)?)?
+			} else {
+				w("png", &to_image(IF::Png, itp.to_rgba(0))?)?
 			}
 		}
 
 		b"DDS " => {
 			let dds = ddsfile::Dds::read(Cursor::new(&data))?;
 			if let Some(Dxgi::BC7_Typeless|Dxgi::BC7_UNorm|Dxgi::BC7_UNorm_sRGB) = dds.get_dxgi_format() {
-				w!("itp", write_itp32(&dds_to_itp32(&dds))?);
+				w("itp", &write_itp32(&dds_to_itp32(&dds))?)?;
 			} else {
 				let img = image::load(Cursor::new(&data), IF::Dds)?.to_rgba8();
-				w!("itp", write_itp32(&rgba_to_itp32(img))?);
+				w("itp", &write_itp32(&rgba_to_itp32(img))?)?;
 			}
 		}
 
 		b"\x89PNG" => {
 			let png = png::Decoder::new(Cursor::new(&data)).read_info()?;
 			if png.info().color_type == png::ColorType::Indexed {
-				w!("itp", write_itp(&indexed_png_to_itp(png)?)?);
+				w("itp", &write_itp(&indexed_png_to_itp(png)?)?)?;
 			} else {
 				let img = image::load(Cursor::new(&data), IF::Png)?.to_rgba8();
-				w!("itp", write_itp32(&rgba_to_itp32(img))?);
+				w("itp", &write_itp32(&rgba_to_itp32(img))?)?;
 			}
 		}
 
 		b"V101"|b"V102" => {
 			todo!()
 		}
+
 		b"file" => {
 			todo!()
 		}

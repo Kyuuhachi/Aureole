@@ -33,8 +33,16 @@ struct ItcFrame {
 }
 
 fn main() -> Result<()> {
-	let cli = Cli::parse();
-	let data = std::fs::read(&cli.file)?;
+	let mut cli = Cli::parse();
+
+	if cli.file.join("itc.csv").is_file() {
+		cli.file = cli.file.join("itc.csv");
+	}
+
+	let Some(name) = cli.file.file_name().and_then(|a| a.to_str()) else {
+		eyre::bail!("file has no name");
+	};
+	let name = name.to_lowercase();
 
 	let w = |ext: &str, val: &[u8]| {
 		let out = cli.output.clone()
@@ -42,58 +50,55 @@ fn main() -> Result<()> {
 		std::fs::write(out, val)
 	};
 
-	match data.get(..4).unwrap_or_default() {
-		&[a,b,c,d] if (1000..=1006).contains(&u32::from_le_bytes([a,b,c,d])) => {
-			let itp = cradle::itp::read(&data)?;
-			w("png", &to_indexed_png(&itp)?)?;
-		}
+	let data = std::fs::read(&cli.file)?;
 
-		b"ITP\xFF" => {
+	if name.ends_with(".itp") {
+		if data.starts_with(b"ITP\xFF") {
 			let itp = cradle::itp32::read(&data)?;
-
 			if itp.has_mipmaps() {
 				w("dds", &to_raw_dds(&itp)?)?
 			} else {
 				w("png", &to_image(IF::Png, itp.to_rgba(0))?)?
 			}
+		} else {
+			let itp = cradle::itp::read(&data)?;
+			w("png", &to_indexed_png(&itp)?)?;
 		}
 
-		b"DDS " => {
-			let dds = ddsfile::Dds::read(Cursor::new(&data))?;
-			if let Some(Dxgi::BC7_Typeless|Dxgi::BC7_UNorm|Dxgi::BC7_UNorm_sRGB) = dds.get_dxgi_format() {
-				w("itp", &write_itp32(&dds_to_itp32(&dds))?)?;
-			} else {
-				let img = image::load(Cursor::new(&data), IF::Dds)?.to_rgba8();
-				w("itp", &write_itp32(&rgba_to_itp32(img))?)?;
-			}
+	} else if name.ends_with(".png") {
+		let png = png::Decoder::new(Cursor::new(&data)).read_info()?;
+		if png.info().color_type == png::ColorType::Indexed {
+			w("itp", &write_itp(&indexed_png_to_itp(png)?)?)?;
+		} else {
+			let img = image::load(Cursor::new(&data), IF::Png)?.to_rgba8();
+			w("itp", &write_itp32(&rgba_to_itp32(img))?)?;
 		}
 
-		b"\x89PNG" => {
-			let png = png::Decoder::new(Cursor::new(&data)).read_info()?;
-			if png.info().color_type == png::ColorType::Indexed {
-				w("itp", &write_itp(&indexed_png_to_itp(png)?)?)?;
-			} else {
-				let img = image::load(Cursor::new(&data), IF::Png)?.to_rgba8();
-				w("itp", &write_itp32(&rgba_to_itp32(img))?)?;
-			}
+	} else if name.ends_with(".dds") {
+		let dds = ddsfile::Dds::read(Cursor::new(&data))?;
+		if let Some(Dxgi::BC7_Typeless|Dxgi::BC7_UNorm|Dxgi::BC7_UNorm_sRGB) = dds.get_dxgi_format() {
+			w("itp", &write_itp32(&dds_to_itp32(&dds))?)?;
+		} else {
+			let img = image::load(Cursor::new(&data), IF::Dds)?.to_rgba8();
+			w("itp", &write_itp32(&rgba_to_itp32(img))?)?;
 		}
 
-		b"V101"|b"V102" => {
-			todo!()
-		}
+	} else if name.ends_with(".itc") {
+		todo!()
 
-		b"file" => {
-			todo!()
-		}
+	} else if name == "itc.csv" || name.ends_with(".itc.csv") {
+		todo!()
 
-		_ => eyre::bail!("could not identify input file"),
+	} else {
+		eyre::bail!("could not infer file type");
 	}
+
 	Ok(())
 }
 
 fn indexed_png_to_itp<T: std::io::Read>(mut png: png::Reader<T>) -> Result<Itp> {
 	let Some(pal) = &png.info().palette else {
-		cradle::util::bail!("no palette?")
+		eyre::bail!("no palette?")
 	};
 	let width = png.info().width as usize;
 	let height = png.info().height as usize;

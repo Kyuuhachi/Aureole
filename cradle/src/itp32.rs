@@ -6,9 +6,9 @@ use image::{Rgba, RgbaImage};
 use crate::util::*;
 
 pub struct Itp32 {
-	width: usize,
-	height: usize,
-	levels: Vec<Vec<u128>>,
+	pub width: usize,
+	pub height: usize,
+	pub levels: Vec<Vec<u128>>,
 }
 
 impl Itp32 {
@@ -22,6 +22,14 @@ impl Itp32 {
 		let mut c = pixels.clone();
 		swizzle(&mut pixels, &mut c, width*4, 4*4, 4);
 		image(width, height, pixels).unwrap()
+	}
+
+	pub fn levels(&self) -> usize {
+		self.levels.len()
+	}
+
+	pub fn has_mipmaps(&self) -> bool {
+		self.levels() > 1
 	}
 }
 

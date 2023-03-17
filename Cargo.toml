@@ -2,6 +2,7 @@
 members = [
 	"choubun",
 	"cp932",
+	"bc7",
 
 	"decompress",
 	"themelios-macros",

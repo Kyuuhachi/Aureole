@@ -50,6 +50,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
+name = "bc7"
+version = "0.1.0"
+
+[[package]]
 name = "beryl"
 version = "0.1.0"
 source = "git+https://github.com/Kyuuhachi/hamu#001af5fb9af55ed5e9e74f0663c58e9d7c0eec9d"
@@ -244,6 +248,7 @@ version = "0.1.0"
 name = "cradle"
 version = "0.1.0"
 dependencies = [
+ "bc7",
  "decompress",
  "hamu",
  "image",

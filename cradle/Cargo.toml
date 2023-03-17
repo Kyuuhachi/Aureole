@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 hamu.workspace = true
 decompress.path = "../decompress"
+bc7.path = "../bc7"
 thiserror = "1.0.0"
 image = { version = "0.24.5", default-features = false }
 

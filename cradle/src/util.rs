@@ -14,6 +14,21 @@ pub enum Error {
 	Write { #[from] source: hamu::write::Error, backtrace: std::backtrace::Backtrace },
 }
 
+pub macro ensure($cond:expr, $($t:tt)*) {
+	if !($cond) {
+		bail!($($t)*)
+	}
+}
+
+pub macro bail($str:literal $($arg:tt)*) {
+	Err(Error::Invalid(format!($str $($arg)*)))?
+}
+
+pub fn image<P: image::Pixel>(w: usize, h: usize, pixels: Vec<P::Subpixel>) -> Result<ImageBuffer<P, Vec<P::Subpixel>>, Error> {
+	ImageBuffer::from_vec(w as u32, h as u32, pixels)
+		.ok_or(Error::Invalid("wrong number of pixels".to_owned()))
+}
+
 pub fn tile<I>(
 	frames: &[I],
 	width: u32,
@@ -77,7 +92,7 @@ pub fn decompress(f: &mut Reader) -> Result<Vec<u8>, Error> {
 	Ok(out)
 }
 
-pub fn compress_ed7(f: &mut Writer, data: &[u8]) {
+pub fn compress(f: &mut Writer, data: &[u8]) {
 	let (csize_r, csize_w) = Label::new();
 	f.delay(|l| Ok(u32::to_le_bytes(hamu::write::cast_usize::<u32>(l(csize_r)?)? - 4)));
 	f.u32(data.len() as u32);

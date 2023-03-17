@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use hamu::read::le::*;
 use hamu::write::le::*;
 use image::{GrayImage, Rgba, RgbaImage};
-use crate::util::{Error, swizzle, decompress};
+use crate::util::{Error, swizzle, image, decompress, compress, ensure, bail};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Itp {
@@ -21,10 +21,6 @@ impl Itp {
 	}
 }
 
-fn image(w: usize, h: usize, pixels: Vec<u8>) -> Result<GrayImage, Error> {
-	GrayImage::from_vec(w as u32, h as u32, pixels).ok_or(Error::Invalid("wrong number of pixels".to_owned()))
-}
-
 pub fn read(data: &[u8]) -> Result<Itp, Error> {
 	match Reader::new(data).u32()? {
 		1000 => read1000(data),
@@ -32,7 +28,7 @@ pub fn read(data: &[u8]) -> Result<Itp, Error> {
 		1004 => read1004(data),
 		1005 => read1005(data),
 		1006 => read1006(data),
-		_ => Err(Error::Invalid("invalid itp type".to_owned()))
+		_ => bail!("invalid itp type")
 	}
 }
 
@@ -46,6 +42,16 @@ pub fn read1000(data: &[u8]) -> Result<Itp, Error> {
 	Ok(Itp { palette, image: image(w, h, pixels)? })
 }
 
+pub fn write1000(itp: &Itp) -> Result<Vec<u8>, Error> {
+	let mut f = Writer::new();
+	f.u32(1000);
+	f.u32(itp.image.width());
+	f.u32(itp.image.height());
+	write_palette(&itp.palette, &mut f);
+	f.slice(itp.image.as_raw());
+	Ok(f.finish()?)
+}
+
 pub fn read1002(data: &[u8]) -> Result<Itp, Error> {
 	let mut f = Reader::new(data);
 	f.check_u32(1002)?;
@@ -54,6 +60,20 @@ pub fn read1002(data: &[u8]) -> Result<Itp, Error> {
 	let palette = read_palette(256, &mut Reader::new(&decompress(&mut f)?))?;
 	let pixels = decompress(&mut f)?;
 	Ok(Itp { palette, image: image(w, h, pixels)? })
+}
+
+pub fn write1002(itp: &Itp) -> Result<Vec<u8>, Error> {
+	let mut f = Writer::new();
+	f.u32(1002);
+	f.u32(itp.image.width());
+	f.u32(itp.image.height());
+	compress(&mut f, &{
+		let mut g = Writer::new();
+		write_palette(&itp.palette, &mut g);
+		g.finish()?
+	});
+	compress(&mut f, itp.image.as_raw());
+	Ok(f.finish()?)
 }
 
 pub fn read1004(data: &[u8]) -> Result<Itp, Error> {
@@ -67,6 +87,24 @@ pub fn read1004(data: &[u8]) -> Result<Itp, Error> {
 	let mut c = pixels.clone();
 	swizzle(&mut pixels, &mut c, w, 16, 8);
 	Ok(Itp { palette, image: image(w, h, pixels)? })
+}
+
+pub fn write1004(itp: &Itp) -> Result<Vec<u8>, Error> {
+	let mut f = Writer::new();
+	f.u32(1004);
+	f.u32(itp.image.width());
+	f.u32(itp.image.height());
+	f.u32(itp.palette.len() as u32);
+	compress(&mut f, &{
+		let mut g = Writer::new();
+		write_palette(&itp.palette, &mut g);
+		g.finish()?
+	});
+	let mut pixels = itp.image.as_raw().clone();
+	let mut c = pixels.clone();
+	swizzle(&mut pixels, &mut c, itp.image.width() as usize, 16, 8);
+	compress(&mut f, &c);
+	Ok(f.finish()?)
 }
 
 pub fn read1005(data: &[u8]) -> Result<Itp, Error> {
@@ -100,9 +138,7 @@ pub fn read1005(data: &[u8]) -> Result<Itp, Error> {
 
 	let size = f.u32()? as usize;
 	let d = decompress(&mut f)?;
-	if d.len() != size {
-		return Err(Error::Invalid("wrong decompressed size".to_owned()))
-	}
+	ensure!(d.len() == size, "wrong decompressed size");
 	let mut g = Reader::new(&d);
 
 	let mut ncolors = vec![0; (h/8)*(w/16)];
@@ -147,15 +183,11 @@ pub fn read1006(data: &[u8]) -> Result<Itp, Error> {
 	let h = f.u16()? as usize;
 	let flags = f.u16()?;
 
-	if w%cw != 0 || h%ch != 0 {
-		return Err(Error::Invalid("invalid chunk size".to_owned()))
-	}
+	ensure!(w%cw == 0 && h%ch == 0, "invalid chunk size");
 
 	let data = if flags & 0x8000 != 0 {
 		let d = decompress(&mut f)?;
-		if d.len() != size-16 {
-			return Err(Error::Invalid("invalid ccpi size".to_owned()))
-		}
+		ensure!(d.len() == size - 16, "invalid ccpi size");
 		Cow::Owned(d)
 	} else {
 		Cow::Borrowed(f.slice(size-16)?)
@@ -200,9 +232,7 @@ pub fn read1006(data: &[u8]) -> Result<Itp, Error> {
 				}
 			}
 		}
-		if pixels.len() > end {
-			return Err(Error::Invalid("overshot when reading tile".to_owned()))
-		}
+		ensure!(pixels.len() == end, "overshot when reading tile");
 	}
 
 	// I do not understand why this swizzle sequence works. But it does.
@@ -228,20 +258,23 @@ pub(crate) fn write_palette(pal: &[Rgba<u8>], g: &mut Writer) {
 
 #[test]
 fn test() -> Result<(), Box<dyn std::error::Error>> {
-	let d = std::fs::read("../data/ao-evo/data/minigame/m02_0001.itp")?; // 1000
-	read(&d)?.to_rgba().save("/tmp/itp0.png")?;
+	let d = read1000(&std::fs::read("../data/ao-evo/data/minigame/m02_0001.itp")?)?;
+	assert!(read1000(&write1000(&d)?)? == d);
+	d.to_rgba().save("/tmp/itp0.png")?;
 
-	let d = std::fs::read("../data/zero-gf/data/minigame/m42_0002.itp")?; // 1002
-	read(&d)?.to_rgba().save("/tmp/itp2.png")?;
+	let d = read1002(&std::fs::read("../data/zero-gf/data/minigame/m42_0002.itp")?)?;
+	assert!(read1002(&write1002(&d)?)? == d);
+	d.to_rgba().save("/tmp/itp2.png")?;
 
-	let d = std::fs::read("../data/ao-evo/data/visual/c_vis600.itp")?; // 1004
-	read(&d)?.to_rgba().save("/tmp/itp4.png")?;
+	let d = read1004(&std::fs::read("../data/ao-evo/data/visual/c_vis600.itp")?)?;
+	assert!(read1004(&write1004(&d)?)? == d);
+	d.to_rgba().save("/tmp/itp4.png")?;
 
-	let d = std::fs::read("../data/zero-gf/data/minigame/m02_0002.itp")?; // 1005
-	read(&d)?.to_rgba().save("/tmp/itp5.png")?;
+	let d = read1005(&std::fs::read("../data/zero-gf/data/minigame/m02_0002.itp")?)?;
+	d.to_rgba().save("/tmp/itp5.png")?;
 
-	let d = std::fs::read("../data/zero-gf/data/cooking/cook04.itp")?; // 1006
-	read(&d)?.to_rgba().save("/tmp/itp6.png")?;
+	let d = read1006(&std::fs::read("../data/zero-gf/data/cooking/cook04.itp")?)?;
+	d.to_rgba().save("/tmp/itp6.png")?;
 
 	Ok(())
 }

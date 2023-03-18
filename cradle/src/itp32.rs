@@ -5,6 +5,7 @@ use image::{Rgba, RgbaImage};
 
 use crate::util::*;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Itp32 {
 	pub width: usize,
 	pub height: usize,
@@ -144,6 +145,69 @@ pub fn read(data: &[u8]) -> Result<Itp32, Error> {
 	})
 }
 
+pub fn write(itp: &Itp32) -> Result<Vec<u8>, Error> {
+	let mut f = Writer::new();
+	let (len_r, len_w) = Label::new();
+	f.slice(b"ITP\xFF");
+
+	f.slice(b"IHDR");
+	f.u32(32);
+	f.u32(32);
+	f.u32(itp.width as u32);
+	f.u32(itp.height as u32);
+	f.delay_u32(len_r);
+	f.u16(3); // major
+	f.u16(10); // minor
+	f.u16(0); // swizzle
+	f.u16(6);
+	f.u16(3);
+	f.u16(0);
+	f.u16(0);
+	f.u16(0);
+
+	f.slice(b"IMIP");
+	f.u32(12);
+	f.u32(12);
+	f.u16(u16::from(itp.has_mipmaps()));
+	f.u16((itp.levels() - 1) as u16);
+	f.u32(0);
+
+	// IHAS - hash. ignored intentionally
+	// IALP - has-alpha flag. Not sure if it has any effect.
+
+	for (n, l) in itp.levels.iter().enumerate() {
+		let l = l.iter().copied().flat_map(u128::to_le_bytes).collect::<Vec<_>>();
+		const CHUNK_SIZE: usize = 0x40000;
+
+		let mut g = Writer::new();
+		let mut max_chunk = 0;
+		for uchunk in l.chunks(CHUNK_SIZE) {
+			let p = g.len();
+			compress(&mut g, uchunk);
+			max_chunk = max_chunk.max(g.len() - p);
+		}
+
+		f.slice(b"IDAT");
+		f.u32(28 + g.len() as u32);
+		f.u32(8);
+		f.u16(0);
+		f.u16(n as u16);
+
+		f.u32(0x80000001);
+		f.u32(l.chunks(CHUNK_SIZE).count() as u32);
+		f.u32(g.len() as u32);
+		f.u32(max_chunk as u32);
+		f.u32(l.len() as u32);
+		f.append(g);
+	}
+
+	f.slice(b"IEND");
+	f.u32(0);
+
+	f.label(len_w);
+	Ok(f.finish()?)
+}
+
 fn decompress(f: &mut Reader, out: &mut Vec<u8>) -> Result<(), Error> {
 	let csize = f.u32()? as usize;
 	let usize = f.u32()? as usize;
@@ -176,11 +240,18 @@ fn decompress(f: &mut Reader, out: &mut Vec<u8>) -> Result<(), Error> {
 	Ok(())
 }
 
+fn compress(f: &mut Writer, data: &[u8]) {
+	f.u32(4 + data.len() as u32);
+	f.u32(data.len() as u32);
+	f.u32(0);
+	f.slice(data);
+}
+
 #[test]
 fn test() -> Result<(), Box<dyn std::error::Error>> {
 	// let d = read(&std::fs::read("../data/zero/data/visual/title.itp")?)?;
 	let d = read(&std::fs::read("../data/zero/data/visual/bu00000.itp")?)?;
-	// assert!(read(&write1000(&d)?)? == d);
+	assert!(read(&write(&d)?)? == d); // can't really guarantee this one since bc7 is lossy :(
 	d.to_rgba(0).save("/tmp/itp32_0.png")?;
 
 	Ok(())

@@ -244,7 +244,7 @@ fn write_itp(itp: &Itp) -> Result<Vec<u8>> {
 }
 
 fn write_itp32(itp: &Itp32) -> Result<Vec<u8>> {
-	todo!()
+	Ok(cradle::itp32::write(itp)?)
 }
 
 fn to_raw_dds(itp: &Itp32) -> Result<Vec<u8>> {

@@ -1,7 +1,7 @@
 use themelios::types::Game;
 use themelios::lookup::Lookup;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Space {
 	None,
 	Space,
@@ -88,6 +88,10 @@ impl<'a> Context<'a> {
 		self.out.push('\n');
 		self.space = Space::Newline;
 		self
+	}
+
+	pub fn is_line(&self) -> bool {
+		self.space == Space::Newline
 	}
 
 	pub fn write_fmt(&mut self, args: std::fmt::Arguments<'_>) {

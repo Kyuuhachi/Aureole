@@ -360,7 +360,7 @@ fn parse_float(p: &mut Parse) -> Result<Option<(S<f64>, S<Unit>)>> {
 	}
 }
 
-macro int($T:ident $(=> $(#$CONV:ident)?)?) {
+macro int($T:ident) {
 	impl TryVal for $T {
 		fn desc() -> String { "int".to_owned() }
 
@@ -373,11 +373,21 @@ macro int($T:ident $(=> $(#$CONV:ident)?)?) {
 					Diag::error(s.0, e).emit();
 					Error
 				})?;
-				let v = unless!($({$($CONV)? $T(v)})?, {v});
 				Ok(Some(v))
 			} else {
 				Ok(None)
 			}
+		}
+	}
+}
+
+macro newtype_val($T:ident) {
+	impl TryVal for $T {
+		fn desc() -> String { "int".to_owned() }
+
+		fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
+			let v = TryVal::try_parse(p)?;
+			Ok(v.map($T))
 		}
 	}
 }
@@ -391,18 +401,18 @@ int!(i16);
 int!(i32);
 int!(i64);
 
-int!(SystemFlags =>);
-int!(CharFlags =>);
-int!(QuestFlags =>);
-int!(ObjectFlags =>);
-int!(LookPointFlags =>);
-int!(TriggerFlags =>);
-int!(EntryFlags =>);
+newtype_val!(SystemFlags);
+newtype_val!(CharFlags);
+newtype_val!(QuestFlags);
+newtype_val!(ObjectFlags);
+newtype_val!(LookPointFlags);
+newtype_val!(TriggerFlags);
+newtype_val!(EntryFlags);
 
-int!(Color =>);
-int!(TcMembers =>);
+newtype_val!(Color);
+newtype_val!(TcMembers);
 
-int!(QuestTask =>);
+newtype_val!(QuestTask);
 
 impl TryVal for String {
 	fn desc() -> String { "string".to_owned() }

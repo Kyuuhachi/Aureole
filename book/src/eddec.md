@@ -200,7 +200,7 @@ number of benefits:
 
 [^item-ref]: However this is not flawless: numbers inside expressions are not
   well-typed. For example, SC has some comparisons like
-  `if char_attr[field_party[0],31] == 337 | char_attr[field_party[0],32] == 337:`
+  `if field_party[0].31 == 337 | field_party[0].32 == 337:`
   for checking if a character is wearing a ZFG (char attrs 31 and 32 are the
   items worn in each accessory slot). This is something I would like to solve
   eventually.

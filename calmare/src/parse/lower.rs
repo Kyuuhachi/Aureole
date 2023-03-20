@@ -614,11 +614,21 @@ impl TryVal for FuncId {
 }
 
 impl TryVal for CharAttr {
-	fn desc() -> String { "'char_attr'".to_owned() }
+	fn desc() -> String { CharId::desc() }
 
 	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
-		if let Some((a, b)) = p.term("char_attr")? {
-			Ok(Some(CharAttr(a, b)))
+		if let Some(chid) = CharId::try_parse(p)? {
+			if let Some(s) = p.space() {
+				Diag::error(s, "no space allowed here").emit()
+			}
+			if !test!(p, Token::Dot) {
+				Diag::error(p.next_span().at_start(), "expected dot").emit();
+			}
+			if let Some(s) = p.space() {
+				Diag::error(s, "no space allowed here").emit()
+			}
+			let n = u8::parse(p)?;
+			Ok(Some(CharAttr(chid, n)))
 		} else {
 			Ok(None)
 		}

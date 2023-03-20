@@ -28,7 +28,7 @@ time with subtitles to indicate the playing audio.
 	}
 	TextWait
 	BgmStop 1500ms
-	Emote char[0] 0mm 2000mm emote[24,27,250ms,0]
+	Emote char[0] 0mm 2000mm 24 27 250ms 0
 	Sleep 1500ms
 	BgmWait
 	EmoteStop char[0]

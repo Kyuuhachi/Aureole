@@ -35,7 +35,7 @@ there will be more easily parsed content: dialogue. Let's take a look at this
 line of dialogue.
 
 ```clm
-	Emote name[0] 0mm 2000mm emote[8,9,250ms] 2
+	Emote name[0] 0mm 2000mm 8 9 250ms 2
 	SoundPlay sound[15] 0 0 100
 	Sleep 1000ms
 	TextTalk name[0] {

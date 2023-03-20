@@ -20,7 +20,7 @@ The code for this sequence is:
 		have to do.{wait}
 	}
 	TextWait
-	Emote name[0] 0mm 2000mm emote[0,1,250ms,2]
+	Emote name[0] 0mm 2000mm 0 1 250ms 2
 	SoundPlay sound[38] 0 0 100
 	Sleep 400ms
 	TextTalk name[0] {
@@ -36,7 +36,7 @@ have written `char[5]` here, but that's how it is.
 Let's take a closer look at this line.
 
 ```clm
-	Emote name[0] 0mm 2000mm emote[0,1,250ms,2]
+	Emote name[0] 0mm 2000mm 0 1 250ms 2
 ```
 
 The `name[0]` is, of course, which character does the emoting -- Estelle. The
@@ -45,37 +45,37 @@ offset is almost always zero, except for example if the character is lying in a
 bed. Vertical offset is usually 2000mm for most characters, 1700mm for Tita or
 other children, as well as characters who are sitting down, and 2300mm for Zin.
 
-So what's the deal with the four parameters in `emote[]`? Well, the game has a
-single instruction that is used to generate all the emotes, as opposed to one
+So what's the deal with the four other parameters? Well, the game has a single
+instruction that is used to generate all the emotes, as opposed to one
 instruction for each emote. The game contains a file that contains all of the
 emote images laid out in a grid, named `h_emotio._ch`. Here's what `h_emotio`
 looks like:
 
 ![A grid of 8 by 8 images.](./img/emotio.png)
 
-So `emote[0,1,250ms,2]` means showing images 0 through 1 (the question mark
-ones), for 250ms each, and run this animation twice. Some emotes such as the
-exclamation mark are shown just once, with short time between each frame.
-Others, such as the question mark here, have longer but fewer frames, and
-repeated several times. The `Emote` instruction can handle all that.
+So `0 1 250ms 2` means showing images 0 through 1 (the question mark ones), for
+250ms each, and run this animation twice. Some emotes such as the exclamation
+mark are shown just once, with short time between each frame. Others, such as
+the question mark here, have longer but fewer frames, and repeated several
+times. The `Emote` instruction can handle all that.
 
 A leaked script file has revealed names for a few of the emotes:
 
 |Name|Content|Meaning|
 |:-|:-|:-|
-|`BIKKURI`|`emote[2,7,80ms,1]`|exclamation mark|
-|`RUNRUN`|`emote[8,9,250ms,2]`|music note|
-|`MUKA`|`emote[12,13,250ms,2]`|angry|
-|`HIYAASE`|`emote[16,19,250ms,1]`|sweatdrop|
-|`TENTENTEN`|`emote[24,27,250ms,0]`|...|
-|`ZZZ`|`emote[28,33,250ms,?]`|sleep|
-|`WAIWAI`|`emote[38,39,250ms,2]`|cheerful|
+|`BIKKURI`|`2 7 80ms 1`|exclamation mark|
+|`RUNRUN`|`8 9 250ms 2`|music note|
+|`MUKA`|`12 13 250ms 2`|angry|
+|`HIYAASE`|`16 19 250ms 1`|sweatdrop|
+|`TENTENTEN`|`24 27 250ms 0`|...|
+|`ZZZ`|`28 33 250ms ?`|sleep|
+|`WAIWAI`|`38 39 250ms 2`|cheerful|
 
 Okay, so it seems like we have a handle on how to make emotes appear. Let's
 change Estelle's reaction to Orvid's snide comment to a nice `MUKA`!
 
 ```clm
-	Emote name[0] 0mm 2000mm emote[12,13,250ms,2]
+	Emote name[0] 0mm 2000mm 12 13 250ms 2
 ```
 
 ![Instead of being confused, Estelle now get angry.](./img/emote2.webp)
@@ -137,7 +137,7 @@ but very important instruction between the ones we have learned thus far.
 		have to do.{wait}
 	}
 	TextWait
-	Emote name[0] 0mm 2000mm emote[12,13,250ms,2]
+	Emote name[0] 0mm 2000mm 12 13 250ms 2
 	SoundPlay sound[38] 0 0 100
 	Sleep 400ms
 	TextTalk name[0] {
@@ -160,7 +160,7 @@ making the game just FEEL good. Let's take a look at what would happen if we
 remove `Sleep` altogether from the original scene.
 
 ```clm
-	Emote name[0] 0mm 2000mm emote[12,13,250ms,2]
+	Emote name[0] 0mm 2000mm 12 13 250ms 2
 	SoundPlay sound[38] 0 0 100
 	// Sleep 400ms // Removing sleep
 	TextTalk name[0] {
@@ -179,7 +179,7 @@ Of course, there are limits to how liberally Sleep can be used. Let's look at
 what would happen if we increase the length of Sleep drastically:
 
 ```clm
-	Emote name[0] 0mm 2000mm emote[12,13,250ms,2]
+	Emote name[0] 0mm 2000mm 12 13 250ms 2
 	SoundPlay sound[38] 0 0 100
 	Sleep 2000ms // Don't. Care. SLUMBER!
 	TextTalk name[0] {
@@ -211,7 +211,7 @@ giving Joshua an indefinite emote:
 		#06102v#501FPardon?{wait}
 	}
 	TextWait
-	Emote name[1] 0mm 1700mm emote[24,27,250ms,0]
+	Emote name[1] 0mm 1700mm 24 27 250ms 0
 	TextTalk self {
 		#27020v*cough* ...Never mind, I was just
 		talking to myself.{wait}

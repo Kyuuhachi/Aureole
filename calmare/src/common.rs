@@ -378,20 +378,6 @@ impl Val for CharId {
 	}
 }
 
-impl Val for Emote {
-	fn write(&self, f: &mut Context) {
-		write!(f, "emote[");
-		self.0.write(f);
-		write!(f, ",");
-		self.1.write(f);
-		write!(f, ",");
-		self.2.write(f);
-		write!(f, ",");
-		self.3.write(f);
-		write!(f, "]");
-	}
-}
-
 impl Val for Pos2 {
 	fn write(&self, f: &mut Context) {
 		write!(f, "({x}, null, {z})", x=self.0, z=self.1)

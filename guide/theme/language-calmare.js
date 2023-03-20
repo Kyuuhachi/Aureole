@@ -10,7 +10,7 @@ hljs.registerLanguage("calmare", hljs => {
 	});
 	TERM.push({
 		className: "tag",
-		begin: /\b(flag|system|var|global|name|bgm|magic|quest|shop|sound|town|battle|item|look_point|entrance|object|trigger|label|anim|chip|vis|fork|eff|eff_instance|menu|sepith|at_roll|placement|fn|emote|file|char_attr|char|field_party|party|custom)\[/,
+		begin: /\b(flag|system|var|global|name|bgm|magic|quest|shop|sound|town|battle|item|look_point|entrance|object|trigger|label|anim|chip|vis|fork|eff|eff_instance|menu|sepith|at_roll|placement|fn|file|char_attr|char|field_party|party|custom)\[/,
 		end: /]/,
 		contains: TERM
 	});

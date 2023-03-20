@@ -152,9 +152,6 @@ newtype!(ForkId(u16));
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CharAttr(pub CharId, pub u8);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Emote(pub u8, pub u8, pub Time, pub u8);
-
 // Translatable string
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(transparent)]

@@ -644,18 +644,6 @@ impl TryVal for FileId {
 	}
 }
 
-impl TryVal for Emote {
-	fn desc() -> String { "'emote'".to_owned() }
-
-	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
-		if let Some((a, b, c, d)) = p.term("emote")? {
-			Ok(Some(Emote(a, b, c, d)))
-		} else {
-			Ok(None)
-		}
-	}
-}
-
 impl TryVal for CharId {
 	fn desc() -> String { "'self', 'null', 'name', 'char', 'field_party', 'party', 'custom'".to_owned() }
 

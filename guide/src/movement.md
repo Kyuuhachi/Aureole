@@ -261,7 +261,7 @@ test. This is `t0100`.
 	TextWait
 	CharTurnTo name[0] 225deg 400deg/s
 	SoundPlay sound[137] 0 0 100
-	Emote name[0] 300mm 1600mm emote[54,57,250ms] 0
+	Emote name[0] 300mm 1600mm 54 57 250ms 0
 	Sleep 1000ms
 ```
 

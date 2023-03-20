@@ -608,20 +608,14 @@ themelios_macros::bytecode! {
 		VisShow(u8 as VisId, i16,i16,u16,u16, i16,i16,u16,u16, i16,i16,u16,u16, u32 as Color, u8, String),
 		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)]
 		/// Attribute 3 is color. The others are unknown, but probably include at least position, scale, and rotation.
-		VisSet(u8 as VisId, match {
-			0 => _0(i32,             i32,         u32 as Time, if matches!(game, Game::FcEvo|Game::Ao|Game::AoEvo) { u32 } else { const 0u32 }),
-			1 => _1(i32,             i32,         u32 as Time, if matches!(game, Game::FcEvo|Game::Ao|Game::AoEvo) { u32 } else { const 0u32 }),
-			2 => _2(i32,             i32,         u32 as Time, if matches!(game, Game::FcEvo|Game::Ao|Game::AoEvo) { u32 } else { const 0u32 }),
-			3 => Color(u32 as Color, u32 as Time, u32,         if matches!(game, Game::FcEvo|Game::Ao|Game::AoEvo) { u32 } else { const 0u32 }),
-			4 => _4(u32,             u32,         u32,         if matches!(game, Game::FcEvo|Game::Ao|Game::AoEvo) { u32 } else { const 0u32 }),
-			5 => _5(u32,             u32,         u32,         if matches!(game, Game::FcEvo|Game::Ao|Game::AoEvo) { u32 } else { const 0u32 }),
-			6 => _6(u32,             u32,         u32,         if matches!(game, Game::FcEvo|Game::Ao|Game::AoEvo) { u32 } else { const 0u32 }),
-			7 => _7(u32,             u32,         u32,         if matches!(game, Game::FcEvo|Game::Ao|Game::AoEvo) { u32 } else { const 0u32 }),
-			8 => _8(u32,             u32,         u32,         if matches!(game, Game::FcEvo|Game::Ao|Game::AoEvo) { u32 } else { const 0u32 }),
-			9 => _9(u32,             u32,         u32,         if matches!(game, Game::FcEvo|Game::Ao|Game::AoEvo) { u32 } else { const 0u32 }),
-		}),
+		VisSet(u8 as VisId, u8, i32, i32, i32, if matches!(game, Game::FcEvo|Game::Ao|Game::AoEvo|Game::AoKai) { i32 } else { const 0i32 }),
+		// VisSet vis[_] 0 i32 i32 Time 0
+		// VisSet vis[_] 1 i32 i32 Time 0
+		// VisSet vis[_] 2 i32 i32 Time 0
+		// VisSet vis[_] 3 Color Time 0 0
+		// 4..9 are unknown
 		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Vis(match {
-			0 => Await(u8 as VisId, u8),
+			0 => Wait(u8 as VisId, u8),
 			1 => Hide(u8 as VisId, u8),
 		}),
 

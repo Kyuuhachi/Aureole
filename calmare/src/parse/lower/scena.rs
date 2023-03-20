@@ -205,7 +205,26 @@ fn try_parse_insn(p: &mut Parse) -> Result<Option<Insn>> {
 			return Ok(Some(i))
 		}
 	}
-	themelios::scena::code::introspect!(run);
+
+	match p.tokens[p.pos].1 {
+		Token::Ident("VisSet") => {
+			p.pos += 1;
+			let s = p.prev_span();
+			let vis = VisId::parse(p)?;
+			let prop = u8::parse(p)?;
+			let (a, b, c, d) = match prop {
+				0..=2 => (i32::parse(p)?, i32::parse(p)?, Time::parse(p)?.0 as i32, i32::parse(p)?),
+				3 => (Color::parse(p)?.0 as i32, Time::parse(p)?.0 as i32, i32::parse(p)?, i32::parse(p)?),
+				_ => (i32::parse(p)?, i32::parse(p)?, i32::parse(p)?, i32::parse(p)?),
+			};
+			let i = Insn::VisSet(vis, prop, a, b, c, d);
+			validate_insn(p, s, &i);
+			Ok(Some(i))
+		}
+		_ => {
+			themelios::scena::code::introspect!(run);
+		}
+	}
 }
 
 fn try_parse_assign(p: &mut Parse) -> Result<Option<Insn>> {

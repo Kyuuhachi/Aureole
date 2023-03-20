@@ -178,7 +178,19 @@ fn insn(f: &mut Context, i: &Insn, mut line: bool) {
 		}
 	}
 
-	themelios::scena::code::introspect!(run);
+	match i {
+		Insn::VisSet(vis, prop, a, b, c, d) => {
+			f.kw("VisSet").val(vis).val(prop);
+			match prop {
+				0..=2 => f.val(a).val(b).val(&Time(*c as u32)).val(d),
+				3 => f.val(&Color(*a as u32)).val(&Time(*b as u32)).val(c).val(d),
+				_ => f.val(a).val(b).val(c).val(d),
+			};
+		}
+		_ => {
+			themelios::scena::code::introspect!(run);
+		}
+	}
 	if line {
 		f.line();
 	}

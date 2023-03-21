@@ -10,9 +10,7 @@ members = [
 	"themelios-types",
 	"themelios-archive",
 	"themelios",
-	"kagami",
 
-	"roundtrip",
 	"calmare",
 	"calmare-cli",
 	"factoria",

@@ -18,7 +18,7 @@ pub mod kw {
 
 // {{{1 AST and parse
 
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+#[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct Top {
 	#[syn(parenthesized)]
 	pub paren_token: syn::token::Paren,
@@ -26,7 +26,7 @@ pub struct Top {
 	#[parse(|input| Punctuated::parse_terminated_with(input, |input| {
 		Ok(PatType {
 			attrs: Attribute::parse_outer(input)?,
-			pat: input.parse()?,
+			pat: Box::new(Pat::parse_single(input)?),
 			colon_token: input.parse()?,
 			ty: input.parse()?,
 		})
@@ -45,7 +45,7 @@ pub struct Top {
 	pub end_span: proc_macro2::Span,
 }
 
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+#[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
 #[parse(prefix = Attribute::parse_outer)]
 pub enum Def {
 	#[parse(peek_func = |i| i.peek(kw::skip) && i.peek2(Token![!]))]
@@ -57,7 +57,7 @@ pub enum Def {
 	Standard(DefStandard),
 }
 
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+#[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct DefStandard {
 	pub attrs: DefAttributes,
 	pub ident: Ident,
@@ -68,14 +68,14 @@ pub struct DefStandard {
 	pub args: Punctuated<Arg, Token![,]>,
 }
 
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+#[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
 pub enum Arg {
 	#[parse(peek = Token![match])]
-	Tail(ArgTail),
-	Standard(Source),
+	Match(Match),
+	Source(Source),
 }
 
-#[derive(Clone, Debug, syn_derive::ToTokens)]
+#[derive(Clone, syn_derive::ToTokens)]
 pub enum Source {
 	Simple(SourceSimple),
 	Const(SourceConst),
@@ -106,7 +106,7 @@ impl Parse for Source {
 	}
 }
 
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+#[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct SourceBlock {
 	#[syn(braced)]
 	pub brace_token: token::Brace,
@@ -114,34 +114,34 @@ pub struct SourceBlock {
 	pub source: Box<Source>,
 }
 
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+#[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct SourceSimple {
 	pub ty: Box<Type>,
 	#[parse(|input| parse_if(input, |input| input.peek(kw::via)))]
 	pub via: Option<Via>,
 }
 
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+#[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct Via {
 	pub via_token: kw::via,
 	pub path: Path,
 }
 
-#[derive(Clone, Debug, syn_derive::ToTokens)]
+#[derive(Clone, syn_derive::ToTokens)]
 pub struct SourceCast {
 	pub source: Box<Source>,
 	pub as_token: Token![as],
 	pub ty: Box<Type>,
 }
 
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+#[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct SourceConst {
 	pub const_token: Token![const],
 	pub lit: LitInt,
 }
 
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
-pub struct ArgTail {
+#[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
+pub struct Match {
 	pub match_token: Token![match],
 	#[syn(braced)]
 	pub brace_token: token::Brace,
@@ -150,7 +150,7 @@ pub struct ArgTail {
 	pub arms: Punctuated<TailArm, Token![,]>,
 }
 
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+#[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct TailArm {
 	pub attrs: Attributes,
 	pub key: LitInt,
@@ -159,7 +159,7 @@ pub struct TailArm {
 	pub def: DefStandard,
 }
 
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+#[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct SourceIf {
 	pub if_token: Token![if],
 	#[parse(|input| Ok(Box::new(Expr::parse_without_eager_brace(input)?)))]
@@ -183,51 +183,23 @@ fn else_branch(input: ParseStream) -> Result<Box<Source>> {
 	Ok(Box::new(else_branch))
 }
 
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+#[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct SplitArm {
-	#[parse(multi_pat_with_leading_vert)]
-	pub pat: Pat,
+	#[parse(Pat::parse_multi_with_leading_vert, boxed)]
+	pub pat: Box<Pat>,
 	#[parse(|input| parse_if(input, |input| input.peek(Token![if])))]
 	pub guard: Option<Guard>,
 	pub fat_arrow_token: Token![=>],
 	pub source: Source,
 }
 
-// Copied from syn::pat::parsing
-pub fn multi_pat_with_leading_vert(input: ParseStream) -> Result<Pat> {
-	let leading_vert: Option<Token![|]> = input.parse()?;
-	multi_pat_impl(input, leading_vert)
-}
-
-fn multi_pat_impl(input: ParseStream, leading_vert: Option<Token![|]>) -> Result<Pat> {
-	let mut pat: Pat = input.parse()?;
-	if leading_vert.is_some()
-		|| input.peek(Token![|]) && !input.peek(Token![||]) && !input.peek(Token![|=])
-	{
-		let mut cases = Punctuated::new();
-		cases.push_value(pat);
-		while input.peek(Token![|]) && !input.peek(Token![||]) && !input.peek(Token![|=]) {
-			let punct = input.parse()?;
-			cases.push_punct(punct);
-			let pat: Pat = input.parse()?;
-			cases.push_value(pat);
-		}
-		pat = Pat::Or(PatOr {
-			attrs: Vec::new(),
-			leading_vert,
-			cases,
-		});
-	}
-	Ok(pat)
-}
-
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+#[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct Guard {
 	pub if_token: Token![if],
 	pub expr: Box<Expr>,
 }
 
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+#[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct DefSkip {
 	pub attrs: DefAttributes,
 	pub skip_token: kw::skip,
@@ -238,7 +210,7 @@ pub struct DefSkip {
 	pub count: LitInt,
 }
 
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+#[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct DefCustom {
 	pub attrs: DefAttributes,
 	pub custom_token: kw::custom,
@@ -250,7 +222,7 @@ pub struct DefCustom {
 	pub clauses: Punctuated<Clause, Token![,]>,
 }
 
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+#[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
 pub enum Clause {
 	#[parse(peek = kw::read)]
 	Read(ClauseRead),
@@ -258,14 +230,14 @@ pub enum Clause {
 	Write(ClauseWrite),
 }
 
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+#[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct ClauseRead {
 	pub read_token: kw::read,
 	pub arrow_token: Token![=>],
 	pub expr: Box<Expr>,
 }
 
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+#[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct ClauseWrite {
 	pub write_token: kw::write,
 	#[parse(|p| {
@@ -273,12 +245,13 @@ pub struct ClauseWrite {
 		path.get_ident().cloned().ok_or_else(|| Error::new(path.span(), "must be ident"))
 	})]
 	pub ident: Ident,
+	#[parse(Pat::parse_multi, boxed)]
 	pub pat: Box<Pat>,
 	pub arrow_token: Token![=>],
 	pub expr: Box<Expr>,
 }
 
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+#[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct DefDef {
 	pub attrs: Attributes,
 	pub def_token: kw::def,
@@ -291,7 +264,7 @@ pub struct DefDef {
 	pub args: Punctuated<Box<Type>, Token![,]>,
 }
 
-#[derive(Clone, Debug, syn_derive::ToTokens)]
+#[derive(Clone, syn_derive::ToTokens)]
 pub struct TopAttributes {
 	pub games: GamesAttr,
 	pub other: Attributes,
@@ -309,7 +282,7 @@ impl Parse for TopAttributes {
 	}
 }
 
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+#[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct GamesAttr {
 	pub expr: Box<Expr>,
 	pub arrow_token: Token![=>],
@@ -330,7 +303,7 @@ pub struct GamesAttr {
 	pub idents: Punctuated<Ident, Token![,]>,
 }
 
-#[derive(Clone, Debug, syn_derive::ToTokens)]
+#[derive(Clone, syn_derive::ToTokens)]
 pub struct DefAttributes {
 	pub game: Option<GameAttr>,
 	pub other: Attributes,
@@ -348,7 +321,7 @@ impl Parse for DefAttributes {
 	}
 }
 
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+#[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct GameAttr {
 	#[parse(Punctuated::parse_terminated)]
 	pub idents: Punctuated<Ident, Token![,]>,
@@ -356,7 +329,7 @@ pub struct GameAttr {
 
 // Utils
 
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+#[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct Attributes(
 	#[parse(Attribute::parse_outer)]
 	#[to_tokens(|tokens, val| tokens.append_all(val))]
@@ -381,5 +354,5 @@ fn parse_if<T: Parse>(input: ParseStream, cond: fn(ParseStream) -> bool) -> Resu
 }
 
 fn pop_attr(attrs: &mut Vec<Attribute>, name: &str) -> Option<Attribute> {
-	attrs.iter().position(|a| a.path.is_ident(name)).map(|i| attrs.remove(i))
+	attrs.iter().position(|a| a.path().is_ident(name)).map(|i| attrs.remove(i))
 }

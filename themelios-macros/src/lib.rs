@@ -281,7 +281,7 @@ fn make_table(ctx: &Ctx) -> String {
 
 fn gather_top(input: Top) -> Result<Ctx> {
 	let games = input.attrs.games;
-	let all_games: Box<[Ident]> = games.idents.iter().cloned().collect();
+	let all_games: Vec<Ident> = games.idents.iter().cloned().collect();
 
 	let mut ctx = Ctx {
 		func_args: input.args,
@@ -303,14 +303,14 @@ fn gather_top(input: Top) -> Result<Ctx> {
 				get_games(&mut def.attrs, &all_games, &mut n, val as usize)?;
 
 				for attr in def.attrs.other.iter() {
-					Diagnostic::spanned(attr.path.span().unwrap(), Level::Error, format!("cannot find attribute `{}` in this scope", attr.path.to_token_stream())).emit();
+					Diagnostic::spanned(attr.path().span().unwrap(), Level::Error, format!("cannot find attribute `{}` in this scope", attr.path().to_token_stream())).emit();
 				}
 			}
 			Def::Custom(mut def) => {
 				let games = get_games(&mut def.attrs, &all_games, &mut n, 1)?;
 
 				for attr in def.attrs.other.iter() {
-					Diagnostic::spanned(attr.path.span().unwrap(), Level::Error, format!("cannot find attribute `{}` in this scope", attr.path.to_token_stream())).emit();
+					Diagnostic::spanned(attr.path().span().unwrap(), Level::Error, format!("cannot find attribute `{}` in this scope", attr.path().to_token_stream())).emit();
 				}
 
 				let mut has_read = false;
@@ -364,7 +364,7 @@ fn gather_top(input: Top) -> Result<Ctx> {
 				ctx.reads.push(ReadArm {
 					span,
 					games: games.clone(),
-					body: pq!{span=> |__f| #read },
+					body: pq!{span=> |__f| { #(#read)* } },
 				});
 			}
 		}
@@ -406,13 +406,13 @@ fn get_games(attrs: &mut DefAttributes, all_games: &[Ident], n: &mut [usize], nu
 	Ok(games)
 }
 
-fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block {
+fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Vec<Stmt> {
 	let mut read = Vec::<Stmt>::new();
 	let span = arm.span();
 
 	for pair in arm.args.into_pairs() {
 		match pair.into_tuple() {
-			(Arg::Standard(arg), _) => {
+			(Arg::Source(arg), _) => {
 				let varname = format_ident!("_{}", ictx.args.len(), span=arg.span());
 
 				let read_expr = read_source(ctx, &arg);
@@ -424,9 +424,7 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 				ictx.arg_names.push(varname);
 				ictx.args.push(source_ty(&arg));
 			}
-			(Arg::Tail(arg), comma) => {
-				let span = arg.span();
-
+			(Arg::Match(arg), comma) => {
 				if let Some(comma) = comma {
 					Diagnostic::spanned(comma.span().unwrap(), Level::Error, "tail must be last").emit();
 				}
@@ -440,7 +438,7 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 					ictx.write.push(pq!{arm=> __f.u8(#key); });
 					let span = arm.span();
 					let body = gather_arm(ctx, ictx, arm.def);
-					arms.push(pq!{span=> #key => #body });
+					arms.push(pq!{span=> #key => { #(#body)* } });
 				}
 
 				let name = &ictx.ident.to_string();
@@ -449,11 +447,8 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 						#(#arms)*
 						_v => Err(format!("invalid Insn::{}*: 0x{:02X}", #name, _v).into())
 					}
-				}));
-				return Block {
-					brace_token: token::Brace { span },
-					stmts: read
-				}
+				}, None));
+				return read
 			}
 		};
 	}
@@ -476,13 +471,8 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Block
 		body: pq!{span=> |__f| { #(#write)* Ok(()) } },
 	});
 
-	// let ident = &ictx.ident;
-	// let args = &ictx.arg_names;
-	read.push(Stmt::Expr(pq!{span=> Ok(Self::#ident(#arg_names)) }));
-	Block {
-		brace_token: token::Brace { span },
-		stmts: read
-	}
+	read.push(Stmt::Expr(pq!{span=> Ok(Self::#ident(#arg_names)) }, None));
+	read
 }
 
 fn source_ty(source: &Source) -> Box<Type> {

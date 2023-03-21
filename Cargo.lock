@@ -461,6 +461,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "gospel"
+version = "0.1.0"
+dependencies = [
+ "paste",
+ "thiserror",
+]
+
+[[package]]
 name = "hamu"
 version = "0.1.0"
 source = "git+https://github.com/Kyuuhachi/hamu#001af5fb9af55ed5e9e74f0663c58e9d7c0eec9d"

@@ -235,69 +235,43 @@ macro_rules! primitives {
 	) => { paste::paste! {
 		#[doc(hidden)]
 		impl<'a> Reader<'a> {
-			$(
-				pub fn [<$type $suf>](&mut self) -> Result<$type> {
-					Ok($type::$conv(self.array()?))
+			$(pub fn [<$type $suf>](&mut self) -> Result<$type> {
+				Ok($type::$conv(self.array()?))
+			})*
+			$(pub fn [<check_ $type $suf>](&mut self, v: $type) -> Result<()> {
+				let pos = self.pos();
+				let u = self.[< $type $suf >]()?;
+				if u != v {
+					self.pos = pos;
+					return Err(Error::Other { pos, source: CheckError {
+						got: u,
+						expected: v,
+					}.into() })
 				}
-			)*
-
-			$(
-				pub fn [<check_ $type $suf>](&mut self, v: $type) -> Result<()> {
-					let pos = self.pos();
-					let u = self.[< $type $suf >]()?;
-					if u != v {
-						self.pos = pos;
-						return Err(Error::Other { pos, source: CheckError {
-							got: u,
-							expected: v,
-						}.into() })
-					}
-					Ok(())
-				}
-			)*
-
-			$(
-				pub fn [<ptr$ptr $suf>](&mut self) -> Result<Self> {
-					self.clone().at(self.[<u$ptr $suf>]()? as usize)
-				}
-			)*
+				Ok(())
+			})*
+			$(pub fn [<ptr$ptr $suf>](&mut self) -> Result<Self> {
+				self.clone().at(self.[<u$ptr $suf>]()? as usize)
+			})*
 		}
 
 		$(#[$trait_attrs])*
 		pub trait $trait: seal::Sealed {
-			$(
-				#[doc(hidden)]
-				fn $type(&mut self) -> Result<$type>;
-			)*
-			$(
-				#[doc(hidden)]
-				fn [<check_ $type>](&mut self, v: $type) -> Result<()>;
-			)*
-			$(
-				#[doc(hidden)]
-				fn [<ptr $ptr>](&mut self) -> Result<Self>;
-			)*
+			$(#[doc(hidden)] fn $type(&mut self) -> Result<$type>;)*
+			$(#[doc(hidden)] fn [<check_ $type>](&mut self, v: $type) -> Result<()>;)*
+			$(#[doc(hidden)] fn [<ptr $ptr>](&mut self) -> Result<Self>;)*
 		}
 
 		impl<'a> $trait for Reader<'a> {
-			$(
-				#[doc(hidden)]
-				fn $type(&mut self) -> Result<$type> {
-					self.[<$type $suf>]()
-				}
-			)*
-			$(
-				#[doc(hidden)]
-				fn [<check_ $type>](&mut self, v: $type) -> Result<()> {
-					self.[<check_ $type $suf>](v)
-				}
-			)*
-			$(
-				#[doc(hidden)]
-				fn [<ptr$ptr>](&mut self) -> Result<Self> {
-					self.[<ptr$ptr $suf>]()
-				}
-			)*
+			$(#[doc(hidden)] fn $type(&mut self) -> Result<$type> {
+				self.[<$type $suf>]()
+			})*
+			$(#[doc(hidden)] fn [<check_ $type>](&mut self, v: $type) -> Result<()> {
+				self.[<check_ $type $suf>](v)
+			})*
+			$(#[doc(hidden)] fn [<ptr$ptr>](&mut self) -> Result<Self> {
+				self.[<ptr$ptr $suf>]()
+			})*
 		}
 	} }
 }

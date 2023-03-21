@@ -230,60 +230,36 @@ macro_rules! primitives {
 	) => { paste::paste! {
 		#[doc(hidden)]
 		impl Writer {
-			$(
-				pub fn [<$type $suf>](&mut self, val: $type) {
-					self.array($type::$conv(val));
-				}
-			)*
-			$(
-				pub fn [<delay$ptr $suf>](&mut self, label: Label) {
-					self.delay(move |ctx| ctx.label(label).map([<u$ptr>]::$conv));
-				}
-			)*
-			$(
-				pub fn [<ptr$ptr $suf>](&mut self) -> Self {
-					let mut g = Writer::new();
-					self.[<delay$ptr $suf>](g.here());
-					g
-				}
-			)*
+			$(pub fn [<$type $suf>](&mut self, val: $type) {
+				self.array($type::$conv(val));
+			})*
+			$(pub fn [<delay$ptr $suf>](&mut self, label: Label) {
+				self.delay(move |ctx| ctx.label(label).map([<u$ptr>]::$conv));
+			})*
+			$(pub fn [<ptr$ptr $suf>](&mut self) -> Self {
+				let mut g = Writer::new();
+				self.[<delay$ptr $suf>](g.here());
+				g
+			})*
 		}
 
 		$(#[$trait_attrs])*
 		pub trait $trait: seal::Sealed {
-			$(
-				#[doc(hidden)]
-				fn $type(&mut self, val: $type);
-			)*
-			$(
-				#[doc(hidden)]
-				fn [<delay$ptr>](&mut self, label: Label);
-			)*
-			$(
-				#[doc(hidden)]
-				fn [<ptr$ptr>](&mut self) -> Self;
-			)*
+			$(#[doc(hidden)] fn $type(&mut self, val: $type);)*
+			$(#[doc(hidden)] fn [<delay$ptr>](&mut self, label: Label);)*
+			$(#[doc(hidden)] fn [<ptr$ptr>](&mut self) -> Self;)*
 		}
 
 		impl $trait for Writer {
-			$(
-				#[doc(hidden)]
-				fn $type(&mut self, val: $type) {
-					self.[<$type $suf>](val)
-				}
-			)*
-			$(
-				#[doc(hidden)]
-				fn [<delay$ptr>](&mut self, label: Label) {
-					self.[<delay$ptr $suf>](label)
-				}
-			)*
-			$(
-				#[doc(hidden)]
-				fn [<ptr$ptr>](&mut self) -> Self {
-					self.[<ptr$ptr $suf>]()
-				}
-			)*
+			$(#[doc(hidden)] fn $type(&mut self, val: $type) {
+				self.[<$type $suf>](val)
+			})*
+			$(#[doc(hidden)] fn [<delay$ptr>](&mut self, label: Label) {
+				self.[<delay$ptr $suf>](label)
+			})*
+			$(#[doc(hidden)] fn [<ptr$ptr>](&mut self) -> Self {
+				self.[<ptr$ptr $suf>]()
+			})*
 		}
 	} }
 }

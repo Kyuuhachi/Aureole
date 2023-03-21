@@ -10,49 +10,50 @@ pub type Rgba = [u8; 4];
 pub fn decode(block: u128) -> [[Rgba; 4]; 4] {
 	match block.trailing_zeros() as usize {
 		// Table 109. Mode-dependent BPTC parameters
-		//                              NS  PB  RS ISB  CB  AB EPB SPB  IB  IB₂
-		0 => decode_with_mode(block>>1,  3,  4,  0,  0,  4,  0,  1,  0,  3,  0),
-		1 => decode_with_mode(block>>2,  2,  6,  0,  0,  6,  0,  0,  1,  3,  0),
-		2 => decode_with_mode(block>>3,  3,  6,  0,  0,  5,  0,  0,  0,  2,  0),
-		3 => decode_with_mode(block>>4,  2,  6,  0,  0,  7,  0,  1,  0,  2,  0),
-		4 => decode_with_mode(block>>5,  1,  0,  2,  1,  5,  6,  0,  0,  2,  3),
-		5 => decode_with_mode(block>>6,  1,  0,  2,  0,  7,  8,  0,  0,  2,  2),
-		6 => decode_with_mode(block>>7,  1,  0,  0,  0,  7,  7,  1,  0,  4,  0),
-		7 => decode_with_mode(block>>8,  2,  6,  0,  0,  5,  5,  1,  0,  2,  0),
+		//                     NS  PB  RS ISB  CB  AB EPB SPB  IB  IB₂
+		0 => decode_with_mode::<3,  4,  0,  0,  4,  0,  1,  0,  3,  0>(block>>1),
+		1 => decode_with_mode::<2,  6,  0,  0,  6,  0,  0,  1,  3,  0>(block>>2),
+		2 => decode_with_mode::<3,  6,  0,  0,  5,  0,  0,  0,  2,  0>(block>>3),
+		3 => decode_with_mode::<2,  6,  0,  0,  7,  0,  1,  0,  2,  0>(block>>4),
+		4 => decode_with_mode::<1,  0,  2,  1,  5,  6,  0,  0,  2,  3>(block>>5),
+		5 => decode_with_mode::<1,  0,  2,  0,  7,  8,  0,  0,  2,  2>(block>>6),
+		6 => decode_with_mode::<1,  0,  0,  0,  7,  7,  1,  0,  4,  0>(block>>7),
+		7 => decode_with_mode::<2,  6,  0,  0,  5,  5,  1,  0,  2,  0>(block>>8),
 		_ => [[Rgba::default(); 4]; 4],
 	}
 }
 
-fn get(bits: &mut u128, nbits: u8) -> u8 {
+#[inline(always)]
+fn get(bits: &mut u128, nbits: usize) -> u8 {
 	let x = (1u128 << nbits) - 1;
 	let v = (*bits & x) as u8;
 	*bits >>= nbits;
 	v
 }
 
+#[inline(always)]
 #[allow(clippy::too_many_arguments)]
-fn decode_with_mode(
-	bits: u128,
+fn decode_with_mode<
 	// Table 110. Full descriptions of the BPTC mode columns
-	ns:  u8, // NS  Number of subsets
-	pb:  u8, // PB  Partition selection bits
-	rb:  u8, // RB  Rotation bits
-	isb: u8, // ISB Index selection bit
-	cb:  u8, // CB  Color bits
-	ab:  u8, // AB  Alpha bits
-	epb: u8, // EPB Endpoint P-bits (all channels)
-	spb: u8, // SPB Shared P-bits
-	ib:  u8, // IB  Index bits
-	ib2: u8, // IB₂ Secondary index bits
-) -> [[Rgba; 4]; 4] {
+	const NS:  usize, // Number of subsets
+	const PB:  usize, // Partition selection bits
+	const RB:  usize, // Rotation bits
+	const ISB: usize, // Index selection bit
+	const CB:  usize, // Color bits
+	const AB:  usize, // Alpha bits
+	const EPB: usize, // Endpoint P-bits (all channels)
+	const SPB: usize, // Shared P-bits
+	const IB:  usize, // Index bits
+	const IB2: usize, // Secondary index bits
+>(bits: u128) -> [[Rgba; 4]; 4] {
 	let bits = &mut {bits};
-	let partition = get(bits, pb) as usize;
-	let rotation  = get(bits, rb);
-	let index_sel = get(bits, isb) != 0;
+	let partition = get(bits, PB) as usize;
+	let rotation  = get(bits, RB);
+	let index_sel = get(bits, ISB) != 0;
 
-	let endpoints = &mut [[Rgba::default(); 2]; 3][..ns as usize];
+	let endpoints = &mut [[Rgba::default(); 2]; NS];
 
-	let cab = [cb, cb, cb, ab];
+	let cab = [CB, CB, CB, AB];
 
 	#[allow(clippy::needless_range_loop)]
 	for c in 0..4 {
@@ -64,21 +65,21 @@ fn decode_with_mode(
 
 	for endp in endpoints.iter_mut() {
 		for e in endp.iter_mut() {
-			let p = get(bits, epb);
-			*e = e.map(|c| (c << epb) | p);
+			let p = get(bits, EPB);
+			*e = e.map(|c| (c << EPB) | p);
 		}
 	}
 
 	for endp in endpoints.iter_mut() {
-		let p = get(bits, spb);
+		let p = get(bits, SPB);
 		for e in endp.iter_mut() {
-			*e = e.map(|c| (c << spb) | p);
+			*e = e.map(|c| (c << SPB) | p);
 		}
 	}
 
 	for c in 0..4 {
 		for e in endpoints.iter_mut().flatten() {
-			let total_bits = cab[c] + epb + spb;
+			let total_bits = cab[c] + EPB + SPB;
 			if 0 < total_bits && total_bits < 8 {
 				e[c] <<= 8 - total_bits;
 				e[c] |= e[c] >> total_bits;
@@ -87,35 +88,40 @@ fn decode_with_mode(
 	}
 
 	let cbits = &mut {*bits};
-	let abits = &mut {*bits >> (16 * ib - ns)};
+	let abits = &mut {*bits >> (16 * IB - NS)};
 
 	let mut output = [[Rgba::default(); 4]; 4];
 
 	for (y, row) in output.iter_mut().enumerate() {
 		for (x, px) in row.iter_mut().enumerate() {
-			let (subset_index, is_anchor) = subset_index(partition, ns, x, y);
-			let endp = endpoints[subset_index as usize];
+			let (subset_index, is_anchor) = subset_index::<NS>(partition, x, y);
+			let endp = endpoints[subset_index];
 
-			let (is, ibs) = if ib2 > 0 {
-				let i0 = get(cbits, ib - u8::from(is_anchor)) as usize;
-				let i1 = get(abits, ib2 - u8::from((x, y) == (0, 0))) as usize;
+			let i0 = get(cbits, IB - usize::from(is_anchor)) as usize;
+			if IB2 > 0 {
+				let i1 = get(abits, IB2 - usize::from((x, y) == (0, 0))) as usize;
 				if index_sel {
-					([i1,i0],[ib2,ib])
+					px[0] = interpolate::<IB2>(endp[0][0], endp[1][0], i1);
+					px[1] = interpolate::<IB2>(endp[0][1], endp[1][1], i1);
+					px[2] = interpolate::<IB2>(endp[0][2], endp[1][2], i1);
+					px[3] = interpolate::<IB >(endp[0][3], endp[1][3], i0);
 				} else {
-					([i0,i1],[ib,ib2])
+					px[0] = interpolate::<IB >(endp[0][0], endp[1][0], i0);
+					px[1] = interpolate::<IB >(endp[0][1], endp[1][1], i0);
+					px[2] = interpolate::<IB >(endp[0][2], endp[1][2], i0);
+					px[3] = interpolate::<IB2>(endp[0][3], endp[1][3], i1);
 				}
 			} else {
-				let i0 = get(cbits, ib - u8::from(is_anchor)) as usize;
-				([i0,i0],[ib,ib])
+				px[0] = interpolate::<IB>(endp[0][0], endp[1][0], i0);
+				px[1] = interpolate::<IB>(endp[0][1], endp[1][1], i0);
+				px[2] = interpolate::<IB>(endp[0][2], endp[1][2], i0);
+				px[3] = interpolate::<IB>(endp[0][3], endp[1][3], i0);
 			};
 
-			px[0] = interpolate(endp[0][0], endp[1][0], is[0], ibs[0]);
-			px[1] = interpolate(endp[0][1], endp[1][1], is[0], ibs[0]);
-			px[2] = interpolate(endp[0][2], endp[1][2], is[0], ibs[0]);
-			px[3] = interpolate(endp[0][3], endp[1][3], is[1], ibs[1]);
-			if ab == 0 {
+			if AB == 0 {
 				px[3] = 255;
 			}
+
 			match rotation {
 				// Table 120. BPTC Rotation bits
 				0 => (), // No change
@@ -130,7 +136,7 @@ fn decode_with_mode(
 	output
 }
 
-fn subset_index(partition: usize, ns: u8, x: usize, y: usize) -> (u8, bool) {
+fn subset_index<const NS: usize>(partition: usize, x: usize, y: usize) -> (usize, bool) {
 	// Table 114. Partition table for 2-subset BPTC, with the 4×4 block of values for each partition number
 	const P2: [[[u8; 4]; 4]; 64] = [
 		[[0, 0, 1, 1], [0, 0, 1, 1], [0, 0, 1, 1], [0, 0, 1, 1]],
@@ -302,15 +308,15 @@ fn subset_index(partition: usize, ns: u8, x: usize, y: usize) -> (u8, bool) {
 		15, 15, 15, 15, 15, 2,  2,  15,
 	];
 
-	let index = match ns {
+	let index = match NS {
 		1 => 0,
 		2 => P2[partition][y][x],
 		3 => P3[partition][y][x],
 		_ => unreachable!(),
-	};
+	} as usize;
 
 	let i = (y * 4 + x) as u8;
-	let is_anchor = match ns {
+	let is_anchor = match NS {
 		1 => i == 0,
 		2 => i == 0 || i == A2[partition],
 		3 => i == 0 || i == A3A[partition] || i == A3B[partition],
@@ -320,8 +326,8 @@ fn subset_index(partition: usize, ns: u8, x: usize, y: usize) -> (u8, bool) {
 	(index, is_anchor)
 }
 
-fn interpolate(e0: u8, e1: u8, i: usize, ib: u8) -> u8 {
-	let weight = match ib {
+fn interpolate<const IB: usize>(e0: u8, e1: u8, i: usize) -> u8 {
+	let weight = match IB {
 		// Table 119. BPTC interpolation factors
 		2 => [       0,             21,             43,             64      ][i],
 		3 => [   0,      9,     18,     27,     37,     46,     55,     64  ][i],

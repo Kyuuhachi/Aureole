@@ -21,4 +21,7 @@ and a number of other auxiliary files.
 
 ## Usage
 
-
+For basic usage, simply drag a script file (normally `._sn` or `.bin`) onto the
+Calmare executable file. To recompile, drag the resulting `.clm` file onto it
+again. For more advanced command-line usage, use `--help`. For a more
+in-depth tutorial, see the [Bracer's Notebook](guide/index.md).

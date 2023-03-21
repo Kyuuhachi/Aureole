@@ -1,4 +1,4 @@
-# Preliminaries
+# Modding Trails in the Sky for Senior Bracers
 
 > So you'd like to mod Trails in the Sky, aspiring bracer?
 

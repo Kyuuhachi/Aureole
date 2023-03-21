@@ -1,4 +1,4 @@
-# EDDecompiler
+# Versus EDDecompiler
 
 It would be foolish to publish a script decompiler without comparing it to
 the only other known tool in its niche: Ouroboros'
@@ -204,6 +204,16 @@ number of benefits:
   for checking if a character is wearing a ZFG (char attrs 31 and 32 are the
   items worn in each accessory slot). This is something I would like to solve
   eventually.
+
+## Instruction name stability
+
+EDDecompiler names unknown instructions as `OP_NN`, where `NN` is the hex code
+for the instruction. Since the instruction tables are different between each
+game, this means that for example `OP_A0` might do completely different things
+in different games. Themelios uses the same name for instructions that are
+semantically the same, even if they are in different games. This is much easier
+to crossreference between games, especially between the base and Evolution
+games.
 
 ## Ease of use
 

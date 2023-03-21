@@ -68,25 +68,25 @@ expand.)
 <details><summary><em>Trails in the Sky FC</em></summary>
 
 ```
-{{#include bgmtbl/fc.txt}}
+{{#include ../bgmtbl/fc.txt}}
 ```
-[(Raw)](bgmtbl/fc.txt)
+[(Raw)](../bgmtbl/fc.txt)
 
 </details>
 <details><summary><em>Trails in the Sky SC</em></summary>
 
 ```
-{{#include bgmtbl/sc.txt}}
+{{#include ../bgmtbl/sc.txt}}
 ```
-[(Raw)](bgmtbl/sc.txt)
+[(Raw)](../bgmtbl/sc.txt)
 
 </details>
 <details><summary><em>Trails in the Sky the 3rd</em></summary>
 
 ```
-{{#include bgmtbl/3rd.txt}}
+{{#include ../bgmtbl/3rd.txt}}
 ```
-[(Raw)](bgmtbl/3rd.txt)
+[(Raw)](../bgmtbl/3rd.txt)
 
 </details>
 

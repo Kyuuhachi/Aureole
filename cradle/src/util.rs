@@ -1,4 +1,4 @@
-use hamu::read::le::*;
+use gospel::read::{Reader, Le as _};
 use hamu::write::le::*;
 use image::{ImageBuffer, GenericImageView, GenericImage};
 
@@ -9,7 +9,7 @@ pub enum Error {
 	#[error(transparent)]
 	Decompress{ #[from] source: decompress::Error },
 	#[error("{source}")]
-	Read { #[from] source: hamu::read::Error, backtrace: std::backtrace::Backtrace },
+	Read { #[from] source: gospel::read::Error, backtrace: std::backtrace::Backtrace },
 	#[error("{source}")]
 	Write { #[from] source: hamu::write::Error, backtrace: std::backtrace::Backtrace },
 }

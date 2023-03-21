@@ -1,8 +1,6 @@
-use hamu::read::le::*;
+use image::RgbaImage;
+use gospel::read::{Reader, Le as _};
 use hamu::write::le::*;
-
-use image::{Rgba, RgbaImage};
-
 use crate::util::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -53,17 +51,16 @@ pub fn read(data: &[u8]) -> Result<Itp32, Error> {
 				f.check_u32(32)?; // chunk size
 				width = f.u32()? as usize;
 				height = f.u32()? as usize;
-				let file_size = f.u32()? as usize;
+				f.check_u32(f.len() as u32)?;
+
 				let major = f.u16()?;
 				minor = f.u16()?;
-
 				f.check_u16(0)?; // swizzle; see https://imgur.com/a/E5YnYXN
 				f.check_u16(6)?; // rest are unknown
 				f.check_u16(3)?;
 				f.check_u16(0)?;
 				f.check_u16(0)?;
 
-				ensure!(file_size == data.len(), "itp32: invalid file size");
 				ensure!(major == 3, "itp32: invalid major {major}, only 3 supported");
 			}
 

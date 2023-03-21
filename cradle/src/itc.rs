@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use hamu::read::le::*;
+use gospel::read::{Reader, Le as _};
 use hamu::write::le::*;
 use image::Rgba;
 use crate::util::*;
@@ -69,11 +69,8 @@ pub fn read(data: &[u8]) -> Result<Itc, Error> {
 	};
 
 	let mut content = Vec::with_capacity(points.len()-1);
-	for (start, end) in points.iter().zip(points.iter().skip(1)) {
-		let Some(c) = data.get(*start..*end) else {
-			bail!("itc: invalid offset")
-		};
-		content.push(c)
+	for (&start, &end) in points.iter().zip(points.iter().skip(1)) {
+		content.push(f.at(start)?.slice(end-start)?)
 	}
 
 	let mut frames = Vec::with_capacity(128);

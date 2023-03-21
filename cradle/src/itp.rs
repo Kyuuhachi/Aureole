@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use hamu::read::le::*;
+use gospel::read::{Reader, Le as _};
 use hamu::write::le::*;
 use image::{GrayImage, Rgba, RgbaImage};
 use crate::util::{Error, swizzle, image, decompress, compress, ensure, bail};
@@ -108,7 +108,7 @@ pub fn write1004(itp: &Itp) -> Result<Vec<u8>, Error> {
 }
 
 pub fn read1005(data: &[u8]) -> Result<Itp, Error> {
-	fn nibbles(f: &mut Reader, out: &mut [u8]) -> Result<(), hamu::read::Error> {
+	fn nibbles(f: &mut Reader, out: &mut [u8]) -> Result<(), Error> {
 		for i in 0..out.len()/2 {
 			let x = f.u8()?;
 			out[2*i] = x >> 4;

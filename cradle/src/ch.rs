@@ -1,7 +1,7 @@
 #![allow(clippy::unusual_byte_groupings, clippy::identity_op)]
 
+use gospel::read::{Reader, Le as _};
 use hamu::write::le::*;
-use hamu::read::le::*;
 use image::{RgbaImage, GenericImageView, Rgba};
 use crate::util::*;
 

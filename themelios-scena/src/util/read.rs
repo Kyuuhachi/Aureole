@@ -47,18 +47,13 @@ pub fn decode(bytes: &[u8]) -> Result<String, DecodeError> {
 	cp932::decode(bytes).map_err(|_| DecodeError { text: cp932::decode_lossy(bytes) })
 }
 
-
 #[extend::ext(name = ReaderExtU)]
 pub impl Reader<'_> {
 	fn string(&mut self) -> Result<String, ReadError> {
-		let mut buf = Vec::new();
-		loop {
-			match self.array()? {
-				[0] => break,
-				[n] => buf.push(n),
-			}
-		}
-		Ok(decode(&buf)?)
+		let mut s = self.clone();
+		while self.array()? != [0] {}
+		let data = s.slice(self.pos() - s.pos() - 1)?;
+		Ok(decode(data)?)
 	}
 
 	fn multiple<const N: usize, A: PartialEq + std::fmt::Debug>(

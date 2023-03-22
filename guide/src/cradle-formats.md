@@ -104,6 +104,10 @@ features such as mipmaps and BC7 compression. Actually I don't know if it
 supports *not* using BC7. This one uses a completely different compression
 algorithm than the earlier variants.
 
+There also appear to exist formats **999**, **1001**, and **1003**. I have not
+encountered any of these formats, though, so I do not know any details. If anyone
+has encountered such a file, I would be happy to know.
+
 It should also be mentioned that some `.itp` files in Geofront are just renamed
 PNG files. Guess they didn't like the 256 color limitation.
 
@@ -114,9 +118,12 @@ any kind of tiling, though; it's just a straight sequence of `.itp` files plus
 some metadata. It is also not limited to 256×256 pixels, allowing for higher
 sprite resolutions.
 
+Just like `._ch`&`._cp`, the order of the data parts shows a strong tendency of
+eight-periodicity.
+
 Another point of interest is the `V102` format. It's exactly the same as the
 usual `V101` format, except it contains a palette, which is used by the
-contained format 1006 `.itps`.
+contained format 1006 `.itp`s.
 
 ### Other
 
@@ -125,4 +132,5 @@ Again, lower priority, but I might get to them eventually.
 `.it3`: 3D model\
 `.ite`: effect\
 `.itf`: font\
-`.iti`: unknown
+`.iti`: unknown\
+`.itv`: unknown

@@ -1,6 +1,4 @@
 use gospel::write::Writer;
-use std::ops::*;
-
 use super::{Backtrace, ensure};
 
 #[derive(Debug, thiserror::Error)]
@@ -56,25 +54,8 @@ pub impl Writer {
 		Ok(())
 	}
 
-	fn multiple<const N: usize, A: PartialEq + std::fmt::Debug>(
-		&mut self,
-		nil: &[u8],
-		items: &[A],
-		mut f: impl FnMut(&mut Self, &A) -> Result<(), WriteError>,
-	) -> Result<(), WriteError> {
-		ensure!(items.len() <= N, super::cast_error::<[A; N]>(format!("{items:?}"), "too large").into());
-		for i in items {
-			f(self, i)?;
-		}
-		for _ in items.len()..N {
-			self.slice(nil);
-		}
-		Ok(())
-	}
-
 	fn sized_string<const N: usize>(&mut self, s: &str) -> Result<(), WriteError> {
 		let s = encode(s)?;
-		// Not using multiple() here to include the string in the error
 		ensure!(s.len() <= N, super::cast_error::<[u8; N]>(format!("{s:?}"), "too large").into());
 		let mut buf = [0; N];
 		buf[..s.len()].copy_from_slice(&s);

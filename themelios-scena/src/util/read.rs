@@ -1,7 +1,5 @@
 use gospel::read::Reader;
-use std::ops::*;
-
-use super::{Backtrace, ensure};
+use super::Backtrace;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ReadError {
@@ -56,33 +54,9 @@ pub impl Reader<'_> {
 		Ok(decode(data)?)
 	}
 
-	fn multiple<const N: usize, A: PartialEq + std::fmt::Debug>(
-		&mut self,
-		nil: &[u8],
-		mut f: impl FnMut(&mut Self) -> Result<A, ReadError>,
-	) -> Result<Vec<A>, ReadError> {
-		let mut out = Vec::with_capacity(N);
-		let mut has_junk = false;
-		for _ in 0..N {
-			let i = self.pos();
-			if self.slice(nil.len())? == nil {
-				has_junk = true;
-			} else {
-				let j = self.pos();
-				self.seek(i)?;
-				let v = f(self)?;
-
-				ensure!(self.pos() == j, "inconsistent position: {i} != {j}");
-				ensure!(!has_junk, "junk after end: {v:?}");
-
-				out.push(v);
-			}
-		}
-		Ok(out)
-	}
-
 	fn sized_string<const N: usize>(&mut self) -> Result<String, ReadError> {
-		let buf = self.multiple::<N, _>(&[0], |a| Ok(a.slice(1)?[0]))?;
-		Ok(decode(&buf)?)
+		let d = self.slice(N)?;
+		let len = d.iter().position(|a| *a == 0).unwrap_or(d.len());
+		Ok(decode(&d[..len])?)
 	}
 }

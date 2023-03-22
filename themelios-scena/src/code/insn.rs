@@ -1106,11 +1106,20 @@ mod func_id_u8_u16 {
 mod sc_party_select_mandatory {
 	use super::*;
 	pub(super) fn read(f: &mut Reader, _: Game) -> Result<[Option<NameId>; 4], ReadError> {
-		f.multiple_loose::<4, _>(&[0xFF,0], |g| Ok(NameId(cast(g.u16()?)?)))
+		array(|| match f.u16()? {
+			0xFF => Ok(None),
+			n => Ok(Some(NameId(n))),
+		})
 	}
 
 	pub(super) fn write(f: &mut Writer, _: Game, v: &[Option<NameId>; 4]) -> Result<(), WriteError> {
-		f.multiple_loose::<4, _>(&[0xFF,0], v, |g, a| { g.u16(a.0); Ok(()) })
+		for a in v {
+			f.u16(match a {
+				Some(v) => v.0,
+				None => 0xFF,
+			})
+		}
+		Ok(())
 	}
 }
 

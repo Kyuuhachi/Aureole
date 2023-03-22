@@ -12,7 +12,8 @@ pub struct Header {
 	pub town: TownId,
 	pub bgm: BgmId,
 	pub flags: u32,
-	pub unk: (u8, u16, u8),
+	pub item_use: FuncId,
+	pub unk: (u8, u8),
 	pub scp: [FileId; 6],
 }
 
@@ -88,6 +89,7 @@ pub fn parse(lines: &[Line], ctx: &Context) -> Result<Scena> {
 		bgm: h.bgm,
 		flags: h.flags,
 		includes: h.scp,
+		item_use: h.item_use,
 		chips,
 		labels,
 		npcs,
@@ -101,9 +103,8 @@ pub fn parse(lines: &[Line], ctx: &Context) -> Result<Scena> {
 		at_rolls,
 		placements,
 		battles,
-		unk1: h.unk.0,
-		unk2: h.unk.1,
-		unk3: h.unk.2,
+		unk2: h.unk.0,
+		unk3: h.unk.1,
 	})
 }
 
@@ -131,6 +132,7 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 				town,
 				bgm,
 				flags,
+				item_use,
 				unk,
 				scp => |p: &mut Parse| {
 					let S(s, n) = Val::parse(p)?;
@@ -146,7 +148,7 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 				}
 			});
 			let scp = scp.map(|a| a.get().unwrap_or(FileId(0)));
-			scena.header.set(Header { name, town, bgm, flags, unk, scp });
+			scena.header.set(Header { name, town, bgm, flags, item_use, unk, scp });
 		}
 		"entry" => {
 			scena.entry.mark(p.tokens[0].0);

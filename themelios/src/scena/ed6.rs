@@ -11,7 +11,7 @@ pub struct Scena {
 	pub map: String, // [Map; マップファイル]
 	pub town: TownId, // [Town; 町名]
 	pub bgm: BgmId, // [BGM; BGM 番号]
-	pub item: FuncId, // [Item; アイテム使用時イベント]
+	pub item_use: FuncId, // [Item; アイテム使用時イベント]
 	pub includes: [FileId; 8], // [Scp0..7; スクリプト(１つだけは必須), これ以降は必要な場合のみ定義する]
 
 	// The script puts cp before ch.
@@ -100,7 +100,7 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 	let map = f.sized_string::<14>()?;
 	let town = TownId(f.u16()?);
 	let bgm = BgmId(f.u16()?);
-	let item = FuncId(f.u16()?, f.u16()?);
+	let item_use = FuncId(f.u16()?, f.u16()?);
 	let includes = array(|| Ok(FileId(match f.u32()? { 0xFFFFFFFF => 0, a => a}))).strict()?;
 	f.check_u16(0)?;
 
@@ -211,7 +211,7 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 	Ok(Scena {
 		path, map,
 		town, bgm,
-		item,
+		item_use,
 		includes,
 		ch, cp,
 		npcs, monsters,
@@ -228,7 +228,7 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	f.sized_string::<14>(&scena.map)?;
 	f.u16(scena.town.0);
 	f.u16(scena.bgm.0);
-	f.u16(scena.item.0); f.u16(scena.item.1);
+	f.u16(scena.item_use.0); f.u16(scena.item_use.1);
 	for i in scena.includes {
 		f.u32(match i.0 { 0 => 0xFFFFFFFF, a => a });
 	}

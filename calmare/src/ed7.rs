@@ -11,7 +11,7 @@ pub fn write(f: &mut Context, scena: &Scena) {
 		town,
 		bgm,
 		flags,
-		unk1,
+		item_use,
 		unk2,
 		unk3,
 
@@ -42,7 +42,8 @@ pub fn write(f: &mut Context, scena: &Scena) {
 		f.kw("town").val(town).line();
 		f.kw("bgm").val(bgm).line();
 		f.kw("flags").val(flags).line();
-		f.kw("unk").val(unk1).val(unk2).val(unk3).line();
+		f.kw("item_use").val(item_use).line();
+		f.kw("unk").val(unk2).val(unk3).line();
 		for (i, a) in includes.iter().enumerate() {
 			if a.0 != 0 {
 				f.kw("scp").val(&(i as u16)).val(a).line();

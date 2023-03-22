@@ -7,7 +7,7 @@ pub struct Header {
 	pub name: (String, String),
 	pub town: TownId,
 	pub bgm: BgmId,
-	pub item: FuncId,
+	pub item_use: FuncId,
 	pub scp: [FileId; 8],
 }
 
@@ -47,7 +47,7 @@ pub fn parse(lines: &[Line], ctx: &Context) -> Result<Scena> {
 		map: h.name.1,
 		town: h.town,
 		bgm: h.bgm,
-		item: h.item,
+		item_use: h.item_use,
 		includes: h.scp,
 		ch,
 		cp,
@@ -80,7 +80,7 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 			scena.header.mark(p.head_span());
 			let mut scp = <[One<FileId>; 8]>::default();
 			parse_data!(p => {
-				name, town, bgm, item,
+				name, town, bgm, item_use,
 				scp => |p: &mut Parse| {
 					let S(s, n) = Val::parse(p)?;
 					let n: u32 = n;
@@ -95,7 +95,7 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 				}
 			});
 			let scp = scp.map(|a| a.get().unwrap_or(FileId(0)));
-			scena.header.set(Header { name, town, bgm, item, scp });
+			scena.header.set(Header { name, town, bgm, item_use, scp });
 		}
 		"entry" => {
 			parse_data!(p => {

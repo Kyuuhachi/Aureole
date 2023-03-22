@@ -11,7 +11,7 @@ pub fn write(f: &mut Context, scena: &Scena) {
 		f.kw("name").val(&scena.path).val(&scena.map).line();
 		f.kw("town").val(&scena.town).line();
 		f.kw("bgm").val(&scena.bgm).line();
-		f.kw("item").val(&scena.item).line();
+		f.kw("item_use").val(&scena.item_use).line();
 		for (i, a) in scena.includes.iter().enumerate() {
 			if a.0 != 0 {
 				f.kw("scp").val(&(i as u16)).val(a).line();

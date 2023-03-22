@@ -32,8 +32,8 @@ pub struct Scena {
 	pub placements: Vec<[(u8,u8,Angle); 8]>,
 	pub battles: Vec<Battle>,
 
-	pub unk1: u8,
-	pub unk2: u16,
+	pub item_use: FuncId,
+	pub unk2: u8,
 	pub unk3: u8,
 }
 
@@ -183,8 +183,8 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 	let n_triggers = f.u8()? as usize;
 	let n_look_points = f.u8()? as usize;
 
-	let unk1 = f.u8()?;
-	let unk2 = f.u16()?;
+	let item_use = FuncId(f.u8()? as u16, f.u8()? as u16);
+	let unk2 = f.u8()?;
 
 	let entry = if f.pos() != p_triggers {
 		Some(Entry {
@@ -421,7 +421,7 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 		at_rolls: btl.at_rolls,
 		placements: btl.placements,
 		battles: btl.battles,
-		unk1,
+		item_use,
 		unk2,
 		unk3,
 	})
@@ -557,8 +557,9 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	f.u8(cast(scena.monsters.len())?);
 	f.u8(cast(scena.triggers.len())?);
 	f.u8(cast(scena.look_points.len())?);
-	f.u8(scena.unk1);
-	f.u16(scena.unk2);
+	f.u8(cast(scena.item_use.0)?);
+	f.u8(cast(scena.item_use.1)?);
+	f.u8(scena.unk2);
 
 	let mut entry = Writer::new();
 	let mut functions = Writer::new();
@@ -769,4 +770,3 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 fn transpose(x: [[f32; 4]; 4]) -> [[f32; 4]; 4] {
 	[0,1,2,3].map(|a| [0,1,2,3].map(|b| x[b][a]))
 }
-

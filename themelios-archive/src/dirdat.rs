@@ -1,7 +1,7 @@
 //! Utilities for reading ED6 PC's .dir/.dat archives.
 //!
 //! There is currently no support for writing archives; this may be added later.
-use hamu::read::le::*;
+use gospel::read::{Reader, Le as _};
 
 /// An entry in a .dir file,
 ///
@@ -38,7 +38,7 @@ pub struct DatEntry {
 ///
 /// In many cases, .dir files contain a number of trailing entries named `/_______.___`.
 /// These entries are not returned, but the capacity of the returned Vec is set to accomodate them.
-pub fn read_dir(data: &[u8]) -> Result<Vec<DirEntry>, hamu::read::Error> {
+pub fn read_dir(data: &[u8]) -> Result<Vec<DirEntry>, gospel::read::Error> {
 	let mut f = Reader::new(data);
 	f.check(b"LB DIR\x1A\0")?;
 	let count = f.u64()? as usize;
@@ -84,7 +84,7 @@ pub fn read_dir(data: &[u8]) -> Result<Vec<DirEntry>, hamu::read::Error> {
 	Ok(items)
 }
 
-pub fn read_dat(data: &[u8]) -> Result<Vec<DatEntry>, hamu::read::Error> {
+pub fn read_dat(data: &[u8]) -> Result<Vec<DatEntry>, gospel::read::Error> {
 	let mut f = Reader::new(data);
 	f.check(b"LB DAT\x1A\0")?;
 	let count = f.u64()? as usize;

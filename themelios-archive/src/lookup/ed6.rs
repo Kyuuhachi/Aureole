@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::Path};
-use hamu::write::le::*;
-use hamu::read::le::*;
+use gospel::read::{Reader, Le as _};
+use gospel::write::{Writer, Le as _};
 
 /// Lookup for ED6: *Trails in the Sky FC*, *SC*, and *the 3rd*.
 ///
@@ -152,8 +152,7 @@ impl ED6Lookup {
 		bin(&mut x[0x04], dir.join("visual/dt4.txt"), suf("_ch"))?;
 		bin(&mut x[0x24], dir.join("visual/dt24.txt"), suf("_ch"))?;
 
-		// There is also visual/dt[02]4.txt (which is a binary file), but I don't know if there are any file refs for those.
-		// And also system/chrpt[12].txt, not sure what that is for.
+		// There is also system/chrpt[12].txt, not sure what that is for.
 
 		Ok(ED6Lookup::new(x))
 	}
@@ -162,9 +161,9 @@ impl ED6Lookup {
 /// .ed6i reading and writing.
 ///
 /// .ed6i is a simple format that encodes an `ED6Lookup`.
-/// You probably won't have much need for these functions, they're mainly intended for use by `themelios-archive-prebuilt`.
+/// You probably won't have much need for these functions, they're mainly intended for use by `themelios`' `indexes` feature.
 impl ED6Lookup {
-	pub fn read_ed6i(data: &[u8]) -> Result<Self, hamu::read::Error> {
+	pub fn read_ed6i(data: &[u8]) -> Result<Self, gospel::read::Error> {
 		let mut f = Reader::new(data);
 		f.check(b"ED6I")?;
 		f.check_u8(0)?; // version
@@ -174,17 +173,17 @@ impl ED6Lookup {
 			i.reserve(n as usize);
 			for _ in 0..n {
 				let len = f.u8()? as usize;
-				let a = f.error_state();
-				let s = f.vec(len)?;
+				let pos = f.pos();
+				let s = f.slice(len)?.to_vec();
 				let s = String::from_utf8(s)
-					.map_err(|e| Reader::to_error(a, Box::new(e)))?;
+					.map_err(|e| gospel::read::Error::Other { pos, source: e.into() })?;
 				i.push(s);
 			}
 		}
 		Ok(Self::new(x))
 	}
 
-	pub fn write_ed6i(&self) -> Result<Vec<u8>, hamu::write::Error> {
+	pub fn write_ed6i(&self) -> Result<Vec<u8>, gospel::write::Error> {
 		let mut f = Writer::new();
 		f.slice(b"ED6I");
 		f.u8(0); // version

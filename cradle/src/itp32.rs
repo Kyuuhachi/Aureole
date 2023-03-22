@@ -1,6 +1,6 @@
 use image::RgbaImage;
 use gospel::read::{Reader, Le as _};
-use hamu::write::le::*;
+use gospel::write::{Writer, Le as _, Label};
 use crate::util::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -144,7 +144,7 @@ pub fn read(data: &[u8]) -> Result<Itp32, Error> {
 
 pub fn write(itp: &Itp32) -> Result<Vec<u8>, Error> {
 	let mut f = Writer::new();
-	let (len_r, len_w) = Label::new();
+	let len = Label::new();
 	f.slice(b"ITP\xFF");
 
 	f.slice(b"IHDR");
@@ -152,7 +152,7 @@ pub fn write(itp: &Itp32) -> Result<Vec<u8>, Error> {
 	f.u32(32);
 	f.u32(itp.width as u32);
 	f.u32(itp.height as u32);
-	f.delay_u32(len_r);
+	f.delay32(len);
 	f.u16(3); // major
 	f.u16(10); // minor
 	f.u16(0); // swizzle
@@ -201,7 +201,7 @@ pub fn write(itp: &Itp32) -> Result<Vec<u8>, Error> {
 	f.slice(b"IEND");
 	f.u32(0);
 
-	f.label(len_w);
+	f.label(len);
 	Ok(f.finish()?)
 }
 

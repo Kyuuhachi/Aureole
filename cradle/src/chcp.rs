@@ -1,6 +1,6 @@
 use image::{GenericImage, GenericImageView, Rgba, RgbaImage};
 use gospel::read::{Reader, Le as _};
-use hamu::write::le::*;
+use gospel::write::{Writer, Le as _};
 use crate::ch;
 use crate::util::*;
 

@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use gospel::read::{Reader, Le as _};
-use hamu::write::le::*;
+use gospel::write::{Writer, Le as _, Label};
 use image::Rgba;
 use crate::util::*;
 
@@ -115,7 +115,7 @@ pub fn write(itc: &Itc) -> Result<Vec<u8>, Error> {
 	}
 
 	for fr in &itc.frames {
-		slice.delay_u32(Label::known(fr.index as u32).0);
+		slice.delay32(Label::known(fr.index as u32));
 		slice.u32(itc.content[fr.index].len() as u32);
 		unknown.u16(fr.unknown);
 		x_offset.f32(fr.x_offset);
@@ -143,7 +143,7 @@ pub fn write(itc: &Itc) -> Result<Vec<u8>, Error> {
 	f.append(palette);
 
 	for (i, img) in itc.content.iter().enumerate() {
-		f.label(Label::known(i as u32).1);
+		f.label(Label::known(i as u32));
 		f.slice(img);
 	}
 

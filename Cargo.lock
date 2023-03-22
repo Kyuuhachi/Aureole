@@ -245,7 +245,6 @@ dependencies = [
  "bc7",
  "decompress",
  "gospel",
- "hamu",
  "image",
  "thiserror",
 ]

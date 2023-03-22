@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use gospel::read::{Reader, Le as _};
-use hamu::write::le::*;
+use gospel::write::{Writer, Le as _};
 use image::{GrayImage, Rgba, RgbaImage};
 use crate::util::{Error, swizzle, image, decompress, compress, ensure, bail};
 

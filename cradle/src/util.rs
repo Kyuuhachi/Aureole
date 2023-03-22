@@ -1,5 +1,5 @@
 use gospel::read::{Reader, Le as _};
-use hamu::write::le::*;
+use gospel::write::{Writer, Le as _, Label};
 use image::{ImageBuffer, GenericImageView, GenericImage};
 
 #[derive(Debug, thiserror::Error)]
@@ -11,7 +11,7 @@ pub enum Error {
 	#[error("{source}")]
 	Read { #[from] source: gospel::read::Error, backtrace: std::backtrace::Backtrace },
 	#[error("{source}")]
-	Write { #[from] source: hamu::write::Error, backtrace: std::backtrace::Backtrace },
+	Write { #[from] source: gospel::write::Error, backtrace: std::backtrace::Backtrace },
 }
 
 pub macro ensure($cond:expr, $($t:tt)*) {
@@ -90,10 +90,10 @@ pub fn decompress(f: &mut Reader) -> Result<Vec<u8>, Error> {
 }
 
 pub fn compress(f: &mut Writer, data: &[u8]) {
-	let (start_r, start_w) = Label::new();
-	let (end_r, end_w) = Label::new();
-	f.delay(|l| Ok(u32::to_le_bytes((l(end_r)? - l(start_r)?) as u32)));
-	f.label(start_w);
+	let start = Label::new();
+	let end = Label::new();
+	f.delay(move |ctx| Ok(u32::to_le_bytes((ctx.label(end)? - ctx.label(start)?) as u32)));
+	f.label(start);
 	f.u32(data.len() as u32);
 	f.u32(1+data.chunks(0xFFF0).count() as u32);
 	for chunk in data.chunks(0xFFF0) {
@@ -104,5 +104,5 @@ pub fn compress(f: &mut Writer, data: &[u8]) {
 	}
 	f.u32(0x06000006);
 	f.slice(&[0,0,0]);
-	f.label(end_w);
+	f.label(end);
 }

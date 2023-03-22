@@ -10,7 +10,7 @@ pub enum Error {
 	#[error("undefined label {label:?} referenced at {pos:#X}")]
 	Label { pos: usize, label: Label },
 	#[error("error at {pos:#X}: {source}")]
-	Other { pos: usize, #[source] source: Box<dyn std::error::Error + Send + Sync> },
+	Other { pos: usize, #[source] source: BoxError },
 }
 
 pub type Result<T, E=Error> = std::result::Result<T, E>;
@@ -32,13 +32,14 @@ impl Error {
 }
 
 #[derive(Clone, Debug, thiserror::Error)]
-#[error("attempted to write {value:#X} as a {type_}")]
+#[error("attempted to write {value:#X} as a u{size}")]
 pub struct LabelSizeError {
 	pub value: usize,
-	pub type_: &'static str
+	pub size: usize,
 }
 
-type Delayed = Box<dyn FnOnce(&DelayContext, &mut [u8]) -> Result<()>>;
+type BoxError = Box<dyn std::error::Error + Send + Sync>;
+type Delayed = Box<dyn FnOnce(&DelayContext, &mut [u8]) -> Result<(), BoxError>>;
 
 /// An incremental writer to a `Vec<u8>`, with support for delayed labels.
 #[derive(Default)]
@@ -61,16 +62,12 @@ impl<'a> DelayContext<'a> {
 		self.pos
 	}
 
-	/// Look up an address, and convert it into any numeric type.
+	/// Look up an address.
 	///
-	/// Returns an error if the label does not exist, or its address could not be converted.
-	pub fn label<T: TryFrom<usize>>(&self, label: Label) -> Result<T> {
-		let value = *self.labels.get(&label)
-			.ok_or(Error::Label { pos: self.pos(), label })?;
-		T::try_from(value).map_err(|_| Error::Other {
-			pos: self.pos,
-			source: LabelSizeError { value, type_: std::any::type_name::<T>() }.into()
-		})
+	/// Returns an error if the label does not exist.
+	pub fn label(&self, label: Label) -> Result<usize> {
+		self.labels.get(&label).copied()
+			.ok_or(Error::Label { pos: self.pos(), label })
 	}
 }
 
@@ -91,10 +88,18 @@ impl Writer {
 	pub fn finish(mut self) -> Result<Vec<u8>> {
 		for (range, cb) in self.delays {
 			let pos = range.start;
-			cb(
+			let res = cb(
 				&DelayContext { pos, labels: &self.labels},
 				&mut self.data[range],
-			)?;
+			);
+			match res {
+				Ok(()) => {},
+				Err(e) => return match e.downcast() {
+					Ok(e) => Err(*e),
+					Err(e) => Err(Error::Other { pos, source: e })
+				}
+
+			}
 		}
 		Ok(self.data)
 	}
@@ -134,7 +139,7 @@ impl Writer {
 	/// The given closure is called with a function that allows looking up labels.
 	/// Other kinds of state are not currently officially allowed.
 	pub fn delay<const N: usize, F>(&mut self, cb: F) where
-		F: FnOnce(&DelayContext) -> Result<[u8; N]> + 'static,
+		F: FnOnce(&DelayContext) -> Result<[u8; N], BoxError> + 'static,
 	{
 		let start = self.len();
 		self.array([0; N]);
@@ -228,13 +233,17 @@ macro_rules! primitives {
 		{ $($type:ident),* }
 		{ $($ptr:tt),* }
 	) => { paste::paste! {
-		#[doc(hidden)]
+		// #[doc(hidden)]
 		impl Writer {
 			$(pub fn [<$type $suf>](&mut self, val: $type) {
 				self.array($type::$conv(val));
 			})*
 			$(pub fn [<delay$ptr $suf>](&mut self, label: Label) {
-				self.delay(move |ctx| ctx.label(label).map([<u$ptr>]::$conv));
+				self.delay(move |ctx| {
+					let value = ctx.label(label)?;
+					let value = [<u$ptr>]::try_from(value).map_err(|_| LabelSizeError { value, size: $ptr })?;
+					Ok([<u$ptr>]::$conv(value))
+				});
 			})*
 			$(pub fn [<ptr$ptr $suf>](&mut self) -> Self {
 				let mut g = Writer::new();

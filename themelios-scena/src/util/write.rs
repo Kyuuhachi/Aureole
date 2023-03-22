@@ -1,5 +1,7 @@
 use gospel::write::Writer;
-use super::{Backtrace, ensure};
+use super::ensure;
+
+type Backtrace = std::backtrace::Backtrace;
 
 #[derive(Debug, thiserror::Error)]
 pub enum WriteError {
@@ -20,7 +22,7 @@ impl std::convert::From<String> for WriteError {
 	fn from(assertion: String) -> Self {
 		Self::Assert {
 			assertion: assertion.into(),
-			backtrace: std::backtrace::Backtrace::capture().into(),
+			backtrace: std::backtrace::Backtrace::capture(),
 		}
 	}
 }

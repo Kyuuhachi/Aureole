@@ -8,8 +8,6 @@ pub use write::*;
 
 pub use strict_result::Strict;
 
-pub type Backtrace = Box<std::backtrace::Backtrace>;
-
 #[derive(Debug, thiserror::Error)]
 #[error("cannot convert {value} into {type_}\n{source}")]
 pub struct CastError {

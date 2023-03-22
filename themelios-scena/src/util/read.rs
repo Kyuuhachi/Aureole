@@ -1,5 +1,6 @@
 use gospel::read::Reader;
-use super::Backtrace;
+
+type Backtrace = std::backtrace::Backtrace;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ReadError {
@@ -20,7 +21,7 @@ impl std::convert::From<String> for ReadError {
 	fn from(assertion: String) -> Self {
 		Self::Assert {
 			assertion: assertion.into(),
-			backtrace: std::backtrace::Backtrace::capture().into(),
+			backtrace: std::backtrace::Backtrace::capture(),
 		}
 	}
 }

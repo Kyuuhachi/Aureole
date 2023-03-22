@@ -1,5 +1,5 @@
-use hamu::read::le::*;
-use hamu::write::le::*;
+use gospel::read::{Reader, Le as _};
+use gospel::write::{Writer, Le as _};
 use crate::types::*;
 
 #[doc(inline)]
@@ -9,18 +9,19 @@ pub mod ed7;
 
 pub mod decompile;
 
-trait ReadStreamExt2: ReadStream {
-	fn pos2(&mut self) -> Result<Pos2, Self::Error> {
+#[extend::ext(name = ReaderExt)]
+impl Reader<'_> {
+	fn pos2(&mut self) -> Result<Pos2, gospel::read::Error> {
 		Ok(Pos2(self.i32()?, self.i32()?))
 	}
 
-	fn pos3(&mut self) -> Result<Pos3, Self::Error> {
+	fn pos3(&mut self) -> Result<Pos3, gospel::read::Error> {
 		Ok(Pos3(self.i32()?, self.i32()?, self.i32()?))
 	}
 }
-impl<T: ReadStream> ReadStreamExt2 for T {}
 
-trait WriteStreamExt2: WriteStream {
+#[extend::ext]
+impl Writer {
 	fn pos2(&mut self, p: Pos2) {
 		self.i32(p.0);
 		self.i32(p.1);
@@ -32,4 +33,3 @@ trait WriteStreamExt2: WriteStream {
 		self.i32(p.2);
 	}
 }
-impl<T: WriteStream> WriteStreamExt2 for T {}

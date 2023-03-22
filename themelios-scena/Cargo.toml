@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-hamu.workspace = true
+gospel.path = "../gospel"
 themelios-macros.path = "../themelios-macros"
 themelios-types.path = "../themelios-types"
 cp932.path = "../cp932"

@@ -1,4 +1,4 @@
-use hamu::write::le::*;
+use gospel::write::Writer;
 use std::ops::*;
 
 use super::{Backtrace, ensure};
@@ -6,7 +6,7 @@ use super::{Backtrace, ensure};
 #[derive(Debug, thiserror::Error)]
 pub enum WriteError {
 	#[error("{source}")]
-	Write { #[from] source: hamu::write::Error, backtrace: Backtrace },
+	Write { #[from] source: gospel::write::Error, backtrace: Backtrace },
 
 	#[error("{source}")]
 	Encoding { #[from] source: EncodeError, backtrace: Backtrace },
@@ -47,7 +47,8 @@ pub fn encode(text: &str) -> Result<Vec<u8>, EncodeError> {
 	cp932::encode(text).map_err(|_| EncodeError { text: text.to_owned() })
 }
 
-pub trait WriteStreamExt1: WriteStream {
+#[extend::ext(name = WriterExtU)]
+pub impl Writer {
 	fn string(&mut self, s: &str) -> Result<(), WriteError> {
 		let s = encode(s)?;
 		self.slice(&s);
@@ -95,21 +96,5 @@ pub trait WriteStreamExt1: WriteStream {
 		buf[..s.len()].copy_from_slice(&s);
 		self.array::<N>(buf);
 		Ok(())
-	}
-}
-impl<T: WriteStream + ?Sized> WriteStreamExt1 for T {}
-
-#[extend::ext]
-pub impl Writer {
-	fn ptr(&mut self) -> Writer {
-		let mut g = Writer::new();
-		self.delay_u16(g.here());
-		g
-	}
-
-	fn ptr32(&mut self) -> Writer {
-		let mut g = Writer::new();
-		self.delay_u32(g.here());
-		g
 	}
 }

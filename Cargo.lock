@@ -992,7 +992,8 @@ dependencies = [
 name = "themelios"
 version = "0.1.0"
 dependencies = [
- "hamu",
+ "extend",
+ "gospel",
  "lazy_static",
  "num_enum",
  "strict_result",
@@ -1028,7 +1029,7 @@ version = "0.1.0"
 dependencies = [
  "cp932",
  "extend",
- "hamu",
+ "gospel",
  "num_enum",
  "strict_result",
  "themelios-macros",

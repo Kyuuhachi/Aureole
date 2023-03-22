@@ -1,10 +1,10 @@
 use std::collections::HashMap;
-use hamu::read::le::*;
-use hamu::write::le::*;
+use gospel::read::{Reader, Le as _};
+use gospel::write::{Writer, Le as _};
 use crate::types::*;
 use themelios_scena::util::*;
 use super::code::{self, Code};
-use super::{ReadStreamExt2, WriteStreamExt2};
+use super::{ReaderExt as _, WriterExt as _};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Scena {
@@ -440,7 +440,7 @@ struct BattleRead {
 }
 
 impl BattleRead {
-	fn get_sepith<'a, T: Read<'a> + Clone>(&mut self, f: &mut T) -> Result<SepithId, ReadError> {
+	fn get_sepith(&mut self, f: &mut Reader) -> Result<SepithId, ReadError> {
 		match self.sepith_pos.entry(f.pos()) {
 			std::collections::hash_map::Entry::Occupied(e) => Ok(*e.get()),
 			std::collections::hash_map::Entry::Vacant(e) => {
@@ -451,7 +451,7 @@ impl BattleRead {
 		}
 	}
 
-	fn get_at_roll<'a, T: Read<'a> + Clone>(&mut self, f: &mut T) -> Result<AtRollId, ReadError> {
+	fn get_at_roll(&mut self, f: &mut Reader) -> Result<AtRollId, ReadError> {
 		match self.at_roll_pos.entry(f.pos()) {
 			std::collections::hash_map::Entry::Occupied(e) => Ok(*e.get()),
 			std::collections::hash_map::Entry::Vacant(e) => {
@@ -462,7 +462,7 @@ impl BattleRead {
 		}
 	}
 
-	fn get_placement<'a, T: Read<'a> + Clone>(&mut self, f: &mut T) -> Result<PlacementId, ReadError> {
+	fn get_placement(&mut self, f: &mut Reader) -> Result<PlacementId, ReadError> {
 		match self.placement_pos.entry(f.pos()) {
 			std::collections::hash_map::Entry::Occupied(e) => Ok(*e.get()),
 			std::collections::hash_map::Entry::Vacant(e) => {
@@ -473,7 +473,7 @@ impl BattleRead {
 		}
 	}
 
-	fn get_battle<'a, T: Read<'a> + Clone>(&mut self, f: &mut T) -> Result<BattleId, ReadError> {
+	fn get_battle(&mut self, f: &mut Reader) -> Result<BattleId, ReadError> {
 		match self.battle_pos.entry(f.pos()) {
 			std::collections::hash_map::Entry::Occupied(e) => Ok(*e.get()),
 			std::collections::hash_map::Entry::Vacant(e) => {
@@ -501,8 +501,8 @@ impl BattleRead {
 							setups.push(BattleSetup {
 								weight,
 								enemies: array(|| Ok(FileId(f.u32()?))).strict()?,
-								placement: self.get_placement(&mut f.ptr()?)?,
-								placement_ambush: self.get_placement(&mut f.ptr()?)?,
+								placement: self.get_placement(&mut f.ptr16()?)?,
+								placement_ambush: self.get_placement(&mut f.ptr16()?)?,
 								bgm: BgmId(f.u16()?),
 								bgm_ambush: BgmId(f.u16()?),
 								at_roll: self.get_at_roll(&mut f.ptr32()?)?,
@@ -532,19 +532,19 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	let mut strings = f.ptr32();
 	strings.string(&scena.filename)?;
 
-	let mut chip = f.ptr();
-	let mut npcs = f.ptr();
-	let mut monsters = f.ptr();
-	let mut triggers = f.ptr();
-	let mut look_points = f.ptr();
+	let mut chip = f.ptr16();
+	let mut npcs = f.ptr16();
+	let mut monsters = f.ptr16();
+	let mut triggers = f.ptr16();
+	let mut look_points = f.ptr16();
 
-	let mut func_table = f.ptr();
+	let mut func_table = f.ptr16();
 	f.u16(cast(scena.functions.len() * 4)?);
-	let mut animations = f.ptr();
+	let mut animations = f.ptr16();
 
 	let mut labels = Writer::new();
 	if let Some(l) = &scena.labels {
-		f.delay_u16(labels.here());
+		f.delay16(labels.here());
 		f.u8(cast(l.len())?);
 	} else {
 		f.u16(0);
@@ -592,7 +592,7 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		g.pos3(monster.pos);
 		g.i16(monster.angle);
 		g.u16(monster.flags.0);
-		g.delay_u16(hamu::write::Label::known(monster.battle.0).0);
+		g.delay16(gospel::write::Label::known(monster.battle.0));
 		g.u16(monster.flag.0);
 		g.u16(monster.chip.0);
 		g.u16(monster.unk2);
@@ -668,7 +668,7 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	}
 
 	for func in &scena.functions {
-		func_table.delay_u32(functions.here());
+		func_table.delay32(functions.here());
 		code::write(&mut functions, game, func)?;
 	}
 
@@ -697,7 +697,7 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 
 	let g = &mut battles;
 	for (idx, battle) in scena.battles.iter().enumerate() {
-		g.label(hamu::write::Label::known(idx as u32).1);
+		g.label(gospel::write::Label::known(idx as u32));
 		g.u16(battle.flags);
 		g.u16(battle.level);
 		g.u8(battle.unk1);
@@ -706,11 +706,10 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		g.u8(battle.can_move);
 		g.u16(battle.move_speed);
 		g.u16(battle.unk2);
-		g.delay_u32(strings.here());
+		g.delay32(strings.here());
 		strings.string(&battle.battlefield)?;
 		if let Some(s) = battle.sepith {
-			g.delay_u32(sepith_pos.get(s.0 as usize).cloned()
-				.ok_or_else(|| "field sepith out of bounds".to_owned())?);
+			g.delay32(*sepith_pos.get(s.0 as usize).ok_or_else(|| "field sepith out of bounds".to_owned())?);
 		} else {
 			g.u32(0);
 		}
@@ -722,14 +721,11 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 			for ms in &setup.enemies {
 				h.u32(ms.0);
 			}
-			h.delay_u16(placement_pos.get(setup.placement.0 as usize).cloned()
-				.ok_or_else(|| "placement out of bounds".to_owned())?);
-			h.delay_u16(placement_pos.get(setup.placement_ambush.0 as usize).cloned()
-				.ok_or_else(|| "placement out of bounds".to_owned())?);
+			h.delay16(*placement_pos.get(setup.placement.0 as usize).ok_or_else(|| "placement out of bounds".to_owned())?);
+			h.delay16(*placement_pos.get(setup.placement_ambush.0 as usize).ok_or_else(|| "placement out of bounds".to_owned())?);
 			h.u16(setup.bgm.0);
 			h.u16(setup.bgm_ambush.0);
-			h.delay_u32(at_roll_pos.get(setup.at_roll.0 as usize).cloned()
-				.ok_or_else(|| "at roll out of bounds".to_owned())?);
+			h.delay32(*at_roll_pos.get(setup.at_roll.0 as usize).ok_or_else(|| "at roll out of bounds".to_owned())?);
 		}
 		g.array(weights);
 		g.append(h);
@@ -743,7 +739,7 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 			g.f32(l.pos.2);
 			g.u16(l.unk1);
 			g.u16(l.unk2);
-			g.delay_u32(strings.here());
+			g.delay32(strings.here());
 			strings.string(l.name.as_str())?;
 		}
 	}

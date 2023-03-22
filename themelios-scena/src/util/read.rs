@@ -1,4 +1,4 @@
-use hamu::read::le::*;
+use gospel::read::Reader;
 use std::ops::*;
 
 use super::{Backtrace, ensure};
@@ -6,10 +6,7 @@ use super::{Backtrace, ensure};
 #[derive(Debug, thiserror::Error)]
 pub enum ReadError {
 	#[error("{source}")]
-	Read { #[from] source: hamu::read::Error, backtrace: Backtrace },
-
-	#[error("{source}")]
-	Coverage { #[from] source: hamu::read::coverage::Error, backtrace: Backtrace },
+	Read { #[from] source: gospel::read::Error, backtrace: Backtrace },
 
 	#[error("{source}")]
 	Encoding { #[from] source: DecodeError, backtrace: Backtrace },
@@ -50,15 +47,9 @@ pub fn decode(bytes: &[u8]) -> Result<String, DecodeError> {
 	cp932::decode(bytes).map_err(|_| DecodeError { text: cp932::decode_lossy(bytes) })
 }
 
-pub trait ReadExt1<'a>: Read<'a> {
-	fn ptr(&mut self) -> Result<Self, ReadError> where Self: Clone {
-		Ok(self.clone().at(self.u16()? as usize)?)
-	}
 
-	fn ptr32(&mut self) -> Result<Self, ReadError> where Self: Clone {
-		Ok(self.clone().at(self.u32()? as usize)?)
-	}
-
+#[extend::ext(name = ReaderExtU)]
+pub impl Reader<'_> {
 	fn string(&mut self) -> Result<String, ReadError> {
 		let mut buf = Vec::new();
 		loop {
@@ -115,8 +106,7 @@ pub trait ReadExt1<'a>: Read<'a> {
 	}
 
 	fn sized_string<const N: usize>(&mut self) -> Result<String, ReadError> {
-		let buf = self.multiple::<N, _>(&[0], |a| Ok(a.u8()?))?;
+		let buf = self.multiple::<N, _>(&[0], |a| Ok(a.slice(1)?[0]))?;
 		Ok(decode(&buf)?)
 	}
 }
-impl<'a, T: Read<'a>> ReadExt1<'a> for T {}

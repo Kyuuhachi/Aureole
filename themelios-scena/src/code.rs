@@ -1,10 +1,8 @@
 use std::collections::HashMap;
 use std::collections::{BTreeMap, BTreeSet};
 
-use hamu::read::le::*;
-use hamu::write::le::*;
-use hamu::write::Label as HLabel;
-use hamu::write::LabelDef as HLabelDef;
+use gospel::read::{Reader, Le as _};
+use gospel::write::{Writer, Le as _, Label as GLabel};
 use crate::types::*;
 use crate::util::*;
 use crate::text::Text;
@@ -21,18 +19,19 @@ impl std::fmt::Debug for Label {
 	}
 }
 
-trait ReadStreamExt2: ReadStream {
-	fn pos2(&mut self) -> Result<Pos2, Self::Error> {
+#[extend::ext]
+impl Reader<'_> {
+	fn pos2(&mut self) -> Result<Pos2, gospel::read::Error> {
 		Ok(Pos2(self.i32()?, self.i32()?))
 	}
 
-	fn pos3(&mut self) -> Result<Pos3, Self::Error> {
+	fn pos3(&mut self) -> Result<Pos3, gospel::read::Error> {
 		Ok(Pos3(self.i32()?, self.i32()?, self.i32()?))
 	}
 }
-impl<T: ReadStream> ReadStreamExt2 for T {}
 
-trait WriteStreamExt2: WriteStream {
+#[extend::ext]
+impl Writer {
 	fn pos2(&mut self, p: Pos2) {
 		self.i32(p.0);
 		self.i32(p.1);
@@ -44,7 +43,6 @@ trait WriteStreamExt2: WriteStream {
 		self.i32(p.2);
 	}
 }
-impl<T: WriteStream> WriteStreamExt2 for T {}
 
 // TODO make this one stricter so it does not permit duplicate labels
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -84,14 +82,14 @@ enum RawIInsn {
 
 #[derive(Debug, PartialEq, Eq)]
 enum RawOInsn<'a> {
-	Unless(&'a Expr, HLabel),
-	Goto(HLabel),
-	Switch(&'a Expr, Vec<(u16, HLabel)>, HLabel),
+	Unless(&'a Expr, GLabel),
+	Goto(GLabel),
+	Switch(&'a Expr, Vec<(u16, GLabel)>, GLabel),
 	Insn(&'a Insn),
-	Label(HLabelDef),
+	Label(GLabel),
 }
 
-pub fn read<'a>(f: &mut impl Read<'a>, game: Game, end: Option<usize>) -> Result<Code, ReadError> {
+pub fn read(f: &mut Reader, game: Game, end: Option<usize>) -> Result<Code, ReadError> {
 	let mut insns = Vec::new();
 	let mut extent = f.pos();
 	loop {
@@ -151,9 +149,9 @@ pub fn read<'a>(f: &mut impl Read<'a>, game: Game, end: Option<usize>) -> Result
 	Ok(Code(insns2))
 }
 
-fn read_raw_insn<'a>(f: &mut impl Read<'a>, game: Game) -> Result<RawIInsn, ReadError> {
+fn read_raw_insn(f: &mut Reader, game: Game) -> Result<RawIInsn, ReadError> {
 	let pos = f.pos();
-	fn addr<'a>(f: &mut impl Read<'a>, game: Game) -> Result<usize, ReadError> {
+	fn addr(f: &mut Reader, game: Game) -> Result<usize, ReadError> {
 		if game.is_ed7() {
 			Ok(f.u32()? as usize)
 		} else {
@@ -193,14 +191,14 @@ fn read_raw_insn<'a>(f: &mut impl Read<'a>, game: Game) -> Result<RawIInsn, Read
 	Ok(insn)
 }
 
-pub fn write(f: &mut impl Write, game: Game, insns: &Code) -> Result<(), WriteError> {
+pub fn write(f: &mut Writer, game: Game, insns: &Code) -> Result<(), WriteError> {
 	let mut labels = HashMap::new();
 	let mut labeldefs = HashMap::new();
 	let mut label = |k| {
 		if let std::collections::hash_map::Entry::Vacant(e) = labels.entry(k) {
-			let (l, l_) = HLabel::new();
+			let l = GLabel::new();
 			e.insert(l);
-			labeldefs.insert(k, l_);
+			labeldefs.insert(k, l);
 		}
 	};
 
@@ -225,9 +223,9 @@ pub fn write(f: &mut impl Write, game: Game, insns: &Code) -> Result<(), WriteEr
 
 	for insn in &insns.0 {
 		write_raw_insn(f, game, match insn {
-			FlatInsn::Unless(e, l) => RawOInsn::Unless(e, labels[l].clone()),
-			FlatInsn::Goto(l) => RawOInsn::Goto(labels[l].clone()),
-			FlatInsn::Switch(e, cs, l) => RawOInsn::Switch(e, cs.iter().map(|(a, l)| (*a, labels[l].clone())).collect(), labels[l].clone()),
+			FlatInsn::Unless(e, l) => RawOInsn::Unless(e, labels[l]),
+			FlatInsn::Goto(l) => RawOInsn::Goto(labels[l]),
+			FlatInsn::Switch(e, cs, l) => RawOInsn::Switch(e, cs.iter().map(|(a, l)| (*a, labels[l])).collect(), labels[l]),
 			FlatInsn::Insn(i) => RawOInsn::Insn(i),
 			FlatInsn::Label(l) => RawOInsn::Label(labeldefs.remove(l).unwrap()),
 		})?;
@@ -238,12 +236,12 @@ pub fn write(f: &mut impl Write, game: Game, insns: &Code) -> Result<(), WriteEr
 	Ok(())
 }
 
-fn write_raw_insn(f: &mut impl Write, game: Game, insn: RawOInsn) -> Result<(), WriteError> {
-	fn addr(f: &mut impl Write, game: Game, l: HLabel) {
+fn write_raw_insn(f: &mut Writer, game: Game, insn: RawOInsn) -> Result<(), WriteError> {
+	fn addr(f: &mut Writer, game: Game, l: GLabel) {
 		if game.is_ed7() {
-			f.delay_u32(l)
+			f.delay32(l)
 		} else {
-			f.delay_u16(l)
+			f.delay16(l)
 		}
 	}
 	match insn {
@@ -351,7 +349,7 @@ pub struct Expr(pub Vec<ExprTerm>);
 
 mod expr {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>, game: Game) -> Result<Expr, ReadError> {
+	pub(super) fn read(f: &mut Reader, game: Game) -> Result<Expr, ReadError> {
 		let mut terms = Vec::new();
 		loop {
 			let op = f.u8()?;
@@ -376,7 +374,7 @@ mod expr {
 		Ok(Expr(terms))
 	}
 
-	pub(super) fn write(f: &mut impl Write, game: Game, v: &Expr) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut Writer, game: Game, v: &Expr) -> Result<(), WriteError> {
 		for term in &v.0 {
 			match *term {
 				ExprTerm::Const(n)       => { f.u8(0x00); f.u32(n); }

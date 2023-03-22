@@ -1,8 +1,6 @@
 use std::collections::BTreeSet;
-
-use hamu::read::coverage::Coverage;
-use hamu::read::le::*;
-use hamu::write::le::*;
+use gospel::read::{Reader, Le as _};
+use gospel::write::{Writer, Le as _};
 use crate::types::*;
 use themelios_scena::text::Text;
 use themelios_scena::util::*;
@@ -26,7 +24,7 @@ pub fn read_ed6(data: &[u8]) -> Result<Vec<ED6Quest>, ReadError> {
 	let mut table = Vec::new();
 
 	for _ in 0..n {
-		let mut g = f.ptr()?;
+		let mut g = f.ptr16()?;
 
 		let id = QuestId(g.u16()?);
 		g.check_u16(0)?;
@@ -37,11 +35,11 @@ pub fn read_ed6(data: &[u8]) -> Result<Vec<ED6Quest>, ReadError> {
 		let mira = g.u16()?;
 		let flags = array(|| Ok(Flag(g.u16()?))).strict()?;
 
-		let name = TString(g.ptr()?.string()?);
-		let desc = Text::read(&mut g.ptr()?)?;
+		let name = TString(g.ptr16()?.string()?);
+		let desc = Text::read(&mut g.ptr16()?)?;
 		let mut steps = Vec::new();
 		for _ in 0..16 {
-			steps.push(Text::read(&mut g.ptr()?)?);
+			steps.push(Text::read(&mut g.ptr16()?)?);
 		}
 
 		table.push(ED6Quest { id, section, index, bp, mira, flags, name, desc, steps });
@@ -55,7 +53,7 @@ pub fn write_ed6(table: &[ED6Quest]) -> Result<Vec<u8>, WriteError> {
 	let mut g = Writer::new();
 
 	for &ED6Quest { id, section, index, bp, mira, flags, ref name, ref desc, ref steps } in table {
-		f.delay_u16(g.here());
+		f.delay16(g.here());
 
 		g.u16(id.0);
 		g.u16(0);
@@ -69,12 +67,12 @@ pub fn write_ed6(table: &[ED6Quest]) -> Result<Vec<u8>, WriteError> {
 
 		let mut h = Writer::new();
 
-		g.delay_u16(h.here());
+		g.delay16(h.here());
 		h.string(&name.0)?;
-		g.delay_u16(h.here());
+		g.delay16(h.here());
 		Text::write(&mut h, desc)?;
 		for step in steps {
-			g.delay_u16(h.here());
+			g.delay16(h.here());
 			Text::write(&mut h, step)?;
 		}
 
@@ -100,7 +98,7 @@ pub struct ED7Quest {
 }
 
 pub fn read_ed7(data: &[u8]) -> Result<Vec<ED7Quest>, ReadError> {
-	let mut f = Coverage::new(Reader::new(data));
+	let mut f = Reader::new(data);
 	let mut table = Vec::new();
 	let mut step_ptrs = Vec::new();
 
@@ -162,12 +160,12 @@ pub fn write_ed7(table: &[ED7Quest]) -> Result<Vec<u8>, WriteError> {
 		f.u16(0);
 		f.u16(q.flags[0].0);
 		f.u16(q.flags[1].0);
-		f.delay_u32(g.here()); g.string(&q.name.0)?;
-		f.delay_u32(g.here()); g.string(&q.client.0)?;
-		f.delay_u32(g.here()); Text::write(&mut g, &q.desc)?;
-		f.delay_u32(h.here());
+		f.delay32(g.here()); g.string(&q.name.0)?;
+		f.delay32(g.here()); g.string(&q.client.0)?;
+		f.delay32(g.here()); Text::write(&mut g, &q.desc)?;
+		f.delay32(h.here());
 		for task in &q.steps {
-			h.delay_u32(g.here());
+			h.delay32(g.here());
 			Text::write(&mut g, task)?;
 		}
 	}

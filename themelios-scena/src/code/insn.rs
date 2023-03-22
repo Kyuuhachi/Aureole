@@ -94,7 +94,7 @@ themelios_macros::bytecode! {
 				}
 			},
 			write ED7Battle(ptr, s1,s2, a1, a2, ch) => |f| {
-				f.delay_u32(hamu::write::Label::known(ptr.0).0);
+				f.delay32(gospel::write::Label::known(ptr.0));
 				f.u32(s1.0); f.u8(*s2);
 				f.u16(*a1); f.u16(*a2);
 				f.u16(ch.0);
@@ -872,8 +872,8 @@ impl Insn {
 }
 
 trait Arg: Sized {
-	fn read<'a>(f: &mut impl Read<'a>, _: Game) -> Result<Self, ReadError>;
-	fn write(f: &mut impl Write, _: Game, v: &Self) -> Result<(), WriteError>;
+	fn read(f: &mut Reader, _: Game) -> Result<Self, ReadError>;
+	fn write(f: &mut Writer, _: Game, v: &Self) -> Result<(), WriteError>;
 }
 
 macro arg($t:ty,
@@ -881,11 +881,11 @@ macro arg($t:ty,
 	|$fw:pat_param, $gw:pat_param, $v:pat_param| $w:expr $(,)?
 ) {
 	impl Arg for $t {
-		fn read<'a>($fr: &mut impl Read<'a>, $gr: Game) -> Result<$t, ReadError> {
+		fn read<'a>($fr: &mut Reader, $gr: Game) -> Result<$t, ReadError> {
 			Ok($r)
 		}
 
-		fn write($fw: &mut impl Write, $gw: Game, $v: &$t) -> Result<(), WriteError> {
+		fn write($fw: &mut Writer, $gw: Game, $v: &$t) -> Result<(), WriteError> {
 			Ok($w)
 		}
 	}
@@ -934,14 +934,14 @@ arg!(Expr,
 
 mod color24 {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>, _: Game) -> Result<Color, ReadError> {
+	pub(super) fn read(f: &mut Reader, _: Game) -> Result<Color, ReadError> {
 		let r = f.u8()?;
 		let g = f.u8()?;
 		let b = f.u8()?;
 		Ok(Color(u32::from_le_bytes([r, g, b, 0xFF])))
 	}
 
-	pub(super) fn write(f: &mut impl Write, _: Game, v: &Color) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut Writer, _: Game, v: &Color) -> Result<(), WriteError> {
 		let [r, g, b, a] = u32::to_le_bytes(v.0);
 		ensure!(a == 0xFF, "alpha must be opaque");
 		f.u8(r);
@@ -953,7 +953,7 @@ mod color24 {
 
 mod quest_list {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>, _: Game) -> Result<Vec<QuestId>, ReadError> {
+	pub(super) fn read(f: &mut Reader, _: Game) -> Result<Vec<QuestId>, ReadError> {
 		let mut quests = Vec::new();
 		loop {
 			match f.u16()? {
@@ -964,7 +964,7 @@ mod quest_list {
 		Ok(quests)
 	}
 
-	pub(super) fn write(f: &mut impl Write, _: Game, v: &Vec<QuestId>) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut Writer, _: Game, v: &Vec<QuestId>) -> Result<(), WriteError> {
 		for &i in v {
 			f.u16(i.0);
 		}
@@ -975,7 +975,7 @@ mod quest_list {
 
 mod fork {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>, game: Game) -> Result<Code, ReadError> {
+	pub(super) fn read(f: &mut Reader, game: Game) -> Result<Code, ReadError> {
 		let len = f.u8()? as usize;
 		let pos = f.pos();
 		let code = super::read(f, game, Some(pos+len))?;
@@ -985,13 +985,13 @@ mod fork {
 		Ok(code)
 	}
 
-	pub(super) fn write(f: &mut impl Write, game: Game, v: &Code) -> Result<(), WriteError> {
-		let (l1, l1_) = HLabel::new();
-		let (l2, l2_) = HLabel::new();
-		f.delay(move |l| Ok(u8::to_le_bytes(hamu::write::cast_usize(l(l2)? - l(l1)?)?)));
-		f.label(l1_);
+	pub(super) fn write(f: &mut Writer, game: Game, v: &Code) -> Result<(), WriteError> {
+		let l1 = GLabel::new();
+		let l2 = GLabel::new();
+		f.delay(move |l| Ok(u8::to_le_bytes(cast(l.label(l2)? - l.label(l1)?)?)));
+		f.label(l1);
 		super::write(f, game, v)?;
-		f.label(l2_);
+		f.label(l2);
 		if !v.is_empty() {
 			f.u8(0);
 		}
@@ -1001,7 +1001,7 @@ mod fork {
 
 mod fork_loop {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>, game: Game) -> Result<Code, ReadError> {
+	pub(super) fn read(f: &mut Reader, game: Game) -> Result<Code, ReadError> {
 		let len = f.u8()? as usize;
 		let pos = f.pos();
 		let code = super::read(f, game, Some(pos+len))?;
@@ -1015,32 +1015,31 @@ mod fork_loop {
 		Ok(code)
 	}
 
-	pub(super) fn write(f: &mut impl Write, game: Game, v: &Code) -> Result<(), WriteError> {
-		let (l1, l1_) = HLabel::new();
-		let (l2, l2_) = HLabel::new();
-		let l1c = l1.clone();
-		f.delay(|l| Ok(u8::to_le_bytes(hamu::write::cast_usize(l(l2)? - l(l1)?)?)));
-		f.label(l1_);
+	pub(super) fn write(f: &mut Writer, game: Game, v: &Code) -> Result<(), WriteError> {
+		let l1 = GLabel::new();
+		let l2 = GLabel::new();
+		f.delay(move |l| Ok(u8::to_le_bytes(cast(l.label(l2)? - l.label(l1)?)?)));
+		f.label(l1);
 		super::write(f, game, v)?;
-		f.label(l2_);
+		f.label(l2);
 		let next = if game.is_ed7() {
 			Insn::NextFrame2()
 		} else {
 			Insn::NextFrame()
 		};
 		write_raw_insn(f, game, RawOInsn::Insn(&next))?;
-		write_raw_insn(f, game, RawOInsn::Goto(l1c))?;
+		write_raw_insn(f, game, RawOInsn::Goto(l1))?;
 		Ok(())
 	}
 }
 
 mod menu {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>, _: Game) -> Result<Vec<TString>, ReadError> {
+	pub(super) fn read(f: &mut Reader, _: Game) -> Result<Vec<TString>, ReadError> {
 		Ok(f.string()?.split_terminator('\x01').map(|a| TString(a.to_owned())).collect())
 	}
 
-	pub(super) fn write(f: &mut impl Write, _: Game, v: &[TString]) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut Writer, _: Game, v: &[TString]) -> Result<(), WriteError> {
 		let mut s = String::new();
 		for line in v {
 			s.push_str(line.as_str());
@@ -1053,13 +1052,13 @@ mod menu {
 
 pub(super) mod char_attr {
 	use super::*;
-	pub fn read<'a>(f: &mut impl Read<'a>, _: Game) -> Result<CharAttr, ReadError> {
+	pub fn read(f: &mut Reader, _: Game) -> Result<CharAttr, ReadError> {
 		let a = CharId(f.u16()?);
 		let b = f.u8()?;
 		Ok(CharAttr(a, b))
 	}
 
-	pub fn write(f: &mut impl Write, _: Game, &CharAttr(a, b): &CharAttr) -> Result<(), WriteError> {
+	pub fn write(f: &mut Writer, _: Game, &CharAttr(a, b): &CharAttr) -> Result<(), WriteError> {
 		f.u16(a.0);
 		f.u8(b);
 		Ok(())
@@ -1068,7 +1067,7 @@ pub(super) mod char_attr {
 
 mod func_id {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>, game: Game) -> Result<FuncId, ReadError> {
+	pub(super) fn read(f: &mut Reader, game: Game) -> Result<FuncId, ReadError> {
 		let a = f.u8()? as u16;
 		let b = if game.is_ed7() {
 			f.u8()? as u16
@@ -1078,7 +1077,7 @@ mod func_id {
 		Ok(FuncId(a, b))
 	}
 
-	pub(super) fn write(f: &mut impl Write, game: Game, &FuncId(a, b): &FuncId) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut Writer, game: Game, &FuncId(a, b): &FuncId) -> Result<(), WriteError> {
 		f.u8(cast(a)?);
 		if game.is_ed7() {
 			f.u8(cast(b)?)
@@ -1091,13 +1090,13 @@ mod func_id {
 
 mod func_id_u8_u16 {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>, _: Game) -> Result<FuncId, ReadError> {
+	pub(super) fn read(f: &mut Reader, _: Game) -> Result<FuncId, ReadError> {
 		let a = f.u8()? as u16;
 		let b = f.u16()?;
 		Ok(FuncId(a, b))
 	}
 
-	pub(super) fn write(f: &mut impl Write, _: Game, &FuncId(a, b): &FuncId) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut Writer, _: Game, &FuncId(a, b): &FuncId) -> Result<(), WriteError> {
 		f.u8(cast(a)?);
 		f.u16(b);
 		Ok(())
@@ -1106,18 +1105,18 @@ mod func_id_u8_u16 {
 
 mod sc_party_select_mandatory {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>, _: Game) -> Result<[Option<NameId>; 4], ReadError> {
+	pub(super) fn read(f: &mut Reader, _: Game) -> Result<[Option<NameId>; 4], ReadError> {
 		f.multiple_loose::<4, _>(&[0xFF,0], |g| Ok(NameId(cast(g.u16()?)?)))
 	}
 
-	pub(super) fn write(f: &mut impl Write, _: Game, v: &[Option<NameId>; 4]) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut Writer, _: Game, v: &[Option<NameId>; 4]) -> Result<(), WriteError> {
 		f.multiple_loose::<4, _>(&[0xFF,0], v, |g, a| { g.u16(a.0); Ok(()) })
 	}
 }
 
 mod sc_party_select_optional {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>, _: Game) -> Result<Vec<NameId>, ReadError> {
+	pub(super) fn read(f: &mut Reader, _: Game) -> Result<Vec<NameId>, ReadError> {
 		let mut quests = Vec::new();
 		loop {
 			match f.u16()? {
@@ -1128,7 +1127,7 @@ mod sc_party_select_optional {
 		Ok(quests)
 	}
 
-	pub(super) fn write(f: &mut impl Write, _: Game, v: &Vec<NameId>) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut Writer, _: Game, v: &Vec<NameId>) -> Result<(), WriteError> {
 		for &i in v {
 			f.u16(i.0);
 		}
@@ -1139,7 +1138,7 @@ mod sc_party_select_optional {
 
 mod char_animation {
 	use super::*;
-	pub(super) fn read<'a>(f: &mut impl Read<'a>, _: Game) -> Result<Vec<u8>, ReadError> {
+	pub(super) fn read(f: &mut Reader, _: Game) -> Result<Vec<u8>, ReadError> {
 		let n = f.u8()?;
 		let mut a = Vec::with_capacity(n as usize);
 		if n == 0 {
@@ -1151,7 +1150,7 @@ mod char_animation {
 		Ok(a)
 	}
 
-	pub(super) fn write(f: &mut impl Write, _: Game, v: &Vec<u8>) -> Result<(), WriteError> {
+	pub(super) fn write(f: &mut Writer, _: Game, v: &Vec<u8>) -> Result<(), WriteError> {
 		f.u8(cast(v.len())?);
 		if v.is_empty() {
 			f.u8(0)

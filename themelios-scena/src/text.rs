@@ -1,5 +1,5 @@
-use hamu::read::le::*;
-use hamu::write::le::*;
+use gospel::read::{Reader, Le as _};
+use gospel::write::{Writer, Le as _};
 use crate::util::*;
 use crate::types::ItemId;
 
@@ -46,8 +46,7 @@ impl std::fmt::Debug for TextSegment {
 }
 
 impl Text {
-	// This shouldn't strictly speaking need Read, but it sure makes it easier.
-	pub fn read<'a>(f: &mut impl Read<'a>) -> Result<Text, ReadError> {
+	pub fn read(f: &mut Reader) -> Result<Text, ReadError> {
 		let mut items = Vec::new();
 		loop {
 			items.push(match f.u8()? {
@@ -72,7 +71,7 @@ impl Text {
 		Ok(Text(items))
 	}
 
-	pub fn write(f: &mut impl WriteStream, v: &Text) -> Result<(), WriteError> {
+	pub fn write(f: &mut Writer, v: &Text) -> Result<(), WriteError> {
 		for item in v.iter() {
 			match &item {
 				TextSegment::String(ref s) => f.slice(&encode(s)?),

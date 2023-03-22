@@ -1,5 +1,5 @@
-use hamu::read::le::*;
-use hamu::write::le::*;
+use gospel::read::{Reader, Le as _};
+use gospel::write::{Writer, Le as _};
 use crate::types::SoundId;
 use themelios_scena::util::*;
 
@@ -46,7 +46,7 @@ pub fn write_ed7(table: &[ED7Sound]) -> Result<Vec<u8>, WriteError> {
 	let mut next_id = 0;
 	for se in table {
 		while se.id.0 >= next_chunk {
-			f.delay_u16(g.here());
+			f.delay16(g.here());
 			next_id = next_chunk;
 			next_chunk += 500;
 		}

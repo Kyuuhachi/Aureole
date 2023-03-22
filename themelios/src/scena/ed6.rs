@@ -1,10 +1,9 @@
-use hamu::read::coverage::Coverage;
-use hamu::read::le::*;
-use hamu::write::le::*;
+use gospel::read::{Reader, Le as _};
+use gospel::write::{Writer, Le as _, Label};
 use crate::types::*;
 use themelios_scena::util::*;
 use super::code::{self, Code};
-use super::{ReadStreamExt2, WriteStreamExt2};
+use super::{ReaderExt as _, WriterExt as _};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Scena {
@@ -95,7 +94,7 @@ pub struct LookPoint { // [LookPoint]
 }
 
 pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
-	let mut f = Coverage::new(Reader::new(data));
+	let mut f = Reader::new(data);
 
 	let path = f.sized_string::<10>()?;
 	let map = f.sized_string::<14>()?;
@@ -107,19 +106,19 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 
 	let head_end = f.clone().u16()? as usize;
 
-	let ch       = (f.ptr()?, f.u16()?);
-	let cp       = (f.ptr()?, f.u16()?);
-	let npcs     = (f.ptr()?, f.u16()?);
-	let monsters = (f.ptr()?, f.u16()?);
-	let triggers = (f.ptr()?, f.u16()?);
-	let look_points = (f.ptr()?, f.u16()?);
+	let ch       = (f.ptr16()?, f.u16()?);
+	let cp       = (f.ptr16()?, f.u16()?);
+	let npcs     = (f.ptr16()?, f.u16()?);
+	let monsters = (f.ptr16()?, f.u16()?);
+	let triggers = (f.ptr16()?, f.u16()?);
+	let look_points = (f.ptr16()?, f.u16()?);
 
-	let mut strings = f.ptr()?;
+	let mut strings = f.ptr16()?;
 
 	let code_start = f.u16()? as usize;
 	f.check_u16(0)?;
 	let code_end = f.clone().u16()? as usize;
-	let func_table = (f.ptr()?, f.u16()? / 2);
+	let func_table = (f.ptr16()?, f.u16()? / 2);
 
 	ensure!(strings.string()? == "@FileName", "expected @FileName");
 
@@ -238,49 +237,49 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	}
 	f.u16(0);
 
-	let (l_ch, l_ch_) = Label::new();
-	f.delay_u16(l_ch);
+	let l_ch = Label::new();
+	f.delay16(l_ch);
 	f.u16(cast(scena.ch.len())?);
 
-	let (l_cp, l_cp_) = Label::new();
-	f.delay_u16(l_cp);
+	let l_cp = Label::new();
+	f.delay16(l_cp);
 	f.u16(cast(scena.cp.len())?);
 
-	let (l_npcs, l_npcs_) = Label::new();
-	f.delay_u16(l_npcs);
+	let l_npcs = Label::new();
+	f.delay16(l_npcs);
 	f.u16(cast(scena.npcs.len())?);
 
-	let (l_monsters, l_monsters_) = Label::new();
-	f.delay_u16(l_monsters);
+	let l_monsters = Label::new();
+	f.delay16(l_monsters);
 	f.u16(cast(scena.monsters.len())?);
 
-	let (l_triggers, l_triggers_) = Label::new();
-	f.delay_u16(l_triggers);
+	let l_triggers = Label::new();
+	f.delay16(l_triggers);
 	f.u16(cast(scena.triggers.len())?);
 
-	let (l_look_points, l_look_points_) = Label::new();
-	f.delay_u16(l_look_points);
+	let l_look_points = Label::new();
+	f.delay16(l_look_points);
 	f.u16(cast(scena.look_points.len())?);
 
-	f.delay_u16(strings.here());
+	f.delay16(strings.here());
 	strings.string("@FileName")?;
 
-	let (l_code_start, l_code_start_) = Label::new();
-	f.delay_u16(l_code_start);
+	let l_code_start = Label::new();
+	f.delay16(l_code_start);
 	f.u16(0);
-	let (l_func_table, l_func_table_) = Label::new();
-	f.delay_u16(l_func_table);
+	let l_func_table = Label::new();
+	f.delay16(l_func_table);
 	f.u16(cast(scena.functions.len() * 2)?);
 
-	g.label(l_ch_);
+	g.label(l_ch);
 	for ch in &scena.ch { g.u32(ch.0); }
 	g.u8(0xFF);
 
-	g.label(l_cp_);
+	g.label(l_cp);
 	for cp in &scena.cp { g.u32(cp.0); }
 	g.u8(0xFF);
 
-	g.label(l_npcs_);
+	g.label(l_npcs);
 	for npc in &scena.npcs {
 		strings.string(npc.name.as_str())?;
 		g.pos3(npc.pos);
@@ -294,7 +293,7 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		g.u16(npc.talk.0); g.u16(npc.talk.1);
 	}
 
-	g.label(l_monsters_);
+	g.label(l_monsters);
 	for monster in &scena.monsters {
 		strings.string(monster.name.as_str())?;
 		g.pos3(monster.pos);
@@ -307,7 +306,7 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		g.u16(monster.unk3);
 	}
 
-	g.label(l_triggers_);
+	g.label(l_triggers);
 	for trigger in &scena.triggers {
 		g.pos3(trigger.pos1);
 		g.pos3(trigger.pos2);
@@ -316,7 +315,7 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		g.u16(trigger.unk1);
 	}
 
-	g.label(l_look_points_);
+	g.label(l_look_points);
 	for lp in &scena.look_points {
 		g.pos3(lp.pos);
 		g.i32(lp.radius.0);
@@ -326,10 +325,10 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 		g.u16(lp.unk1);
 	}
 
-	func_table.label(l_func_table_);
-	g.label(l_code_start_);
+	func_table.label(l_func_table);
+	g.label(l_code_start);
 	for func in scena.functions.iter() {
-		func_table.delay_u16(g.here());
+		func_table.delay16(g.here());
 		code::write(&mut g, game, func)?;
 	}
 

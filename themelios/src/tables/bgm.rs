@@ -1,6 +1,5 @@
-use hamu::read::coverage::Coverage;
-use hamu::read::le::*;
-use hamu::write::le::*;
+use gospel::read::{Reader, Le as _};
+use gospel::write::{Writer, Le as _};
 use crate::types::BgmId;
 use themelios_scena::util::*;
 
@@ -14,7 +13,7 @@ pub struct ED7Bgm {
 }
 
 pub fn read_ed7(data: &[u8]) -> Result<Vec<ED7Bgm>, ReadError> {
-	let mut f = Coverage::new(Reader::new(data));
+	let mut f = Reader::new(data);
 	let mut table = Vec::new();
 	loop {
 		let loop_start = f.u32()?;

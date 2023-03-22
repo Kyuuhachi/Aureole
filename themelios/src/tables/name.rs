@@ -1,6 +1,5 @@
-use hamu::read::coverage::Coverage;
-use hamu::read::le::*;
-use hamu::write::le::*;
+use gospel::read::{Reader, Le as _};
+use gospel::write::{Writer, Le as _};
 use crate::types::*;
 use themelios_scena::util::*;
 
@@ -15,11 +14,11 @@ pub struct ED7Name {
 }
 
 pub fn read_ed7(data: &[u8]) -> Result<Vec<ED7Name>, ReadError> {
-	let mut f = Coverage::new(Reader::new(data));
+	let mut f = Reader::new(data);
 	let mut table = Vec::new();
 	loop {
 		let id = NameId(f.u16()?);
-		let name = TString(f.ptr()?.string()?);
+		let name = TString(f.ptr16()?.string()?);
 		let chip1 = FileId(f.u32()?);
 		let chip2 = FileId(f.u32()?);
 		let ms1 = FileId(f.u32()?);
@@ -35,7 +34,7 @@ pub fn write_ed7(table: &[ED7Name]) -> Result<Vec<u8>, WriteError> {
 	let mut g = Writer::new();
 	for name in table {
 		f.u16(name.id.0);
-		f.delay_u16(g.here());
+		f.delay16(g.here());
 		f.u32(name.chip1.0);
 		f.u32(name.chip2.0);
 		f.u32(name.ms1.0);
@@ -44,7 +43,7 @@ pub fn write_ed7(table: &[ED7Name]) -> Result<Vec<u8>, WriteError> {
 	}
 
 	f.u16(999);
-	f.delay_u16(g.here());
+	f.delay16(g.here());
 	f.u32(0);
 	f.u32(0);
 	f.u32(0);

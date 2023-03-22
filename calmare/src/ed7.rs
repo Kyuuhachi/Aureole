@@ -18,7 +18,7 @@ pub fn write(f: &mut Context, scena: &Scena) {
 		includes,
 
 		entry,
-		chip,
+		chips,
 		labels,
 		npcs,
 		monsters,
@@ -71,10 +71,10 @@ pub fn write(f: &mut Context, scena: &Scena) {
 		f.line();
 	}
 
-	for (i, chip) in chip.iter().enumerate() {
+	for (i, chip) in chips.iter().enumerate() {
 		f.val(&ChipId(i as u16)).val(chip).line();
 	}
-	if !chip.is_empty() {
+	if !chips.is_empty() {
 		f.line();
 	}
 

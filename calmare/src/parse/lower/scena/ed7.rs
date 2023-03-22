@@ -33,7 +33,7 @@ impl TryVal for FPos3 {
 struct ScenaBuild {
 	header: One<Header>,
 	entry: One<Entry>,
-	chip: Many<ChipId, FileId>,
+	chips: Many<ChipId, FileId>,
 	chars: Many<CharDefId, NpcOrMonster<Npc, Monster>>,
 	triggers: Many<TriggerId, Trigger>,
 	look_points: Many<LookPointId, LookPoint>,
@@ -57,7 +57,7 @@ pub fn parse(lines: &[Line], ctx: &Context) -> Result<Scena> {
 		Diag::error(Span::new_at(0), "missing 'scena' block").emit();
 	}
 
-	let chip = scena.chip.get(|a| a.0 as usize);
+	let chips = scena.chips.get(|a| a.0 as usize);
 	let (npcs, monsters) = chars(scena.chars);
 	let labels = scena.labels.get(|a| a.0 as usize);
 	let triggers = scena.triggers.get(|a| a.0 as usize);
@@ -88,7 +88,7 @@ pub fn parse(lines: &[Line], ctx: &Context) -> Result<Scena> {
 		bgm: h.bgm,
 		flags: h.flags,
 		includes: h.scp,
-		chip,
+		chips,
 		labels,
 		npcs,
 		monsters,
@@ -173,9 +173,9 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 		}
 		"chip" => {
 			let S(s, n) = Val::parse(p)?;
-			scena.chip.mark(p.tokens[0].0 | s, n);
+			scena.chips.mark(p.tokens[0].0 | s, n);
 			let v = Val::parse(p)?;
-			scena.chip.insert(n, v);
+			scena.chips.insert(n, v);
 		}
 		"npc" => {
 			let S(s, n) = Val::parse(p)?;

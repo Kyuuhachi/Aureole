@@ -16,7 +16,7 @@ pub struct Scena {
 	pub flags: u32,
 	pub includes: [FileId; 6],
 
-	pub chip: Vec<FileId>,
+	pub chips: Vec<FileId>,
 	pub labels: Option<Vec<Label>>,
 	pub npcs: Vec<Npc>,
 	pub monsters: Vec<Monster>,
@@ -163,7 +163,7 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 	let strings_start = strings.pos();
 	let filename = strings.string()?;
 
-	let p_chip     = f.u16()? as usize;
+	let p_chips    = f.u16()? as usize;
 	let p_npcs     = f.u16()? as usize;
 	let p_monsters = f.u16()? as usize;
 	let p_triggers = f.u16()? as usize;
@@ -177,7 +177,7 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 	let n_labels = f.u8()? as usize;
 	let unk3 = f.u8()?;
 
-	let n_chip     = f.u8()? as usize;
+	let n_chips    = f.u8()? as usize;
 	let n_npcs     = f.u8()? as usize;
 	let n_monsters = f.u8()? as usize;
 	let n_triggers = f.u8()? as usize;
@@ -208,7 +208,7 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 	};
 
 	let data_chunks = [
-		(p_chip,        n_chip        != 0),
+		(p_chips,       n_chips       != 0),
 		(p_npcs,        n_npcs        != 0),
 		(p_monsters,    n_monsters    != 0),
 		(p_triggers,    n_triggers    != 0),
@@ -226,8 +226,8 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 		&& p_labels <= f.pos()
 		&& p_labels + n_labels*20 == p_triggers
 		&& p_triggers + n_triggers*96 == p_look_points
-		&& p_look_points + n_look_points*36 == p_chip
-		&& p_chip + n_chip*4 == p_npcs
+		&& p_look_points + n_look_points*36 == p_chips
+		&& p_chips + n_chips*4 == p_npcs
 		&& p_npcs + n_npcs*28 == p_monsters
 		&& p_monsters + n_monsters*32 <= p_animations
 		&& p_animations <= p_func_table
@@ -241,8 +241,8 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 		None
 	};
 
-	let mut g = f.clone().at(p_chip)?;
-	let chip = list(n_chip, || Ok(FileId(g.u32()?))).strict()?;
+	let mut g = f.clone().at(p_chips)?;
+	let chips = list(n_chips, || Ok(FileId(g.u32()?))).strict()?;
 
 	let mut g = f.clone().at(p_npcs)?;
 	let npcs = list(n_npcs, || Ok(Npc {
@@ -408,7 +408,7 @@ pub fn read(game: Game, data: &[u8]) -> Result<Scena, ReadError> {
 		bgm,
 		flags,
 		includes,
-		chip,
+		chips,
 		labels,
 		npcs,
 		monsters,
@@ -532,7 +532,7 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	let mut strings = f.ptr32();
 	strings.string(&scena.filename)?;
 
-	let mut chip = f.ptr16();
+	let mut chips = f.ptr16();
 	let mut npcs = f.ptr16();
 	let mut monsters = f.ptr16();
 	let mut triggers = f.ptr16();
@@ -552,7 +552,7 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	}
 	f.u8(scena.unk3);
 
-	f.u8(cast(scena.chip.len())?);
+	f.u8(cast(scena.chips.len())?);
 	f.u8(cast(scena.npcs.len())?);
 	f.u8(cast(scena.monsters.len())?);
 	f.u8(cast(scena.triggers.len())?);
@@ -567,8 +567,8 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	let mut placements = Writer::new();
 	let mut battles = Writer::new();
 
-	let g = &mut chip;
-	for chip in &scena.chip {
+	let g = &mut chips;
+	for chip in &scena.chips {
 		g.u32(chip.0);
 	}
 
@@ -748,7 +748,7 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	f.append(labels);
 	f.append(triggers);
 	f.append(look_points);
-	f.append(chip);
+	f.append(chips);
 	f.append(npcs);
 	f.append(monsters);
 	f.append(at_rolls);
@@ -761,7 +761,7 @@ pub fn write(game: Game, scena: &Scena) -> Result<Vec<u8>, WriteError> {
 	f.append(strings);
 	// EDDec has order
 	//   header, entry, at_rolls, sepith, placements, battles,
-	//   chip, npcs, monsters, triggers, look_points, labels,
+	//   chips, npcs, monsters, triggers, look_points, labels,
 	//   animations, func_table, functions, strings
 	Ok(f.finish()?)
 }

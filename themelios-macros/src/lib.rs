@@ -15,6 +15,11 @@ use syn::{
 mod parse;
 use parse::*;
 
+macro_rules! q {
+	(_      => $($b:tt)*) => { ::quote::quote!         {                $($b)* } };
+	($a:expr=> $($b:tt)*) => { ::quote::quote_spanned! { ($a).span() => $($b)* } };
+}
+
 macro_rules! pq {
 	(_      => $($b:tt)*) => { ::syn::parse_quote!         {                $($b)* } };
 	($a:expr=> $($b:tt)*) => { ::syn::parse_quote_spanned! { ($a).span() => $($b)* } };
@@ -35,16 +40,16 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 	let game_expr = &ctx.game_expr;
 	let game_ty = &ctx.game_ty;
 
-	let read: Vec<Arm> = ctx.reads.iter().map(|ReadArm { span, games, body }| {
+	let read: Vec<_> = ctx.reads.iter().map(|ReadArm { span, games, body }| {
 		let games_name = games.iter().map(|a| &a.0).collect::<Vec<_>>();
 		let games_hex  = games.iter().map(|a| &a.1).collect::<Vec<_>>();
-		pq!{span=>
+		q!{span=>
 			#((IS::#games_name, #games_hex))|* => {
 				run(__f, #body)
 			}
 		}
 	}).collect();
-	let read: ItemFn = pq!{_=>
+	let read = q!{_=>
 		pub fn read(__f: &mut Reader, #func_args) -> Result<Self, ReadError> {
 			fn run<A>(__f: &mut Reader, fun: impl FnOnce(&mut Reader) -> Result<A, ReadError>) -> Result<A, ReadError> {
 				fun(__f)
@@ -57,10 +62,10 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		}
 	};
 
-	let write: Vec<Arm> = ctx.writes.iter().map(|WriteArm { span, games, pat, body, .. }| {
+	let write: Vec<_> = ctx.writes.iter().map(|WriteArm { span, games, pat, body, .. }| {
 		let games_name = games.iter().map(|a| &a.0).collect::<Vec<_>>();
 		let games_hex  = games.iter().map(|a| &a.1).collect::<Vec<_>>();
-		pq!{span=>
+		q!{span=>
 			(__iset@(#(IS::#games_name)|*), Self::#pat) => {
 				__f.u8(match __iset {
 					#(IS::#games_name => #games_hex,)*
@@ -71,7 +76,7 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 			}
 		}
 	}).collect();
-	let write: ItemFn = pq!{_=>
+	let write = q!{_=>
 		pub fn write(__f: &mut Writer, #func_args, __insn: &Insn) -> Result<(), WriteError> {
 			fn run(__f: &mut Writer, fun: impl FnOnce(&mut Writer) -> Result<(), WriteError>) -> Result<(), WriteError> {
 				fun(__f)
@@ -87,11 +92,9 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 
 	let doc_insn_table = make_table(&ctx);
 
-	let Insn_body: Punctuated<Variant, Token![,]> = ctx.defs.iter().map(|Insn { span, attrs, ident, args, .. }| -> Variant {
-		pq!{span=>
-			#attrs
-			#ident(#(#args),*)
-		}
+	let Insn_body: Punctuated<_, Token![,]> = ctx.defs.iter().map(|Insn { span, attrs, ident, args, .. }| q!{span=>
+		#attrs
+		#ident(#(#args),*)
 	}).collect();
 
 	let main = quote! {
@@ -122,7 +125,7 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		quote::quote_spanned!{*span=> (#ident #((#arg_names #types))*) }
 	});
 
-	let introspect = quote! {
+	let introspect = q!{_=>
 		pub macro introspect($m:path $({$($arg:tt)*})?) {
 			$m!{ $({$($arg)*})? [#(#introspect)*] }
 		}

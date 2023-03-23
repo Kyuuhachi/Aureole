@@ -7,7 +7,7 @@ use proc_macro::{TokenStream as TokenStream0, Diagnostic, Level};
 use proc_macro2::Span;
 use quote::{quote, format_ident, ToTokens};
 use syn::{
-	*,
+	Token, Ident,
 	spanned::Spanned,
 	punctuated::*,
 };
@@ -29,7 +29,7 @@ macro_rules! pq {
 #[proc_macro]
 #[allow(non_snake_case)]
 pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
-	let input: Top = parse_macro_input!(tokens);
+	let input: Top = syn::parse_macro_input!(tokens);
 	let ctx = match gather_top(input) {
 		Ok(ctx) => ctx,
 		Err(err) => return err.into_compile_error().into()
@@ -138,14 +138,14 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 }
 
 struct Ctx {
-	func_args: Punctuated<PatType, Token![,]>,
+	func_args: Punctuated<syn::PatType, Token![,]>,
 	games: Vec<Ident>,
 	attrs: Attributes,
 	defs: Vec<Insn>,
 	reads: Vec<ReadArm>,
 	writes: Vec<WriteArm>,
-	game_expr: Box<Expr>,
-	game_ty: Box<Type>,
+	game_expr: Box<syn::Expr>,
+	game_ty: Box<syn::Type>,
 }
 
 #[derive(Clone)]
@@ -154,9 +154,9 @@ struct InwardContext {
 	attrs: Attributes,
 	arg_names: Punctuated<Ident, Token![,]>,
 	#[allow(clippy::vec_box)]
-	args: Vec<Box<Type>>,
+	args: Vec<Box<syn::Type>>,
 	games: GameSpec,
-	write: Vec<Stmt>,
+	write: Vec<syn::Stmt>,
 }
 
 type GameSpec = Vec<(Ident, u8)>;
@@ -166,21 +166,21 @@ struct Insn {
 	ident: Ident,
 	attrs: Attributes,
 	#[allow(clippy::vec_box)]
-	args: Vec<Box<Type>>,
+	args: Vec<Box<syn::Type>>,
 }
 
 struct ReadArm {
 	span: Span,
 	games: GameSpec,
-	body: Box<Expr>,
+	body: Box<syn::Expr>,
 }
 
 struct WriteArm {
 	span: Span,
 	games: GameSpec,
 	ident: Ident,
-	pat: Box<Pat>,
-	body: Box<Expr>,
+	pat: Box<syn::Pat>,
+	body: Box<syn::Expr>,
 }
 
 fn make_table(ctx: &Ctx) -> String {
@@ -282,7 +282,7 @@ fn make_table(ctx: &Ctx) -> String {
 	format!("\n\n<span></span>{}\n\n", doc.render_to_string())
 }
 
-fn gather_top(input: Top) -> Result<Ctx> {
+fn gather_top(input: Top) -> syn::Result<Ctx> {
 	let games = input.attrs.games;
 	let all_games: Vec<Ident> = games.idents.iter().cloned().collect();
 
@@ -382,7 +382,7 @@ fn gather_top(input: Top) -> Result<Ctx> {
 	Ok(ctx)
 }
 
-fn get_games(attrs: &mut DefAttributes, all_games: &[Ident], n: &mut [usize], num: usize) -> Result<GameSpec> {
+fn get_games(attrs: &mut DefAttributes, all_games: &[Ident], n: &mut [usize], num: usize) -> syn::Result<GameSpec> {
 	let games = if let Some(attr) = &attrs.game {
 		attr.idents.iter().cloned().collect()
 	} else {
@@ -409,8 +409,8 @@ fn get_games(attrs: &mut DefAttributes, all_games: &[Ident], n: &mut [usize], nu
 	Ok(games)
 }
 
-fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Vec<Stmt> {
-	let mut read = Vec::<Stmt>::new();
+fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Vec<syn::Stmt> {
+	let mut read = Vec::<syn::Stmt>::new();
 	let span = arm.span();
 
 	for pair in arm.args.into_pairs() {
@@ -432,7 +432,7 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Vec<S
 					Diagnostic::spanned(comma.span().unwrap(), Level::Error, "tail must be last").emit();
 				}
 
-				let mut arms = Vec::<Arm>::new();
+				let mut arms = Vec::<syn::Arm>::new();
 				for arm in arg.arms {
 					let mut ictx = ictx.clone();
 					ictx.ident = format_ident!("{}{}", &ictx.ident, &arm.def.ident, span=arm.def.ident.span());
@@ -445,7 +445,7 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Vec<S
 				}
 
 				let name = &ictx.ident.to_string();
-				read.push(Stmt::Expr(pq!{span=>
+				read.push(syn::Stmt::Expr(pq!{span=>
 					match __f.u8()? {
 						#(#arms)*
 						_v => Err(format!("invalid Insn::{}*: 0x{:02X}", #name, _v).into())
@@ -474,11 +474,11 @@ fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Vec<S
 		body: pq!{span=> |__f| { #(#write)* Ok(()) } },
 	});
 
-	read.push(Stmt::Expr(pq!{span=> Ok(Self::#ident(#arg_names)) }, None));
+	read.push(syn::Stmt::Expr(pq!{span=> Ok(Self::#ident(#arg_names)) }, None));
 	read
 }
 
-fn source_ty(source: &Source) -> Box<Type> {
+fn source_ty(source: &Source) -> Box<syn::Type> {
 	match source {
 		Source::Simple(source) => source.ty.clone(),
 		Source::Const(source) => {
@@ -486,7 +486,7 @@ fn source_ty(source: &Source) -> Box<Type> {
 				Diagnostic::spanned(source.span().unwrap(), Level::Error, "constants must be suffixed").emit();
 				pq!{_=> usize }
 			} else {
-				parse_str(source.lit.suffix()).unwrap()
+				syn::parse_str(source.lit.suffix()).unwrap()
 			}
 		}
 		Source::Cast(source) => source.ty.clone(),
@@ -495,7 +495,7 @@ fn source_ty(source: &Source) -> Box<Type> {
 	}
 }
 
-fn write_source(ctx: &Ctx, source: &Source, val: Expr) -> Expr {
+fn write_source(ctx: &Ctx, source: &Source, val: syn::Expr) -> syn::Expr {
 	match source {
 		Source::Simple(source) => {
 			let args = ctx.func_args.iter()
@@ -532,7 +532,7 @@ fn write_source(ctx: &Ctx, source: &Source, val: Expr) -> Expr {
 	}
 }
 
-fn read_source(ctx: &Ctx, source: &Source) -> Expr {
+fn read_source(ctx: &Ctx, source: &Source) -> syn::Expr {
 	match source {
 		Source::Simple(source) => {
 			let args = ctx.func_args.iter()

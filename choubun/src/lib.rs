@@ -223,7 +223,7 @@ impl Node {
 			match item {
 				Item::Node(v) => v.render_fragment(out, indent+1)?,
 				Item::Leaf(v) => v.render_fragment(out, true)?,
-				Item::Text(v) => escape(out, v)?,
+				Item::Text(v) => escape(out, v, false)?,
 				Item::Raw(v)  => write!(out, "{}", v)?,
 			}
 		}
@@ -240,7 +240,7 @@ impl Leaf {
 		write!(out, "<{}", self.name)?;
 		for (k, v) in &self.attrs {
 			write!(out, " {k}=\"")?;
-			escape(out, v)?;
+			escape(out, v, true)?;
 			write!(out, "\"")?;
 		}
 		if slash {
@@ -252,13 +252,13 @@ impl Leaf {
 	}
 }
 
-fn escape<W: fmt::Write>(out: &mut W, str: &str) -> fmt::Result {
+fn escape<W: fmt::Write>(out: &mut W, str: &str, attr: bool) -> fmt::Result {
 	for c in str.chars() {
 		match c {
 			'&' => write!(out, "&amp;")?,
 			'<' => write!(out, "&lt;")?,
 			'>' => write!(out, "&gt;")?,
-			'"' => write!(out, "&quot;")?,
+			'"' if attr => write!(out, "&quot;")?,
 			c => write!(out, "{}", c)?,
 		}
 	}

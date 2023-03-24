@@ -509,7 +509,7 @@ themelios_macros::bytecode! {
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7CharAnimation(u16 as CharId, u16 as u32 as Time, Vec<u8> via char_animation),
 		CharFlagsSet   (u16 as CharId, u16 as CharFlags), // [set_state]
 		CharFlagsUnset (u16 as CharId, u16 as CharFlags), // [reset_state]
-		CharFlag2Set   (u16 as CharId, u16 as CharFlags),
+		CharFlags2Set  (u16 as CharId, u16 as CharFlags),
 		CharFlags2Unset(u16 as CharId, u16 as CharFlags),
 		CharShake      (u16 as CharId, u32, u32, u32, u32 as Time),
 		CharColor      (u16 as CharId, u32 as Color, u32 as Time),

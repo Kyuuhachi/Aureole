@@ -453,19 +453,48 @@ themelios_macros::bytecode! {
 
 		CharSetChipBase    (u16 as CharId, if game.is_ed7() { u8 as u16 } else { u16 } as ChipId), // [set_chr_base]
 		CharSetChipPattern (u16 as CharId, if game.is_ed7() { u8 as u16 } else { u16 }), // [set_chr_ptn]
-		#[game(Zero, ZeroEvo, Ao, AoEvo)] CharSetName(u16 as CharId, TString), // debug script only
+
+		#[game(Zero, ZeroEvo, Ao, AoEvo)]
+		CharSetName(u16 as CharId, TString),
+
 		CharSetPos     (u16 as CharId, Pos3, i16 as Angle), // [set_pos]
 		CharSetPos2    (u16 as CharId, Pos3, i16 as Angle),
-		CharTurnToChar (u16 as CharId, u16 as CharId, u16 as AngularSpeed), // [look_to]
+
+		/// Turns to look at another character.
+		///
+		/// Official name is `look_to`.
+		CharTurnToChar (u16 as CharId, u16 as CharId, u16 as AngularSpeed),
+
+		/// Turns to look at a specific position.
 		CharTurnToPos  (u16 as CharId, Pos2,          u16 as AngularSpeed),
-		CharTurnTo     (u16 as CharId, i16 as Angle,  u16 as AngularSpeed), // [turn_to]
+
+		/// Turns to look in a specific direction.
+		///
+		/// Official name is `turn_to`.
+		CharTurnTo     (u16 as CharId, i16 as Angle,  u16 as AngularSpeed),
+
+		/// Walks to a random position inside the given rectangle.
 		CharIdle       (u16 as CharId, Pos2, Pos2, u32 as Speed),
-		CharWalkToPos  (u16 as CharId, Pos3, u32 as Speed, u8), // [walk_to]
+
+		/// Walks to a position.
+		///
+		/// Official name is `walk_to`.
+		CharWalkToPos  (u16 as CharId, Pos3, u32 as Speed, u8),
+
+		/// Walks to a position, without looking forward.
 		CharWalkToPos2 (u16 as CharId, Pos3, u32 as Speed, u8),
+
 		_Char90        (u16 as CharId, i32, i32, i32, u32, u8),
 		_Char91        (u16 as CharId, i32, i32, i32, i32, u8),
-		CharWalkToChar (u16 as CharId, u16 as CharId, i32 as Length, u32 as Speed, u8), // [walk_to_chr]
+
+		/// Walks to near where another character is standing.
+		///
+		/// Official name is `walk_to_chr`.
+		CharWalkToChar (u16 as CharId, u16 as CharId, i32 as Length, u32 as Speed, u8),
+
+		/// Walks to near where another character is standing, without looking forward.
 		CharWalkToChar2(u16 as CharId, u16 as CharId, i32 as Length, u32 as Speed, u8),
+
 		_94        (u8, u16 as CharId, i16 as Angle, i32, u32 as Speed, u8),
 		CharJump       (u16 as CharId, i32, i32, i32, u32, u32 as Speed), // [jump]
 		_Char96        (u16 as CharId, Pos3, i32, i32),

@@ -343,33 +343,55 @@ themelios_macros::bytecode! {
 		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7CamRotate(i16 as Angle, i16 as Angle, i16 as Angle, u32 as Time),
 		CamPers(i32, u32 as Time), // [camera_pers]
 
-		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] ObjFrame(u16 as ObjectId, u32), // [mapobj_frame]
-		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] ObjPlay(u16 as ObjectId, u32), // [mapobj_play]
-		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_6F(u8),
-		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7ObjFrame(u8 as u16 as ObjectId, u16),
-		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7ObjPlay(u8 as u16 as ObjectId, u16, u32, u32), // TODO EDDec thinks the first u32 is two u16
-		ObjFlagsSet( // [mapobj_set_flag]
+		/// Waits for camera animations to finish.
+		///
+		/// The argument might be a bitfield, telling which animations to wait for. The values are
+		/// unknown. however. A common value seems to be 121.
+		#[game(Zero,ZeroEvo,Ao,AoEvo)]
+		CamWait(u8),
+
+		/// Instantly sets a map object's frame counter.
+		///
+		/// Official name is `mapobj_frame`.
+		ObjFrame(
+			if game.is_ed7() { u8 as u16 } else { u16 } as ObjectId,
+			if game.is_ed7() { u16 as u32 } else { u32 },
+		),
+
+		/// Animates a map object to the given frame.
+		///
+		/// Official name is `mapobj_play`.
+		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)]
+		ED6ObjPlay(u16 as ObjectId, u32),
+
+		/// Animates a map object between the given frames.
+		///
+		/// The latter two arguments are unknown.
+		#[game(Zero,ZeroEvo,Ao,AoEvo)]
+		ED7ObjPlay(u8 as u16 as ObjectId, u16, u16, u16, u32),
+
+		/// Sets a flag on a map object.
+		///
+		/// See [`ObjectFlags`] for details.
+		///
+		/// Official name is `mapobj_set_flag`.
+		ObjFlagsSet(
 			if matches!(game.base(), BaseGame::Fc|BaseGame::Sc) { u16 } else { u8 as u16 } as ObjectId,
 			if matches!(game.base(), BaseGame::Fc|BaseGame::Sc) { u16 as u32 } else { u32 } as ObjectFlags,
 		),
-		ObjFlagsUnset( // [mapobj_reset_flag]
+
+		/// Unsets a flag on a map object.
+		///
+		/// See [`ObjectFlags`] for details.
+		///
+		/// Official name is `mapobj_reset_flag`.
+		ObjFlagsUnset(
 			if matches!(game.base(), BaseGame::Fc|BaseGame::Sc) { u16 } else { u8 as u16 } as ObjectId,
 			if matches!(game.base(), BaseGame::Fc|BaseGame::Sc) { u16 as u32 } else { u32 } as ObjectFlags,
 		),
-		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] ObjWait(u16 as ObjectId),
-		// I can confirm with 100% certainty that ObjFlags(Un)Set, ED7_76_0, ED7_74, and ED7ObjPlay have the same namespace, being "mapobj"
 
-		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _74(u16, u32, u16),
-		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _75(u8 as u16 as ObjectId, u32, u8),
-		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _76(u16, u32, u16, i32, i32, i32, u8, u8),
-		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] MapColor(u32 as Color, u32 as Time), // [map_color]
-		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _78(u8, u8, u8),
-		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _79(u8 as u16 as ObjectId, u16),
-		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _7A(u8 as u16 as ObjectId, u16),
-		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _7B(),
-
-		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_74(u8 as u16 as ObjectId, u16),
-		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_75(u8, u8, u32),
+		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_74(u8 as u16 as ObjectId, u8, u8),
+		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_75(u8 as u16 as ObjectId, u8, u32 as Time),
 		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_76(u8 as u16 as ObjectId, String, match {
 			0 => _0(u32),
 			1 => _1(u32),
@@ -377,14 +399,24 @@ themelios_macros::bytecode! {
 			3 => _3(i32),
 			4 => _4(i32),
 		}),
-		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_77(u8, u16),
+		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_77(u8 as u16 as ObjectId, u16),
 		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_78(u8 as u16 as ObjectId, u16 as CharId),
-		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_79(u16 as ObjectId),
+
+		/// Waits for a map object to finish its animation.
+		ObjWait(u16 as ObjectId),
+
+		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _74(u16 as ObjectId, u32, u16),
+		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _75(u8 as u16 as ObjectId, u32, u8),
+		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _76(u16 as ObjectId, u32, u16, i32, i32, i32, u8, u8),
 		#[game(Zero)] skip!(2),
 		#[game(Ao,AoEvo)] EventSkip(u8, u32), // TODO this one will need label handling
-		#[game(Ao,AoEvo)] ED7_7B(u8),
+		#[game(Ao,AoEvo)] ED7_7B(u8 as u16 as NameId),
 		#[game(Zero,Ao)] skip!(1),
-		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_7D(u32 as Color, u32),
+		MapColor(u32 as Color, u32 as Time), // [map_color]
+		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _78(Color via color24),
+		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _79(u8 as u16 as ObjectId, u16),
+		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _7A(u8 as u16 as ObjectId, u16),
+		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _7B(),
 		#[game(Zero,Ao)] skip!(4),
 
 		Shake(u32, u32, u32, u32 as Time), // [quake]

@@ -3,9 +3,18 @@
 ## Calmare
 - Docs
   - Instruction table now shows signature on hover.
+  - Add docs to some instructions.
 - Breaking
   - Add `item_use` to ed7scena header, instead of it being `unk`.
     - Also rename ed6scena's `item` to `item_use` because it's clearer.
+  - Instruction set changes:
+    - Merge `ObjFrame` and `ED7ObjFrame`.
+    - Change signature of `ED7ObjPlay`.
+    - Rename `ED7_6F` to `CamWait`
+    - Rename `ObjPlay` to `ED6ObjPlay`.
+    - Merge `ED7_79` into `ObjWait`.
+    - Merge `ED7_7D` into `MapColor`.
+    - Fill in types for a bunch of unknown instructions.
 
 # 0.1.2 (2023-03-20)
 

@@ -550,7 +550,7 @@ fn text(f: &mut Context, v: &Text) {
 						write!(f, "{{color {n}}}");
 					}
 					TextSegment::Item(n) => {
-						write!(f, "{{item ");
+						write!(f, "{{");
 						f.val(n).no_space();
 						write!(f, "}}");
 					}

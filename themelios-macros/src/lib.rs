@@ -235,8 +235,10 @@ fn make_table(ctx: &Ctx) -> String {
 			}
 
 			let head = choubun::node("td", |n| {
-				for Insn { ident, ..} in defs {
-					n.node("span", |n| n.text(format_args!("[`{ident}`](Self::{ident})")));
+				for Insn { ident, args, .. } in defs {
+					let args = args.iter().map(|a| quote!{#a}.to_string()).collect::<Vec<_>>().join(", ");
+					n.text(format_args!("[`{ident}`](`Self::{ident}` \"{ident}({args})\")"));
+					// n.text(format_args!("`({args})`"));
 					n.text(" ");
 				}
 			});

@@ -12,6 +12,7 @@
     - Change signature of `ED7ObjPlay`.
     - Rename `ED7_6F` to `CamWait`
     - Rename `ObjPlay` to `ED6ObjPlay`.
+    - Rename `Sc_Char98*` to `CharPath*`
     - Merge `ED7_79` into `ObjWait`.
     - Merge `ED7_7D` into `MapColor`.
     - Fill in types for a bunch of unknown instructions.

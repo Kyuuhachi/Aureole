@@ -470,10 +470,10 @@ themelios_macros::bytecode! {
 		CharJump       (u16 as CharId, i32, i32, i32, u32, u32 as Speed), // [jump]
 		_Char96        (u16 as CharId, Pos3, i32, i32),
 		_Char97        (u16 as CharId, Pos2, i32 as Angle32, u32, u16),
-		Sc_Char98(match {
-			0 => _0(u16 as CharId),
-			1 => _1(Pos3),
-			2 => _2(u16 as CharId, u32, u8),
+		CharPath(match {
+			0 => New(u16 as CharId),
+			1 => Add(Pos3),
+			2 => Run(u16 as CharId, u32 as Speed, u8),
 		}),
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_A0(u16 as CharId, u16 as u32 as Time, u8, u8),
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] CharAnimation(u16 as CharId, u8, u8, u32 as Time), // [chr_anime]

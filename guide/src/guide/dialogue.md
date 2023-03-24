@@ -80,6 +80,8 @@ Most of this should be fairly self-explanatory, but there are a number of things
 - `#001F` - The `F` specifier sets the portrait that is shown next to the text.
   It refers to the file `h_kao###._ch`[^kao] (顔 *kao* is Japanese for "face").
 
+- A more in-depth tutorial on text formatting can be found in [Appendix A](../text-format.md);
+
 - `{wait}` - Tells the game to wait for the user to press a key before
   continuing. You'll see this one on almost every dialogue box.
 

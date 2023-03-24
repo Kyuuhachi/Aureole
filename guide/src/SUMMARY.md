@@ -13,8 +13,13 @@
 
 - [Bracer's Notebook](./guide/index.md)
   - [Character Dialogue](./guide/dialogue.md)
+    - [Text Formatting](./guide/dialogue.md)
   - [Character Movement](./guide/movement.md)
   - [Emotes](./guide/emote.md)
   - [Camera](./guide/camera.md)
   - [Music](./guide/music.md)
   - [Character Sprites (Chips)](./guide/chips.md)
+
+---
+
+[Appendix A: Text Formatting](./text-format.md)

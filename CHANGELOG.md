@@ -4,6 +4,7 @@
 - Docs
   - Instruction table now shows signature on hover.
   - Add docs to some instructions.
+  - Add a page on text formatting.
 - Breaking
   - Add `item_use` to ed7scena header, instead of it being `unk`.
     - Also rename ed6scena's `item` to `item_use` because it's clearer.

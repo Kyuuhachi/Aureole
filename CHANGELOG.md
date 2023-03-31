@@ -18,6 +18,8 @@
     - Merge `ED7_79` into `ObjWait`.
     - Merge `ED7_7D` into `MapColor`.
     - Fill in types for a bunch of unknown instructions.
+- Bug fixes
+  - Write `{item[n]}`, not `{item item[n]}`. (The latter remains valid syntax.)
 
 # 0.1.2 (2023-03-20)
 

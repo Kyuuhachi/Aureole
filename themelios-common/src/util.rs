@@ -43,26 +43,27 @@ pub fn cast_error<T>(
 	}
 }
 
-#[macro_export]
-macro_rules! __ensure {
+pub macro ensure {
 	($cond:expr, $($t:tt)*) => {
 		if !($cond) {
 			$crate::util::bail!($($t)*)
 		}
-	};
-}
-pub use __ensure as ensure;
-
-#[macro_export]
-macro_rules! __bail {
-	($str:literal $($arg:tt)*) => {
-		return Err(format!($str $($arg)*).into())
-	};
-	($e:expr) => {
-		return Err($e)
+	},
+	($cond:expr) => {
+		if !($cond) {
+			bail!(stringify!($cond).into())
+		}
 	}
 }
-pub use __bail as bail;
+
+pub macro bail {
+	($str:literal $($arg:tt)*) => {
+		bail!(format!($str $($arg)*).into())
+	},
+	($e:expr) => {
+		Err($e).strict()?
+	}
+}
 
 pub fn array<const N: usize, R: Try>(
 	mut f: impl FnMut() -> R,

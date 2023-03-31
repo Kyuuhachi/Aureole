@@ -1005,6 +1005,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "themelios-ani"
+version = "0.1.0"
+dependencies = [
+ "cp932",
+ "extend",
+ "gospel",
+ "num_enum",
+ "strict_result",
+ "themelios-common",
+ "themelios-macros",
+ "thiserror",
+]
+
+[[package]]
 name = "themelios-archive"
 version = "0.1.0"
 dependencies = [

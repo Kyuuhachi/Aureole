@@ -7,8 +7,9 @@ members = [
 
 	"decompress",
 	"themelios-macros",
-	"themelios-scena",
 	"themelios-common",
+	"themelios-scena",
+	"themelios-ani",
 	"themelios-archive",
 	"themelios",
 

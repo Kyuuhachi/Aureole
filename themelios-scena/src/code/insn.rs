@@ -913,7 +913,6 @@ themelios_macros::bytecode! {
 	]
 }
 
-
 impl Insn {
 	pub fn name(&self) -> &'static str {
 		macro run(

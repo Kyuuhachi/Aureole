@@ -998,8 +998,8 @@ dependencies = [
  "num_enum",
  "strict_result",
  "themelios-archive",
+ "themelios-common",
  "themelios-scena",
- "themelios-types",
  "thiserror",
  "zstd",
 ]
@@ -1010,6 +1010,17 @@ version = "0.1.0"
 dependencies = [
  "cp932",
  "gospel",
+]
+
+[[package]]
+name = "themelios-common"
+version = "0.1.0"
+dependencies = [
+ "cp932",
+ "extend",
+ "gospel",
+ "strict_result",
+ "thiserror",
 ]
 
 [[package]]
@@ -1027,19 +1038,12 @@ dependencies = [
 name = "themelios-scena"
 version = "0.1.0"
 dependencies = [
- "cp932",
  "extend",
  "gospel",
  "num_enum",
- "strict_result",
+ "themelios-common",
  "themelios-macros",
- "themelios-types",
- "thiserror",
 ]
-
-[[package]]
-name = "themelios-types"
-version = "0.1.0"
 
 [[package]]
 name = "thiserror"

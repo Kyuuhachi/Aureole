@@ -6,7 +6,7 @@ use std::ops::{Residual, Try};
 pub use read::*;
 pub use write::*;
 
-pub use strict_result::Strict;
+pub use strict_result::*;
 
 #[derive(Debug, thiserror::Error)]
 #[error("cannot convert {value} into {type_}\n{source}")]

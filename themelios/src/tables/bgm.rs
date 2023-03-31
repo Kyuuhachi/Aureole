@@ -1,7 +1,7 @@
 use gospel::read::{Reader, Le as _};
 use gospel::write::{Writer, Le as _};
 use crate::types::BgmId;
-use themelios_scena::util::*;
+use themelios_common::util::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ED7Bgm {

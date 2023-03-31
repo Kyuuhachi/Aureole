@@ -7,10 +7,12 @@ use crate::span::{Spanned as S, Span};
 pub mod ed6;
 pub mod ed7;
 
-themelios::types::newtype!(CharDefId(u16));
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+struct CharDefId(u16);
 newtype!(CharDefId, "char");
 
-themelios::types::newtype!(FuncDefId(u16));
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+struct FuncDefId(u16);
 newtype!(FuncDefId, "fn");
 
 #[derive(Debug, Clone)]

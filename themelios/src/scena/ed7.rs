@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use gospel::read::{Reader, Le as _};
 use gospel::write::{Writer, Le as _};
 use crate::types::*;
-use themelios_scena::util::*;
+use themelios_common::util::*;
 use super::code::{self, Code};
 use super::{ReaderExt as _, WriterExt as _};
 

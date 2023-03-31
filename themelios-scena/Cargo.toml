@@ -6,10 +6,7 @@ edition = "2021"
 [dependencies]
 gospel.path = "../gospel"
 themelios-macros.path = "../themelios-macros"
-themelios-types.path = "../themelios-types"
-cp932.path = "../cp932"
-strict_result = "1.1.0"
+themelios-common.path = "../themelios-common"
 
-thiserror = "1.0.0"
 num_enum = "0.5.7"
 extend = "1.1.2"

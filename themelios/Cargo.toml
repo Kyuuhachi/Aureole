@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 gospel.path = "../gospel"
-themelios-types.path = "../themelios-types"
+themelios-common.path = "../themelios-common"
 themelios-scena.path = "../themelios-scena"
 themelios-archive.path = "../themelios-archive"
 strict_result = "1.1.0"

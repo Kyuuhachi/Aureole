@@ -92,7 +92,7 @@ pub fn read(data: &[u8]) -> Result<Itp32, Error> {
 				let mut data = Vec::with_capacity(capacity);
 				match minor {
 					5 => {
-						while f.remaining() > 0 {
+						while !f.is_empty() {
 							decompress(&mut f, &mut data)?;
 						}
 					}
@@ -216,7 +216,7 @@ fn decompress(f: &mut Reader, out: &mut Vec<u8>) -> Result<(), Error> {
 	if mode == 0 {
 		out.extend_from_slice(&data[4..]);
 	} else {
-		while f.remaining() > 0 {
+		while !f.is_empty() {
 			let x = f.u16()? as usize;
 			let op = x & !(!0 << mode);
 			let num = x >> mode;

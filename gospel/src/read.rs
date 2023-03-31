@@ -90,7 +90,7 @@ impl<'a> Reader<'a> {
 	/// Returns an error if there is not enough data left, in which case the read position is
 	/// unchanged.
 	pub fn slice(&mut self, len: usize) -> Result<&'a [u8]> {
-		if len > self.remaining() {
+		if len > self.remaining().len() {
 			return Err(Error::Read { pos: self.pos(), len, size: self.len() });
 		}
 		let pos = self.pos;
@@ -138,13 +138,21 @@ impl<'a> Reader<'a> {
 	/// [`len`](`Self::len`).
 	#[must_use]
 	pub fn is_empty(&self) -> bool {
-		self.remaining() == 0
+		self.remaining().is_empty()
 	}
 
-	/// Returns the number of bytes available to read.
+	/// Returns the remaining data in the buffer.
 	#[must_use]
-	pub fn remaining(&self) -> usize {
-		self.len() - self.pos()
+	pub fn remaining(&self) -> &'a [u8] {
+		&self.data[self.pos()..]
+	}
+
+	/// Returns the data being read from.
+	///
+	/// This is the full slice; for only the remainder, see [`remaining`](`Self::remaining`).
+	#[must_use]
+	pub fn data(&self) -> &'a [u8] {
+		self.data
 	}
 
 	/// Sets the read position.

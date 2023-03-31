@@ -98,7 +98,6 @@ impl Writer {
 					Ok(e) => Err(*e),
 					Err(e) => Err(Error::Other { pos, source: e })
 				}
-
 			}
 		}
 		Ok(self.data)

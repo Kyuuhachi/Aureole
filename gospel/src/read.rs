@@ -63,15 +63,15 @@ impl std::fmt::Display for CheckBytesError {
 /// [`Range`](`std::ops::Range`).
 #[derive(Clone)]
 pub struct Reader<'a> {
-	data: &'a [u8],
 	pos: usize,
+	data: &'a [u8],
 }
 
 impl<'a> std::fmt::Debug for Reader<'a> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("Reader")
-			.field("data", &format_args!("[_; {}]", self.data.len()))
 			.field("pos", &self.pos)
+			.field("data", &format_args!("[_; {}]", self.data.len()))
 			.finish()
 	}
 }
@@ -80,8 +80,8 @@ impl<'a> Reader<'a> {
 	/// Constructs a new `Reader`.
 	pub fn new(data: &'a [u8]) -> Reader<'a> {
 		Self {
-			data,
 			pos: 0,
+			data,
 		}
 	}
 

@@ -5,8 +5,7 @@ pub fn decode(bytes: &[u8]) -> Result<String, usize> {
 	let mut out = String::with_capacity(bytes.len());
 	let mut pos = 0;
 	while pos < bytes.len() {
-		let (ch, len) = decode_char(&bytes[pos..]);
-		let ch = ch.ok_or(pos)?;
+		let (ch, len) = decode_char(&bytes[pos..]).ok_or(pos)?;
 		out.push(ch);
 		pos += len;
 	}
@@ -17,55 +16,47 @@ pub fn decode_lossy(bytes: &[u8]) -> String {
 	let mut out = String::with_capacity(bytes.len());
 	let mut pos = 0;
 	while pos < bytes.len() {
-		let (ch, len) = decode_char(&bytes[pos..]);
-		let ch = ch.unwrap_or('�');
+		let (ch, len) = decode_char(&bytes[pos..]).unwrap_or(('�', 1));
 		out.push(ch);
 		pos += len;
 	}
 	out
 }
 
-fn decode_char(bytes: &[u8]) -> (Option<char>, usize) {
+pub fn decode_char(bytes: &[u8]) -> Option<(char, usize)> {
 	use std::char::from_u32 as ch;
-	let c = match bytes.first() {
-		None => return (None, 1),
-		Some(c) => *c,
-	};
-	match c {
-		0x00..=0x80 => (ch(c as u32), 1),
-		0xA0        => (ch(0xF8F0), 1), // half-width katakana
-		0xA1..=0xDF => (ch(0xFEC0 + c as u32), 1),
-		0xFD..=0xFF => (ch(0xF8F1 - 0xFD + c as u32), 1), // Windows compatibility
-		_ => {
-			let c2 = match bytes.get(1) {
-				None => return (None, 2),
-				Some(c2) => *c2,
-			};
-
+	let c = *bytes.first()?;
+	Some((match c {
+		0x00..=0x80 => ch(c as u32)?,
+		0xA0        => ch(0xF8F0)?, // half-width katakana
+		0xA1..=0xDF => ch(0xFEC0 + c as u32)?,
+		0xFD..=0xFF => ch(0xF8F1 - 0xFD + c as u32)?, // Windows compatibility
+		_ => return Some(({
+			let c2 = *bytes.get(1)?;
 			if let Some(ch) = dec::cp932ext(c, c2) {
-				return (Some(ch), 2)
-			}
-
-			let c2 = match c2 {
-				0x40..=0x7E => c2 - 0x40,
-				0x80..=0xFC => c2 - 0x41,
-				_ => return (None, 2),
-			};
-			match c {
-				0x81..=0x9F | 0xE0..=0xEA => {
-					let c1 = (c - 1) % 0x40;
-					let c1 = (c1 << 1) + c2 / 0x5E;
-					let c2 = c2 % 0x5E;
-					let (c1, c2) = (c1 + 0x21, c2 + 0x21);
-					(dec::jisx0208(c1, c2), 2)
+				ch
+			} else {
+				let c2 = match c2 {
+					0x40..=0x7E => c2 - 0x40,
+					0x80..=0xFC => c2 - 0x41,
+					_ => return None,
+				};
+				match c {
+					0x81..=0x9F | 0xE0..=0xEA => {
+						let c1 = (c - 1) % 0x40;
+						let c1 = (c1 << 1) + c2 / 0x5E;
+						let c2 = c2 % 0x5E;
+						let (c1, c2) = (c1 + 0x21, c2 + 0x21);
+						dec::jisx0208(c1, c2)?
+					}
+					0xF0..=0xF9 => {
+						ch(0xE000 + 188 * (c - 0xF0) as u32 + c2 as u32)?
+					}
+					_ => return None
 				}
-				0xF0..=0xF9 => {
-					(ch(0xE000 + 188 * (c - 0xF0) as u32 + c2 as u32), 2)
-				}
-				_ => (None, 2)
 			}
-		}
-	}
+		}, 2))
+	}, 1))
 }
 
 pub fn encode(text: &str) -> Result<Vec<u8>, usize> {

@@ -327,31 +327,31 @@ themelios_macros::bytecode! {
 		#[game(Sc,Tc)] _9B(u8 as CharId), // These two are often used with Damage
 		#[game(Sc,Tc)] _9C(u8 as CharId),
 		#[game(Sc,Tc)] _9D(u8 as CharId),
-		#[game(Sc,Tc)] skip!(1),
-		#[game(Sc,Tc)] _9F(u8, u32),
+		#[game(Tc)] skip!(1),
+		#[game(Tc)] _9F(u8, u32),
 
-		#[game(Sc,Tc)] _A0(u8 as CharId, [u8; 7]),
-		#[game(Sc,Tc)] Summon(u8 as CharId, FileId /*ms#####._dt*/),
-		#[game(Sc,Tc)] Unsummon(u8 as CharId),
-		#[game(Sc,Tc)] SortPillars(u8 as CharId, u8), // used in the Pillars
-		#[game(Sc,Tc)] For(match {
+		#[game(Tc)] _A0(u8 as CharId, [u8; 7]),
+		#[game(Tc)] Summon(u8 as CharId, FileId /*ms#####._dt*/),
+		#[game(Tc)] Unsummon(u8 as CharId),
+		#[game(Tc)] SortPillars(u8 as CharId, u8), // used in the Pillars
+		#[game(Tc)] For(match {
 			0 => PillarReset(),
 			1 => PillarNext(),
 			2 => Pillar(Addr),
 		}),
-		#[game(Sc,Tc)] _A5(u8 as CharId, u8 as EffInstanceId, u32, u32, u8),
-		#[game(Sc,Tc)] _A6(u8 as CharId, u8 as EffInstanceId, u8 as CharId, i32, i32, i32, u32),
-		#[game(Sc,Tc)] _A7(u8, u16),
-		#[game(Sc,Tc)] _A8(u8 as CharId, u8),
-		#[game(Sc,Tc)] _A9(u32 as Time),
-		#[game(Sc,Tc)] _AA(i32, i32),
-		#[game(Sc,Tc)] _AB(u8, u8 as CharId, u8, u32),
-		#[game(Sc,Tc)] _AC(u8 as CharId, u8, u32, u32, u8),
-		#[game(Sc,Tc)] skip!(1),
-		#[game(Sc,Tc)] _AE(i16 as Angle, u32),
-		#[game(Sc,Tc)] _AF(u8, u8, u32, u32, u32, u32),
-		#[game(Sc,Tc)] skip!(1),
-		#[game(Sc,Tc)] _B1(u8, u16), // This looks like an address, but doesn't seem to be one.
+		#[game(Tc)] _A5(u8 as CharId, u8 as EffInstanceId, u32, u32, u8),
+		#[game(Tc)] _A6(u8 as CharId, u8 as EffInstanceId, u8 as CharId, i32, i32, i32, u32),
+		#[game(Tc)] _A7(u8, u16),
+		#[game(Tc)] _A8(u8 as CharId, u8),
+		#[game(Tc)] _A9(u32 as Time),
+		#[game(Tc)] _AA(i32, i32),
+		#[game(Tc)] _AB(u8, u8 as CharId, u8, u32),
+		#[game(Tc)] _AC(u8 as CharId, u8, u32, u32, u8),
+		#[game(Tc)] skip!(1),
+		#[game(Tc)] _AE(i16 as Angle, u32),
+		#[game(Tc)] _AF(u8, u8, u32, u32, u32, u32),
+		#[game(Tc)] skip!(1),
+		#[game(Tc)] _B1(u8, u16), // This looks like an address, but doesn't seem to be one.
 	]
 }
 

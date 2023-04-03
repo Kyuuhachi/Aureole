@@ -23,20 +23,23 @@ struct Cli {
 
 #[derive(Debug, Clone, PartialEq)]
 #[derive(serde::Serialize, serde::Deserialize)]
-struct ItcFrame {
-	filename: String,
+struct ItcImage {
+	frame: usize,
+	path: PathBuf,
 	unknown: u16,
-	x_offset: f32,
-	y_offset: f32,
-	x_scale: f32,
-	y_scale: f32,
+	offset: (i32, i32),
+	#[serde(default = "default_scale", skip_serializing_if = "is_default_scale")]
+	scale: (f32, f32),
 }
+
+fn default_scale() -> (f32, f32) { (1.0, 1.0) }
+fn is_default_scale(a: &(f32, f32)) -> bool { *a == default_scale() }
 
 fn main() -> Result<()> {
 	let mut cli = Cli::parse();
 
-	if cli.file.join("itc.csv").is_file() {
-		cli.file = cli.file.join("itc.csv");
+	if cli.file.join("chip.json").is_file() {
+		cli.file = cli.file.join("chip.json");
 	}
 
 	let Some(name) = cli.file.file_name().and_then(|a| a.to_str()) else {
@@ -65,66 +68,78 @@ fn main() -> Result<()> {
 		let outdir = cli.output.clone().unwrap_or_else(|| cli.file.with_extension(""));
 		std::fs::create_dir_all(&outdir)?;
 
-		let nd = itc.content.len().to_string().len();
-		let mut images = Vec::with_capacity(itc.content.len());
-		for (i, data) in itc.content.iter().enumerate() {
-			let (ext, data, w, h) = convert_itp(data, itc.palette.as_deref())?;
-			let name = format!("{i:0nd$}.{ext}");
-			std::fs::write(outdir.join(&name), &data)?;
-			images.push((name, w, h));
-		}
+		let mut images = Vec::new();
+		for (i, img) in itc.content.iter().enumerate() {
+			if let Some((frame_id, frame)) = itc.frames.iter().enumerate().find(|a| a.1.index == Some(i)) {
+				let (ext, data, w, h) = convert_itp(img, itc.palette.as_deref())?;
+				let path = PathBuf::from(format!("{frame_id}.{ext}"));
+				std::fs::write(outdir.join(&path), &data)?;
 
-		let mut wtr = csv::Writer::from_path(outdir.join("itc.csv"))?;
-		for frame in &itc.frames {
-			let (name, w, h) = images[frame.index].clone();
-			wtr.serialize(ItcFrame {
-				filename: name,
-				unknown: frame.unknown,
-				x_offset: frame.x_offset * w as f32,
-				y_offset: frame.y_offset * h as f32,
-				x_scale: frame.x_scale.recip(),
-				y_scale: frame.y_scale.recip(),
-			})?;
-		}
-
-	} else if name == "itc.csv" || name.ends_with(".itc.csv") {
-		let mut rdr = csv::Reader::from_path(&cli.file)?;
-		let frames: Vec<ItcFrame> = rdr.deserialize().collect::<Result<_, _>>()?;
-		let mut images = BTreeMap::new();
-		for f in &frames {
-			if !images.contains_key(&f.filename) {
-				let path = cli.file.parent().unwrap().join(&f.filename);
-				let data = std::fs::read(&path)?;
-				images.insert(f.filename.clone(), convert_image(&data)?);
+				let xs = frame.x_scale.recip();
+				let ys = frame.y_scale.recip();
+				let xo = -(frame.x_offset * (w as f32 / frame.x_scale)).round() as i32;
+				let yo = -(frame.y_offset * (h as f32 / frame.y_scale)).round() as i32;
+				images.push(ItcImage {
+					path,
+					frame: frame_id,
+					unknown: frame.unknown,
+					offset: (xo, yo),
+					scale: (xs, ys),
+				})
 			}
 		}
 
-		let itc = Itc {
-			frames: frames.iter().map(|f| {
-				let (index, (_, &(_, w, h))) = images.iter().enumerate().find(|a| a.1.0 == &f.filename).unwrap();
-				cradle::itc::Frame {
-					index,
-					unknown: f.unknown,
-					x_offset: f.x_offset / w as f32,
-					y_offset: f.y_offset / h as f32,
-					x_scale: f.x_scale.recip(),
-					y_scale: f.y_scale.recip(),
-				}
-			}).collect(),
-			content: images.values().map(|a| a.0.as_slice()).collect(),
-			palette: None,
-		};
+		let mut f = std::fs::File::create(outdir.join("chip.json"))?;
+		{
+			use serde_json::ser::Formatter;
+			let mut pf = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+			pf.begin_array(&mut f)?;
+			for (i, v) in images.iter().enumerate() {
+				pf.begin_array_value(&mut f, i == 0)?;
+				serde_json::to_writer(&mut f, v)?;
+				pf.end_array_value(&mut f)?;
+			}
+			pf.end_array(&mut f)?;
+		}
 
-		let out = if let Some(i) = cli.output.clone() {
-			i
-		} else if name == "itc.csv" {
-			PathBuf::from(cli.file.parent().unwrap().to_str().unwrap().to_owned() + ".itc")
-		} else { // *.itc.csv
-			cli.file.with_extension("")
-		};
-
-		let data = cradle::itc::write(&itc)?;
-		std::fs::write(out, data)?;
+	// } else if name == "chip.json" || name.ends_with(".chip.json") {
+	// 	let mut rdr = csv::Reader::from_path(&cli.file)?;
+	// 	let frames: Vec<ItcFrame> = rdr.deserialize().collect::<Result<_, _>>()?;
+	// 	let mut images = BTreeMap::new();
+	// 	for f in &frames {
+	// 		if !images.contains_key(&f.filename) {
+	// 			let path = cli.file.parent().unwrap().join(&f.filename);
+	// 			let data = std::fs::read(&path)?;
+	// 			images.insert(f.filename.clone(), convert_image(&data)?);
+	// 		}
+	// 	}
+	//
+	// 	let itc = Itc {
+	// 		frames: frames.iter().map(|f| {
+	// 			let (index, (_, &(_, w, h))) = images.iter().enumerate().find(|a| a.1.0 == &f.filename).unwrap();
+	// 			cradle::itc::Frame {
+	// 				index,
+	// 				unknown: f.unknown,
+	// 				x_offset: f.x_offset / w as f32,
+	// 				y_offset: f.y_offset / h as f32,
+	// 				x_scale: f.x_scale.recip(),
+	// 				y_scale: f.y_scale.recip(),
+	// 			}
+	// 		}).collect(),
+	// 		content: images.values().map(|a| a.0.as_slice()).collect(),
+	// 		palette: None,
+	// 	};
+	//
+	// 	let out = if let Some(i) = cli.output.clone() {
+	// 		i
+	// 	} else if name == "chip.json" {
+	// 		PathBuf::from(cli.file.parent().unwrap().to_str().unwrap().to_owned() + ".itc")
+	// 	} else { // *.chip.json
+	// 		cli.file.with_extension("")
+	// 	};
+	//
+	// 	let data = cradle::itc::write(&itc)?;
+	// 	std::fs::write(out, data)?;
 
 	} else {
 		eyre::bail!("could not infer file type");

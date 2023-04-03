@@ -14,14 +14,24 @@ pub enum Error {
 	Write { #[from] source: gospel::write::Error, backtrace: std::backtrace::Backtrace },
 }
 
-pub macro ensure($cond:expr, $($t:tt)*) {
-	if !($cond) {
-		bail!($($t)*)
+pub macro ensure {
+	($cond:expr, $($t:tt)*) => {
+		if !($cond) {
+			bail!($($t)*)
+		}
+	},
+	($cond:expr) => {
+		ensure!($cond, stringify!($cond).into())
 	}
 }
 
-pub macro bail($str:literal $($arg:tt)*) {
-	Err(Error::Invalid(format!($str $($arg)*)))?
+pub macro bail {
+	($str:literal $($arg:tt)*) => {
+		bail!(format!($str $($arg)*).into())
+	},
+	($e:expr) => {
+		Err(Error::Invalid($e))?
+	}
 }
 
 pub fn image<P: image::Pixel>(w: usize, h: usize, pixels: Vec<P::Subpixel>) -> Result<ImageBuffer<P, Vec<P::Subpixel>>, Error> {

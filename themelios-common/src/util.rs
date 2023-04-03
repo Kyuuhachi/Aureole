@@ -46,13 +46,11 @@ pub fn cast_error<T>(
 pub macro ensure {
 	($cond:expr, $($t:tt)*) => {
 		if !($cond) {
-			$crate::util::bail!($($t)*)
+			bail!($($t)*)
 		}
 	},
 	($cond:expr) => {
-		if !($cond) {
-			bail!(stringify!($cond).into())
-		}
+		ensure!($cond, stringify!($cond).into())
 	}
 }
 

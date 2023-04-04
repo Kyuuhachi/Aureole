@@ -129,4 +129,5 @@ These directives are exclusive to the *Evolution* versions, and are therefore la
 
 [^kao]: In *Sky*, files are looked up via `t_face`, but effectively resolve to `h_kao###._ch`, or
   `h_ka####._ch` for larger numbers. In Crossbell, they resolve to `ka#####.itp`.
+
 [ruby]: https://en.wikipedia.org/wiki/Ruby_character

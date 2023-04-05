@@ -68,8 +68,8 @@ fn main() -> Result<()> {
 
 	} else if name.ends_with(".dds") {
 		let dds = ddsfile::Dds::read(Cursor::new(&data))?;
-		if let Some(Dxgi::BC7_Typeless|Dxgi::BC7_UNorm|Dxgi::BC7_UNorm_sRGB) = dds.get_dxgi_format() {
-			Itp32::from_dds(&dds).unwrap().write(file("itp")?)?;
+		if let Some(itp) = Itp32::from_bc7_dds(&dds) {
+			itp.write(file("itp")?)?;
 		} else {
 			let img = image::load(Cursor::new(&data), IF::Dds)?.to_rgba8();
 			Itp32::from_rgba(&img).write(file("itp")?)?;
@@ -266,7 +266,7 @@ impl Itp32 {
 		}
 	}
 
-	fn from_dds(dds: &ddsfile::Dds) -> Option<Itp32> {
+	fn from_bc7_dds(dds: &ddsfile::Dds) -> Option<Itp32> {
 		let Some(Dxgi::BC7_Typeless|Dxgi::BC7_UNorm|Dxgi::BC7_UNorm_sRGB) = dds.get_dxgi_format() else {
 			return None;
 		};
@@ -285,7 +285,7 @@ impl Itp32 {
 		Some(Itp32 { width, height, levels })
 	}
 
-	fn to_dds(self) -> ddsfile::Dds {
+	fn to_bc7_dds(self) -> ddsfile::Dds {
 		let mut dds = ddsfile::Dds::new_dxgi(ddsfile::NewDxgiParams {
 			height: self.width as u32,
 			width: self.height as u32,

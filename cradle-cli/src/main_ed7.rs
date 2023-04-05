@@ -35,10 +35,12 @@ fn main() -> Result<()> {
 	};
 	let name = name.to_lowercase();
 
-	let w = |ext: &str, val: &[u8]| {
-		let out = cli.output.clone()
-			.unwrap_or_else(|| cli.file.with_extension(ext));
-		std::fs::write(out, val)
+	let path = |ext: &str| {
+		cli.output.clone()
+			.unwrap_or_else(|| cli.file.with_extension(ext))
+	};
+	let file = |ext: &str| {
+		File::create(path(ext))
 	};
 
 	let data = std::fs::read(&cli.file)?;
@@ -47,35 +49,35 @@ fn main() -> Result<()> {
 		if data.starts_with(b"ITP\xFF") {
 			let itp = cradle::itp32::read(&data)?;
 			if itp.has_mipmaps() {
-				w("dds", &to_raw_dds(&itp)?)?
+				write_raw_dds(file("dds")?, &itp)?;
 			} else {
-				w("png", &to_image(IF::Png, itp.to_rgba(0))?)?
+				write_png(file("png")?, &itp.to_rgba(0), None)?;
 			}
 		} else {
 			let itp = cradle::itp::read(&data)?;
-			w("png", &to_indexed_png(&itp)?)?
+			write_png(file("png")?, &itp.to_rgba(), Some(&itp.palette))?;
 		}
 
 	} else if name.ends_with(".png") {
 		let (img, pal) = load_png(Cursor::new(&data))?;
 		if let Some(pal) = pal {
-			w("itp", &write_itp(&Itp::from_rgba(&img, pal).unwrap())?)?
+			write_itp(file("itp")?, &Itp::from_rgba(&img, pal).unwrap())?;
 		} else {
-			w("itp", &write_itp32(&rgba_to_itp32(img))?)?
+			write_itp32(file("itp")?, &rgba_to_itp32(img))?;
 		}
 
 	} else if name.ends_with(".dds") {
 		let dds = ddsfile::Dds::read(Cursor::new(&data))?;
 		if let Some(Dxgi::BC7_Typeless|Dxgi::BC7_UNorm|Dxgi::BC7_UNorm_sRGB) = dds.get_dxgi_format() {
-			w("itp", &write_itp32(&dds_to_itp32(&dds))?)?
+			write_itp32(file("itp")?, &dds_to_itp32(&dds))?;
 		} else {
 			let img = image::load(Cursor::new(&data), IF::Dds)?.to_rgba8();
-			w("itp", &write_itp32(&rgba_to_itp32(img))?)?
+			write_itp32(file("itp")?, &rgba_to_itp32(img))?;
 		}
 
 	} else if name.ends_with(".itc") {
 		let itc = cradle::itc::read(&data)?;
-		let outdir = cli.output.clone().unwrap_or_else(|| cli.file.with_extension(""));
+		let outdir = path("");
 		std::fs::create_dir_all(&outdir)?;
 
 		convert_itc(&itc, &outdir)?;
@@ -186,7 +188,7 @@ fn convert_itc(itc: &Itc, outdir: &Path) -> eyre::Result<()> {
 			} else {
 				println!("couldn't deduce transform for {}", path.display());
 
-				save_png(File::create(&path)?, &img, pal.as_deref())?;
+				write_png(File::create(&path)?, &img, pal.as_deref())?;
 
 				imgdata.push(ItcImage {
 					path,
@@ -211,7 +213,7 @@ fn convert_itc(itc: &Itc, outdir: &Path) -> eyre::Result<()> {
 		let y = h / 2 - (i.img.height() as i32 / 2 + i.offset.1) as u32;
 		out.pixels_mut().for_each(|p| *p = *i.img.get_pixel(0, 0));
 		out.copy_from(&i.img, x, y)?;
-		save_png(File::create(&i.path)?, &out, i.pal.as_deref())?;
+		write_png(File::create(&i.path)?, &out, i.pal.as_deref())?;
 	}
 
 	let mut f = std::fs::File::create(outdir.join("chip.json"))?;
@@ -230,11 +232,10 @@ fn convert_itc(itc: &Itc, outdir: &Path) -> eyre::Result<()> {
 	Ok(())
 }
 
-fn save_png(mut w: impl Write + Seek, img: &RgbaImage, pal: Option<&[Rgba<u8>]>) -> eyre::Result<()> {
+fn write_png(mut w: impl Write + Seek, img: &RgbaImage, pal: Option<&[Rgba<u8>]>) -> eyre::Result<()> {
 	if let Some(pal) = &pal {
 		let itp = Itp::from_rgba(img, pal.to_vec()).unwrap();
-		let data = to_indexed_png(&itp)?;
-		w.write_all(&data)?;
+		write_indexed_png(w, &itp)?;
 	} else {
 		img.write_to(&mut w, IF::Png)?;
 	}
@@ -297,22 +298,15 @@ fn rgba_to_itp32(img: RgbaImage) -> Itp32 {
 	}
 }
 
-fn to_image(format: IF, img: RgbaImage) -> Result<Vec<u8>> {
-	let mut f = Cursor::new(Vec::new());
-	img.write_to(&mut f, format)?;
-	Ok(f.into_inner())
+fn write_itp(mut w: impl Write, itp: &Itp) -> Result<()> {
+	Ok(w.write_all(&cradle::itp::write1004(itp)?)?)
 }
 
-fn write_itp(itp: &Itp) -> Result<Vec<u8>> {
-	Ok(cradle::itp::write1004(itp)?)
+fn write_itp32(mut w: impl Write, itp: &Itp32) -> Result<()> {
+	Ok(w.write_all(&cradle::itp32::write(itp)?)?)
 }
 
-fn write_itp32(itp: &Itp32) -> Result<Vec<u8>> {
-	Ok(cradle::itp32::write(itp)?)
-}
-
-fn to_raw_dds(itp: &Itp32) -> Result<Vec<u8>> {
-	let mut f = Cursor::new(Vec::new());
+fn write_raw_dds(mut w: impl Write, itp: &Itp32) -> Result<()> {
 	let mut dds = ddsfile::Dds::new_dxgi(ddsfile::NewDxgiParams {
 		height: itp.width as u32,
 		width: itp.height as u32,
@@ -326,13 +320,13 @@ fn to_raw_dds(itp: &Itp32) -> Result<Vec<u8>> {
 		alpha_mode: ddsfile::AlphaMode::Unknown,
 	})?;
 	dds.data = itp.levels.iter().flatten().copied().flat_map(u128::to_le_bytes).collect();
-	dds.write(&mut f)?;
-	Ok(f.into_inner())
+	dds.write(&mut w)?;
+	Ok(())
 }
 
-fn to_indexed_png(itp: &Itp) -> Result<Vec<u8>> {
-	let mut f = Cursor::new(Vec::new());
-	let mut png = png::Encoder::new(&mut f, itp.image.width(), itp.image.height());
+fn write_indexed_png(mut w: impl Write, itp: &Itp) -> Result<()> {
+	let mut png = png::Encoder::new(&mut w, itp.image.width(), itp.image.height());
+	png.set_source_gamma(png::ScaledFloat::new(2.2));
 	let mut pal = Vec::with_capacity(3*itp.palette.len());
 	let mut alp = Vec::with_capacity(itp.palette.len());
 	for &Rgba([r,g,b,a]) in &itp.palette {
@@ -348,5 +342,5 @@ fn to_indexed_png(itp: &Itp) -> Result<Vec<u8>> {
 	let mut w = png.write_header()?;
 	w.write_image_data(&itp.image)?;
 	w.finish()?;
-	Ok(f.into_inner())
+	Ok(())
 }

@@ -49,30 +49,30 @@ fn main() -> Result<()> {
 		if data.starts_with(b"ITP\xFF") {
 			let itp = cradle::itp32::read(&data)?;
 			if itp.has_mipmaps() {
-				itp32_to_dds(&itp)?.write(&mut file("dds")?)?;
+				itp.to_dds().write(&mut file("dds")?)?;
 			} else {
-				write_png(file("png")?, &itp.to_rgba(0), None)?;
+				itp.to_rgba(0).write(None, file("png")?)?;
 			}
 		} else {
 			let itp = cradle::itp::read(&data)?;
-			write_png(file("png")?, &itp.to_rgba(), Some(&itp.palette))?;
+			itp.to_rgba().write(Some(&itp.palette), file("png")?)?;
 		}
 
 	} else if name.ends_with(".png") {
 		let (img, pal) = load_png(Cursor::new(&data))?;
 		if let Some(pal) = pal {
-			write_itp(file("itp")?, &Itp::from_rgba(&img, pal).unwrap())?;
+			Itp::from_rgba(&img, pal).unwrap().write(file("itp")?)?;
 		} else {
-			write_itp32(file("itp")?, &rgba_to_itp32(img))?;
+			Itp32::from_rgba(&img).write(file("itp")?)?;
 		}
 
 	} else if name.ends_with(".dds") {
 		let dds = ddsfile::Dds::read(Cursor::new(&data))?;
 		if let Some(Dxgi::BC7_Typeless|Dxgi::BC7_UNorm|Dxgi::BC7_UNorm_sRGB) = dds.get_dxgi_format() {
-			write_itp32(file("itp")?, &dds_to_itp32(&dds))?;
+			Itp32::from_dds(&dds).unwrap().write(file("itp")?)?;
 		} else {
 			let img = image::load(Cursor::new(&data), IF::Dds)?.to_rgba8();
-			write_itp32(file("itp")?, &rgba_to_itp32(img))?;
+			Itp32::from_rgba(&img).write(file("itp")?)?;
 		}
 
 	} else if name.ends_with(".itc") {
@@ -142,7 +142,7 @@ struct ItcImage {
 fn unit_scale() -> (f32, f32) { (1.0, 1.0) }
 fn is_unit_scale(a: &(f32, f32)) -> bool { *a == unit_scale() }
 
-fn convert_itc(itc: &Itc, outdir: &Path) -> eyre::Result<()> {
+fn convert_itc(itc: &Itc, outdir: &Path) -> Result<()> {
 	struct Img {
 		path: PathBuf,
 		img: RgbaImage,
@@ -188,7 +188,7 @@ fn convert_itc(itc: &Itc, outdir: &Path) -> eyre::Result<()> {
 			} else {
 				println!("couldn't deduce transform for {}", path.display());
 
-				write_png(File::create(&path)?, &img, pal.as_deref())?;
+				img.write(pal.as_deref(), File::create(&path)?)?;
 
 				imgdata.push(ItcImage {
 					path,
@@ -213,7 +213,7 @@ fn convert_itc(itc: &Itc, outdir: &Path) -> eyre::Result<()> {
 		let y = h / 2 - (i.img.height() as i32 / 2 + i.offset.1) as u32;
 		out.pixels_mut().for_each(|p| *p = *i.img.get_pixel(0, 0));
 		out.copy_from(&i.img, x, y)?;
-		write_png(File::create(&i.path)?, &out, i.pal.as_deref())?;
+		out.write(i.pal.as_deref(), File::create(&i.path)?)?;
 	}
 
 	let mut f = std::fs::File::create(outdir.join("chip.json"))?;
@@ -232,17 +232,91 @@ fn convert_itc(itc: &Itc, outdir: &Path) -> eyre::Result<()> {
 	Ok(())
 }
 
-fn write_png(mut w: impl Write + Seek, img: &RgbaImage, pal: Option<&[Rgba<u8>]>) -> eyre::Result<()> {
-	if let Some(pal) = &pal {
-		let itp = Itp::from_rgba(img, pal.to_vec()).unwrap();
-		write_indexed_png(w, &itp)?;
-	} else {
-		img.write_to(&mut w, IF::Png)?;
+#[extend::ext]
+impl Itp {
+	fn write(&self, mut w: impl Write) -> Result<()> {
+		Ok(w.write_all(&cradle::itp::write1004(self)?)?)
 	}
-	Ok(())
 }
 
-fn load_png(mut r: impl BufRead + Seek) -> eyre::Result<(RgbaImage, Option<Vec<Rgba<u8>>>)> {
+#[extend::ext]
+impl Itp32 {
+	fn write(&self, mut w: impl Write) -> Result<()> {
+		Ok(w.write_all(&cradle::itp32::write(self)?)?)
+	}
+
+	fn from_rgba(img: &RgbaImage) -> Itp32 {
+		let a = intel_tex_2::bc7::compress_blocks(
+			&intel_tex_2::bc7::alpha_very_fast_settings(),
+			&intel_tex_2::RgbaSurface {
+				width: img.width(),
+				height: img.width(),
+				stride: img.width() * 4,
+				data: img,
+			}
+		);
+		let data = a
+			.chunks_exact(16)
+			.map(|a| u128::from_le_bytes(a.try_into().unwrap()))
+			.collect();
+		Itp32 {
+			width: img.width() as usize,
+			height: img.height() as usize,
+			levels: vec![data],
+		}
+	}
+
+	fn from_dds(dds: &ddsfile::Dds) -> Option<Itp32> {
+		let Some(Dxgi::BC7_Typeless|Dxgi::BC7_UNorm|Dxgi::BC7_UNorm_sRGB) = dds.get_dxgi_format() else {
+			return None;
+		};
+
+		let width = dds.get_width() as usize;
+		let height = dds.get_height() as usize;
+
+		let mut it = dds.data
+			.chunks_exact(16)
+			.map(|a| u128::from_le_bytes(a.try_into().unwrap()));
+
+		let levels = (0..dds.get_num_mipmap_levels() as u16).map(|level| {
+			let level_size = (width >> level) * (height >> level);
+			it.by_ref().take(level_size >> 4).collect()
+		}).collect();
+		Some(Itp32 { width, height, levels })
+	}
+
+	fn to_dds(self) -> ddsfile::Dds {
+		let mut dds = ddsfile::Dds::new_dxgi(ddsfile::NewDxgiParams {
+			height: self.width as u32,
+			width: self.height as u32,
+			depth: None,
+			format: Dxgi::BC7_UNorm,
+			mipmap_levels: self.has_mipmaps().then_some(self.levels() as u32),
+			array_layers: None,
+			caps2: None,
+			is_cubemap: false,
+			resource_dimension: ddsfile::D3D10ResourceDimension::Texture2D,
+			alpha_mode: ddsfile::AlphaMode::Unknown,
+		}).unwrap();
+		dds.data = self.levels.iter().flatten().copied().flat_map(u128::to_le_bytes).collect();
+		dds
+	}
+}
+
+#[extend::ext]
+impl RgbaImage {
+	fn write(&self, pal: Option<&[Rgba<u8>]>, mut w: impl Write + Seek) -> Result<()> {
+		if let Some(pal) = &pal {
+			let itp = Itp::from_rgba(self, pal.to_vec()).unwrap();
+			write_indexed_png(w, &itp)?;
+		} else {
+			self.write_to(&mut w, IF::Png)?;
+		}
+		Ok(())
+	}
+}
+
+fn load_png(mut r: impl BufRead + Seek) -> Result<(RgbaImage, Option<Vec<Rgba<u8>>>)> {
 	let pos = r.stream_position()?;
 	let png = png::Decoder::new(&mut r).read_info()?;
 	let info = png.info();
@@ -262,70 +336,8 @@ fn load_png(mut r: impl BufRead + Seek) -> eyre::Result<(RgbaImage, Option<Vec<R
 	Ok((img, pal))
 }
 
-fn dds_to_itp32(dds: &ddsfile::Dds) -> Itp32 {
-	let width = dds.get_width() as usize;
-	let height = dds.get_height() as usize;
-
-	let mut it = dds.data
-		.chunks_exact(16)
-		.map(|a| u128::from_le_bytes(a.try_into().unwrap()));
-
-	let levels = (0..dds.get_num_mipmap_levels() as u16).map(|level| {
-		let level_size = (width >> level) * (height >> level);
-		it.by_ref().take(level_size >> 4).collect()
-	}).collect();
-	Itp32 { width, height, levels }
-}
-
-fn rgba_to_itp32(img: RgbaImage) -> Itp32 {
-	let a = intel_tex_2::bc7::compress_blocks(
-		&intel_tex_2::bc7::alpha_very_fast_settings(),
-		&intel_tex_2::RgbaSurface {
-			width: img.width(),
-			height: img.width(),
-			stride: img.width() * 4,
-			data: &img,
-		}
-	);
-	let data = a
-		.chunks_exact(16)
-		.map(|a| u128::from_le_bytes(a.try_into().unwrap()))
-		.collect();
-	Itp32 {
-		width: img.width() as usize,
-		height: img.height() as usize,
-		levels: vec![data],
-	}
-}
-
-fn write_itp(mut w: impl Write, itp: &Itp) -> Result<()> {
-	Ok(w.write_all(&cradle::itp::write1004(itp)?)?)
-}
-
-fn write_itp32(mut w: impl Write, itp: &Itp32) -> Result<()> {
-	Ok(w.write_all(&cradle::itp32::write(itp)?)?)
-}
-
-fn itp32_to_dds(itp: &Itp32) -> Result<ddsfile::Dds> {
-	let mut dds = ddsfile::Dds::new_dxgi(ddsfile::NewDxgiParams {
-		height: itp.width as u32,
-		width: itp.height as u32,
-		depth: None,
-		format: Dxgi::BC7_UNorm,
-		mipmap_levels: itp.has_mipmaps().then_some(itp.levels() as u32),
-		array_layers: None,
-		caps2: None,
-		is_cubemap: false,
-		resource_dimension: ddsfile::D3D10ResourceDimension::Texture2D,
-		alpha_mode: ddsfile::AlphaMode::Unknown,
-	})?;
-	dds.data = itp.levels.iter().flatten().copied().flat_map(u128::to_le_bytes).collect();
-	Ok(dds)
-}
-
 fn write_indexed_png(mut w: impl Write, itp: &Itp) -> Result<()> {
 	let mut png = png::Encoder::new(&mut w, itp.image.width(), itp.image.height());
-	png.set_source_gamma(png::ScaledFloat::new(2.2));
 	let mut pal = Vec::with_capacity(3*itp.palette.len());
 	let mut alp = Vec::with_capacity(itp.palette.len());
 	for &Rgba([r,g,b,a]) in &itp.palette {

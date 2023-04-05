@@ -42,12 +42,35 @@ fn main() -> Result<()> {
 	let data = std::fs::read(&cli.file)?;
 
 	if name.ends_with(".itp") {
-		let (ext, data, _, _) = convert_itp(&data, None)?;
-		w(ext, &data)?;
+		if data.starts_with(b"ITP\xFF") {
+			let itp = cradle::itp32::read(&data)?;
+			if itp.has_mipmaps() {
+				w("dds", &to_raw_dds(&itp)?)?
+			} else {
+				w("png", &to_image(IF::Png, itp.to_rgba(0))?)?
+			}
+		} else {
+			let itp = cradle::itp::read(&data)?;
+			w("png", &to_indexed_png(&itp)?)?
+		}
 
-	} else if name.ends_with(".png") || name.ends_with(".dds") {
-		let (data, _, _) = convert_image(&data)?;
-		w("itp", &data)?;
+	} else if name.ends_with(".png") {
+		let png = png::Decoder::new(Cursor::new(&data)).read_info()?;
+		if png.info().color_type == png::ColorType::Indexed {
+			w("itp", &write_itp(&indexed_png_to_itp(png)?)?)?
+		} else {
+			let img = image::load(Cursor::new(&data), IF::Png)?.to_rgba8();
+			w("itp", &write_itp32(&rgba_to_itp32(img))?)?
+		}
+
+	} else if name.ends_with(".dds") {
+		let dds = ddsfile::Dds::read(Cursor::new(&data))?;
+		if let Some(Dxgi::BC7_Typeless|Dxgi::BC7_UNorm|Dxgi::BC7_UNorm_sRGB) = dds.get_dxgi_format() {
+			w("itp", &write_itp32(&dds_to_itp32(&dds))?)?
+		} else {
+			let img = image::load(Cursor::new(&data), IF::Dds)?.to_rgba8();
+			w("itp", &write_itp32(&rgba_to_itp32(img))?)?
+		}
 
 	} else if name.ends_with(".itc") {
 		let itc = cradle::itc::read(&data)?;
@@ -215,48 +238,6 @@ fn save_png(path: &Path, img: &RgbaImage, pal: Option<&[Rgba<u8>]>) -> eyre::Res
 		img.save_with_format(&path, IF::Png)?;
 	}
 	Ok(())
-}
-
-fn convert_itp(data: &[u8], override_palette: Option<&[Rgba<u8>]>) -> Result<(&'static str, Vec<u8>, u32, u32)> {
-	if data.starts_with(b"ITP\xFF") {
-		let itp = cradle::itp32::read(data)?;
-		if itp.has_mipmaps() {
-			Ok(("dds", to_raw_dds(&itp)?, itp.width as u32, itp.height as u32))
-		} else {
-			Ok(("png", to_image(IF::Png, itp.to_rgba(0))?, itp.width as u32, itp.height as u32))
-		}
-	} else {
-		let mut itp = cradle::itp::read(data)?;
-		if let Some(pal) = override_palette {
-			itp.palette.clear();
-			itp.palette.extend_from_slice(pal);
-		}
-		Ok(("png", to_indexed_png(&itp)?, itp.image.width(), itp.image.height()))
-	}
-}
-
-fn convert_image(data: &[u8]) -> Result<(Vec<u8>, u32, u32)> {
-	if data.starts_with(b"DDS ") {
-		let dds = ddsfile::Dds::read(Cursor::new(&data))?;
-		if let Some(Dxgi::BC7_Typeless|Dxgi::BC7_UNorm|Dxgi::BC7_UNorm_sRGB) = dds.get_dxgi_format() {
-			let itp = dds_to_itp32(&dds);
-			Ok((write_itp32(&itp)?, itp.width as u32, itp.height as u32))
-		} else {
-			let img = image::load(Cursor::new(&data), IF::Dds)?.to_rgba8();
-			let itp = rgba_to_itp32(img);
-			Ok((write_itp32(&itp)?, itp.width as u32, itp.height as u32))
-		}
-	} else {
-		let png = png::Decoder::new(Cursor::new(&data)).read_info()?;
-		if png.info().color_type == png::ColorType::Indexed {
-			let itp = indexed_png_to_itp(png)?;
-			Ok((write_itp(&itp)?, itp.image.width(), itp.image.height()))
-		} else {
-			let img = image::load(Cursor::new(&data), IF::Png)?.to_rgba8();
-			let itp = rgba_to_itp32(img);
-			Ok((write_itp32(&itp)?, itp.width as u32, itp.height as u32))
-		}
-	}
 }
 
 fn indexed_png_to_itp<T: std::io::Read>(mut png: png::Reader<T>) -> Result<Itp> {

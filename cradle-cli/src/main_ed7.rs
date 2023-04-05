@@ -1,4 +1,6 @@
-use std::{path::{PathBuf, Path}, io::Cursor};
+use std::fs::File;
+use std::io::{Cursor, Read, Seek, Write, SeekFrom, BufRead};
+use std::path::{PathBuf, Path};
 
 use clap::{Parser, ValueHint};
 use cradle::{itp::Itp, itp32::Itp32, itc::Itc};
@@ -55,11 +57,10 @@ fn main() -> Result<()> {
 		}
 
 	} else if name.ends_with(".png") {
-		let png = png::Decoder::new(Cursor::new(&data)).read_info()?;
-		if png.info().color_type == png::ColorType::Indexed {
-			w("itp", &write_itp(&indexed_png_to_itp(png)?)?)?
+		let (img, pal) = load_png(Cursor::new(&data))?;
+		if let Some(pal) = pal {
+			w("itp", &write_itp(&Itp::from_rgba(&img, pal).unwrap())?)?
 		} else {
-			let img = image::load(Cursor::new(&data), IF::Png)?.to_rgba8();
 			w("itp", &write_itp32(&rgba_to_itp32(img))?)?
 		}
 
@@ -185,7 +186,7 @@ fn convert_itc(itc: &Itc, outdir: &Path) -> eyre::Result<()> {
 			} else {
 				println!("couldn't deduce transform for {}", path.display());
 
-				save_png(&path, &img, pal.as_deref())?;
+				save_png(File::create(&path)?, &img, pal.as_deref())?;
 
 				imgdata.push(ItcImage {
 					path,
@@ -210,7 +211,7 @@ fn convert_itc(itc: &Itc, outdir: &Path) -> eyre::Result<()> {
 		let y = h / 2 - (i.img.height() as i32 / 2 + i.offset.1) as u32;
 		out.pixels_mut().for_each(|p| *p = *i.img.get_pixel(0, 0));
 		out.copy_from(&i.img, x, y)?;
-		save_png(&i.path, &out, i.pal.as_deref())?;
+		save_png(File::create(&i.path)?, &out, i.pal.as_deref())?;
 	}
 
 	let mut f = std::fs::File::create(outdir.join("chip.json"))?;
@@ -229,37 +230,35 @@ fn convert_itc(itc: &Itc, outdir: &Path) -> eyre::Result<()> {
 	Ok(())
 }
 
-fn save_png(path: &Path, img: &RgbaImage, pal: Option<&[Rgba<u8>]>) -> eyre::Result<()> {
+fn save_png(mut w: impl Write + Seek, img: &RgbaImage, pal: Option<&[Rgba<u8>]>) -> eyre::Result<()> {
 	if let Some(pal) = &pal {
 		let itp = Itp::from_rgba(img, pal.to_vec()).unwrap();
 		let data = to_indexed_png(&itp)?;
-		std::fs::write(path, data)?;
+		w.write_all(&data)?;
 	} else {
-		img.save_with_format(&path, IF::Png)?;
+		img.write_to(&mut w, IF::Png)?;
 	}
 	Ok(())
 }
 
-fn indexed_png_to_itp<T: std::io::Read>(mut png: png::Reader<T>) -> Result<Itp> {
-	let Some(pal) = &png.info().palette else {
-		eyre::bail!("no palette?")
-	};
-	eyre::ensure!(png.info().bit_depth == png::BitDepth::Eight, "only 8-bit palette supported");
-	let width = png.info().width as usize;
-	let height = png.info().height as usize;
-	let palette = if let Some(trns) = &png.info().trns {
-		pal.chunks_exact(3).zip(trns.iter())
-			.map(|(a, b)| Rgba([a[0], a[1], a[2], *b]))
-			.collect()
-	} else {
-		pal.chunks_exact(3)
-			.map(|a| Rgba([a[0], a[1], a[2], 0xFF]))
-			.collect()
-	};
-	let mut data = vec![0; width * height];
-	png.next_frame(&mut data)?;
-	let image = cradle::util::image(width, height, data)?;
-	Ok(Itp { palette, image })
+fn load_png(mut r: impl BufRead + Seek) -> eyre::Result<(RgbaImage, Option<Vec<Rgba<u8>>>)> {
+	let pos = r.stream_position()?;
+	let png = png::Decoder::new(&mut r).read_info()?;
+	let info = png.info();
+	let pal = info.palette.as_ref().map(|pal| {
+		if let Some(trns) = &info.trns {
+			pal.chunks_exact(3).zip(trns.iter())
+				.map(|(a, b)| Rgba([a[0], a[1], a[2], *b]))
+				.collect()
+		} else {
+			pal.chunks_exact(3)
+				.map(|a| Rgba([a[0], a[1], a[2], 0xFF]))
+				.collect()
+		}
+	});
+	r.seek(SeekFrom::Start(pos))?;
+	let img = image::load(r, IF::Png)?.to_rgba8();
+	Ok((img, pal))
 }
 
 fn dds_to_itp32(dds: &ddsfile::Dds) -> Itp32 {

@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::HashMap;
 
 use gospel::read::{Reader, Le as _};
 use gospel::write::{Writer, Le as _};
@@ -18,6 +19,18 @@ impl Itp {
 			*p1 = self.palette[p2.0[0] as usize];
 		}
 		image
+	}
+
+	pub fn from_rgba(image: &RgbaImage, palette: Vec<Rgba<u8>>) -> Result<Self, Rgba<u8>> {
+		let map = palette.iter().enumerate().map(|a| (a.1, a.0)).collect::<HashMap<_, _>>();
+		let mut out = GrayImage::new(image.width(), image.height());
+		for (a, b) in out.pixels_mut().zip(image.pixels()) {
+			a.0[0] = *map.get(b).ok_or(*b)? as u8;
+		}
+		Ok(Itp {
+			image: out,
+			palette,
+		})
 	}
 }
 

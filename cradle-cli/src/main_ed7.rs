@@ -1,10 +1,10 @@
-use std::{path::PathBuf, io::Cursor, collections::BTreeMap};
+use std::{path::{PathBuf, Path}, io::Cursor};
 
 use clap::{Parser, ValueHint};
 use cradle::{itp::Itp, itp32::Itp32, itc::Itc};
 use ddsfile::DxgiFormat as Dxgi;
 use eyre::Result;
-use image::{RgbaImage, ImageFormat as IF, Rgba};
+use image::{RgbaImage, ImageFormat as IF, Rgba, GenericImage};
 
 #[derive(Debug, Clone, Parser)]
 struct Cli {
@@ -16,24 +16,10 @@ struct Cli {
 	#[clap(long, short, value_hint = ValueHint::FilePath)]
 	output: Option<PathBuf>,
 
-	/// The file to process. Should be a .itp, .itc, .png, .dds, or .csv.
+	/// The file to be processed. Should be a .itp, .itc, .png, .dds, or .json, or a directory containing a .json.
 	#[clap(required = true, value_hint = ValueHint::FilePath)]
 	file: PathBuf,
 }
-
-#[derive(Debug, Clone, PartialEq)]
-#[derive(serde::Serialize, serde::Deserialize)]
-struct ItcImage {
-	frame: usize,
-	path: PathBuf,
-	unknown: u16,
-	offset: (i32, i32),
-	#[serde(default = "default_scale", skip_serializing_if = "is_default_scale")]
-	scale: (f32, f32),
-}
-
-fn default_scale() -> (f32, f32) { (1.0, 1.0) }
-fn is_default_scale(a: &(f32, f32)) -> bool { *a == default_scale() }
 
 fn main() -> Result<()> {
 	let mut cli = Cli::parse();
@@ -68,39 +54,7 @@ fn main() -> Result<()> {
 		let outdir = cli.output.clone().unwrap_or_else(|| cli.file.with_extension(""));
 		std::fs::create_dir_all(&outdir)?;
 
-		let mut images = Vec::new();
-		for (i, img) in itc.content.iter().enumerate() {
-			if let Some((frame_id, frame)) = itc.frames.iter().enumerate().find(|a| a.1.index == Some(i)) {
-				let (ext, data, w, h) = convert_itp(img, itc.palette.as_deref())?;
-				let path = PathBuf::from(format!("{frame_id}.{ext}"));
-				std::fs::write(outdir.join(&path), &data)?;
-
-				let xs = frame.x_scale.recip();
-				let ys = frame.y_scale.recip();
-				let xo = -(frame.x_offset * (w as f32 / frame.x_scale)).round() as i32;
-				let yo = -(frame.y_offset * (h as f32 / frame.y_scale)).round() as i32;
-				images.push(ItcImage {
-					path,
-					frame: frame_id,
-					unknown: frame.unknown,
-					offset: (xo, yo),
-					scale: (xs, ys),
-				})
-			}
-		}
-
-		let mut f = std::fs::File::create(outdir.join("chip.json"))?;
-		{
-			use serde_json::ser::Formatter;
-			let mut pf = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-			pf.begin_array(&mut f)?;
-			for (i, v) in images.iter().enumerate() {
-				pf.begin_array_value(&mut f, i == 0)?;
-				serde_json::to_writer(&mut f, v)?;
-				pf.end_array_value(&mut f)?;
-			}
-			pf.end_array(&mut f)?;
-		}
+		convert_itc(&itc, &outdir)?;
 
 	// } else if name == "chip.json" || name.ends_with(".chip.json") {
 	// 	let mut rdr = csv::Reader::from_path(&cli.file)?;
@@ -145,6 +99,121 @@ fn main() -> Result<()> {
 		eyre::bail!("could not infer file type");
 	}
 
+	Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize)]
+struct ItcImage {
+	frame: usize,
+	path: PathBuf,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	offset: Option<(f32, f32)>,
+	#[serde(default = "unit_scale", skip_serializing_if = "is_unit_scale")]
+	scale: (f32, f32),
+}
+
+fn unit_scale() -> (f32, f32) { (1.0, 1.0) }
+fn is_unit_scale(a: &(f32, f32)) -> bool { *a == unit_scale() }
+
+fn convert_itc(itc: &Itc, outdir: &Path) -> eyre::Result<()> {
+	struct Img {
+		path: PathBuf,
+		img: RgbaImage,
+		pal: Option<Vec<Rgba<u8>>>,
+		offset: (i32, i32),
+	}
+	let mut images = Vec::new();
+	let mut imgdata = Vec::new();
+	for (i, data) in itc.content.iter().enumerate() {
+		if let Some((frame_id, frame)) = itc.frames.iter().enumerate().find(|a| a.1.index == Some(i)) {
+			let (pal, img) = if data.starts_with(b"ITP\xFF") {
+				let itp = cradle::itp32::read(data)?;
+				(None, itp.to_rgba(0))
+			} else {
+				let itp = cradle::itp::read(data)?;
+				let pal = itc.palette.as_ref().unwrap_or(&itp.palette).to_owned();
+				(Some(pal), itp.to_rgba())
+			};
+
+			let path = outdir.join(format!("{frame_id}.png"));
+			let xs = frame.x_scale.recip();
+			let ys = frame.x_scale.recip();
+			let xo = frame.x_offset * img.width() as f32 * xs;
+			let yo = frame.y_offset * img.height() as f32 * ys;
+
+			if (xo-xo.round()).abs() < f32::EPSILON && (yo-yo.round()).abs() < f32::EPSILON {
+				let xo = xo.round() as i32;
+				let yo = yo.round() as i32;
+
+				images.push(Img {
+					path: path.clone(),
+					img,
+					pal,
+					offset: (xo, yo)
+				});
+
+				imgdata.push(ItcImage {
+					path,
+					frame: frame_id,
+					offset: None,
+					scale: (xs, ys),
+				})
+			} else {
+				println!("couldn't deduce transform for {}", path.display());
+
+				save_png(&path, &img, pal.as_deref())?;
+
+				imgdata.push(ItcImage {
+					path,
+					frame: frame_id,
+					offset: Some((xo, yo)),
+					scale: (xs, ys),
+				})
+			}
+		}
+	}
+
+	let w = images.iter()
+		.map(|i| 2 * (i.img.width() / 2 + i.offset.0.unsigned_abs()))
+		.max().unwrap_or(0).next_power_of_two();
+	let h = images.iter()
+		.map(|i| 2 * (i.img.height() / 2 + i.offset.1.unsigned_abs()))
+		.max().unwrap_or(0).next_power_of_two();
+
+	for i in &images {
+		let mut out = RgbaImage::new(w, h);
+		let x = w / 2 - (i.img.width() as i32 / 2 + i.offset.0) as u32;
+		let y = h / 2 - (i.img.height() as i32 / 2 + i.offset.1) as u32;
+		out.pixels_mut().for_each(|p| *p = *i.img.get_pixel(0, 0));
+		out.copy_from(&i.img, x, y)?;
+		save_png(&i.path, &out, i.pal.as_deref())?;
+	}
+
+	let mut f = std::fs::File::create(outdir.join("chip.json"))?;
+	{
+		use serde_json::ser::Formatter;
+		let mut pf = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+		pf.begin_array(&mut f)?;
+		for (i, v) in imgdata.iter().enumerate() {
+			pf.begin_array_value(&mut f, i == 0)?;
+			serde_json::to_writer(&mut f, v)?;
+			pf.end_array_value(&mut f)?;
+		}
+		pf.end_array(&mut f)?;
+	}
+
+	Ok(())
+}
+
+fn save_png(path: &Path, img: &RgbaImage, pal: Option<&[Rgba<u8>]>) -> eyre::Result<()> {
+	if let Some(pal) = &pal {
+		let itp = Itp::from_rgba(img, pal.to_vec()).unwrap();
+		let data = to_indexed_png(&itp)?;
+		std::fs::write(path, data)?;
+	} else {
+		img.save_with_format(&path, IF::Png)?;
+	}
 	Ok(())
 }
 

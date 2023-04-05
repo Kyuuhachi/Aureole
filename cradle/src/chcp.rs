@@ -102,3 +102,15 @@ fn test() -> Result<(), Box<dyn std::error::Error>> {
 	}
 	Ok(())
 }
+
+#[test]
+fn test2() -> Result<(), Box<dyn std::error::Error>> {
+	let ch = std::fs::read("../data/fc.extract/07/ch0014a._ch")?;
+	let cp = std::fs::read("../data/fc.extract/07/ch0014ap._cp")?;
+	let a = read(&ch, &cp)?;
+	std::fs::create_dir_all("/tmp/a")?;
+	for (i, f) in a.iter().enumerate() {
+		f.save(format!("/tmp/a/{i}.png"))?;
+	}
+	Ok(())
+}

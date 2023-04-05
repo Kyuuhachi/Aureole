@@ -49,7 +49,7 @@ fn main() -> Result<()> {
 		if data.starts_with(b"ITP\xFF") {
 			let itp = cradle::itp32::read(&data)?;
 			if itp.has_mipmaps() {
-				write_raw_dds(file("dds")?, &itp)?;
+				itp32_to_dds(&itp)?.write(&mut file("dds")?)?;
 			} else {
 				write_png(file("png")?, &itp.to_rgba(0), None)?;
 			}
@@ -306,7 +306,7 @@ fn write_itp32(mut w: impl Write, itp: &Itp32) -> Result<()> {
 	Ok(w.write_all(&cradle::itp32::write(itp)?)?)
 }
 
-fn write_raw_dds(mut w: impl Write, itp: &Itp32) -> Result<()> {
+fn itp32_to_dds(itp: &Itp32) -> Result<ddsfile::Dds> {
 	let mut dds = ddsfile::Dds::new_dxgi(ddsfile::NewDxgiParams {
 		height: itp.width as u32,
 		width: itp.height as u32,
@@ -320,8 +320,7 @@ fn write_raw_dds(mut w: impl Write, itp: &Itp32) -> Result<()> {
 		alpha_mode: ddsfile::AlphaMode::Unknown,
 	})?;
 	dds.data = itp.levels.iter().flatten().copied().flat_map(u128::to_le_bytes).collect();
-	dds.write(&mut w)?;
-	Ok(())
+	Ok(dds)
 }
 
 fn write_indexed_png(mut w: impl Write, itp: &Itp) -> Result<()> {

@@ -10,8 +10,5 @@ In the future it is intended to also support animation/battle scripts, tables, a
 There is a short guide/tutorial [here](aureole.kyuuhachi.dev/guide).
 
 ## Residential Block - Cradle
-A tool for converting itp and itc files to and from png/dds.
-
-Currently it uses dds if there are mipmaps, png otherwise; might add an option to select manually later.
-
-Support for Sky PC's .ch and ch/cp is planned for later.
+Cradle is a converter for Falcom's image, sprite, and (planned) 3D model files
+to and from more conventional formats.

@@ -52,6 +52,7 @@
 - Support itc with non-contiguous frames.
 - Use JSON instead of CSV.
 - When possible, bake offset into extracted images.
+- Support ED6 formats too (via separate exe).
 
 ## 0.1.2 (2023-03-20)
 - Initial release.

@@ -9,17 +9,16 @@
 > feel free to inquire about owning another home at the
 > nearest city office.
 
-Cradle is a converter for Falcom's  image, sprite, and (planned) 3D model files
+Cradle is a converter for Falcom's image, sprite, and (planned) 3D model files
 to and from more conventional formats.
 
 ## Usage
 
 Since the Liberl and Crossbell series use completely different file formats[^evo],
 Cradle <del>has</del> <ins>will have</ins> two different executable files,
-`cradle-ed6` and `cradle-ed7`.
+`cradle-ed6` and `cradle-ed7`. For details on the various formats supported
+(and some not (yet) supported), see the [Formats](./cradle-formats.md) page.
 
-For basic usage, simply drag an image file file (normally `._sn` or `.bin`) onto the
-Calmare executable file. For more advanced command-line usage, use `--help`.
-For a more user-friendly tutorial, see the [Bracer's Notebook](guide/index.md).
+For basic usage, simply drag an image file file onto the Cradle executable file.
 
 [^evo]: *Sky Evolution* uses the same formats as Crossbell.

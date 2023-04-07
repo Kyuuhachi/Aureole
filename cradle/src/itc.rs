@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::BTreeSet;
 
 use gospel::read::{Reader, Le as _};
@@ -48,8 +49,18 @@ impl Default for Frame {
 #[derive(Clone, PartialEq)]
 pub struct Itc<'a> {
 	pub frames: [Frame; 128],
-	pub content: Vec<&'a [u8]>,
+	pub content: Vec<Cow<'a, [u8]>>,
 	pub palette: Option<Vec<Rgba<u8>>>,
+}
+
+impl<'a> Default for Itc<'a> {
+	fn default() -> Self {
+		Self {
+			frames: std::array::from_fn(|_| Default::default()),
+			content: Default::default(),
+			palette: Default::default()
+		}
+	}
 }
 
 impl<'a> std::fmt::Debug for Itc<'a> {
@@ -117,7 +128,7 @@ pub fn read(data: &[u8]) -> Result<Itc, Error> {
 
 	let mut content = Vec::with_capacity(points.len()-1);
 	for (&start, &end) in points.iter().zip(points.iter().skip(1)) {
-		content.push(f.at(start)?.slice(end-start)?)
+		content.push(f.at(start)?.slice(end-start)?.into())
 	}
 
 	for (k, (off, len)) in frames.iter_mut().zip(slices.into_iter()) {

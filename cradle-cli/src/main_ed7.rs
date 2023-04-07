@@ -1,11 +1,13 @@
+#![feature(try_blocks)]
+
 use std::fs::File;
-use std::io::{Cursor, Read, Seek, Write, SeekFrom, BufRead};
+use std::io::{Cursor, Seek, Write, SeekFrom, BufRead, BufReader};
 use std::path::{PathBuf, Path};
 
 use clap::{Parser, ValueHint};
 use cradle::{itp::Itp, itp32::Itp32, itc::Itc};
 use eyre::Result;
-use image::{RgbaImage, ImageFormat as IF, Rgba, GenericImage};
+use image::{RgbaImage, ImageFormat as IF, Rgba, GenericImage, GenericImageView};
 
 #[derive(Debug, Clone, Parser)]
 struct Cli {
@@ -23,13 +25,14 @@ struct Cli {
 }
 
 fn main() -> Result<()> {
-	let mut cli = Cli::parse();
+	let cli = Cli::parse();
 
-	if cli.file.join("chip.json").is_file() {
-		cli.file = cli.file.join("chip.json");
+	let mut infile = cli.file.clone();
+	if infile.join("chip.json").is_file() {
+		infile = infile.join("chip.json");
 	}
 
-	let Some(name) = cli.file.file_name().and_then(|a| a.to_str()) else {
+	let Some(name) = infile.file_name().and_then(|a| a.to_str()) else {
 		eyre::bail!("file has no name");
 	};
 	let name = name.to_lowercase();
@@ -42,7 +45,7 @@ fn main() -> Result<()> {
 		File::create(path(ext))
 	};
 
-	let data = std::fs::read(&cli.file)?;
+	let data = std::fs::read(&infile)?;
 
 	if name.ends_with(".itp") {
 		if data.starts_with(b"ITP\xFF") {
@@ -59,11 +62,7 @@ fn main() -> Result<()> {
 
 	} else if name.ends_with(".png") {
 		let (img, pal) = load_png(Cursor::new(&data))?;
-		if let Some(pal) = pal {
-			Itp::from_rgba(&img, pal).unwrap().write(file("itp")?)?;
-		} else {
-			Itp32::from_rgba(&img).write(file("itp")?)?;
-		}
+		img.write_itp(pal.as_deref(), file("itp")?)?;
 
 	} else if name.ends_with(".dds") {
 		let dds = ddsfile::Dds::read(Cursor::new(&data))?;
@@ -81,44 +80,8 @@ fn main() -> Result<()> {
 
 		convert_itc(&itc, &outdir)?;
 
-	// } else if name == "chip.json" || name.ends_with(".chip.json") {
-	// 	let mut rdr = csv::Reader::from_path(&cli.file)?;
-	// 	let frames: Vec<ItcFrame> = rdr.deserialize().collect::<Result<_, _>>()?;
-	// 	let mut images = BTreeMap::new();
-	// 	for f in &frames {
-	// 		if !images.contains_key(&f.filename) {
-	// 			let path = cli.file.parent().unwrap().join(&f.filename);
-	// 			let data = std::fs::read(&path)?;
-	// 			images.insert(f.filename.clone(), convert_image(&data)?);
-	// 		}
-	// 	}
-	//
-	// 	let itc = Itc {
-	// 		frames: frames.iter().map(|f| {
-	// 			let (index, (_, &(_, w, h))) = images.iter().enumerate().find(|a| a.1.0 == &f.filename).unwrap();
-	// 			cradle::itc::Frame {
-	// 				index,
-	// 				unknown: f.unknown,
-	// 				x_offset: f.x_offset / w as f32,
-	// 				y_offset: f.y_offset / h as f32,
-	// 				x_scale: f.x_scale.recip(),
-	// 				y_scale: f.y_scale.recip(),
-	// 			}
-	// 		}).collect(),
-	// 		content: images.values().map(|a| a.0.as_slice()).collect(),
-	// 		palette: None,
-	// 	};
-	//
-	// 	let out = if let Some(i) = cli.output.clone() {
-	// 		i
-	// 	} else if name == "chip.json" {
-	// 		PathBuf::from(cli.file.parent().unwrap().to_str().unwrap().to_owned() + ".itc")
-	// 	} else { // *.chip.json
-	// 		cli.file.with_extension("")
-	// 	};
-	//
-	// 	let data = cradle::itc::write(&itc)?;
-	// 	std::fs::write(out, data)?;
+	} else if name == "chip.json" || name.ends_with(".chip.json") {
+		convert_to_itc(&infile)?.write(file("itc")?)?;
 
 	} else {
 		eyre::bail!("could not infer file type");
@@ -163,7 +126,7 @@ fn convert_itc(itc: &Itc, outdir: &Path) -> Result<()> {
 
 			let path = outdir.join(format!("{frame_id}.png"));
 			let xs = frame.x_scale.recip();
-			let ys = frame.x_scale.recip();
+			let ys = frame.y_scale.recip();
 			let xo = frame.x_offset * img.width() as f32 * xs;
 			let yo = frame.y_offset * img.height() as f32 * ys;
 
@@ -231,6 +194,54 @@ fn convert_itc(itc: &Itc, outdir: &Path) -> Result<()> {
 	Ok(())
 }
 
+fn convert_to_itc(jsonpath: &Path) -> Result<Itc> {
+	let spec: Vec<ItcImage> = serde_json::from_reader(File::open(jsonpath)?)?;
+	let mut itc = Itc::default();
+	for i in spec {
+		let (img, pal) = load_png(BufReader::new(File::open(jsonpath.parent().unwrap().join(&i.path))?))?;
+		let (img, (xo, yo)) = if let Some(o) = i.offset {
+			(img, o)
+		} else {
+			let (img, (xo, yo)) = crop(&img);
+			(img.to_image(), (xo as f32, yo as f32))
+		};
+		eyre::ensure!(i.frame < 128, "i.frame < 128");
+		itc.frames[i.frame] = cradle::itc::Frame {
+			index: Some(itc.content.len()),
+			unknown: 0,
+			x_offset: xo / i.scale.0 / img.width() as f32,
+			y_offset: yo / i.scale.1 / img.height() as f32,
+			x_scale: i.scale.0.recip(),
+			y_scale: i.scale.1.recip(),
+		};
+		let mut c = Cursor::new(Vec::<u8>::new());
+		img.write_itp(pal.as_deref(), &mut c)?;
+		itc.content.push(c.into_inner().into());
+	}
+	Ok(itc)
+}
+
+fn crop(img: &RgbaImage) -> (image::SubImage<&RgbaImage>, (i32, i32)) {
+	Option::unwrap_or_else(try {
+		let w = img.width();
+		let h = img.height();
+		let l = (0..w). find(|&x| (0..h).any(|y| img.get_pixel(x, y).0[3] != 0))?;
+		let r = (0..w).rfind(|&x| (0..h).any(|y| img.get_pixel(x, y).0[3] != 0))?;
+		let u = (0..h). find(|&y| (0..w).any(|x| img.get_pixel(x, y).0[3] != 0))?;
+		let d = (0..h).rfind(|&y| (0..w).any(|x| img.get_pixel(x, y).0[3] != 0))?;
+
+		let cx = w as i32 / 2 - (r+l) as i32 / 2;
+		let cy = h as i32 / 2 - (d+u) as i32 / 2;
+
+		let ow = (r - l + 2).next_power_of_two().max(4); // I don't know why the +2
+		let oh = (d - u + 2).next_power_of_two().max(4);
+		let ox = (w as i32 / 2 - cx) as u32 - ow / 2;
+		let oy = (h as i32 / 2 - cy) as u32 - oh / 2;
+
+		(img.view(ox, oy, ow, oh), (cx, cy))
+	}, || (img.view(0, 0, img.width(), img.height()), (0, 0)))
+}
+
 #[extend::ext]
 impl Itp {
 	fn write(&self, mut w: impl Write) -> Result<()> {
@@ -245,6 +256,14 @@ impl Itp32 {
 	}
 }
 
+
+#[extend::ext]
+impl Itc<'_> {
+	fn write(&self, mut w: impl Write) -> Result<()> {
+		Ok(w.write_all(&cradle::itc::write(self)?)?)
+	}
+}
+
 #[extend::ext]
 impl RgbaImage {
 	fn write(&self, pal: Option<&[Rgba<u8>]>, mut w: impl Write + Seek) -> Result<()> {
@@ -255,6 +274,14 @@ impl RgbaImage {
 			self.write_to(&mut w, IF::Png)?;
 		}
 		Ok(())
+	}
+
+	fn write_itp(&self, pal: Option<&[Rgba<u8>]>, w: impl Write) -> Result<()> {
+		if let Some(pal) = pal {
+			Itp::from_rgba(self, pal.to_vec()).unwrap().write(w)
+		} else {
+			Itp32::from_rgba(self).write(w)
+		}
 	}
 }
 

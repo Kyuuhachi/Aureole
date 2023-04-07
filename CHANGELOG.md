@@ -1,6 +1,6 @@
-# 0.1.3 (TBA)
+# Calmare & Themelios
 
-## Calmare
+## 0.1.3 (TBA)
 - Docs
   - Instruction table now shows signature on hover.
   - Add docs to some instructions.
@@ -21,9 +21,7 @@
 - Bug fixes
   - Write `{item[n]}`, not `{item item[n]}`. (The latter remains valid syntax.)
 
-# 0.1.2 (2023-03-20)
-
-## Calmare
+## 0.1.2 (2023-03-20)
 - Docs
   - Merge the Bracer Notebook and the other WIP book I was working on.
 - Breaking
@@ -40,16 +38,20 @@
       not have any index file (files were instead renamed, destroying their original names). These
       are left as `file[0x...]`.
 
-## Cradle
-- Initial release.
 
-# 0.1.1 (2023-03-12)
-
-## Calmare
+## 0.1.1 (2023-03-12)
 - Actually get full roundtripping working.
   - Which involves a number of breaking changes, not listed here.
 
-# 0.1.0 (2023-03-10)
+## 0.1.0 (2023-03-10)
+- Initial release.
 
-## Calmare
+# Cradle
+
+## 0.2.0 (TBA)
+- Support itc with non-contiguous frames.
+- Use JSON instead of CSV.
+- When possible, bake offset into extracted images.
+
+## 0.1.2 (2023-03-20)
 - Initial release.

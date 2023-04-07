@@ -97,6 +97,83 @@ pub fn write<I>(mode: Mode, img: &I) -> Result<Vec<u8>, Error> where
 	Ok(ch.finish()?)
 }
 
+macro_rules! guess {
+	($($prefix:literal, $mode:ident, $w:literal, $h:literal;)*) => {
+		pub fn guess_from_byte_size(name: &str, bytes: usize) -> Option<(Mode, usize, usize)> {
+			$(if name.starts_with($prefix) && bytes == $w * $h * Mode::$mode.bytes_per() {
+				return Some((Mode::$mode, $w, $h))
+			})*
+			None
+		}
+		pub fn guess_from_image_size(name: &str, w: usize, h: usize) -> Option<Mode> {
+			$(if name.starts_with($prefix) && w == $w && h == $h {
+				return Some(Mode::$mode)
+			})*
+			None
+		}
+	}
+}
+
+guess! {
+	"c_ka",     Argb4444,  128,  128; // dialogue face
+	"h_ka",     Argb4444,  256,  256;
+	"c_stch",   Argb8888,  512,  512; // menu portrait
+	"h_stch",   Argb8888, 1024, 1024;
+	"cti",      Argb1555,  256,  256; // s-craft cut-in
+	"bface",    Argb1555,  256,  256; // battle face
+	"hface",    Argb1555,  512,  512;
+	"m",        Argb4444, 1024, 1024; // minimap
+	"ca",       Argb1555,  128,  128; // bestiary image
+	"ca",       Argb1555,  256,  256;
+	"c_note",   Argb1555,  768,  512; // notebook
+	"h_note",   Argb1555, 1536, 1024;
+	"c_epi",    Argb4444,  208,  176; // door thumbnails
+	"h_epi",    Argb4444,  416,  352;
+	"c_orb",    Argb1555,  512,  512; // character orbment
+	"c_subti",  Argb8888,  256,  256; // misc
+	"h_subti",  Argb8888,  512,  512;
+	"c_mnbg01", Argb4444,  128,  128; // impossible to tell if 4444 or 1555
+	"c_tuto20", Argb4444,  768,  512;
+	"c_map00",  Argb1555, 1024,  512;
+	"c_map00",  Argb1555,  768,  512;
+	"c_map01",  Argb4444, 1024,  512;
+	"h_map01",  Argb4444, 2048, 1024;
+
+	"c_camp01", Argb4444,  256,  256; // menu textures
+	"h_camp01", Argb4444,  512,  512;
+	"c_camp02", Argb1555,  256,  256;
+	"h_camp02", Argb1555,  512,  512;
+	"c_camp03", Argb1555,  256,  256;
+	"h_camp03", Argb1555,  512,  512;
+	"c_camp04", Argb4444,  256,  256;
+	"h_camp04", Argb4444,  512,  512;
+	"c_camp05", Argb4444,  256,  256;
+	"h_camp05", Argb4444,  512,  512;
+
+	"c_back",   Argb1555,  768,  512; // main menu bg (02 is for orbment menu)
+	"w_back",   Argb1555, 1024,  512;
+	"c_title0", Argb1555, 1024,  512;
+	"c_title1", Argb4444,  512,  512;
+	"h_title1", Argb4444, 1024, 1024;
+	"c_title2", Argb4444, 1024,  512;
+	"c_title3", Argb4444,  512,  512;
+	"c_title4", Argb4444, 1024,  512;
+	"c_title5", Argb1555, 1024,  512;
+	"c_title6", Argb1555, 1024,  512;
+
+	"c_vis",    Argb1555,  768,  512; // event visual
+	"c_vis",    Argb1555,  256,  256;
+	"c_vis",    Argb1555,  512,  256;
+	"c_vis",    Argb1555,  640,  304;
+	"c_vis",    Argb1555, 1024, 1024;
+	"h_vis",    Argb1555, 1536, 1024;
+	"w_vis",    Argb1555, 2048, 1024;
+
+	"",         Argb4444,  256,  256;
+	"",         Argb4444,  512,  512;
+	"",         Argb4444,  768,  512;
+	"",         Argb4444, 1024, 1024;
+}
 
 #[test]
 fn test() -> Result<(), Box<dyn std::error::Error>> {
@@ -120,4 +197,3 @@ fn test() -> Result<(), Box<dyn std::error::Error>> {
 
 	Ok(())
 }
-

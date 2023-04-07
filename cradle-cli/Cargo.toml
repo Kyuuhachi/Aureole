@@ -3,10 +3,10 @@ name = "cradle-cli"
 version = "0.1.0"
 edition = "2021"
 
-# [[bin]]
-# name = "cradle-ed6"
-# path = "src/main.rs"
-# doc = false
+[[bin]]
+name = "cradle-ed6"
+path = "src/main_ed6.rs"
+doc = false
 
 [[bin]]
 name = "cradle-ed7"
@@ -15,7 +15,7 @@ doc = false
 
 [dependencies]
 cradle = { path = "../cradle", features = ["ddsfile", "intel_tex_2"] }
-clap = { version = "4.1", features = ["derive"] }
+clap = { version = "4.2", features = ["derive"] }
 eyre = "0.6.8"
 extend = "1.2.0"
 

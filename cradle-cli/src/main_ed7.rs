@@ -83,6 +83,9 @@ fn main() -> Result<()> {
 	} else if name == "chip.json" || name.ends_with(".chip.json") {
 		convert_to_itc(&infile)?.write(file("itc")?)?;
 
+	} else if name.ends_with("._ch") || name.ends_with("._cp") {
+		eyre::bail!("this looks like an ed7 file, try cradle-ed7");
+
 	} else {
 		eyre::bail!("could not infer file type");
 	}

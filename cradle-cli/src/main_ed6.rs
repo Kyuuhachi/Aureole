@@ -167,7 +167,7 @@ fn convert_chcp(chcp: &[RgbaImage], outdir: &Path) -> Result<()> {
 		let path = outdir.join(format!("{frame_id}.png"));
 		img.write_to(&mut File::create(&path)?, IF::Png)?;
 		imgdata.push(ItcImage {
-			path,
+			path: path.strip_prefix(outdir).unwrap().to_path_buf(),
 			frame: frame_id,
 			offset: None,
 			scale: (1., 1.),

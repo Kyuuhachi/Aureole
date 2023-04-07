@@ -145,7 +145,7 @@ fn convert_itc(itc: &Itc, outdir: &Path) -> Result<()> {
 				});
 
 				imgdata.push(ItcImage {
-					path,
+					path: path.strip_prefix(outdir).unwrap().to_path_buf(),
 					frame: frame_id,
 					offset: None,
 					scale: (xs, ys),

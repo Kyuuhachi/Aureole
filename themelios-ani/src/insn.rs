@@ -292,7 +292,7 @@ themelios_macros::bytecode! {
 		#[game(Sc,Tc)] CharClone(u8 as CharId, u8 as CharId),
 		#[game(Sc,Tc)] AsitemStart(),
 		#[game(Sc,Tc)] AsitemEnd(),
-		#[game(Sc,Tc)] _8D(u8, u32, i32, i32, i32),
+		#[game(Sc,Tc)] _8D(u8, i32, i32, i32, i32),
 
 		// This seems to be similarly dependently typed as VisSet
 		#[game(Sc,Tc)] X(match {

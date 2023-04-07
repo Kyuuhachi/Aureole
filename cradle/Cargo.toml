@@ -10,5 +10,8 @@ bc7.path = "../bc7"
 thiserror = "1.0.0"
 image = { version = "0.24.5", default-features = false }
 
+ddsfile = { version = "0.5.1", optional = true }
+intel_tex_2 = { version = "0.2.1", optional = true }
+
 [dev-dependencies]
 image = { version = "0.24.5", default-features = false, features = ["png"] }

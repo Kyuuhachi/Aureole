@@ -243,9 +243,11 @@ name = "cradle"
 version = "0.1.0"
 dependencies = [
  "bc7",
+ "ddsfile",
  "decompress",
  "gospel",
  "image",
+ "intel_tex_2",
  "thiserror",
 ]
 

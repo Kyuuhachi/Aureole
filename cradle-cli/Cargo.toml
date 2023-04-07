@@ -14,7 +14,7 @@ path = "src/main_ed7.rs"
 doc = false
 
 [dependencies]
-cradle.path = "../cradle"
+cradle = { path = "../cradle", features = ["ddsfile", "intel_tex_2"] }
 clap = { version = "4.1", features = ["derive"] }
 eyre = "0.6.8"
 extend = "1.2.0"

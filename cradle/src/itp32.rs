@@ -23,12 +23,76 @@ impl Itp32 {
 		image(width, height, pixels).unwrap()
 	}
 
+	#[cfg(feature = "intel_tex_2")]
+	pub fn from_rgba(img: &RgbaImage) -> Itp32 {
+		let a = intel_tex_2::bc7::compress_blocks(
+			&intel_tex_2::bc7::alpha_very_fast_settings(),
+			&intel_tex_2::RgbaSurface {
+				width: img.width(),
+				height: img.width(),
+				stride: img.width() * 4,
+				data: img,
+			}
+		);
+		let data = a
+			.chunks_exact(16)
+			.map(|a| u128::from_le_bytes(a.try_into().unwrap()))
+			.collect();
+		Itp32 {
+			width: img.width() as usize,
+			height: img.height() as usize,
+			levels: vec![data],
+		}
+	}
+
 	pub fn levels(&self) -> usize {
 		self.levels.len()
 	}
 
 	pub fn has_mipmaps(&self) -> bool {
 		self.levels() > 1
+	}
+
+	#[cfg(feature = "ddsfile")]
+	pub fn from_bc7_dds(dds: &ddsfile::Dds) -> Option<Itp32> {
+		match dds.get_dxgi_format() {
+			Some(ddsfile::DxgiFormat::BC7_Typeless)
+			| Some(ddsfile::DxgiFormat::BC7_UNorm)
+			| Some(ddsfile::DxgiFormat::BC7_UNorm_sRGB)
+			=> {}
+			_ => return None,
+		}
+
+		let width = dds.get_width() as usize;
+		let height = dds.get_height() as usize;
+
+		let mut it = dds.data
+			.chunks_exact(16)
+			.map(|a| u128::from_le_bytes(a.try_into().unwrap()));
+
+		let levels = (0..dds.get_num_mipmap_levels() as u16).map(|level| {
+			let level_size = (width >> level) * (height >> level);
+			it.by_ref().take(level_size >> 4).collect()
+		}).collect();
+		Some(Itp32 { width, height, levels })
+	}
+
+	#[cfg(feature = "ddsfile")]
+	pub fn to_bc7_dds(self) -> ddsfile::Dds {
+		let mut dds = ddsfile::Dds::new_dxgi(ddsfile::NewDxgiParams {
+			height: self.width as u32,
+			width: self.height as u32,
+			depth: None,
+			format: ddsfile::DxgiFormat::BC7_UNorm,
+			mipmap_levels: self.has_mipmaps().then_some(self.levels() as u32),
+			array_layers: None,
+			caps2: None,
+			is_cubemap: false,
+			resource_dimension: ddsfile::D3D10ResourceDimension::Texture2D,
+			alpha_mode: ddsfile::AlphaMode::Unknown,
+		}).unwrap();
+		dds.data = self.levels.iter().flatten().copied().flat_map(u128::to_le_bytes).collect();
+		dds
 	}
 }
 

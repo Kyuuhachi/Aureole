@@ -4,7 +4,6 @@ use std::path::{PathBuf, Path};
 
 use clap::{Parser, ValueHint};
 use cradle::{itp::Itp, itp32::Itp32, itc::Itc};
-use ddsfile::DxgiFormat as Dxgi;
 use eyre::Result;
 use image::{RgbaImage, ImageFormat as IF, Rgba, GenericImage};
 
@@ -49,7 +48,7 @@ fn main() -> Result<()> {
 		if data.starts_with(b"ITP\xFF") {
 			let itp = cradle::itp32::read(&data)?;
 			if itp.has_mipmaps() {
-				itp.to_dds().write(&mut file("dds")?)?;
+				itp.to_bc7_dds().write(&mut file("dds")?)?;
 			} else {
 				itp.to_rgba(0).write(None, file("png")?)?;
 			}
@@ -243,63 +242,6 @@ impl Itp {
 impl Itp32 {
 	fn write(&self, mut w: impl Write) -> Result<()> {
 		Ok(w.write_all(&cradle::itp32::write(self)?)?)
-	}
-
-	fn from_rgba(img: &RgbaImage) -> Itp32 {
-		let a = intel_tex_2::bc7::compress_blocks(
-			&intel_tex_2::bc7::alpha_very_fast_settings(),
-			&intel_tex_2::RgbaSurface {
-				width: img.width(),
-				height: img.width(),
-				stride: img.width() * 4,
-				data: img,
-			}
-		);
-		let data = a
-			.chunks_exact(16)
-			.map(|a| u128::from_le_bytes(a.try_into().unwrap()))
-			.collect();
-		Itp32 {
-			width: img.width() as usize,
-			height: img.height() as usize,
-			levels: vec![data],
-		}
-	}
-
-	fn from_bc7_dds(dds: &ddsfile::Dds) -> Option<Itp32> {
-		let Some(Dxgi::BC7_Typeless|Dxgi::BC7_UNorm|Dxgi::BC7_UNorm_sRGB) = dds.get_dxgi_format() else {
-			return None;
-		};
-
-		let width = dds.get_width() as usize;
-		let height = dds.get_height() as usize;
-
-		let mut it = dds.data
-			.chunks_exact(16)
-			.map(|a| u128::from_le_bytes(a.try_into().unwrap()));
-
-		let levels = (0..dds.get_num_mipmap_levels() as u16).map(|level| {
-			let level_size = (width >> level) * (height >> level);
-			it.by_ref().take(level_size >> 4).collect()
-		}).collect();
-		Some(Itp32 { width, height, levels })
-	}
-
-	fn to_bc7_dds(self) -> ddsfile::Dds {
-		let mut dds = ddsfile::Dds::new_dxgi(ddsfile::NewDxgiParams {
-			height: self.width as u32,
-			width: self.height as u32,
-			depth: None,
-			format: Dxgi::BC7_UNorm,
-			mipmap_levels: self.has_mipmaps().then_some(self.levels() as u32),
-			array_layers: None,
-			caps2: None,
-			is_cubemap: false,
-			resource_dimension: ddsfile::D3D10ResourceDimension::Texture2D,
-			alpha_mode: ddsfile::AlphaMode::Unknown,
-		}).unwrap();
-		dds.data = self.levels.iter().flatten().copied().flat_map(u128::to_le_bytes).collect();
-		dds
 	}
 }
 

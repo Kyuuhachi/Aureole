@@ -48,7 +48,7 @@
 
 # Cradle
 
-## 0.2.0 (TBA)
+## 0.2.0 (2023-04-08)
 - Support itc with non-contiguous frames.
 - Use JSON instead of CSV.
 - When possible, bake offset into extracted images.

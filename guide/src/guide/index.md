@@ -15,7 +15,7 @@ are positioned in the world, what they are saying, and so on.
 
 The game normally loads these from inside a file named `ED6_DT01.dat`. This file
 is rather inconvenient to edit, however, so we will start by installing the
-[SoraVoice][voice] mod, which, in addition to adding voices, also allows loading
+[SoraVoice] mod, which, in addition to adding voices, also allows loading
 these scena files from a normal directory.
 
 1. Install the game and find its installation directory. It should look

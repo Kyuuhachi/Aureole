@@ -46,21 +46,24 @@ pub fn write<I>(frames: &[I]) -> Result<(Vec<u8>, Vec<u8>), Error> where
 		ensure!(f.dimensions() == (256, 256), "chcp: must be 256x256");
 	}
 
-	for (p, f) in pat.iter_mut().zip(frames.iter()) {
+
+	for (ps, fs) in pat.chunks_mut(8).zip(frames.chunks(8)) {
 		for y in 0..16 {
-			for x in 0..16 {
-				let sub = f.view(x*16, y*16, 16, 16);
-				let mut c = [[0; 16]; 16];
-				for (c, (_, _, p)) in c.flatten_mut().iter_mut().zip(sub.pixels()) {
-					*c = ch::to4444(p);
-				}
-				let p = &mut p[y as usize][x as usize];
-				if c != [[0; 16]; 16] {
-					if let Some(n) = base.iter().position(|a| *a == c) {
-						*p = n as u16;
-					} else {
-						*p = base.len() as u16;
-						base.push(c);
+			for (p, f) in ps.iter_mut().zip(fs.iter()) {
+				for x in 0..16 {
+					let sub = f.view(x*16, y*16, 16, 16);
+					let mut c = [[0; 16]; 16];
+					for (c, (_, _, p)) in c.flatten_mut().iter_mut().zip(sub.pixels()) {
+						*c = ch::to4444(p);
+					}
+					let p = &mut p[y as usize][x as usize];
+					if c != [[0; 16]; 16] {
+						if let Some(n) = base.iter().position(|a| *a == c) {
+							*p = n as u16;
+						} else {
+							*p = base.len() as u16;
+							base.push(c);
+						}
 					}
 				}
 			}
@@ -105,12 +108,11 @@ fn test() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn test2() -> Result<(), Box<dyn std::error::Error>> {
-	let ch = std::fs::read("../data/fc.extract/07/ch0014a._ch")?;
-	let cp = std::fs::read("../data/fc.extract/07/ch0014ap._cp")?;
+	let ch = std::fs::read("../data/fc.extract/07/ch00108._ch")?;
+	let cp = std::fs::read("../data/fc.extract/07/ch00108p._cp")?;
 	let a = read(&ch, &cp)?;
-	std::fs::create_dir_all("/tmp/a")?;
-	for (i, f) in a.iter().enumerate() {
-		f.save(format!("/tmp/a/{i}.png"))?;
-	}
+	let (ch2, cp2) = write(&a)?;
+	std::fs::write("/tmp/ch._ch", ch2)?;
+	std::fs::write("/tmp/ap._ph", cp2)?;
 	Ok(())
 }

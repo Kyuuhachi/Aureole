@@ -197,7 +197,10 @@ fn convert_to_chcp(jsonpath: &Path) -> Result<(Vec<u8>, Vec<u8>)> {
 		let img = image::open(jsonpath.parent().unwrap().join(&i.path))?.to_rgba8();
 		eyre::ensure!(i.offset.is_none(), "i.offset.is_none()");
 		eyre::ensure!(i.scale == (1., 1.), "i.scale == (1., 1.)");
-		chcp.push(img);
+		while chcp.len() <= i.frame {
+			chcp.push(RgbaImage::new(256, 256));
+		}
+		chcp[i.frame] = img;
 	}
 	Ok(cradle::chcp::write(&chcp)?)
 }

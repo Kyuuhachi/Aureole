@@ -18,6 +18,7 @@
     - Merge `ED7_79` into `ObjWait`.
     - Merge `ED7_7D` into `MapColor`.
     - Fill in types for a bunch of unknown instructions.
+  - Change internal representation of `Text` from `Vec<TextSegment | Page>` to `Vec<Vec<TextSegment>>`.
 - Bug fixes
   - Write `{item[n]}`, not `{item item[n]}`. (The latter remains valid syntax.)
 

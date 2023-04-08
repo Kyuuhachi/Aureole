@@ -442,22 +442,16 @@ impl TryVal for Text {
 	fn desc() -> String { "dialogue text".to_owned() }
 
 	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
-		if let Some(d) = test!(p, Token::Brace(s) => s) {
-			let mut out = Vec::new();
-			parse_text_chunk(&mut out, p.context, &d.tokens);
-			while let Some(d) = test!(p, Token::Brace(s) => s) {
-				out.push(TextSegment::Page);
-				parse_text_chunk(&mut out, p.context, &d.tokens);
-			}
-
-			Ok(Some(Text(out)))
-		} else {
-			Ok(None)
+		let mut pages = Vec::new();
+		while let Some(d) = test!(p, Token::Brace(s) => s) {
+			pages.push(parse_text_chunk(p.context, &d.tokens));
 		}
+		Ok(Some(Text { pages }))
 	}
 }
 
-fn parse_text_chunk(out: &mut Vec<TextSegment>, ctx: &Context, d: &[S<TextToken>]) {
+fn parse_text_chunk(ctx: &Context, d: &[S<TextToken>]) -> Vec<themelios::text::TextSegment> {
+	let mut out = Vec::new();
 	for S(_, t) in d {
 		match t {
 			TextToken::Text(s) => {
@@ -514,6 +508,7 @@ fn parse_text_chunk(out: &mut Vec<TextSegment>, ctx: &Context, d: &[S<TextToken>
 			}
 		}
 	}
+	out
 }
 
 macro unit($T:ident, $unit:ident, $unit_str:literal) {

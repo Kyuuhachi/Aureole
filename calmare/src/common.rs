@@ -520,12 +520,12 @@ fn expr(f: &mut Context, e: &Expr) {
 }
 
 fn text(f: &mut Context, v: &Text) {
-	let mut it = v.iter().peekable();
-	loop {
+	for page in &v.pages {
+		let mut it = page.iter().peekable();
 		f.kw("{").line();
-		let cont = f.indent(|f| {
+		f.indent(|f| {
 			loop {
-				let Some(next) = it.next() else { break false };
+				let Some(next) = it.next() else { break };
 				match next {
 					TextSegment::String(s) => {
 						if f.is_line() && s.starts_with(' ') {
@@ -542,9 +542,6 @@ fn text(f: &mut Context, v: &Text) {
 					}
 					TextSegment::Wait => {
 						write!(f, "{{wait}}")
-					}
-					TextSegment::Page => {
-						break true
 					}
 					TextSegment::Color(n) => {
 						write!(f, "{{color {n}}}");
@@ -565,9 +562,6 @@ fn text(f: &mut Context, v: &Text) {
 			}
 		});
 		f.line().kw("}");
-		if !cont {
-			break
-		}
 	}
 }
 

@@ -4,20 +4,8 @@ use crate::util::*;
 use crate::types::ItemId;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Text(pub Vec<TextSegment>);
-
-impl std::ops::Deref for Text {
-	type Target = Vec<TextSegment>;
-
-	fn deref(&self) -> &Self::Target {
-		&self.0
-	}
-}
-
-impl std::ops::DerefMut for Text {
-	fn deref_mut(&mut self) -> &mut Self::Target {
-		&mut self.0
-	}
+pub struct Text {
+	pub pages: Vec<Vec<TextSegment>>
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -25,7 +13,6 @@ pub enum TextSegment {
 	String(String),
 	Line,
 	Wait,
-	Page,
 	Color(u8),
 	Item(ItemId),
 	Byte(u8), // other byte of unknown meaning
@@ -37,7 +24,6 @@ impl std::fmt::Debug for TextSegment {
 			Self::String(v) => v.fmt(f),
 			Self::Line => write!(f, "Line"),
 			Self::Wait => write!(f, "Wait"),
-			Self::Page => write!(f, "Page"),
 			Self::Color(v) => f.debug_tuple("Color").field(v).finish(),
 			Self::Item(v) => f.debug_tuple("Item").field(v).finish(),
 			Self::Byte(v) => f.debug_tuple("Byte").field(v).finish(),
@@ -47,13 +33,18 @@ impl std::fmt::Debug for TextSegment {
 
 impl Text {
 	pub fn read(f: &mut Reader) -> Result<Text, ReadError> {
-		let mut items = Vec::new();
+		let mut pages = vec![Vec::new()];
+		let mut items = pages.last_mut().unwrap();
 		loop {
 			items.push(match f.u8()? {
 				0x00 => break,
 				0x01 => TextSegment::Line,
 				0x02 => TextSegment::Wait,
-				0x03 => TextSegment::Page,
+				0x03 => {
+					pages.push(Vec::new());
+					items = pages.last_mut().unwrap();
+					continue;
+				}
 				0x07 => TextSegment::Color(f.u8()?),
 				0x1F => TextSegment::Item(ItemId(f.u16()?)),
 				ch@(0x05 | 0x06 | 0x09 | 0x0D | 0x18) => TextSegment::Byte(ch),
@@ -68,19 +59,23 @@ impl Text {
 				}
 			})
 		}
-		Ok(Text(items))
+		Ok(Text { pages })
 	}
 
 	pub fn write(f: &mut Writer, v: &Text) -> Result<(), WriteError> {
-		for item in v.iter() {
-			match &item {
-				TextSegment::String(ref s) => f.slice(&encode(s)?),
-				TextSegment::Line => f.u8(0x01),
-				TextSegment::Wait => f.u8(0x02),
-				TextSegment::Page => f.u8(0x03),
-				TextSegment::Color(n) => { f.u8(0x07); f.u8(*n); }
-				TextSegment::Item(n) => { f.u8(0x1F); f.u16(n.0); }
-				TextSegment::Byte(n) => f.u8(*n),
+		for (i, page) in v.pages.iter().enumerate() {
+			if i != 0 {
+				f.u8(0x03); // page
+			}
+			for item in page {
+				match &item {
+					TextSegment::String(ref s) => f.slice(&encode(s)?),
+					TextSegment::Line => f.u8(0x01),
+					TextSegment::Wait => f.u8(0x02),
+					TextSegment::Color(n) => { f.u8(0x07); f.u8(*n); }
+					TextSegment::Item(n) => { f.u8(0x1F); f.u16(n.0); }
+					TextSegment::Byte(n) => f.u8(*n),
+				}
 			}
 		}
 		f.u8(0);

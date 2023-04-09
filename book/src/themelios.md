@@ -19,6 +19,8 @@ Themelios is a Rust library that powers Calmare, reading and writing binary
 files into well-typed Rust objects. It is currently not particularly
 well-documented, but it gets the job done.
 
+API docs can be found [here](https://aureole.kyuuhachi.dev/doc/themelios/).
+
 ## Structure
 
 Themelios consists of a sizable number of internal crates, but the ones

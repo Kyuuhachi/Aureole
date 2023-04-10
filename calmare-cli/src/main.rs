@@ -6,6 +6,8 @@ use calmare::parse::diag::Level;
 use clap::{Parser, ValueHint};
 use themelios::lookup::Lookup;
 use themelios::types::Game;
+use themelios::scena::ed6::Scena as ED6Scena;
+use themelios::scena::ed7::Scena as ED7Scena;
 
 #[derive(Debug, Clone, Parser)]
 struct Cli {
@@ -126,12 +128,12 @@ fn main_inner() -> eyre::Result<()> {
 				} else {
 					"bin"
 				};
-				let data = themelios::scena::ed6::write(game, &s)?;
+				let data = ED6Scena::write(game, &s)?;
 				get_output(cli.output.as_deref(), &cli.file, suffix)?
 					.write_all(&data)?;
 			}
 			calmare::Content::ED7Scena(s) => {
-				let data = themelios::scena::ed7::write(game, &s)?;
+				let data = ED7Scena::write(game, &s)?;
 				get_output(cli.output.as_deref(), &cli.file, "bin")?
 					.write_all(&data)?;
 			}
@@ -154,9 +156,9 @@ fn write_scena(game: Option<CliGame>, buf: &[u8], lookup: Option<&dyn Lookup>) -
 		Some(game) => {
 			let game = cli_game(game);
 			let c = if game.is_ed7() {
-				calmare::Content::ED7Scena(themelios::scena::ed7::read(game, buf)?)
+				calmare::Content::ED7Scena(ED7Scena::read(game, buf)?)
 			} else {
-				calmare::Content::ED6Scena(themelios::scena::ed6::read(game, buf)?)
+				calmare::Content::ED6Scena(ED6Scena::read(game, buf)?)
 			};
 			Ok(calmare::to_string(game, &c, lookup))
 		},
@@ -167,11 +169,11 @@ fn write_scena(game: Option<CliGame>, buf: &[u8], lookup: Option<&dyn Lookup>) -
 				Game::Zero, Game::Ao, // Geofront
 			] {
 				if game.is_ed7() {
-					if let Ok(scena) = themelios::scena::ed7::read(game, buf) {
+					if let Ok(scena) = ED7Scena::read(game, buf) {
 						return Ok(calmare::to_string(game, &calmare::Content::ED7Scena(scena), lookup))
 					}
 				} else {
-					if let Ok(scena) = themelios::scena::ed6::read(game, buf) {
+					if let Ok(scena) = ED6Scena::read(game, buf) {
 						return Ok(calmare::to_string(game, &calmare::Content::ED6Scena(scena), lookup))
 					}
 				}

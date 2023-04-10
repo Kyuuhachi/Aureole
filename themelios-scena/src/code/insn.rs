@@ -983,13 +983,13 @@ arg!(FileId,
 );
 
 arg!(Text,
-	|f, _| crate::text::Text::read(f)?,
-	|f, _, v| crate::text::Text::write(f, v)?,
+	|f, _| Text::read(f)?,
+	|f, _, v| Text::write(f, v)?,
 );
 
 arg!(Expr,
-	|f, g| super::expr::read(f, g)?,
-	|f, g, v| super::expr::write(f, g, v)?,
+	|f, g| Expr::read(f, g)?,
+	|f, g, v| Expr::write(f, g, v)?,
 );
 
 mod color24 {
@@ -1038,7 +1038,7 @@ mod fork {
 	pub(super) fn read(f: &mut Reader, game: Game) -> Result<Code, ReadError> {
 		let len = f.u8()? as usize;
 		let pos = f.pos();
-		let code = super::read(f, game, Some(pos+len))?;
+		let code = Code::read(f, game, Some(pos+len))?;
 		if len > 0 {
 			f.check_u8(0)?;
 		}
@@ -1050,7 +1050,7 @@ mod fork {
 		let l2 = GLabel::new();
 		f.delay(move |l| Ok(u8::to_le_bytes(cast(l.label(l2)? - l.label(l1)?)?)));
 		f.label(l1);
-		super::write(f, game, v)?;
+		Code::write(f, game, v)?;
 		f.label(l2);
 		if !v.is_empty() {
 			f.u8(0);
@@ -1064,7 +1064,7 @@ mod fork_loop {
 	pub(super) fn read(f: &mut Reader, game: Game) -> Result<Code, ReadError> {
 		let len = f.u8()? as usize;
 		let pos = f.pos();
-		let code = super::read(f, game, Some(pos+len))?;
+		let code = Code::read(f, game, Some(pos+len))?;
 		let next = if game.is_ed7() {
 			Insn::NextFrame2()
 		} else {
@@ -1080,7 +1080,7 @@ mod fork_loop {
 		let l2 = GLabel::new();
 		f.delay(move |l| Ok(u8::to_le_bytes(cast(l.label(l2)? - l.label(l1)?)?)));
 		f.label(l1);
-		super::write(f, game, v)?;
+		Code::write(f, game, v)?;
 		f.label(l2);
 		let next = if game.is_ed7() {
 			Insn::NextFrame2()

@@ -56,9 +56,9 @@ impl std::ops::Deref for Code {
 	}
 }
 
-impl Code {
-	pub fn push(&mut self, value: FlatInsn) {
-		self.0.push(value)
+impl std::ops::DerefMut for Code {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut self.0
 	}
 }
 
@@ -89,64 +89,111 @@ enum RawOInsn<'a> {
 	Label(GLabel),
 }
 
-pub fn read(f: &mut Reader, game: Game, end: Option<usize>) -> Result<Code, ReadError> {
-	let mut insns = Vec::new();
-	let mut extent = f.pos();
-	loop {
-		if let Some(end) = end && f.pos() >= end {
-			ensure!(f.pos() == end, "overshot while reading function");
-			break
-		}
-		insns.push((f.pos(), read_raw_insn(f, game)?));
-		match &insns.last().unwrap().1 {
-			RawIInsn::Insn(Insn::Return()) if end.is_none() && f.pos() > extent => break,
-			RawIInsn::Insn(_) => {}
-			RawIInsn::Unless(_, l) => extent = extent.max(*l),
-			RawIInsn::Goto(l) => extent = extent.max(*l),
-			RawIInsn::Switch(_, cs, l) => {
-				extent = cs.iter().map(|a| a.1)
-					.chain(Some(*l))
-					.chain(Some(extent))
-					.max().unwrap();
+impl Code {
+	pub fn read(f: &mut Reader, game: Game, end: Option<usize>) -> Result<Code, ReadError> {
+		let mut insns = Vec::new();
+		let mut extent = f.pos();
+		loop {
+			if let Some(end) = end && f.pos() >= end {
+				ensure!(f.pos() == end, "overshot while reading function");
+				break
+			}
+			insns.push((f.pos(), read_raw_insn(f, game)?));
+			match &insns.last().unwrap().1 {
+				RawIInsn::Insn(Insn::Return()) if end.is_none() && f.pos() > extent => break,
+				RawIInsn::Insn(_) => {}
+				RawIInsn::Unless(_, l) => extent = extent.max(*l),
+				RawIInsn::Goto(l) => extent = extent.max(*l),
+				RawIInsn::Switch(_, cs, l) => {
+					extent = cs.iter().map(|a| a.1)
+						.chain(Some(*l))
+						.chain(Some(extent))
+						.max().unwrap();
+				}
 			}
 		}
-	}
 
-	let mut labels = BTreeSet::new();
-	for (_, insn) in &insns {
-		match insn {
-			RawIInsn::Unless(_, target) => {
-				labels.insert(*target);
-			}
-			RawIInsn::Goto(target) => {
-				labels.insert(*target);
-			}
-			RawIInsn::Switch(_, branches, default) => {
-				for (_, target) in branches {
+		let mut labels = BTreeSet::new();
+		for (_, insn) in &insns {
+			match insn {
+				RawIInsn::Unless(_, target) => {
 					labels.insert(*target);
 				}
-				labels.insert(*default);
+				RawIInsn::Goto(target) => {
+					labels.insert(*target);
+				}
+				RawIInsn::Switch(_, branches, default) => {
+					for (_, target) in branches {
+						labels.insert(*target);
+					}
+					labels.insert(*default);
+				}
+				RawIInsn::Insn(_) => {}
 			}
-			RawIInsn::Insn(_) => {}
 		}
+
+		let labels = labels.into_iter().enumerate().map(|(a,b)|(b,Label(a))).collect::<BTreeMap<_, _>>();
+
+		let mut insns2 = Vec::with_capacity(insns.len() + labels.len());
+		for (pos, insn) in insns {
+			if let Some(label) = labels.get(&pos) {
+				insns2.push(FlatInsn::Label(*label));
+			}
+			insns2.push(match insn {
+				RawIInsn::Unless(e, l) => FlatInsn::Unless(e, labels[&l]),
+				RawIInsn::Goto(l) => FlatInsn::Goto(labels[&l]),
+				RawIInsn::Switch(e, cs, l) => FlatInsn::Switch(e, cs.into_iter().map(|(a, l)| (a, labels[&l])).collect(), labels[&l]),
+				RawIInsn::Insn(i) => FlatInsn::Insn(i),
+			})
+		}
+
+		Ok(Code(insns2))
 	}
 
-	let labels = labels.into_iter().enumerate().map(|(a,b)|(b,Label(a))).collect::<BTreeMap<_, _>>();
+	pub fn write(f: &mut Writer, game: Game, insns: &Code) -> Result<(), WriteError> {
+		let mut labels = HashMap::new();
+		let mut labeldefs = HashMap::new();
+		let mut label = |k| {
+			if let std::collections::hash_map::Entry::Vacant(e) = labels.entry(k) {
+				let l = GLabel::new();
+				e.insert(l);
+				labeldefs.insert(k, l);
+			}
+		};
 
-	let mut insns2 = Vec::with_capacity(insns.len() + labels.len());
-	for (pos, insn) in insns {
-		if let Some(label) = labels.get(&pos) {
-			insns2.push(FlatInsn::Label(*label));
+		for insn in &insns.0 {
+			match insn {
+				FlatInsn::Unless(_, target) => {
+					label(*target);
+				},
+				FlatInsn::Goto(target) => {
+					label(*target);
+				},
+				FlatInsn::Switch(_, branches, default) => {
+					for (_, target) in branches {
+						label(*target);
+					}
+					label(*default);
+				}
+				FlatInsn::Insn(_) => {}
+				FlatInsn::Label(l) => label(*l),
+			}
 		}
-		insns2.push(match insn {
-			RawIInsn::Unless(e, l) => FlatInsn::Unless(e, labels[&l]),
-			RawIInsn::Goto(l) => FlatInsn::Goto(labels[&l]),
-			RawIInsn::Switch(e, cs, l) => FlatInsn::Switch(e, cs.into_iter().map(|(a, l)| (a, labels[&l])).collect(), labels[&l]),
-			RawIInsn::Insn(i) => FlatInsn::Insn(i),
-		})
-	}
 
-	Ok(Code(insns2))
+		for insn in &insns.0 {
+			write_raw_insn(f, game, match insn {
+				FlatInsn::Unless(e, l) => RawOInsn::Unless(e, labels[l]),
+				FlatInsn::Goto(l) => RawOInsn::Goto(labels[l]),
+				FlatInsn::Switch(e, cs, l) => RawOInsn::Switch(e, cs.iter().map(|(a, l)| (*a, labels[l])).collect(), labels[l]),
+				FlatInsn::Insn(i) => RawOInsn::Insn(i),
+				FlatInsn::Label(l) => RawOInsn::Label(labeldefs.remove(l).unwrap()),
+			})?;
+		}
+
+		ensure!(labeldefs.is_empty(), "unreferenced labels: {:?}", Vec::from_iter(labeldefs.keys()));
+
+		Ok(())
+	}
 }
 
 fn read_raw_insn(f: &mut Reader, game: Game) -> Result<RawIInsn, ReadError> {
@@ -160,7 +207,7 @@ fn read_raw_insn(f: &mut Reader, game: Game) -> Result<RawIInsn, ReadError> {
 	}
 	let insn = match f.u8()? {
 		0x02 => {
-			let e = expr::read(f, game)?;
+			let e = Expr::read(f, game)?;
 			let l = addr(f, game)?;
 			RawIInsn::Unless(e, l)
 		}
@@ -169,7 +216,7 @@ fn read_raw_insn(f: &mut Reader, game: Game) -> Result<RawIInsn, ReadError> {
 			RawIInsn::Goto(l)
 		}
 		0x04 => {
-			let e = expr::read(f, game)?;
+			let e = Expr::read(f, game)?;
 			let count = if game.is_ed7() {
 				f.u8()? as u16
 			} else {
@@ -191,51 +238,6 @@ fn read_raw_insn(f: &mut Reader, game: Game) -> Result<RawIInsn, ReadError> {
 	Ok(insn)
 }
 
-pub fn write(f: &mut Writer, game: Game, insns: &Code) -> Result<(), WriteError> {
-	let mut labels = HashMap::new();
-	let mut labeldefs = HashMap::new();
-	let mut label = |k| {
-		if let std::collections::hash_map::Entry::Vacant(e) = labels.entry(k) {
-			let l = GLabel::new();
-			e.insert(l);
-			labeldefs.insert(k, l);
-		}
-	};
-
-	for insn in &insns.0 {
-		match insn {
-			FlatInsn::Unless(_, target) => {
-				label(*target);
-			},
-			FlatInsn::Goto(target) => {
-				label(*target);
-			},
-			FlatInsn::Switch(_, branches, default) => {
-				for (_, target) in branches {
-					label(*target);
-				}
-				label(*default);
-			}
-			FlatInsn::Insn(_) => {}
-			FlatInsn::Label(l) => label(*l),
-		}
-	}
-
-	for insn in &insns.0 {
-		write_raw_insn(f, game, match insn {
-			FlatInsn::Unless(e, l) => RawOInsn::Unless(e, labels[l]),
-			FlatInsn::Goto(l) => RawOInsn::Goto(labels[l]),
-			FlatInsn::Switch(e, cs, l) => RawOInsn::Switch(e, cs.iter().map(|(a, l)| (*a, labels[l])).collect(), labels[l]),
-			FlatInsn::Insn(i) => RawOInsn::Insn(i),
-			FlatInsn::Label(l) => RawOInsn::Label(labeldefs.remove(l).unwrap()),
-		})?;
-	}
-
-	ensure!(labeldefs.is_empty(), "unreferenced labels: {:?}", Vec::from_iter(labeldefs.keys()));
-
-	Ok(())
-}
-
 fn write_raw_insn(f: &mut Writer, game: Game, insn: RawOInsn) -> Result<(), WriteError> {
 	fn addr(f: &mut Writer, game: Game, l: GLabel) {
 		if game.is_ed7() {
@@ -247,7 +249,7 @@ fn write_raw_insn(f: &mut Writer, game: Game, insn: RawOInsn) -> Result<(), Writ
 	match insn {
 		RawOInsn::Unless(e, l) => {
 			f.u8(0x02);
-			expr::write(f, game, e)?;
+			Expr::write(f, game, e)?;
 			addr(f, game, l);
 		},
 		RawOInsn::Goto(l) => {
@@ -256,7 +258,7 @@ fn write_raw_insn(f: &mut Writer, game: Game, insn: RawOInsn) -> Result<(), Writ
 		},
 		RawOInsn::Switch(e, cs, l) => {
 			f.u8(0x04);
-			expr::write(f, game, e)?;
+			Expr::write(f, game, e)?;
 			if game.is_ed7() {
 				f.u8(cast(cs.len())?)
 			} else {
@@ -347,9 +349,8 @@ pub enum ExprTerm {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Expr(pub Vec<ExprTerm>);
 
-mod expr {
-	use super::*;
-	pub(super) fn read(f: &mut Reader, game: Game) -> Result<Expr, ReadError> {
+impl Expr {
+	pub fn read(f: &mut Reader, game: Game) -> Result<Expr, ReadError> {
 		let mut terms = Vec::new();
 		loop {
 			let op = f.u8()?;
@@ -374,7 +375,7 @@ mod expr {
 		Ok(Expr(terms))
 	}
 
-	pub(super) fn write(f: &mut Writer, game: Game, v: &Expr) -> Result<(), WriteError> {
+	pub fn write(f: &mut Writer, game: Game, v: &Expr) -> Result<(), WriteError> {
 		for term in &v.0 {
 			match *term {
 				ExprTerm::Const(n)       => { f.u8(0x00); f.u32(n); }

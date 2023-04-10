@@ -3,7 +3,7 @@ use gospel::read::{Reader, Le as _};
 use gospel::write::{Writer, Le as _};
 use crate::types::*;
 use themelios_common::util::*;
-use super::code::{self, Code};
+use super::code::{Code, FlatInsn, Insn};
 use super::{ReaderExt as _, WriterExt as _};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -330,7 +330,7 @@ impl Scena {
 			// Probably if they end the function with an explicit return.
 			if end.is_none() && g.pos() != strings_start && (strings_start - g.pos()) % 8 == 1 && g.clone().u8()? == 0x01 {
 				g.check_u8(0x01)?;
-				func.push(code::FlatInsn::Insn(code::Insn::Return()))
+				func.push(FlatInsn::Insn(Insn::Return()))
 			}
 
 			functions.push(func);
@@ -395,7 +395,7 @@ impl Scena {
 		}
 		for func in &mut functions {
 			for insn in &mut func.0 {
-				if let code::FlatInsn::Insn(code::Insn::ED7Battle { 0: battle, .. }) = insn {
+				if let FlatInsn::Insn(Insn::ED7Battle { 0: battle, .. }) = insn {
 					*battle = btl.get_battle(&mut f.clone().at(battle.0 as usize)?)?;
 				}
 			}

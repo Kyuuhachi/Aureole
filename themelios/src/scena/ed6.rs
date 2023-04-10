@@ -2,7 +2,7 @@ use gospel::read::{Reader, Le as _};
 use gospel::write::{Writer, Le as _};
 use crate::types::*;
 use themelios_common::util::*;
-use super::code::{self, Code};
+use super::code::Code;
 use super::{ReaderExt as _, WriterExt as _};
 
 #[derive(Debug, Clone, PartialEq, Eq)]

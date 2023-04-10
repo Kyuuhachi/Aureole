@@ -446,7 +446,7 @@ impl TryVal for Text {
 		while let Some(d) = test!(p, Token::Brace(s) => s) {
 			pages.push(parse_text_chunk(p.context, &d.tokens));
 		}
-		Ok(Some(Text { pages }))
+		Ok(Some(Text(pages)))
 	}
 }
 

@@ -4,9 +4,7 @@ use crate::util::*;
 use crate::types::ItemId;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Text {
-	pub pages: Vec<Vec<TextSegment>>
-}
+pub struct Text(pub Vec<Vec<TextSegment>>);
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum TextSegment {
@@ -59,11 +57,11 @@ impl Text {
 				}
 			})
 		}
-		Ok(Text { pages })
+		Ok(Text(pages))
 	}
 
 	pub fn write(f: &mut Writer, v: &Text) -> Result<(), WriteError> {
-		for (i, page) in v.pages.iter().enumerate() {
+		for (i, page) in v.0.iter().enumerate() {
 			if i != 0 {
 				f.u8(0x03); // page
 			}

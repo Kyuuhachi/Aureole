@@ -520,7 +520,7 @@ fn expr(f: &mut Context, e: &Expr) {
 }
 
 fn text(f: &mut Context, v: &Text) {
-	for page in &v.pages {
+	for page in &v.0 {
 		let mut it = page.iter().peekable();
 		f.kw("{").line();
 		f.indent(|f| {

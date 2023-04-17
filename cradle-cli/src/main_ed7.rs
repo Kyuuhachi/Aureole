@@ -233,11 +233,12 @@ fn crop(img: &RgbaImage) -> (image::SubImage<&RgbaImage>, (i32, i32)) {
 		let u = (0..h). find(|&y| (0..w).any(|x| img.get_pixel(x, y).0[3] != 0))?;
 		let d = (0..h).rfind(|&y| (0..w).any(|x| img.get_pixel(x, y).0[3] != 0))?;
 
-		let cx = w as i32 / 2 - (r+l) as i32 / 2;
-		let cy = h as i32 / 2 - (d+u) as i32 / 2;
-
 		let ow = (r - l + 2).next_power_of_two().max(4); // I don't know why the +2
 		let oh = (d - u + 2).next_power_of_two().max(4);
+
+		let cx = if ow == w { 0 } else { w as i32 / 2 - (r+l) as i32 / 2 };
+		let cy = if oh == h { 0 } else { h as i32 / 2 - (d+u) as i32 / 2 };
+
 		let ox = (w as i32 / 2 - cx) as u32 - ow / 2;
 		let oy = (h as i32 / 2 - cy) as u32 - oh / 2;
 

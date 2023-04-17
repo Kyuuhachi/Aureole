@@ -50,6 +50,9 @@
 
 # Cradle
 
+## 0.2.1 (2023-04-17)
+- Fix a number of issues concerning itp32
+
 ## 0.2.0 (2023-04-08)
 - Support itc with non-contiguous frames.
 - Use JSON instead of CSV.

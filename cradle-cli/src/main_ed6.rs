@@ -5,7 +5,7 @@ use std::path::{PathBuf, Path};
 
 use clap::{Parser, ValueHint};
 use cradle::{ch, chcp};
-use eyre::{Result, Context, ContextCompat};
+use anyhow::{Result, Context};
 use image::{RgbaImage, ImageFormat as IF};
 
 #[derive(Debug, Clone, Parser)]
@@ -66,7 +66,7 @@ fn main() -> Result<()> {
 	}
 
 	let Some(name) = infile.file_name().and_then(|a| a.to_str()) else {
-		eyre::bail!("file has no name");
+		anyhow::bail!("file has no name");
 	};
 	let name = name.to_lowercase();
 
@@ -135,10 +135,10 @@ fn main() -> Result<()> {
 		std::fs::write(cp_out, cp)?;
 
 	} else if name.ends_with(".itp") || name.ends_with(".itc") {
-		eyre::bail!("this looks like an ed7 file, try cradle-ed7");
+		anyhow::bail!("this looks like an ed7 file, try cradle-ed7");
 
 	} else {
-		eyre::bail!("could not infer file type");
+		anyhow::bail!("could not infer file type");
 	}
 
 	Ok(())
@@ -195,8 +195,8 @@ fn convert_to_chcp(jsonpath: &Path) -> Result<(Vec<u8>, Vec<u8>)> {
 	let mut chcp = Vec::new();
 	for i in spec {
 		let img = image::open(jsonpath.parent().unwrap().join(&i.path))?.to_rgba8();
-		eyre::ensure!(i.offset.is_none(), "i.offset.is_none()");
-		eyre::ensure!(i.scale == (1., 1.), "i.scale == (1., 1.)");
+		anyhow::ensure!(i.offset.is_none());
+		anyhow::ensure!(i.scale == (1., 1.));
 		while chcp.len() <= i.frame {
 			chcp.push(RgbaImage::new(256, 256));
 		}

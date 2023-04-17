@@ -6,7 +6,7 @@ use std::path::{PathBuf, Path};
 
 use clap::{Parser, ValueHint};
 use cradle::{itp::Itp, itp32::Itp32, itc::Itc};
-use eyre::Result;
+use anyhow::Result;
 use image::{RgbaImage, ImageFormat as IF, Rgba, GenericImage, GenericImageView};
 
 #[derive(Debug, Clone, Parser)]
@@ -33,7 +33,7 @@ fn main() -> Result<()> {
 	}
 
 	let Some(name) = infile.file_name().and_then(|a| a.to_str()) else {
-		eyre::bail!("file has no name");
+		anyhow::bail!("file has no name");
 	};
 	let name = name.to_lowercase();
 
@@ -84,10 +84,10 @@ fn main() -> Result<()> {
 		convert_to_itc(&infile)?.write(file("itc")?)?;
 
 	} else if name.ends_with("._ch") || name.ends_with("._cp") {
-		eyre::bail!("this looks like an ed7 file, try cradle-ed7");
+		anyhow::bail!("this looks like an ed7 file, try cradle-ed7");
 
 	} else {
-		eyre::bail!("could not infer file type");
+		anyhow::bail!("could not infer file type");
 	}
 
 	Ok(())
@@ -208,7 +208,7 @@ fn convert_to_itc(jsonpath: &Path) -> Result<Itc> {
 			let (img, (xo, yo)) = crop(&img);
 			(img.to_image(), (xo as f32, yo as f32))
 		};
-		eyre::ensure!(i.frame < 128, "i.frame < 128");
+		anyhow::ensure!(i.frame < 128);
 		itc.frames[i.frame] = cradle::itc::Frame {
 			index: Some(itc.content.len()),
 			unknown: 0,

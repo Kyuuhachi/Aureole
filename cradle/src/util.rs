@@ -4,10 +4,10 @@ use image::{ImageBuffer, GenericImageView, GenericImage};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-	#[error("{0}")]
-	Invalid(String),
-	#[error(transparent)]
-	Decompress{ #[from] source: decompress::Error },
+	#[error("{error}")]
+	Invalid { error: String, backtrace: std::backtrace::Backtrace },
+	#[error("{source}")]
+	Decompress{ #[from] source: decompress::Error, backtrace: std::backtrace::Backtrace },
 	#[error("{source}")]
 	Read { #[from] source: gospel::read::Error, backtrace: std::backtrace::Backtrace },
 	#[error("{source}")]
@@ -30,7 +30,7 @@ pub macro bail {
 		bail!(format!($str $($arg)*).into())
 	},
 	($e:expr) => {
-		Err(Error::Invalid($e))?
+		Err(Error::Invalid { error: $e, backtrace: std::backtrace::Backtrace::capture() })?
 	}
 }
 

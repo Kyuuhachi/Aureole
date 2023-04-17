@@ -29,7 +29,7 @@ impl Itp32 {
 			&intel_tex_2::bc7::alpha_very_fast_settings(),
 			&intel_tex_2::RgbaSurface {
 				width: img.width(),
-				height: img.width(),
+				height: img.height(),
 				stride: img.width() * 4,
 				data: img,
 			}

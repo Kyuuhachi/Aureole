@@ -99,6 +99,7 @@ impl Itp32 {
 pub fn read(data: &[u8]) -> Result<Itp32, Error> {
 	let mut f = Reader::new(data);
 	f.check(b"ITP\xFF")?;
+	let file_len = f.data().len();
 
 	let mut width = 0;
 	let mut height = 0;
@@ -115,7 +116,7 @@ pub fn read(data: &[u8]) -> Result<Itp32, Error> {
 				f.check_u32(32)?; // chunk size
 				width = f.u32()? as usize;
 				height = f.u32()? as usize;
-				f.check_u32(f.len() as u32)?;
+				f.check_u32(file_len as u32)?;
 
 				let major = f.u16()?;
 				minor = f.u16()?;

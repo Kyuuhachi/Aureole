@@ -8,8 +8,6 @@ use gospel::read::{Reader, Le as _};
 /// As far as I am aware, only three of the fields are actually used by the games: `name`, `compressed_size`, and `offset`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DirEntry {
-	/// This field is only informative: it might be useful for consumers, but this module does not make use of it.
-	pub index: u16,
 	/// The name of the file.
 	pub name: String,
 	/// There are only three files in 3rd/dt29 where this field is nonzero.
@@ -45,7 +43,7 @@ pub fn read_dir(data: &[u8]) -> Result<Vec<DirEntry>, gospel::read::Error> {
 
 	let mut items = Vec::with_capacity(count);
 
-	for index in 0..count {
+	for _ in 0..count {
 		if f.clone().check(b"/_______.___").is_ok() {
 			break
 		}
@@ -59,7 +57,6 @@ pub fn read_dir(data: &[u8]) -> Result<Vec<DirEntry>, gospel::read::Error> {
 		let offset          = f.u32()? as usize;
 
 		items.push(DirEntry {
-			index: index as u16,
 			name,
 			unk1,
 			compressed_size,

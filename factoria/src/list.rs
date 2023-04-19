@@ -120,11 +120,11 @@ fn list_one(cmd: &List, dir_file: &Path) -> eyre::Result<()> {
 	// TODO sort order: index (default), name, timestamp
 	if cmd.long {
 		let mut cells = Vec::new();
-		for e in &entries {
+		for (i, e) in entries.iter().enumerate() {
 			if let Some(arch) = archive_number {
-				cells.push(Cell::new(format!("0x{:04X}{:04X}", arch, e.index)));
+				cells.push(Cell::new(format!("0x{:04X}{:04X}", arch, i)));
 			} else {
-				cells.push(Cell::new(format!("0x{:04X}", e.index)));
+				cells.push(Cell::new(format!("0x{:04X}", i)));
 			}
 			cells.push(Cell::new(e.unk1.to_string()).right());
 			cells.push(Cell::new(size(cmd, e.unk3)).right());

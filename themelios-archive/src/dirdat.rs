@@ -1,6 +1,8 @@
 //! Utilities for reading ED6 PC's .dir/.dat archives.
 //!
 //! There is currently no support for writing archives; this may be added later.
+use std::ops::Range;
+
 use gospel::read::{Reader, Le as _};
 
 /// An entry in a .dir file,
@@ -26,10 +28,30 @@ pub struct DirEntry {
 	pub offset: usize,
 }
 
+impl DirEntry {
+	pub fn range(&self) -> Option<Range<usize>> {
+		if self.timestamp == 0 {
+			None
+		} else {
+			Some(self.offset .. self.offset + self.archived_size)
+		}
+	}
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DatEntry {
 	pub offset: usize,
 	pub end: usize,
+}
+
+impl DatEntry {
+	pub fn range(&self) -> Option<Range<usize>> {
+		if self.end == 0 {
+			None
+		} else {
+			Some(self.offset .. self.end)
+		}
+	}
 }
 
 /// Reads the contents of entries from a .dir file.

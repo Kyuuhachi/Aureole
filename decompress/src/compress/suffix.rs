@@ -1,3 +1,4 @@
+#![allow(unused)]
 // Made according to this guide https://zork.net/~st/jottings/sais.html
 use std::{cmp::Ordering, marker::PhantomData};
 
@@ -56,7 +57,7 @@ macro_rules! common {
 			self.sa.last().map(|a| self.offset() + *a)
 		}
 
-		pub fn indices<'c>(&'c self) -> impl Iterator<Item=usize> + 'c {
+		pub fn indices(&self) -> impl Iterator<Item=usize> + '_ {
 			self.sa.iter().map(|a| self.offset() + *a)
 		}
 
@@ -68,7 +69,7 @@ macro_rules! common {
 			self.sa.last().map(|a| self.get_t(*a))
 		}
 
-		pub fn suffixes<'c>(&'c self) -> impl Iterator<Item=&'a T> + 'c {
+		pub fn suffixes(&self) -> impl Iterator<Item=&'a T> + '_ {
 			self.sa.iter().map(|a| self.get_t(*a))
 		}
 
@@ -172,7 +173,7 @@ impl<'a, 'b, T: Text + ?Sized> SuffixArrayRef<'a, 'b, T> {
 		self.back(self.offset())
 	}
 
-	pub fn to_owned(&self) -> SuffixArray<'a, T> {
+	pub fn to_owned(self) -> SuffixArray<'a, T> {
 		SuffixArray {
 			text: self.text,
 			sa: self.sa.iter().map(|a| *a + self.offset()).collect(),

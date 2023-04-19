@@ -1,5 +1,3 @@
-use gospel::read::{Reader, Le as _};
-use gospel::write::{Writer, Le as _, Label};
 use image::{ImageBuffer, GenericImageView, GenericImage};
 
 #[derive(Debug, thiserror::Error)]
@@ -75,44 +73,4 @@ pub fn swizzle<A>(data: &mut [A], residual: &mut [A], w: usize, cw: usize, ch: u
 			}
 		}
 	}
-}
-
-pub fn decompress(f: &mut Reader) -> Result<Vec<u8>, Error> {
-	let csize = f.u32()? as usize;
-	let start = f.pos();
-	let usize = f.u32()? as usize;
-	let mut out = Vec::with_capacity(usize);
-	for _ in 1..f.u32()? {
-		let Some(chunklen) = (f.u16()? as usize).checked_sub(2) else {
-			bail!("bad chunk length")
-		};
-		decompress::decompress(f.slice(chunklen)?, &mut out)?;
-		f.check_u8(1)?;
-	}
-
-	f.check_u32(0x06000006)?;
-	f.slice(3)?; // unknown
-
-	ensure!(csize == f.pos()-start, "wrong compressed length: expected {}, got {}", csize, f.pos()-start);
-	ensure!(usize == out.len(), "wrong uncompressed length: expected {}, got {}", usize, out.len());
-
-	Ok(out)
-}
-
-pub fn compress(f: &mut Writer, data: &[u8]) {
-	let start = Label::new();
-	let end = Label::new();
-	f.delay(move |ctx| Ok(u32::to_le_bytes((ctx.label(end)? - ctx.label(start)?) as u32)));
-	f.label(start);
-	f.u32(data.len() as u32);
-	f.u32(1+data.chunks(0xFFF0).count() as u32);
-	for chunk in data.chunks(0xFFF0) {
-		let data = decompress::compress(chunk);
-		f.u16(data.len() as u16 + 2);
-		f.slice(&data);
-		f.u8(1);
-	}
-	f.u32(0x06000006);
-	f.slice(&[0,0,0]);
-	f.label(end);
 }

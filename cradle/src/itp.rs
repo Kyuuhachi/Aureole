@@ -1,10 +1,12 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
+use image::{GrayImage, Rgba, RgbaImage};
+
 use gospel::read::{Reader, Le as _};
 use gospel::write::{Writer, Le as _};
-use image::{GrayImage, Rgba, RgbaImage};
-use crate::util::{Error, swizzle, image, decompress, compress, ensure, bail};
+use decompress::{decompress_ed7 as decompress, compress_ed7 as compress};
+use crate::util::{Error, swizzle, image, ensure, bail};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Itp {

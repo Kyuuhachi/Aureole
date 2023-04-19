@@ -10,6 +10,8 @@ pub enum Error {
 		offset: usize,
 		len: usize,
 	},
+	#[error("invalid frame")]
+	Frame,
 }
 
 type Result<A, E=Error> = std::result::Result<A, E>;

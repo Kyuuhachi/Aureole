@@ -5,7 +5,7 @@ pub use themelios_archive::lookup::*;
 /// Returns the default [`Lookup`] for the given game.
 ///
 /// This should be all that's needed unless any mods add new files to the archives.
-pub fn default_for(game: crate::types::Game) -> &'static dyn Lookup {
+pub fn default_for(game: crate::types::Game) -> &'static (dyn Lookup + Send + Sync) {
 	use std::io::Read;
 	use zstd::dict::DecoderDictionary as DD;
 

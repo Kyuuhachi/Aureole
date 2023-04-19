@@ -10,5 +10,5 @@ proc-macro = true
 syn = { version = "2.0", features = ["full"] }
 quote = "1.0"
 proc-macro2 = "1.0"
-choubun = { path = "../choubun" }
 syn_derive = "0.1.5"
+maud = "0.25.0"

@@ -1,6 +1,5 @@
 [workspace]
 members = [
-	"choubun",
 	"cp932",
 	"bc7",
 	"gospel",

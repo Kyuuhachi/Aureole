@@ -184,104 +184,107 @@ struct WriteArm {
 }
 
 fn make_table(ctx: &Ctx) -> String {
-	let doc = choubun::node("table", |n| {
-		n.node("style", |n| n.text("\n\
-			#insn-table { text-align: center; width: min-content; overflow-x: unset; }\n\
-			#insn-table thead { position: sticky; top: 0; }\n\
-			#insn-table th { writing-mode: vertical-lr; }\n\
-			#insn-table td:first-child { text-align: left; }\n\
-			#insn-table td:not(:first-child) { vertical-align: middle; }\n\
-			#insn-table td { border-top: none; }\n\
-			#insn-table td:not(:first-child) { border-left: none; }\n\
-			#insn-table .insn-table-blank { background: linear-gradient(to right, transparent -75000%, currentcolor 1000000%); }\n\
-			#insn-table .insn-table-right { border-right: none; }\n\
-			#insn-table .insn-table-down { border-bottom: none; }\n\
-		"));
-		n.attr("id", "insn-table");
-		let mut hex: BTreeMap<Ident, BTreeMap<Ident, u8>> = BTreeMap::new();
-		for insn in &ctx.defs {
-			hex.insert(insn.ident.clone(), BTreeMap::new());
+	let mut hex = BTreeMap::new();
+	for insn in &ctx.defs {
+		hex.insert(insn.ident.clone(), BTreeMap::new());
+	}
+	for WriteArm { games, ident, .. } in &ctx.writes {
+		let entry = hex.get_mut(ident).unwrap();
+		for (game, h) in games {
+			entry.insert(game.clone(), *h);
 		}
-		for WriteArm { games, ident, .. } in &ctx.writes {
-			if let Some(entry) = hex.get_mut(ident) {
-				for (game, hex) in games {
-					entry.insert(game.clone(), *hex);
-				}
-			} else {
-				// will error because of unknown branch
+	}
+
+	let css = r#"
+		#insn-table { text-align: center; width: min-content; overflow-x: unset; }
+		#insn-table thead { position: sticky; top: 0; }
+		#insn-table th { writing-mode: vertical-lr; }
+		#insn-table td:first-child { text-align: left; }
+		#insn-table td:not(:first-child) { vertical-align: middle; }
+		#insn-table td { border-top: none; }
+		#insn-table td:not(:first-child) { border-left: none; }
+		#insn-table .insn-table-blank { background: linear-gradient(to right, transparent -75000%, currentcolor 1000000%); }
+		#insn-table .insn-table-right { border-right: none; }
+		#insn-table .insn-table-down { border-bottom: none; }
+	"#;
+
+	let head = maud::html! {
+		th {}
+		@for game in &ctx.games {
+			th {
+				@let ty = &ctx.game_ty;
+				(format_args!("[`{game}`]({ty}::{game})", ty=quote!{ #ty }))
 			}
 		}
+	};
 
-		n.node("thead", |n| {
-			n.indent();
-			n.node("tr", |n| {
-				n.node("th", |_| {});
-				for game in &ctx.games {
-					n.node("th", |n| {
-						let ty = &ctx.game_ty;
-						n.text(format_args!("[`{game}`]({ty}::{game})", ty=quote!{ #ty }))
-					});
-				}
-			});
-		});
-
-		let mut table = Vec::new();
-		let mut insns = ctx.defs.iter().peekable();
-		while let Some(def) = insns.next() {
-			let games = hex.get(&def.ident).unwrap();
-			let mut defs = vec![def];
-			while let Some(next) = insns.peek() && hex.get(&next.ident).unwrap() == games {
-				defs.push(insns.next().unwrap());
-			}
-
-			let head = choubun::node("td", |n| {
-				for Insn { ident, args, .. } in defs {
-					let args = args.iter().map(|a| quote!{#a}.to_string()).collect::<Vec<_>>().join(", ");
-					n.text(format_args!("[`{ident}`](`Self::{ident}` \"{ident}({args})\")"));
-					// n.text(format_args!("`({args})`"));
-					n.text(" ");
-				}
-			});
-
-			let row = ctx.games.iter().map(|a| games.get(a)).collect::<Vec<_>>();
-			table.push((head, row));
+	let mut table = Vec::new();
+	let mut iter = ctx.defs.iter().peekable();
+	while let Some(def) = iter.next() {
+		let games = hex.get(&def.ident).unwrap();
+		let mut defs = vec![def];
+		while let Some(next) = iter.peek() && hex.get(&next.ident).unwrap() == games {
+			defs.push(iter.next().unwrap());
 		}
 
-		n.node("tbody", |n| {
-			n.indent();
-			let mut iter = table.into_iter().peekable();
-			while let Some((head, row)) = iter.next() {
-				n.node("tr", |n| {
-					n.add(head);
-					let mut row_iter = row.iter().copied().peekable();
-					let next = iter.peek();
-					let mut next_iter = next.iter().flat_map(|a| a.1.iter().copied());
-					while let Some(hex) = row_iter.next() {
-						let same_right = row_iter.peek() == Some(&hex);
-						let same_below = next_iter.next().map(|a| a.map(|a| *a as u16)) == Some(hex.map(|a| *a as u16 + 1));
-						n.node("td", |n| {
-							if let Some(hex) = hex {
-								n.text(format_args!("{hex:02X}"));
-							} else {
-								n.class("insn-table-blank")
-							}
-							if same_right {
-								n.class("insn-table-right")
-							}
-							if same_below {
-								n.class("insn-table-down")
-							}
-						});
+		let insn_names = defs.iter().map(|Insn { ident, args, .. }| {
+			let args = args.iter().map(|a| quote!{#a}.to_string()).collect::<Vec<_>>().join(", ");
+			format!("[`{ident}`](`Self::{ident}` \"{ident}({args})\")")
+		}).collect::<Vec<String>>().join(" ");
+
+		let row = ctx.games.iter().map(|a| games.get(a)).collect::<Vec<_>>();
+		table.push((insn_names, row));
+	}
+
+	let mut rows = Vec::new();
+
+	let mut iter = table.into_iter().peekable();
+	while let Some((insn_names, row)) = iter.next() {
+		let mut tr = maud::PreEscaped(String::new());
+		tr.0.push_str(&maud::html! {
+			td { (maud::PreEscaped(insn_names)) }
+		}.0);
+		let mut row_iter = row.iter().copied().peekable();
+		let next = iter.peek();
+		let mut next_iter = next.iter().flat_map(|a| a.1.iter().copied());
+		while let Some(hex) = row_iter.next() {
+			let same_right = row_iter.peek() == Some(&hex);
+			let same_below = next_iter.next().map(|a| a.map(|a| *a as u16)) == Some(hex.map(|a| *a as u16 + 1));
+			tr.0.push_str(&maud::html! {
+				td
+					."insn-table-blank"[hex.is_none()]
+					."insn-table-right"[same_right]
+					."insn-table-down"[same_below]
+				{
+					@if let Some(hex) = hex {
+						(format_args!("{hex:02X}"))
 					}
-				});
+				}
+			}.0);
+		}
+		rows.push(tr);
+	}
+
+	let table = maud::html! {
+		table #"insn-table" {
+			style { (css) }
+			thead {
+				"\n\t" tr { (head) } "\n\t"
 			}
-		});
-	});
-	let doc = choubun::node("div", |n| {
-		n.class("example-wrap");
-		n.add(doc)
-	});
-	format!("\n\n<span></span>{}\n\n", doc.render_to_string())
+			tbody {
+				@for row in rows {
+					"\n\t" tr { (row) }
+				} "\n\t"
+			}
+		}
+	};
+
+	format!("\n\n{}\n\n", maud::html! {
+		span {} // this span is needed to get rustdoc to parse the html as inline, so it parses the links correctly
+		."example-wrap" {
+			(table)
+		}
+	}.0)
 }
 
 fn gather_top(input: Top) -> syn::Result<Ctx> {

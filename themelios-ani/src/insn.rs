@@ -130,7 +130,7 @@ themelios_macros::bytecode! {
 			u8 as EffInstanceId,
 		),
 		EffPlay2(
-			u8 as EffId, u8 as CharId, String, u16,
+			u8 as CharId, u8 as CharId, String, u16,
 			Pos3,
 			i16, i16, i16,
 			if game.base() == BaseGame::Fc { u32 } else { u16 as u32 },
@@ -346,12 +346,15 @@ themelios_macros::bytecode! {
 		#[game(Tc)] _A9(u32 as Time),
 		#[game(Tc)] _AA(i32, i32),
 		#[game(Tc)] _AB(u8, u8 as CharId, u8, u32),
-		#[game(Tc)] _AC(u8 as CharId, u8, u32, u32, u8),
+		#[game(Tc)] _AC(u8 as CharId, u8 as EffInstanceId, u32, u32, u8),
 		#[game(Tc)] skip!(1),
 		#[game(Tc)] _AE(i16 as Angle, u32),
 		#[game(Tc)] _AF(u8, u8, u32, u32, u32, u32),
 		#[game(Tc)] skip!(1),
-		#[game(Tc)] _B1(u8, u16), // This looks like an address, but doesn't seem to be one.
+		#[game(Tc)] Flag(match {
+			0 => Set(u16 as Flag),
+			1 => Unset(u16 as Flag),
+		}),
 	]
 }
 

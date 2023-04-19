@@ -20,11 +20,7 @@ members = [
 	"cradle-cli",
 ]
 
-[workspace.dependencies]
-hamu = { git = "https://github.com/Kyuuhachi/hamu", features = ["beryl"] }
-
 [profile.dev]
-package.hamu.opt-level = 3
 package.choubun.opt-level = 3
 package.cp932.opt-level = 3
 package.decompress.opt-level = 3

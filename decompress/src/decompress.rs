@@ -1,10 +1,9 @@
-use hamu::read::le::*;
-use hamu::read::Error as HError;
+use gospel::read::{Reader, Le};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
 	#[error(transparent)]
-	Read { #[from] source: HError },
+	Read { #[from] source: gospel::read::Error },
 	#[error("attempted to repeat {count} bytes from offset -{offset}, but only have {len} bytes")]
 	BadRepeat {
 		count: usize,
@@ -12,6 +11,8 @@ pub enum Error {
 		len: usize,
 	},
 }
+
+type Result<A, E=Error> = std::result::Result<A, E>;
 
 struct OutBuf<'a> {
 	start: usize,
@@ -26,7 +27,7 @@ impl<'a> OutBuf<'a> {
 		}
 	}
 
-	fn constant(&mut self, n: usize, f: &mut Reader) -> Result<(), Error> {
+	fn constant(&mut self, n: usize, f: &mut Reader) -> Result<()> {
 		let b = f.u8()?;
 		for _ in 0..n {
 			self.out.push(b);
@@ -34,7 +35,7 @@ impl<'a> OutBuf<'a> {
 		Ok(())
 	}
 
-	fn verbatim(&mut self, n: usize, f: &mut Reader) -> Result<(), Error> {
+	fn verbatim(&mut self, n: usize, f: &mut Reader) -> Result<()> {
 		for _ in 0..n {
 			let b = f.u8()?;
 			self.out.push(b);
@@ -42,7 +43,7 @@ impl<'a> OutBuf<'a> {
 		Ok(())
 	}
 
-	fn repeat(&mut self, n: usize, o: usize, _f: &mut Reader) -> Result<(), Error> {
+	fn repeat(&mut self, n: usize, o: usize, _f: &mut Reader) -> Result<()> {
 		if !(1..=self.out.len()-self.start).contains(&o) {
 			return Err(Error::BadRepeat { count: n, offset: o, len: self.out.len() })
 		}
@@ -68,7 +69,7 @@ impl Bits {
 		}
 	}
 
-	fn bit<T: ReadStream>(&mut self, f: &mut T) -> Result<bool, T::Error> {
+	fn bit(&mut self, f: &mut Reader) -> Result<bool> {
 		if self.nextbit == 0 {
 			self.renew_bits(f)?;
 		}
@@ -77,13 +78,13 @@ impl Bits {
 		Ok(v)
 	}
 
-	fn renew_bits<T: ReadStream>(&mut self, f: &mut T) -> Result<(), T::Error> {
+	fn renew_bits(&mut self, f: &mut Reader) -> Result<()> {
 		self.bits = f.u16()?;
 		self.nextbit = 1;
 		Ok(())
 	}
 
-	fn bits<T: ReadStream>(&mut self, n: usize, f: &mut T) -> Result<usize, T::Error> {
+	fn bits(&mut self, n: usize, f: &mut Reader) -> Result<usize> {
 		let mut x = 0;
 		for _ in 0..n%8 {
 			x = x << 1 | usize::from(self.bit(f)?);
@@ -94,7 +95,7 @@ impl Bits {
 		Ok(x)
 	}
 
-	fn read_count<T: ReadStream>(&mut self, f: &mut T) -> Result<usize, T::Error> {
+	fn read_count(&mut self, f: &mut Reader) -> Result<usize> {
 		Ok(
 			if      self.bit(f)? {  2 }
 			else if self.bit(f)? {  3 }
@@ -145,7 +146,7 @@ fn decompress2(data: &[u8], w: &mut OutBuf) -> Result<(), Error> {
 	let f = &mut Reader::new(data);
 
 	let mut last_o = 0;
-	while f.remaining() > 0 {
+	while !f.is_empty() {
 		#[bitmatch] match f.u8()? as usize {
 			"00xnnnnn" => {
 				let n = if x == 1 { n << 8 | f.u8()? as usize } else { n };
@@ -167,7 +168,7 @@ fn decompress2(data: &[u8], w: &mut OutBuf) -> Result<(), Error> {
 	Ok(())
 }
 
-pub fn decompress(data: &[u8], w: &mut Vec<u8>) -> Result<(), Error> {
+pub fn decompress(data: &[u8], w: &mut Vec<u8>) -> Result<()> {
 	let w = &mut OutBuf::new(w);
 	if data.first() == Some(&0) {
 		decompress1(data, w)

@@ -63,7 +63,7 @@ themelios_macros::bytecode! {
 		CrossFade(u32 as Time), // [cross_fade]
 
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)]
-		ED6Battle(u32 as BattleId, FileId, u8, u16, u8 as u16 as CharId),
+		ED6Battle(u32 as BattleId, FileId, u8, u16, CharId via char_id8),
 
 		def! ED7Battle(BattleId, FileId, u8, u16, u16, CharId),
 		def! ED7NpcBattle(FileId, u8, [FileId; 8], u16, u16),
@@ -79,7 +79,7 @@ themelios_macros::bytecode! {
 						FileId(f.u32()?), f.u8()?,
 						f.u16()?,
 						f.u16()?,
-						CharId(f.u16()?),
+						CharId::read(f, game)?,
 					))
 				} else {
 					Ok(Self::ED7NpcBattle(
@@ -97,7 +97,7 @@ themelios_macros::bytecode! {
 				f.delay32(gospel::write::Label::known(ptr.0));
 				f.u32(s1.0); f.u8(*s2);
 				f.u16(*a1); f.u16(*a2);
-				f.u16(ch.0);
+				CharId::write(f, game, ch)?;
 				Ok(())
 			},
 			write ED7NpcBattle(s1,s2, c, a1, a2) => |f| {
@@ -236,7 +236,7 @@ themelios_macros::bytecode! {
 		QuestBonusBp(u16 as QuestId, u16),
 		QuestBonusMira(u16 as QuestId, u16),
 
-		PartyAdd(u8 as u16 as NameId, u8 as u16 as CharId, if game.base() == BaseGame::Fc { const 0u8 } else { u8 }), // [join_party]
+		PartyAdd(u8 as u16 as NameId, CharId via char_id8, if game.base() == BaseGame::Fc { const 0u8 } else { u8 }), // [join_party]
 		PartyRemove(u8 as u16 as NameId, u8), // [separate_party]
 		PartyClear(),
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] _30(u8),
@@ -285,17 +285,17 @@ themelios_macros::bytecode! {
 		PartyEquip(u8 as u16 as NameId, u16 as ItemId, if game.base() == BaseGame::Fc && !(600..=799).contains(&_1.0) { const 0u8 } else { u8 }),
 		PartyPosition(u8 as u16 as NameId),
 
-		ForkFunc(u16 as CharId, u8 as u16 as ForkId, FuncId via func_id), // [execute]
-		ForkQuit(u16 as CharId, u8 as u16 as ForkId), // [terminate]
-		Fork(    u16 as CharId, if game.is_ed7() { u8 as u16 } else { u16 } as ForkId, Code via fork), // [preset]? In t0311, only used with a single instruction inside
-		ForkLoop(u16 as CharId, if game.is_ed7() { u8 as u16 } else { u16 } as ForkId, Code via fork_loop),
-		ForkWait(u16 as CharId, if game.is_ed7() { u8 as u16 } else { u16 } as ForkId), // [wait_terminate]
+		ForkFunc(CharId, u8 as u16 as ForkId, FuncId via func_id), // [execute]
+		ForkQuit(CharId, u8 as u16 as ForkId), // [terminate]
+		Fork(    CharId, if game.is_ed7() { u8 as u16 } else { u16 } as ForkId, Code via fork), // [preset]? In t0311, only used with a single instruction inside
+		ForkLoop(CharId, if game.is_ed7() { u8 as u16 } else { u16 } as ForkId, Code via fork_loop),
+		ForkWait(CharId, if game.is_ed7() { u8 as u16 } else { u16 } as ForkId), // [wait_terminate]
 		NextFrame(), // [next_frame]
 
 		Event(FuncId via func_id), // [event] Not sure how this differs from Call
 
-		_Char4A(u16 as CharId, u8), // Argument is almost always 255, but sometimes 0, and in a single case 1
-		_Char4B(u16 as CharId, u8),
+		_Char4A(CharId, u8), // Argument is almost always 255, but sometimes 0, and in a single case 1
+		_Char4B(CharId, u8),
 
 		skip!(1), // {asm} one-byte nop
 		Var(u16 as Var, Expr),
@@ -304,29 +304,29 @@ themelios_macros::bytecode! {
 		skip!(1), // {asm} one-byte nop
 		CharAttr(CharAttr via char_attr, Expr),
 
-		TextStart(u16 as CharId), // [talk_start]
-		TextEnd(u16 as CharId), // [talk_end]
+		TextStart(CharId), // [talk_start]
+		TextEnd(CharId), // [talk_end]
 		/// Shows a text box without a speak bubble arrow.
 		///
 		/// I believe the CharId, which is only present in ED7, is used to select the textbox title.
 		/// However, it is 999 on chests.
-		TextMessage(if game.is_ed7() { u16 } else { const 255u16 } as CharId, Text), // [mes]
+		TextMessage(CharId via char_id_text_message, Text), // [mes]
 		skip!(1), // {asm} same as NextFrame
 		TextClose(u8), // [mes_close]
 		ScMenuSetTitle(u16, u16, u16, Text),
 		TextWait(), // [wait_prompt]
 		_59(), // Always directly after a TextReset 1, and exists in all but one such case. I suspect that one is a bug.
 		TextSetPos(i16, i16, i16, i16), // [mes_pos]
-		TextTalk(u16 as CharId, Text), // [popup]
-		TextTalkNamed(u16 as CharId, TString, Text), // [popup2]
+		TextTalk(CharId, Text), // [popup]
+		TextTalkNamed(CharId, TString, Text), // [popup2]
 		Menu(u16 as MenuId, i16, i16, u8, Vec<TString> via menu), // [menu] (the u8 is a bool)
 		MenuWait(u16 as Var), // [wait_menu]
 		MenuClose(u16 as MenuId), // [menu_close]
 		TextSetName(TString), // [name]
-		CharName2(u16 as CharId), // [name2]
+		CharName2(CharId), // [name2]
 
-		Emote(u16 as CharId, i32 as Length, i32 as Length, u8, u8, u32 as Time, u8), // [emotion] mostly used through macros such as EMO_BIKKURI3().
-		EmoteStop(u16 as CharId), // [emotion_close]
+		Emote(CharId, i32 as Length, i32 as Length, u8, u8, u32 as Time, u8), // [emotion] mostly used through macros such as EMO_BIKKURI3().
+		EmoteStop(CharId), // [emotion_close]
 
 		LookPointFlagsSet(u8 as u16 as LookPointId, u16 as LookPointFlags),
 		LookPointFlagsUnset(u8 as u16 as LookPointId, u16 as LookPointFlags),
@@ -335,8 +335,8 @@ themelios_macros::bytecode! {
 		CamSetDistance(i32, i32, i32, u32 as Time), // [camera_move]
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] _Cam68(u8), // TODO this isn't in any scripts? Is it from the asm?
 		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_Cam69(u8, u16),
-		CamLookChar(u16 as CharId, u32 as Time), // [camera_look_chr]
-		_Char6A(u16 as CharId),
+		CamLookChar(CharId, u32 as Time), // [camera_look_chr]
+		_Char6A(CharId),
 		CamZoom(i32, u32 as Time), // [camera_zoom]
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] CamRotate(i32 as Angle32, u32 as Time), // [camera_rotate]
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] CamLookPos(Pos3, u32 as Time), // [camera_look_at]
@@ -400,7 +400,7 @@ themelios_macros::bytecode! {
 			4 => _4(i32),
 		}),
 		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_77(u8 as u16 as ObjectId, u16),
-		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_78(u8 as u16 as ObjectId, u16 as CharId),
+		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_78(u8 as u16 as ObjectId, CharId),
 
 		/// Waits for a map object to finish its animation.
 		ObjWait(u16 as ObjectId),
@@ -423,8 +423,8 @@ themelios_macros::bytecode! {
 
 		#[game(Fc, FcEvo)] skip!(1), // {asm} two-byte nop
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_7D(match {
-			0 => _0(u16 as CharId, u16, u16),
-			1 => _1(u16 as CharId, u16, u16), // args always zero; always paired with a _0 except when the char is 254
+			0 => _0(CharId, u16, u16),
+			1 => _1(CharId, u16, u16), // args always zero; always paired with a _0 except when the char is 254
 		}),
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _7E(i16, i16, i16, u8, u32),
 
@@ -432,10 +432,10 @@ themelios_macros::bytecode! {
 		EffLoad(u8 as EffId, String),
 		EffPlay(
 			u8 as EffId, u8 as EffInstanceId,
-			u16 as CharId, if game.is_ed7() { u16 } else { const 0u16 }, Pos3, // source
+			CharId, if game.is_ed7() { u16 } else { const 0u16 }, Pos3, // source
 			i16, i16, i16,
 			u32, u32, u32, // scale?
-			u16 as CharId, Pos3, // target
+			CharId, Pos3, // target
 			u32 as Time, // period (0 if one-shot)
 		),
 		EffPlay2(
@@ -449,72 +449,72 @@ themelios_macros::bytecode! {
 		#[game(Fc, FcEvo)] FcAchievement(u8, u8),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] _83(u8 as EffInstanceId, u8),
 		EffUnload(u8 as EffId),
-		_85(u16 as CharId),
+		_85(CharId),
 
-		CharSetChipBase    (u16 as CharId, if game.is_ed7() { u8 as u16 } else { u16 } as ChipId), // [set_chr_base]
-		CharSetChipPattern (u16 as CharId, if game.is_ed7() { u8 as u16 } else { u16 }), // [set_chr_ptn]
+		CharSetChipBase    (CharId, if game.is_ed7() { u8 as u16 } else { u16 } as ChipId), // [set_chr_base]
+		CharSetChipPattern (CharId, if game.is_ed7() { u8 as u16 } else { u16 }), // [set_chr_ptn]
 
 		#[game(Zero, ZeroEvo, Ao, AoEvo)]
-		CharSetName(u16 as CharId, TString),
+		CharSetName(CharId, TString),
 
-		CharSetPos     (u16 as CharId, Pos3, i16 as Angle), // [set_pos]
-		CharSetPos2    (u16 as CharId, Pos3, i16 as Angle),
+		CharSetPos     (CharId, Pos3, i16 as Angle), // [set_pos]
+		CharSetPos2    (CharId, Pos3, i16 as Angle),
 
 		/// Turns to look at another character.
 		///
 		/// Official name is `look_to`.
-		CharTurnToChar (u16 as CharId, u16 as CharId, u16 as AngularSpeed),
+		CharTurnToChar (CharId, CharId, u16 as AngularSpeed),
 
 		/// Turns to look at a specific position.
-		CharTurnToPos  (u16 as CharId, Pos2,          u16 as AngularSpeed),
+		CharTurnToPos  (CharId, Pos2,          u16 as AngularSpeed),
 
 		/// Turns to look in a specific direction.
 		///
 		/// Official name is `turn_to`.
-		CharTurnTo     (u16 as CharId, i16 as Angle,  u16 as AngularSpeed),
+		CharTurnTo     (CharId, i16 as Angle,  u16 as AngularSpeed),
 
 		/// Walks to a random position inside the given rectangle.
-		CharIdle       (u16 as CharId, Pos2, Pos2, u32 as Speed),
+		CharIdle       (CharId, Pos2, Pos2, u32 as Speed),
 
 		/// Walks to a position.
 		///
 		/// Official name is `walk_to`.
-		CharWalkToPos  (u16 as CharId, Pos3, u32 as Speed, u8),
+		CharWalkToPos  (CharId, Pos3, u32 as Speed, u8),
 
 		/// Walks to a position, without looking forward.
-		CharWalkToPos2 (u16 as CharId, Pos3, u32 as Speed, u8),
+		CharWalkToPos2 (CharId, Pos3, u32 as Speed, u8),
 
-		_Char90        (u16 as CharId, i32, i32, i32, u32, u8),
-		_Char91        (u16 as CharId, i32, i32, i32, i32, u8),
+		_Char90        (CharId, i32, i32, i32, u32, u8),
+		_Char91        (CharId, i32, i32, i32, i32, u8),
 
 		/// Walks to near where another character is standing.
 		///
 		/// Official name is `walk_to_chr`.
-		CharWalkToChar (u16 as CharId, u16 as CharId, i32 as Length, u32 as Speed, u8),
+		CharWalkToChar (CharId, CharId, i32 as Length, u32 as Speed, u8),
 
 		/// Walks to near where another character is standing, without looking forward.
-		CharWalkToChar2(u16 as CharId, u16 as CharId, i32 as Length, u32 as Speed, u8),
+		CharWalkToChar2(CharId, CharId, i32 as Length, u32 as Speed, u8),
 
-		_94        (u8, u16 as CharId, i16 as Angle, i32, u32 as Speed, u8),
-		CharJump       (u16 as CharId, i32, i32, i32, u32, u32 as Speed), // [jump]
-		_Char96        (u16 as CharId, Pos3, i32, i32),
-		_Char97        (u16 as CharId, Pos2, i32 as Angle32, u32, u16),
+		_94        (u8, CharId, i16 as Angle, i32, u32 as Speed, u8),
+		CharJump       (CharId, i32, i32, i32, u32, u32 as Speed), // [jump]
+		_Char96        (CharId, Pos3, i32, i32),
+		_Char97        (CharId, Pos2, i32 as Angle32, u32, u16),
 		CharPath(match {
-			0 => New(u16 as CharId),
+			0 => New(CharId),
 			1 => Add(Pos3),
-			2 => Run(u16 as CharId, u32 as Speed, u8),
+			2 => Run(CharId, u32 as Speed, u8),
 		}),
-		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_A0(u16 as CharId, u16 as u32 as Time, u8, u8),
-		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] CharAnimation(u16 as CharId, u8, u8, u32 as Time), // [chr_anime]
-		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7CharAnimation(u16 as CharId, u16 as u32 as Time, Vec<u8> via char_animation),
-		CharFlagsSet   (u16 as CharId, u16 as CharFlags), // [set_state]
-		CharFlagsUnset (u16 as CharId, u16 as CharFlags), // [reset_state]
-		CharFlags2Set  (u16 as CharId, u16 as CharFlags),
-		CharFlags2Unset(u16 as CharId, u16 as CharFlags),
-		CharShake      (u16 as CharId, u32, u32, u32, u32 as Time),
-		CharColor      (u16 as CharId, u32 as Color, u32 as Time),
-		Sc_A0          (u16 as CharId, u32 as Color, u8,u8,u8), // TODO Double-check
-		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] CharAttachObj(u16 as CharId, u16 as ObjectId),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_A0(CharId, u16 as u32 as Time, u8, u8),
+		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] CharAnimation(CharId, u8, u8, u32 as Time), // [chr_anime]
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7CharAnimation(CharId, u16 as u32 as Time, Vec<u8> via char_animation),
+		CharFlagsSet   (CharId, u16 as CharFlags), // [set_state]
+		CharFlagsUnset (CharId, u16 as CharFlags), // [reset_state]
+		CharFlags2Set  (CharId, u16 as CharFlags),
+		CharFlags2Unset(CharId, u16 as CharFlags),
+		CharShake      (CharId, u32, u32, u32, u32 as Time),
+		CharColor      (CharId, u32 as Color, u32 as Time),
+		Sc_A0          (CharId, u32 as Color, u8,u8,u8), // TODO Double-check
+		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] CharAttachObj(CharId, u16 as ObjectId),
 		FlagSet(u16 as Flag), // [set_flag]
 		FlagUnset(u16 as Flag), // [reset_flag]
 
@@ -628,7 +628,7 @@ themelios_macros::bytecode! {
 		#[game(Zero, ZeroEvo, Ao)] skip!(1),
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_BA(u8),
 
-		ItemUse(u16 as ItemId, u16 as CharId),
+		ItemUse(u16 as ItemId, CharId),
 
 		/// Returns whether the given member has a particular orbal art.
 		///
@@ -685,14 +685,14 @@ themelios_macros::bytecode! {
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_C8(u16, u16, String, u8, u16), // Something with C_PLATnn._CH
 		#[game(Zero, Ao, AoEvo)] ED7_CC(u8),
 		#[game(Zero, Ao, AoEvo)] CharId(match {
-			1 => Set(u8 as u16 as CharId, u8 as u16 as NameId),
+			1 => Set(CharId via char_id8, u8 as u16 as NameId),
 		}),
 		#[game(ZeroEvo)] skip!(1),
 
 		#[game(Sc, ScEvo, Tc, TcEvo)] PartySelect(u16, [Option<NameId>; 4] via sc_party_select_mandatory, Vec<NameId> via sc_party_select_optional),
 		#[game(Sc, ScEvo)] Sc_CA(u8 as u16 as ObjectId, u8, u32),
 		#[game(Tc, TcEvo)] Tc_CA(u8 as u16 as ObjectId, u8, i32, u32),
-		#[game(Sc, ScEvo, Tc, TcEvo)] CharInSlot(if game.base() == BaseGame::Tc { u8 } else { const 0u8 }, u8 as u16 as CharId),
+		#[game(Sc, ScEvo, Tc, TcEvo)] CharInSlot(if game.base() == BaseGame::Tc { u8 } else { const 0u8 }, CharId via char_id8),
 		#[game(Sc, ScEvo, Tc, TcEvo)] ED6Menu(match {
 			0 => New(u8 as u16 as MenuId, u16, u16, u8),
 			1 => Add(u8 as u16 as MenuId, TString),
@@ -708,11 +708,11 @@ themelios_macros::bytecode! {
 			5 => Select(u8 as u16 as MenuId, u8),
 			6 => _6(u8 as u16 as MenuId),
 		}),
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_CD(u16 as CharId), // related to showing photographs
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_CD(CharId), // related to showing photographs
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Global(u8 as Global, Expr),
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_CF(u16 as CharId, u8, String), // something with skeleton animation
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_CF(CharId, u8, String), // something with skeleton animation
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_D0(i32 as Angle32, u32 as Time),
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_D1(u16 as CharId, i32, i32, i32, u32 as Time), // something with camera?
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_D1(CharId, i32, i32, i32, u32 as Time), // something with camera?
 		#[game(Sc, ScEvo, Tc, TcEvo)] ED6LoadChip(FileId, FileId, u8 as u16 as ChipId),
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7LoadChip(FileId, u8 as u16 as ChipId),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] UnloadChip(u8 as u16 as ChipId),
@@ -720,7 +720,7 @@ themelios_macros::bytecode! {
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] PartyGetEquipped(u8 as u16 as NameId, u8),
 
 		#[game(Sc, ScEvo, Tc, TcEvo)] Sc_D6(u8), // bool
-		#[game(Sc, ScEvo, Tc, TcEvo)] Sc_D7(u8, u32, u16 as CharId),
+		#[game(Sc, ScEvo, Tc, TcEvo)] Sc_D7(u8, u32, CharId),
 		/// Always occurs before ObjSetFrame and ObjPlay. Probably animation speed?
 		#[game(Sc, ScEvo, Tc, TcEvo)] Sc_D8(u8 as u16 as ObjectId, u16),
 		#[game(Sc, ScEvo, Tc, TcEvo)] ScCutIn(match {
@@ -770,7 +770,7 @@ themelios_macros::bytecode! {
 		#[game(Tc, TcEvo)] TcOrganizeTeams(u8, u8, u8, u32 as TcMembers, u32 as TcMembers, u32 as TcMembers, u32 as TcMembers),
 		#[game(Tc, TcEvo)] Tc_DE(u8, u32),
 		#[game(Tc, TcEvo)] Tc_DF(u8, u16),
-		#[game(Tc, TcEvo)] Tc_E0(u16 as CharId, u8, u8),
+		#[game(Tc, TcEvo)] Tc_E0(CharId, u8, u8),
 		#[game(Tc, TcEvo)] TcIndexInTeam(u8 as u16 as NameId, u8),
 		/// Only used in a0028. Possibly related to minigames?
 		#[game(Tc, TcEvo)] Tc_E2(match {
@@ -821,11 +821,11 @@ themelios_macros::bytecode! {
 
 		#[game(FcEvo)] EvoCtp(String), // Refers to /data/map2/{}.ctp
 
-		#[game(Sc, ScEvo, TcEvo)] Sc_E3(u8, u16 as CharId, u8),
+		#[game(Sc, ScEvo, TcEvo)] Sc_E3(u8, CharId, u8),
 		/// A no-op.
 		#[game(Sc, ScEvo, TcEvo)] Sc_E4(u8, u16),
-		#[game(Sc, ScEvo)] Sc_E5(u16 as CharId, u8),
-		#[game(TcEvo)] TcEvo_F2(u16 as CharId, u8, u16, u16),
+		#[game(Sc, ScEvo)] Sc_E5(CharId, u8),
+		#[game(TcEvo)] TcEvo_F2(CharId, u8, u16, u16),
 		#[game(Sc, ScEvo)] Sc_E6(u8), // related to RAM saving, according to debug script
 		#[game(TcEvo)] custom! {
 			// What's EvoVisLipSync doing up here? Maybe they wanted FF to stay clear.
@@ -858,7 +858,7 @@ themelios_macros::bytecode! {
 		///
 		/// Always preceded by a [`TcEvo_F9`](Self::TcEvo_F9), with the object matching. But sometimes the object is 0.
 		#[game(TcEvo)] TcEvo_FA(u16 as ObjectId, u32),
-		#[game(TcEvo)] TcEvo_FB(u8, u16 as CharId, u8),
+		#[game(TcEvo)] TcEvo_FB(u8, CharId, u8),
 		#[game(TcEvo)] TcEvo_FC(u8, u8),
 
 		#[game(FcEvo, ScEvo, TcEvo)] EvoVoiceLine(u16), // [pop_msg]
@@ -992,6 +992,75 @@ arg!(Expr,
 	|f, g, v| Expr::write(f, g, v)?,
 );
 
+arg!(CharId,
+	|f, g| to_char_id(g, f.u16()?)?,
+	|f, g, v| f.u16(from_char_id(g, *v)),
+);
+
+mod char_id8 {
+	use super::*;
+	pub(super) fn read(f: &mut Reader, g: Game) -> Result<CharId, ReadError> {
+		to_char_id(g, f.u8()? as u16)
+	}
+	pub(super) fn write(f: &mut Writer, g: Game, v: &CharId) -> Result<(), WriteError> {
+		f.u8(cast(from_char_id(g, *v))?);
+		Ok(())
+	}
+}
+
+mod char_id_text_message {
+	use super::*;
+	pub(super) fn read(f: &mut Reader, g: Game) -> Result<CharId, ReadError> {
+		if g.is_ed7() {
+			CharId::read(f, g)
+		} else {
+			Ok(CharId::Null)
+		}
+	}
+
+	pub(super) fn write(f: &mut Writer, g: Game, v: &CharId) -> Result<(), WriteError> {
+		if g.is_ed7() {
+			CharId::write(f, g, v)
+		} else {
+			ensure!(*v == CharId::Null, "can only be null here");
+			Ok(())
+		}
+	}
+}
+
+fn to_char_id(g: Game, v: u16) -> Result<CharId, ReadError> {
+	use BaseGame::*;
+	let g = g.base();
+	Ok(match v {
+		257.. => CharId::Name(NameId(v - 257)),
+		256   => return Err("char id 256".into()),
+		255   => CharId::Null,
+		254   => CharId::Self_,
+		244.. if g == Ao => CharId::Custom(v-244),
+		246.. if g == Sc => CharId::Party(v-246),
+		238.. if g != Sc => CharId::Party(v-238),
+		16..  if g == Tc => CharId::Local(LocalCharId(v - 16)),
+		8..   if g != Tc => CharId::Local(LocalCharId(v - 8)),
+		0..   => CharId::FieldParty(v),
+	})
+}
+
+fn from_char_id(g: Game, v: CharId) -> u16 {
+	use BaseGame::*;
+	let g = g.base();
+	match v {
+		CharId::FieldParty(v) => v,
+		CharId::Local(v) if g == Tc => 16 + v.0,
+		CharId::Local(v)            => 8  + v.0,
+		CharId::Party(v) if g == Sc => 246 + v,
+		CharId::Party(v)            => 238 + v,
+		CharId::Custom(v) => 244 + v,
+		CharId::Null      => 255,
+		CharId::Self_     => 254,
+		CharId::Name(v)   => 257 + v.0,
+	}
+}
+
 mod color24 {
 	use super::*;
 	pub(super) fn read(f: &mut Reader, _: Game) -> Result<Color, ReadError> {
@@ -1112,15 +1181,15 @@ mod menu {
 
 pub(super) mod char_attr {
 	use super::*;
-	pub fn read(f: &mut Reader, _: Game) -> Result<CharAttr, ReadError> {
-		let a = CharId(f.u16()?);
+	pub fn read(f: &mut Reader, g: Game) -> Result<CharAttr, ReadError> {
+		let a = CharId::read(f, g)?;
 		let b = f.u8()?;
 		Ok(CharAttr(a, b))
 	}
 
-	pub fn write(f: &mut Writer, _: Game, &CharAttr(a, b): &CharAttr) -> Result<(), WriteError> {
-		f.u16(a.0);
-		f.u8(b);
+	pub fn write(f: &mut Writer, g: Game, CharAttr(a, b): &CharAttr) -> Result<(), WriteError> {
+		CharId::write(f, g, a)?;
+		f.u8(*b);
 		Ok(())
 	}
 }

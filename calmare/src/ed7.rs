@@ -79,10 +79,10 @@ pub fn write(f: &mut Context, scena: &Scena) {
 		f.line();
 	}
 
-	let mut n = 8;
+	let mut n = 0;
 
 	for npc in npcs {
-		f.kw("npc").val(&CharId(n)).suf(":").line().indent(|f| {
+		f.kw("npc").val(&LocalCharId(n)).suf(":").line().indent(|f| {
 			f.kw("name").val(&npc.name).line();
 			f.kw("pos").val(&npc.pos).line();
 			f.kw("angle").val(&npc.angle).line();
@@ -98,7 +98,7 @@ pub fn write(f: &mut Context, scena: &Scena) {
 	}
 
 	for monster in monsters {
-		f.kw("monster").val(&CharId(n)).suf(":").line().indent(|f| {
+		f.kw("monster").val(&LocalCharId(n)).suf(":").line().indent(|f| {
 			f.kw("pos").val(&monster.pos).line();
 			f.kw("angle").val(&monster.angle).line();
 			f.kw("flags").val(&monster.flags).line();

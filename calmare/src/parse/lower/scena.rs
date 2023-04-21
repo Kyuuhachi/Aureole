@@ -8,10 +8,6 @@ pub mod ed6;
 pub mod ed7;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-struct CharDefId(u16);
-newtype!(CharDefId, "char");
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct FuncDefId(u16);
 newtype!(FuncDefId, "fn");
 
@@ -21,7 +17,7 @@ pub enum NpcOrMonster<A, B> {
 	Monster(B),
 }
 
-fn chars<A, B>(items: Many<CharDefId, NpcOrMonster<A, B>>) -> (Vec<A>, Vec<B>) {
+fn chars<A, B>(items: Many<LocalCharId, NpcOrMonster<A, B>>) -> (Vec<A>, Vec<B>) {
 	let misorder = items.0.iter()
 		.skip_while(|a| !matches!(&a.1.1, Some(NpcOrMonster::Monster(_))))
 		.find(|a| matches!(&a.1.1, Some(NpcOrMonster::Npc(_))));

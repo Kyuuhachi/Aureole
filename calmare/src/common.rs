@@ -316,6 +316,7 @@ nt_arg!(TownId,   "town[{}]");
 nt_arg!(BattleId, "battle[{}]");
 nt_arg!(ItemId,   "item[{}]");
 
+nt_arg!(LocalCharId, "char[{}]");
 nt_arg!(LookPointId, "look_point[{}]");
 nt_arg!(EntranceId,  "entrance[{}]");
 nt_arg!(ObjectId,    "object[{}]");
@@ -356,22 +357,14 @@ impl Val for CharAttr {
 
 impl Val for CharId {
 	fn write(&self, f: &mut Context) {
-		let v = self.0;
-		match v {
-			257.. => NameId(v - 257).write(f),
-			256   => write!(f, "(ERROR)"),
-			255   => write!(f, "null"),
-			254   => write!(f, "self"),
-			244.. if f.game.base() == BaseGame::Ao
-			      => write!(f, "custom[{}]", v-244),
-			246.. if f.game.base() == BaseGame::Sc
-			      => write!(f, "party[{}]", v-246),
-			238.. => write!(f, "party[{}]", v-238),
-			16..  if f.game.base() == BaseGame::Tc
-			      => write!(f, "char[{}]", v - 16),
-			8..   if f.game.base() != BaseGame::Tc
-			      => write!(f, "char[{}]", v - 8),
-			0..   => write!(f, "field_party[{}]", v),
+		match self {
+			CharId::FieldParty(v) => write!(f, "field_party[{v}]"),
+			CharId::Local(v) => v.write(f),
+			CharId::Party(v) => write!(f, "party[{v}]"),
+			CharId::Custom(v) => write!(f, "custom[{v}]"),
+			CharId::Null => write!(f, "null"),
+			CharId::Self_ => write!(f, "self"),
+			CharId::Name(v) => v.write(f),
 		}
 	}
 }

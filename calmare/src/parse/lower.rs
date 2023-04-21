@@ -655,22 +655,22 @@ impl TryVal for CharId {
 	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
 		let span = p.next_span();
 		if let Some(()) = p.term("self")? {
-			Ok(Some(CharId(254)))
+			Ok(Some(CharId::Self_))
 		} else if let Some(()) = p.term("null")? {
-			Ok(Some(CharId(255)))
-		} else if let Some((s,)) = p.term::<(u16,)>("name")? {
-			Ok(Some(CharId(s + 257)))
-		} else if let Some((s,)) = p.term::<(u16,)>("char")? {
-			Ok(Some(CharId(s + if p.context.game.base() == BaseGame::Tc { 16 } else { 8 })))
+			Ok(Some(CharId::Null))
+		} else if let Some(n) = NameId::try_parse(p)? {
+			Ok(Some(CharId::Name(n)))
+		} else if let Some(l) = LocalCharId::try_parse(p)? {
+			Ok(Some(CharId::Local(l)))
 		} else if let Some((s,)) = p.term::<(u16,)>("field_party")? {
-			Ok(Some(CharId(s)))
+			Ok(Some(CharId::FieldParty(s)))
 		} else if let Some((s,)) = p.term::<(u16,)>("party")? {
-			Ok(Some(CharId(s + if p.context.game.base() == BaseGame::Sc { 246 } else { 238 })))
+			Ok(Some(CharId::Party(s)))
 		} else if let Some((s,)) = p.term::<(u16,)>("custom")? {
 			if p.context.game.base() != BaseGame::Ao {
 				Diag::error(span, "'custom' is only supported on Azure").emit();
 			}
-			Ok(Some(CharId(s + 244)))
+			Ok(Some(CharId::Custom(s)))
 		} else {
 			Ok(None)
 		}
@@ -706,6 +706,7 @@ newtype!(TownId,   "town");
 newtype!(BattleId, "battle");
 newtype!(ItemId,   "item");
 
+newtype!(LocalCharId, "char");
 newtype!(LookPointId, "look_point");
 newtype!(EntranceId,  "entrance");
 newtype!(ObjectId,    "object");

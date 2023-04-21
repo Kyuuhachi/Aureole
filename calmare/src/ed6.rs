@@ -65,10 +65,10 @@ pub fn write(f: &mut Context, scena: &Scena) {
 		f.line();
 	}
 
-	let mut n = if matches!(f.game.base(), BaseGame::Tc) { 16 } else { 8 };
+	let mut n = 0;
 
 	for npc in &scena.npcs {
-		f.kw("npc").val(&CharId(n)).suf(":").line().indent(|f| {
+		f.kw("npc").val(&LocalCharId(n)).suf(":").line().indent(|f| {
 			f.kw("name").val(&npc.name).line();
 			f.kw("pos").val(&npc.pos).line();
 			f.kw("angle").val(&npc.angle).line();
@@ -85,7 +85,7 @@ pub fn write(f: &mut Context, scena: &Scena) {
 	}
 
 	for monster in &scena.monsters {
-		f.kw("monster").val(&CharId(n)).suf(":").line().indent(|f| {
+		f.kw("monster").val(&LocalCharId(n)).suf(":").line().indent(|f| {
 			f.kw("name").val(&monster.name).line();
 			f.kw("pos").val(&monster.pos).line();
 			f.kw("angle").val(&monster.angle).line();

@@ -17,7 +17,7 @@ struct ScenaBuild {
 	entries: Vec<Entry>,
 	ch: Many<ChipId, FileId>,
 	cp: Many<ChipId, FileId>,
-	chars: Many<CharDefId, NpcOrMonster<Npc, Monster>>,
+	chars: Many<LocalCharId, NpcOrMonster<Npc, Monster>>,
 	triggers: Many<TriggerId, Trigger>,
 	look_points: Many<LookPointId, LookPoint>,
 	functions: Many<FuncDefId, Code>,

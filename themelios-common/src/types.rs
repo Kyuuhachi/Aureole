@@ -69,8 +69,19 @@ newtype!(Speed(u32));
 newtype!(AngularSpeed(u16));
 newtype!(Angle32(i32));
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum CharId {
+	FieldParty(u16),
+	Local(LocalCharId),
+	Party(u16),
+	Custom(u16),
+	Null,
+	Self_,
+	Name(NameId),
+}
+newtype!(LocalCharId(u16));
+
 newtype!(ChipId(u16));
-newtype!(CharId(u16));
 newtype!(LookPointId(u16));
 newtype!(ObjectId(u16));
 newtype!(EntranceId(u8));

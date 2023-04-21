@@ -20,6 +20,7 @@
     - Fill in types for a bunch of unknown instructions.
   - Change internal representation of `Text` from `Vec<TextSegment | Page>` to `Vec<Vec<TextSegment>>`.
   - Change most ::read and ::write functions to be associated.
+  - Change `CharId` to an enum
 - Bug fixes
   - Write `{item[n]}`, not `{item item[n]}`. (The latter remains valid syntax.)
 

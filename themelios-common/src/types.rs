@@ -58,6 +58,11 @@ newtype!(ShopId(u8));
 newtype!(MagicId(u16));
 
 newtype!(FileId(u32), "0x{:08X}");
+
+impl FileId {
+	pub const NONE: FileId = FileId(0);
+}
+
 newtype!(Color(u32), "0x{:08X}");
 
 newtype!(Flag(u16));

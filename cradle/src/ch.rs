@@ -115,8 +115,8 @@ macro_rules! guess {
 }
 
 guess! {
-	"c_ka",     Argb4444,  128,  128; // dialogue face
-	"h_ka",     Argb4444,  256,  256;
+	"c_ka",     Argb1555,  128,  128; // dialogue face
+	"h_ka",     Argb1555,  256,  256;
 	"c_stch",   Argb8888,  512,  512; // menu portrait
 	"h_stch",   Argb8888, 1024, 1024;
 	"cti",      Argb1555,  256,  256; // s-craft cut-in
@@ -165,6 +165,7 @@ guess! {
 	"c_vis",    Argb1555,  256,  256;
 	"c_vis",    Argb1555,  512,  256;
 	"c_vis",    Argb1555,  640,  304;
+	"c_vis",    Argb1555,  128,  64;
 	"c_vis",    Argb1555, 1024, 1024;
 	"h_vis",    Argb1555, 1536, 1024;
 	"w_vis",    Argb1555, 2048, 1024;

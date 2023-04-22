@@ -313,7 +313,7 @@ themelios_macros::bytecode! {
 		TextMessage(CharId via char_id_text_message, Text), // [mes]
 		skip!(1), // {asm} same as NextFrame
 		TextClose(u8), // [mes_close]
-		ScMenuSetTitle(u16, u16, u16, Text),
+		ScMenuSetTitle(u16, u16, u16, TString),
 		TextWait(), // [wait_prompt]
 		_59(), // Always directly after a TextReset 1, and exists in all but one such case. I suspect that one is a bug.
 		TextSetPos(i16, i16, i16, i16), // [mes_pos]

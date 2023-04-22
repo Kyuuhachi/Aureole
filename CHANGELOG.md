@@ -17,6 +17,7 @@
     - Rename `CharFlag2Set` to `CharFlags2Set`.
     - Merge `ED7_79` into `ObjWait`.
     - Merge `ED7_7D` into `MapColor`.
+    - Change ScMenuSetTitle to `TString` instead of `Text`.
     - Fill in types for a bunch of unknown instructions.
   - Change internal representation of `Text` from `Vec<TextSegment | Page>` to `Vec<Vec<TextSegment>>`.
   - Change most ::read and ::write functions to be associated.

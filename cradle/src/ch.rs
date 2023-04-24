@@ -161,7 +161,18 @@ guess! {
 	"c_title5", Argb1555, 1024,  512;
 	"c_title6", Argb1555, 1024,  512;
 
-	"c_vis",    Argb1555,  768,  512; // event visual
+	"c_vis419", Argb4444,  768,  512;
+	"c_vis438", Argb4444,  768,  512;
+	"c_vis439", Argb4444,  768,  512;
+	"h_vis419", Argb4444, 1536, 1024;
+	"h_vis438", Argb4444, 1536, 1024;
+	"h_vis439", Argb4444, 1536, 1024;
+	"c_vis448", Argb4444,  768,  512;
+	"c_vis478", Argb4444,  768,  512;
+	"c_vis53",  Argb4444,  768,  512;
+	"c_vis54",  Argb4444,  768,  512;
+
+	"c_vis",    Argb1555,  768,  512;
 	"c_vis",    Argb1555,  256,  256;
 	"c_vis",    Argb1555,  512,  256;
 	"c_vis",    Argb1555,  640,  304;

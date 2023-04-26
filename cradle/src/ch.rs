@@ -136,6 +136,7 @@ guess! {
 	"c_tuto20", Argb4444,  768,  512;
 	"c_map00",  Argb1555, 1024,  512;
 	"c_map00",  Argb1555,  768,  512;
+	"c_map012", Argb1555, 1024,  512;
 	"c_map01",  Argb4444, 1024,  512;
 	"h_map01",  Argb4444, 2048, 1024;
 
@@ -160,6 +161,12 @@ guess! {
 	"c_title4", Argb4444, 1024,  512;
 	"c_title5", Argb1555, 1024,  512;
 	"c_title6", Argb1555, 1024,  512;
+
+	"c_book",   Argb1555,  768,  512;
+	"c_cook",   Argb1555,  512,  512;
+	"c_raback", Argb1555, 1024,  512;
+	"c_encnt1", Argb1555,  768,  512;
+	"c_gameov", Argb1555,  768,  512;
 
 	"c_vis419", Argb4444,  768,  512;
 	"c_vis438", Argb4444,  768,  512;
@@ -206,6 +213,9 @@ fn test() -> Result<(), Box<dyn std::error::Error>> {
 
 	let d = std::fs::read("../data/fc.extract/00/h_stchr0._ch")?;
 	read(Mode::Argb8888, 1024, &d)?.save("/tmp/ch5.png")?;
+
+	let d = std::fs::read("../data/3rd.extract/24/c_raback._ch")?;
+	read(Mode::Argb1555, 1024, &d)?.save("/tmp/ch6.png")?;
 
 	Ok(())
 }

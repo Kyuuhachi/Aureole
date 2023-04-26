@@ -181,8 +181,7 @@ themelios_macros::bytecode! {
 		/// Official name is `event_end`.
 		EventEnd(u8),
 
-		// I'm not certain about these two. Could be EntranceId or TriggerId.
-		_1B(u8 as u16 as LookPointId, FuncId via func_id_u8_u16),
+		_1B(u8 as EntranceId, FuncId via func_id_u8_u16),
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)]
 		_1C(u8 as u16 as ObjectId, FuncId via func_id_u8_u16),
 		#[game(Zero, Ao, AoEvo)]
@@ -792,9 +791,9 @@ themelios_macros::bytecode! {
 		}),
 		#[game(Tc, TcEvo)] skip!(1),
 		#[game(Tc, TcEvo)] Tc_E5(match {
-			0 => _0(u8, u8 as u16 as NameId, u16, u16),
-			1 => _1(u8, u8 as u16 as NameId, u16, u16),
-			2 => _2(u8, u8 as u16 as NameId, u32),
+			0 => _0(u8, u8, u16, u16),
+			1 => _1(u8, u8, u16, u16),
+			2 => _2(u8, u8, u32),
 		}),
 		#[game(Tc, TcEvo)] Tc_E6(match {
 			0 => _0(u8),

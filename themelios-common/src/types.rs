@@ -169,7 +169,7 @@ newtype!(ForkId(u16));
 pub struct CharAttr(pub CharId, pub u8);
 
 // Translatable string
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
 #[repr(transparent)]
 pub struct TString(pub String);
 impl_from_into!(TString(String));

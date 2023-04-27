@@ -1,6 +1,7 @@
 use std::fmt;
 use gospel::read::Reader;
 
+#[must_use]
 #[derive(Clone, Copy)]
 pub struct Dump<'a> {
 	start: usize,
@@ -64,6 +65,24 @@ impl Dump<'_> {
 			let w = num_width + usize::from(num_width != 0) + usize::from(has_text);
 			(SCREEN_WIDTH - w) / c / 4 * 4
 		}).max(1);
+
+		if self.data[self.start..self.end].is_empty() || lines == 0 {
+			let pos = self.start;
+			if num_width > 0 {
+				let s = format!("{:X}", pos);
+				if s.len() < num_width {
+					sgr(f, "2;33")?;
+					for _ in s.len()..num_width {
+						f.write_str("0")?;
+					}
+				}
+				sgr(f, "33")?;
+				f.write_str(&s)?;
+				sgr(f, "")?;
+				f.write_str(" ")?;
+			}
+			f.write_str("\n")?;
+		}
 
 		for (i, chunk) in self.data[self.start..self.end].chunks(width).take(lines).enumerate() {
 			let pos = self.start + i * width;

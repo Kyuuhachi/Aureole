@@ -6,7 +6,6 @@ use gospel::read::{Reader, Le as _};
 use themelios_common::util::*;
 
 pub mod insn;
-mod dump;
 
 fn strings(f: &mut Reader) -> Result<Vec<String>, ReadError> {
 	let mut strings = Vec::new();

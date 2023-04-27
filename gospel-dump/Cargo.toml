@@ -1,0 +1,8 @@
+[package]
+name = "gospel_dump"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+gospel.path = "../gospel"
+cp932.path = "../cp932"

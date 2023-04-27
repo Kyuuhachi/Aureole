@@ -3,6 +3,7 @@ members = [
 	"cp932",
 	"bc7",
 	"gospel",
+	"gospel-dump",
 
 	"decompress",
 	"themelios-macros",

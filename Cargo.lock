@@ -456,6 +456,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "gospel_dump"
+version = "0.1.0"
+dependencies = [
+ "cp932",
+ "gospel",
+]
+
+[[package]]
 name = "heck"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

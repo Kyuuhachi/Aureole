@@ -132,7 +132,6 @@ pub fn write(f: &mut Context, scena: &Scena) {
 				f.kw("// rotate").val(&r.to_axis_angle().0).val(&r.to_axis_angle().1.to_degrees()).line();
 				f.kw("// scale").val(&s).line();
 			});
-			// TODO add a comment with decomposition
 
 			f.kw("unk1").val(&tr.unk1).line();
 			f.kw("unk2").val(&tr.unk2).line();

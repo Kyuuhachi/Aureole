@@ -5,6 +5,7 @@
   - Instruction table now shows signature on hover.
   - Add docs to some instructions.
   - Add a page on text formatting.
+- In ED7, show matrix decomposition on triggers
 - Breaking
   - Add `item_use` to ed7scena header, instead of it being `unk`.
     - Also rename ed6scena's `item` to `item_use` because it's clearer.
@@ -19,9 +20,12 @@
     - Merge `ED7_7D` into `MapColor`.
     - Change ScMenuSetTitle to `TString` instead of `Text`.
     - Fill in types for a bunch of unknown instructions.
-  - Change internal representation of `Text` from `Vec<TextSegment | Page>` to `Vec<Vec<TextSegment>>`.
-  - Change most ::read and ::write functions to be associated.
-  - Change `CharId` to an enum
+  - Themelios internals:
+    - Change `Text` from `Vec<TextSegment | Page>` to `Vec<Vec<TextSegment>>`.
+    - Change most ::read and ::write functions to be associated.
+    - Change `CharId` to an enum
+	- Use Glam types where appropriate
+
 - Bug fixes
   - Write `{item[n]}`, not `{item item[n]}`. (The latter remains valid syntax.)
 

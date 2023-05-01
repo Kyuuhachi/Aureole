@@ -371,13 +371,13 @@ impl Val for CharId {
 
 impl Val for Pos2 {
 	fn write(&self, f: &mut Context) {
-		write!(f, "({x}, null, {z})", x=self.0, z=self.1)
+		write!(f, "({x}, null, {z})", x=self.x, z=self.z)
 	}
 }
 
 impl Val for Pos3 {
 	fn write(&self, f: &mut Context) {
-		write!(f, "({x}, {y}, {z})", x=self.0, y=self.1, z=self.2)
+		write!(f, "({x}, {y}, {z})", x=self.x, y=self.y, z=self.z)
 	}
 }
 

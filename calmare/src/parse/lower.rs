@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use glam::{Vec3, Mat4};
 use themelios::text::{Text, TextSegment};
 use themelios::types::*;
 use themelios::lookup::Lookup;
@@ -564,7 +565,7 @@ impl TryVal for Pos3 {
 
 	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
 		if let Some((x, y, z)) = p.tuple()? {
-			Ok(Some(Pos3(x, y, z)))
+			Ok(Some(Pos3 { x, y, z }))
 		} else {
 			Ok(None)
 		}
@@ -589,10 +590,29 @@ impl TryVal for Pos2 {
 
 	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
 		if let Some((x, Null, z)) = p.tuple()? {
-			Ok(Some(Pos2(x, z)))
+			Ok(Some(Pos2 { x, z }))
 		} else {
 			Ok(None)
 		}
+	}
+}
+
+impl TryVal for Vec3 {
+	fn desc() -> String { "pos3".to_owned() }
+
+	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
+		if let Some((x, y, z)) = p.tuple()? {
+			Ok(Some(Vec3 { x, y, z }))
+		} else {
+			Ok(None)
+		}
+	}
+}
+
+impl Val for Mat4 {
+	fn parse(p: &mut Parse) -> Result<Self> {
+		let v = <[f32; 16]>::parse(p)?;
+		Ok(Mat4::from_cols_array(&v).transpose())
 	}
 }
 

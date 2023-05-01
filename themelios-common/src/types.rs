@@ -43,10 +43,12 @@ macro_rules! newtype {
 pub struct FuncId(pub u16, pub u16);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Pos2(pub i32, pub i32);
+pub struct Pos2 {
+	pub x: i32,
+	pub z: i32,
+}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Pos3(pub i32, pub i32, pub i32);
+pub type Pos3 = glam::IVec3;
 
 newtype!(NameId(u16));
 newtype!(BgmId(u16));

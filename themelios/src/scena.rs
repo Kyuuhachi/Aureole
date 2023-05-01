@@ -12,24 +12,24 @@ pub mod decompile;
 #[extend::ext(name = ReaderExt)]
 impl Reader<'_> {
 	fn pos2(&mut self) -> Result<Pos2, gospel::read::Error> {
-		Ok(Pos2(self.i32()?, self.i32()?))
+		Ok(Pos2 { x: self.i32()?, z: self.i32()? })
 	}
 
 	fn pos3(&mut self) -> Result<Pos3, gospel::read::Error> {
-		Ok(Pos3(self.i32()?, self.i32()?, self.i32()?))
+		Ok(Pos3 { x: self.i32()?, y: self.i32()?, z: self.i32()? })
 	}
 }
 
 #[extend::ext]
 impl Writer {
 	fn pos2(&mut self, p: Pos2) {
-		self.i32(p.0);
-		self.i32(p.1);
+		self.i32(p.x);
+		self.i32(p.z);
 	}
 
 	fn pos3(&mut self, p: Pos3) {
-		self.i32(p.0);
-		self.i32(p.1);
-		self.i32(p.2);
+		self.i32(p.x);
+		self.i32(p.y);
+		self.i32(p.z);
 	}
 }

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use glam::{Vec3, Mat4};
 use gospel::read::{Reader, Le as _};
 use gospel::write::{Writer, Le as _};
 use crate::types::*;
@@ -40,7 +41,7 @@ pub struct Scena {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Label {
 	pub name: TString,
-	pub pos: (f32, f32, f32),
+	pub pos: Vec3,
 	pub unk1: u16,
 	pub unk2: u16,
 }
@@ -73,9 +74,9 @@ pub struct Monster {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Trigger {
-	pub pos: (f32, f32, f32),
+	pub pos: Vec3,
 	pub radius: f32,
-	pub transform: [[f32; 4]; 4],
+	pub transform: Mat4,
 	pub unk1: u8,
 	pub unk2: u16,
 	pub function: FuncId,
@@ -273,11 +274,9 @@ impl Scena {
 
 		let mut g = f.clone().at(p_triggers)?;
 		let triggers = list(n_triggers, || Ok(Trigger {
-			pos: (g.f32()?, g.f32()?, g.f32()?),
+			pos: Vec3  { x: g.f32()?, y: g.f32()?, z: g.f32()? },
 			radius: g.f32()?,
-			transform: transpose(array(|| {
-				array(|| Ok(g.f32()?))
-			}).strict()?),
+			transform: Mat4::from_cols_array(&array(|| Ok(g.f32()?)).strict()?),
 			unk1: g.u8()?,
 			unk2: g.u16()?,
 			function: FuncId(g.u8()? as u16, g.u8()? as u16),
@@ -342,7 +341,7 @@ impl Scena {
 		} else {
 			let mut g = f.clone().at(p_labels)?;
 			Some(list(n_labels, || Ok(Label {
-				pos: (g.f32()?, g.f32()?, g.f32()?),
+				pos: Vec3 { x: g.f32()?, y: g.f32()?, z: g.f32()? },
 				unk1: g.u16()?,
 				unk2: g.u16()?,
 				name: TString(g.ptr32()?.string()?),
@@ -513,14 +512,12 @@ impl Scena {
 
 		let g = &mut triggers;
 		for trigger in &scena.triggers {
-			g.f32(trigger.pos.0);
-			g.f32(trigger.pos.1);
-			g.f32(trigger.pos.2);
+			g.f32(trigger.pos.x);
+			g.f32(trigger.pos.y);
+			g.f32(trigger.pos.z);
 			g.f32(trigger.radius);
-			for row in transpose(trigger.transform) {
-				for col in row {
-					g.f32(col)
-				}
+			for v in trigger.transform.to_cols_array() {
+				g.f32(v)
 			}
 			g.u8(trigger.unk1);
 			g.u16(trigger.unk2);
@@ -645,9 +642,9 @@ impl Scena {
 		if let Some(l) = &scena.labels {
 			let g = &mut labels;
 			for l in l {
-				g.f32(l.pos.0);
-				g.f32(l.pos.1);
-				g.f32(l.pos.2);
+				g.f32(l.pos.x);
+				g.f32(l.pos.y);
+				g.f32(l.pos.z);
 				g.u16(l.unk1);
 				g.u16(l.unk2);
 				g.delay32(strings.here());
@@ -767,8 +764,4 @@ impl BattleRead {
 			}
 		}
 	}
-}
-
-fn transpose(x: [[f32; 4]; 4]) -> [[f32; 4]; 4] {
-	[0,1,2,3].map(|a| [0,1,2,3].map(|b| x[b][a]))
 }

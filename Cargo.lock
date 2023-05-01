@@ -125,6 +125,7 @@ version = "0.1.0"
 dependencies = [
  "codespan-reporting",
  "extend",
+ "glam",
  "themelios",
  "unicode-xid",
 ]
@@ -446,6 +447,12 @@ dependencies = [
  "crc32fast",
  "miniz_oxide",
 ]
+
+[[package]]
+name = "glam"
+version = "0.24.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad83ab008a4fa3b31dfa713dd41b5a9bdea1e94e4cf1e2fc274ffbd49b0271d3"
 
 [[package]]
 name = "gospel"
@@ -978,6 +985,7 @@ name = "themelios"
 version = "0.1.0"
 dependencies = [
  "extend",
+ "glam",
  "gospel",
  "lazy_static",
  "num_enum",
@@ -1017,6 +1025,7 @@ version = "0.1.0"
 dependencies = [
  "cp932",
  "extend",
+ "glam",
  "gospel",
  "strict_result",
  "thiserror",
@@ -1038,6 +1047,7 @@ name = "themelios-scena"
 version = "0.1.0"
 dependencies = [
  "extend",
+ "glam",
  "gospel",
  "num_enum",
  "themelios-common",

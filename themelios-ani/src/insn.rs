@@ -434,8 +434,8 @@ arg!(Addr,
 );
 
 arg!(Pos3,
-	|f, _| Pos3(f.i32()?, f.i32()?, f.i32()?),
-	|f, _, v| { f.i32(v.0); f.i32(v.1); f.i32(v.2); },
+	|f, _| Pos3 { x: f.i32()?, y: f.i32()?, z: f.i32()? },
+	|f, _, v| { f.i32(v.x); f.i32(v.y); f.i32(v.z); },
 );
 
 mod talk_random {

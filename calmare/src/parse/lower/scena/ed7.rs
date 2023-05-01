@@ -17,19 +17,6 @@ pub struct Header {
 	pub scp: [FileId; 6],
 }
 
-struct FPos3(f32, f32, f32);
-impl TryVal for FPos3 {
-	fn desc() -> String { "fpos3".to_owned() }
-
-	fn try_parse(p: &mut Parse) -> Result<Option<Self>> {
-		if let Some((x, y, z)) = p.tuple()? {
-			Ok(Some(FPos3(x, y, z)))
-		} else {
-			Ok(None)
-		}
-	}
-}
-
 #[derive(Debug, Clone, Default)]
 struct ScenaBuild {
 	header: One<Header>,
@@ -232,10 +219,10 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 				unk5,
 				unk6,
 			});
-			let FPos3(x, y, z) = pos;
+			let Vec3 {..} = &pos;
 			let radius: f32 = radius;
 			scena.triggers.insert(n, Trigger {
-				pos: (x / 1000., y / 1000., z / 1000.),
+				pos: pos / 1000.,
 				radius: radius / 1000.,
 				transform,
 				unk1,
@@ -285,10 +272,10 @@ fn parse_line(scena: &mut ScenaBuild, p: &mut Parse) -> Result<()> {
 				unk1,
 				unk2,
 			});
-			let FPos3(x, y, z) = pos;
+			let Vec3 {..} = &pos;
 			scena.labels.insert(n, Label {
 				name,
-				pos: (x / 1000., y / 1000., z / 1000.),
+				pos: pos / 1000.,
 				unk1,
 				unk2,
 			});

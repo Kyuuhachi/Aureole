@@ -10,3 +10,4 @@ themelios-common.path = "../themelios-common"
 
 num_enum = "0.5.7"
 extend = "1.1.2"
+glam = "0.24.0"

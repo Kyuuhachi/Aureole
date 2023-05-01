@@ -116,7 +116,7 @@ pub fn write(f: &mut Context, scena: &Scena) {
 	for (i, tr) in triggers.iter().enumerate() {
 		f.val(&TriggerId(i as u16)).suf(":").line().indent(|f| {
 			f.kw("pos");
-			write!(f, "({}, {}, {})", tr.pos.0 * 1000., tr.pos.1 * 1000., tr.pos.2 * 1000.);
+			write!(f, "({}, {}, {})", tr.pos.x * 1000., tr.pos.y * 1000., tr.pos.z * 1000.);
 			f.line();
 
 			f.kw("radius");
@@ -125,7 +125,7 @@ pub fn write(f: &mut Context, scena: &Scena) {
 
 			f.kw("transform");
 			f.line().indent(|f| {
-				for r in &tr.transform {
+				for r in tr.transform.transpose().to_cols_array_2d() {
 					for (i, c) in r.iter().enumerate() {
 						if i != 0 {
 							write!(f, " ");
@@ -181,7 +181,7 @@ pub fn write(f: &mut Context, scena: &Scena) {
 				f.kw("name").val(&lb.name).line();
 
 				f.kw("pos");
-				write!(f, "({}, {}, {})", lb.pos.0 * 1000., lb.pos.1 * 1000., lb.pos.2 * 1000.);
+				write!(f, "({}, {}, {})", lb.pos.x * 1000., lb.pos.y * 1000., lb.pos.z * 1000.);
 				f.line();
 
 				f.kw("unk1").val(&lb.unk1).line();

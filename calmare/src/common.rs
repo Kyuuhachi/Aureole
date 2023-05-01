@@ -253,6 +253,17 @@ prim_arg!(i8, "{}");
 prim_arg!(i16, "{}");
 prim_arg!(i32, "{}");
 
+impl Val for f32 {
+	fn write(&self, f: &mut Context) {
+		let s = format!("{:?}", self);
+		if s.contains('e') {
+			write!(f, "{}", self);
+		} else {
+			write!(f, "{}", s);
+		}
+	}
+}
+
 impl Val for String {
 	fn write(&self, f: &mut Context) {
 		write!(f, "\"");
@@ -371,13 +382,19 @@ impl Val for CharId {
 
 impl Val for Pos2 {
 	fn write(&self, f: &mut Context) {
-		write!(f, "({x}, null, {z})", x=self.x, z=self.z)
+		f.pre("(").val(&self.x).suf(",").kw("null").suf(",").val(&self.z).suf(")");
 	}
 }
 
 impl Val for Pos3 {
 	fn write(&self, f: &mut Context) {
-		write!(f, "({x}, {y}, {z})", x=self.x, y=self.y, z=self.z)
+		f.pre("(").val(&self.x).suf(",").val(&self.y).suf(",").val(&self.z).suf(")");
+	}
+}
+
+impl Val for glam::Vec3 {
+	fn write(&self, f: &mut Context) {
+		f.pre("(").val(&self.x).suf(",").val(&self.y).suf(",").val(&self.z).suf(")");
 	}
 }
 

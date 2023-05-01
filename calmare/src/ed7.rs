@@ -115,31 +115,22 @@ pub fn write(f: &mut Context, scena: &Scena) {
 
 	for (i, tr) in triggers.iter().enumerate() {
 		f.val(&TriggerId(i as u16)).suf(":").line().indent(|f| {
-			f.kw("pos");
-			write!(f, "({}, {}, {})", tr.pos.x * 1000., tr.pos.y * 1000., tr.pos.z * 1000.);
-			f.line();
-
-			f.kw("radius");
-			write!(f, "{}", tr.radius * 1000.);
-			f.line();
+			f.kw("pos").val(&(tr.pos * 1000.)).line();
+			f.kw("radius").val(&(tr.radius * 1000.)).line();
 
 			f.kw("transform");
 			f.line().indent(|f| {
 				for r in tr.transform.transpose().to_cols_array_2d() {
-					for (i, c) in r.iter().enumerate() {
-						if i != 0 {
-							write!(f, " ");
-						}
-						// Why is there no way to do this by default
-						let s = format!("{:?}", c);
-						if s.contains('e') {
-							write!(f, "{}", c);
-						} else {
-							write!(f, "{}", s);
-						}
+					for c in r {
+						f.val(&c);
 					}
 					f.line();
 				}
+
+				let (s, r, t) = tr.transform.inverse().to_scale_rotation_translation();
+				f.kw("// translate").val(&t).line();
+				f.kw("// rotate").val(&r.to_axis_angle().0).val(&r.to_axis_angle().1.to_degrees()).line();
+				f.kw("// scale").val(&s).line();
 			});
 			// TODO add a comment with decomposition
 
@@ -180,9 +171,7 @@ pub fn write(f: &mut Context, scena: &Scena) {
 			f.val(&LabelId(i as u16)).suf(":").line().indent(|f| {
 				f.kw("name").val(&lb.name).line();
 
-				f.kw("pos");
-				write!(f, "({}, {}, {})", lb.pos.x * 1000., lb.pos.y * 1000., lb.pos.z * 1000.);
-				f.line();
+				f.kw("pos").val(&(lb.pos * 1000.)).line();
 
 				f.kw("unk1").val(&lb.unk1).line();
 				f.kw("unk2").val(&lb.unk2).line();

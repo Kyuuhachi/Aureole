@@ -66,7 +66,6 @@ impl ED6Ent {
 				cam_from, cam_deg, cam_zoom, cam_pers, cam_at, cam_limit,
 				town, unk4,
 			});
-			println!("{:?}", table.last().unwrap());
 		}
 		Ok(table)
 	}

@@ -129,7 +129,7 @@ pub fn write(f: &mut Context, scena: &Scena) {
 
 				let (s, r, t) = tr.transform.inverse().to_scale_rotation_translation();
 				f.kw("// translate").val(&t).line();
-				f.kw("// rotate").val(&r.to_axis_angle().0).val(&r.to_axis_angle().1.to_degrees()).line();
+				f.kw("// rotate").val(&r.to_axis_angle().0).val(&r.to_axis_angle().1.to_degrees()).suf("deg").line();
 				f.kw("// scale").val(&s).line();
 			});
 

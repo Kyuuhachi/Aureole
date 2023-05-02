@@ -987,6 +987,7 @@ dependencies = [
  "extend",
  "glam",
  "gospel",
+ "gospel_dump",
  "lazy_static",
  "num_enum",
  "strict_result",

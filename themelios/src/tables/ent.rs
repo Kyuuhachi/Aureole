@@ -6,29 +6,29 @@ use crate::types::*;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ED6Ent {
-	pub name: String,
-	bbox: (Vec3, Vec3),
-	pos: Vec3,
-	angle: Angle,
-	unk1: u16,
+	pub name: TString,
+	pub bbox: (Vec3, Vec3),
+	pub pos: Vec3,
+	pub angle: Angle,
+	pub unk1: u16,
 	// 1: disabled
-	flags: u16,
-	unk2: u16,
+	pub flags: u16,
+	pub unk2: u16,
 
-	dest_name: String,
-	dest: FileId,
-	dest_entrance: EntranceId,
-	unk3: u16,
+	pub dest_name: String,
+	pub dest: FileId,
+	pub dest_entrance: EntranceId,
+	pub unk3: u16,
 
-	cam_from: Vec3,
-	cam_deg: f32,
-	cam_zoom: f32,
-	cam_pers: f32,
-	cam_at: Vec3,
-	cam_limit: (Angle, Angle),
+	pub cam_from: Vec3,
+	pub cam_deg: f32,
+	pub cam_zoom: f32,
+	pub cam_pers: f32,
+	pub cam_at: Vec3,
+	pub cam_limit: (Angle, Angle),
 
-	town: TownId,
-	unk4: u16,
+	pub town: TownId,
+	pub unk4: u16,
 }
 
 impl ED6Ent {
@@ -36,7 +36,7 @@ impl ED6Ent {
 		let mut f = Reader::new(data);
 		let mut table = Vec::new();
 		for _ in 0..f.u16()? {
-			let name = f.sized_string::<16>()?;
+			let name = TString(f.sized_string::<16>()?);
 			let bbox = (f.vec3()?, f.vec3()?);
 			let pos = f.vec3()?;
 			let angle = Angle(f.i16()?);
@@ -75,7 +75,7 @@ impl ED6Ent {
 		let mut f = Writer::new();
 		f.u16(cast(table.len())?);
 		for a in table {
-			f.sized_string::<16>(&a.name)?;
+			f.sized_string::<16>(&a.name.0)?;
 			f.vec3(a.bbox.0);
 			f.vec3(a.bbox.1);
 			f.vec3(a.pos);

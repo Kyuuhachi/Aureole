@@ -1,4 +1,7 @@
-use gospel::read::Reader;
+use gospel::read::{Reader, Le as _};
+
+use glam::Vec3;
+use crate::types::{Pos2, Pos3};
 
 type Backtrace = std::backtrace::Backtrace;
 
@@ -46,7 +49,7 @@ pub fn decode(bytes: &[u8]) -> Result<String, DecodeError> {
 	cp932::decode(bytes).map_err(|_| DecodeError { text: cp932::decode_lossy(bytes) })
 }
 
-#[extend::ext(name = ReaderExtU)]
+#[extend::ext(name = ReaderExt)]
 pub impl Reader<'_> {
 	fn string(&mut self) -> Result<String, ReadError> {
 		let mut s = self.clone();
@@ -59,5 +62,17 @@ pub impl Reader<'_> {
 		let d = self.slice(N)?;
 		let len = d.iter().position(|a| *a == 0).unwrap_or(d.len());
 		Ok(decode(&d[..len])?)
+	}
+
+	fn pos2(&mut self) -> Result<Pos2, gospel::read::Error> {
+		Ok(Pos2 { x: self.i32()?, z: self.i32()? })
+	}
+
+	fn pos3(&mut self) -> Result<Pos3, gospel::read::Error> {
+		Ok(Pos3 { x: self.i32()?, y: self.i32()?, z: self.i32()? })
+	}
+
+	fn vec3(&mut self) -> Result<Vec3, gospel::read::Error> {
+		Ok(Vec3 { x: self.f32()?, y: self.f32()?, z: self.f32()? })
 	}
 }

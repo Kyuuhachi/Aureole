@@ -5,7 +5,6 @@ use gospel::write::{Writer, Le as _};
 use crate::types::*;
 use themelios_common::util::*;
 use super::code::{Code, FlatInsn, Insn};
-use super::{ReaderExt as _, WriterExt as _};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Scena {
@@ -274,7 +273,7 @@ impl Scena {
 
 		let mut g = f.clone().at(p_triggers)?;
 		let triggers = list(n_triggers, || Ok(Trigger {
-			pos: Vec3  { x: g.f32()?, y: g.f32()?, z: g.f32()? },
+			pos: g.vec3()?,
 			radius: g.f32()?,
 			transform: Mat4::from_cols_array(&array(|| Ok(g.f32()?)).strict()?),
 			unk1: g.u8()?,
@@ -341,7 +340,7 @@ impl Scena {
 		} else {
 			let mut g = f.clone().at(p_labels)?;
 			Some(list(n_labels, || Ok(Label {
-				pos: Vec3 { x: g.f32()?, y: g.f32()?, z: g.f32()? },
+				pos: g.vec3()?,
 				unk1: g.u16()?,
 				unk2: g.u16()?,
 				name: TString(g.ptr32()?.string()?),

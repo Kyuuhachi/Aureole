@@ -1,5 +1,8 @@
-use gospel::write::Writer;
+use gospel::write::{Writer, Le as _};
 use super::ensure;
+
+use glam::Vec3;
+use crate::types::{Pos2, Pos3};
 
 type Backtrace = std::backtrace::Backtrace;
 
@@ -47,7 +50,7 @@ pub fn encode(text: &str) -> Result<Vec<u8>, EncodeError> {
 	cp932::encode(text).map_err(|_| EncodeError { text: text.to_owned() })
 }
 
-#[extend::ext(name = WriterExtU)]
+#[extend::ext(name = WriterExt)]
 pub impl Writer {
 	fn string(&mut self, s: &str) -> Result<(), WriteError> {
 		let s = encode(s)?;
@@ -63,5 +66,23 @@ pub impl Writer {
 		buf[..s.len()].copy_from_slice(&s);
 		self.array::<N>(buf);
 		Ok(())
+	}
+
+	fn pos2(&mut self, p: Pos2) {
+		self.i32(p.x);
+		self.i32(p.z);
+	}
+
+	fn pos3(&mut self, p: Pos3) {
+		self.i32(p.x);
+		self.i32(p.y);
+		self.i32(p.z);
+	}
+
+
+	fn vec3(&mut self, p: Vec3) {
+		self.f32(p.x);
+		self.f32(p.y);
+		self.f32(p.z);
 	}
 }

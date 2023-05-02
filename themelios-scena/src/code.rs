@@ -19,31 +19,6 @@ impl std::fmt::Debug for Label {
 	}
 }
 
-#[extend::ext]
-impl Reader<'_> {
-	fn pos2(&mut self) -> Result<Pos2, gospel::read::Error> {
-		Ok(Pos2 { x: self.i32()?, z: self.i32()? })
-	}
-
-	fn pos3(&mut self) -> Result<Pos3, gospel::read::Error> {
-		Ok(Pos3 { x: self.i32()?, y: self.i32()?, z: self.i32()? })
-	}
-}
-
-#[extend::ext]
-impl Writer {
-	fn pos2(&mut self, p: Pos2) {
-		self.i32(p.x);
-		self.i32(p.z);
-	}
-
-	fn pos3(&mut self, p: Pos3) {
-		self.i32(p.x);
-		self.i32(p.y);
-		self.i32(p.z);
-	}
-}
-
 // TODO make this one stricter so it does not permit duplicate labels
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Code(pub Vec<FlatInsn>);

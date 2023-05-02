@@ -1,8 +1,8 @@
 #![feature(let_chains)]
 #![feature(decl_macro)]
 
-use themelios_common::{types, util};
-use gospel::read::{Reader, Le as _};
+use themelios_common::types;
+use gospel::read::Reader;
 use themelios_common::util::*;
 
 pub mod insn;

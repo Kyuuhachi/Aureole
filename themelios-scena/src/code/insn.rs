@@ -813,7 +813,7 @@ themelios_macros::bytecode! {
 		/// Opens the save menu in order to save clear data.
 		SaveClearData(),
 
-		#[game(FcEvo, Sc, ScEvo, TcEvo)] Sc_DE(String), // a place name. Not a t_town, strangely
+		#[game(FcEvo, Sc, ScEvo, TcEvo)] Sc_DE(TString),
 		#[game(FcEvo, Sc, ScEvo, TcEvo)] skip!(1),
 		#[game(FcEvo, Sc, ScEvo, TcEvo)] Sc_E0(u8 as u16 as ObjectId, Pos3),
 		#[game(FcEvo, Sc, ScEvo, TcEvo)] skip!(2),

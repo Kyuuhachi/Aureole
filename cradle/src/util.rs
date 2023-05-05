@@ -60,17 +60,48 @@ pub fn tile<I>(
 }
 
 #[inline(always)]
-pub fn swizzle<A>(data: &mut [A], residual: &mut [A], w: usize, cw: usize, ch: usize) {
-	assert_eq!(data.len(), residual.len());
-	for (ci, r) in residual.chunks_mut(cw*ch).enumerate() {
-		let cx = ci % (w / cw) * cw;
-		let cy = ci / (w / cw) * ch;
-		for (y, r) in r.chunks_mut(cw).enumerate() {
-			for (x, r) in r.iter_mut().enumerate() {
-				let x = cx+x;
-				let y = cy+y;
-				std::mem::swap(&mut data[y*w+x], r);
+pub fn swizzle<A: Clone, const N: usize>(data: &[A], out: &mut [A], shape: [usize; N], order: [usize; N]) {
+	assert_eq!(out.len(), data.len());
+	assert_eq!(shape.iter().copied().product::<usize>(), data.len());
+	let stride = order.map(|i| shape[i+1..].iter().copied().product::<usize>());
+	for (i, p) in iter_shape(shape, order).enumerate() {
+		let mut n = 0;
+		for j in 0..N {
+			n += stride[j] * p[order[j]];
+		}
+		out[i] = data[n].clone();
+	}
+}
+
+#[inline(always)]
+pub fn iter_shape<const N: usize>(shape: [usize; N], order: [usize; N]) -> impl Iterator<Item=[usize; N]> {
+	let mut n = shape.map(|_| 0);
+	let mut done = false;
+	std::iter::from_fn(move || {
+		if done { return None }
+		let v = n;
+		for k in order.into_iter().rev() {
+			n[k] += 1;
+			if n[k] == shape[k] {
+				n[k] = 0;
+			} else {
+				return Some(v);
 			}
 		}
-	}
+		done = true;
+		Some(v)
+	})
+}
+
+#[test]
+fn test_iter_shape() {
+	assert_eq!(iter_shape([2,3,2],[0,1,2]).collect::<Vec<_>>(), vec![
+		[0,0,0], [0,0,1], [0,1,0], [0,1,1], [0,2,0], [0,2,1],
+		[1,0,0], [1,0,1], [1,1,0], [1,1,1], [1,2,0], [1,2,1],
+	]);
+
+	assert_eq!(iter_shape([2,3,2],[0,2,1]).collect::<Vec<_>>(), vec![
+		[0,0,0], [0,1,0], [0,2,0], [0,0,1], [0,1,1], [0,2,1],
+		[1,0,0], [1,1,0], [1,2,0], [1,0,1], [1,1,1], [1,2,1]
+	]);
 }

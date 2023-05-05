@@ -14,12 +14,11 @@ impl Itp32 {
 	pub fn to_rgba(&self, level: usize) -> RgbaImage {
 		let width = self.width >> level;
 		let height = self.height >> level;
-		let mut pixels = Vec::with_capacity(width * height);
+		let mut pixels = Vec::with_capacity(width * height * 4);
 		for p in &self.levels[level] {
 			pixels.extend(bc7::decode(*p).flatten().flatten())
 		}
-		let mut c = pixels.clone();
-		swizzle(&mut pixels, &mut c, width*4, 4*4, 4);
+		swizzle(&pixels.clone(), &mut pixels, [height/4, width/4, 4, 4, 4], [0, 2, 1, 3, 4]);
 		image(width, height, pixels).unwrap()
 	}
 
@@ -105,6 +104,7 @@ pub fn read(data: &[u8]) -> Result<Itp32, Error> {
 	let mut height = 0;
 	let mut n_mips = 0;
 	let mut minor = 0;
+	let mut swizzle = 0; // see https://imgur.com/a/E5YnYXN
 	let mut levels = Vec::new();
 
 	loop {
@@ -120,7 +120,7 @@ pub fn read(data: &[u8]) -> Result<Itp32, Error> {
 
 				let major = f.u16()?;
 				minor = f.u16()?;
-				f.check_u16(0)?; // swizzle; see https://imgur.com/a/E5YnYXN
+				swizzle = f.u16()?;
 				f.check_u16(6)?; // rest are unknown
 				f.check_u16(3)?;
 				f.check_u16(0)?;
@@ -153,7 +153,9 @@ pub fn read(data: &[u8]) -> Result<Itp32, Error> {
 				f.check_u16(0)?;
 				f.check_u16(n as u16)?;
 
-				let capacity = (width >> n) * (height >> n);
+				let w = width >> n;
+				let h = height >> n;
+				let capacity = w * h;
 				let mut data = Vec::with_capacity(capacity);
 				match minor {
 					5 => {
@@ -183,10 +185,18 @@ pub fn read(data: &[u8]) -> Result<Itp32, Error> {
 					_ => bail!("itp32: invalid minor {minor}, only 5 or 10 supported")
 				}
 				ensure!(data.len() == capacity, "itp32: not enough data");
-				let data = data.chunks(16)
-					.map(|a| a.try_into().unwrap())
-					.map(u128::from_le_bytes)
+
+				let mut data: Vec<u128> = data
+					.chunks_exact(16)
+					.map(|a| u128::from_le_bytes(a.try_into().unwrap()))
 					.collect();
+
+				match swizzle {
+					0 | 5.. => {},
+					4 => crate::util::swizzle(&data.clone(), &mut data, [h/32, w/32, 2, 2, 2, 2, 2, 2], [0,2,4,6,1,3,5,7]),
+					_ => bail!("unsupported swizzle mode {swizzle}")
+				};
+
 				levels.push(data);
 			}
 

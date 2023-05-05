@@ -6,7 +6,7 @@ use image::{GrayImage, Rgba, RgbaImage};
 use gospel::read::{Reader, Le as _};
 use gospel::write::{Writer, Le as _};
 use decompress::{decompress_ed7 as decompress, compress_ed7 as compress};
-use crate::util::{Error, swizzle, image, ensure, bail};
+use crate::util::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Itp {
@@ -98,9 +98,7 @@ pub fn read1004(data: &[u8]) -> Result<Itp, Error> {
 	let h = f.u32()? as usize;
 	let palette = read_palette(f.u32()?, &mut Reader::new(&decompress(&mut f)?))?;
 	let mut pixels = decompress(&mut f)?;
-
-	let mut c = pixels.clone();
-	swizzle(&mut pixels, &mut c, w, 16, 8);
+	swizzle(&pixels.clone(), &mut pixels, [h/8, w/16, 8, 16], [0,2,1,3]);
 	Ok(Itp { palette, image: image(w, h, pixels)? })
 }
 
@@ -116,9 +114,9 @@ pub fn write1004(itp: &Itp) -> Result<Vec<u8>, Error> {
 		g.finish()?
 	});
 	let mut pixels = itp.image.as_raw().clone();
-	let mut c = pixels.clone();
-	swizzle(&mut pixels, &mut c, itp.image.width() as usize, 16, 8);
-	compress(&mut f, &c);
+	let (w, h) = (itp.image.width() as usize, itp.image.height() as usize);
+	swizzle(&pixels.clone(), &mut pixels, [h/8, 8, w/16, 16], [0,2,1,3]);
+	compress(&mut f, &pixels);
 	Ok(f.finish()?)
 }
 
@@ -178,8 +176,7 @@ pub fn read1005(data: &[u8]) -> Result<Itp, Error> {
 		pixels.extend(chunk);
 	}
 
-	let mut c = pixels.clone();
-	swizzle(&mut pixels, &mut c, w, 16, 8);
+	swizzle(&pixels.clone(), &mut pixels, [h/8, w/16, 8, 16], [0,2,1,3]);
 	Ok(Itp { palette, image: image(w, h, pixels)? })
 }
 
@@ -250,10 +247,7 @@ pub fn read1006(data: &[u8]) -> Result<Itp, Error> {
 		ensure!(pixels.len() == end, "overshot when reading tile");
 	}
 
-	// I do not understand why this swizzle sequence works. But it does.
-	let mut c = pixels.clone();
-	swizzle(&mut c, &mut pixels, cw, 2, 2);
-	swizzle(&mut pixels, &mut c, w, cw, ch);
+	swizzle(&pixels.clone(), &mut pixels, [h/ch, w/cw, ch/2, cw/2, 2, 2], [0,2,4,1,3,5]);
 	Ok(Itp { palette, image: image(w, h, pixels)? })
 }
 

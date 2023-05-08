@@ -24,7 +24,7 @@
     - Change `Text` from `Vec<TextSegment | Page>` to `Vec<Vec<TextSegment>>`.
     - Change most ::read and ::write functions to be associated.
     - Change `CharId` to an enum
-	- Use Glam types where appropriate
+    - Use Glam types where appropriate
 
 - Bug fixes
   - Write `{item[n]}`, not `{item item[n]}`. (The latter remains valid syntax.)

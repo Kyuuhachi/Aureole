@@ -181,11 +181,11 @@ themelios_macros::bytecode! {
 		/// Official name is `event_end`.
 		EventEnd(u8),
 
-		_1B(u8 as EntranceId, FuncId via func_id_u8_u16),
+		EntranceSetFunc(u8 as EntranceId, FuncId via func_id_u8_u16),
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)]
-		_1C(u8 as u16 as ObjectId, FuncId via func_id_u8_u16),
+		ED6_1C(u8 as u16 as ObjectId, FuncId via func_id_u8_u16),
 		#[game(Zero, Ao, AoEvo)]
-		ED7_1C(u8, u8 as u16 as ObjectId, u8, u8, u8, u8, u16 as Flag, u16),
+		ED7_1C(u8, u8 as u16 as ObjectId, u8, u8, FuncId via func_id, u16 as Flag, u16),
 
 		#[game(Zero, ZeroEvo, Ao, AoEvo)]
 		ED7_1D(match {
@@ -813,7 +813,7 @@ themelios_macros::bytecode! {
 		/// Opens the save menu in order to save clear data.
 		SaveClearData(),
 
-		#[game(FcEvo, Sc, ScEvo, TcEvo)] Sc_DE(TString),
+		#[game(FcEvo, Sc, ScEvo, TcEvo)] PlaceNameString(TString),
 		#[game(FcEvo, Sc, ScEvo, TcEvo)] skip!(1),
 		#[game(FcEvo, Sc, ScEvo, TcEvo)] Sc_E0(u8 as u16 as ObjectId, Pos3),
 		#[game(FcEvo, Sc, ScEvo, TcEvo)] skip!(2),

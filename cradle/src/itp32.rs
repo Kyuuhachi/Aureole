@@ -79,8 +79,8 @@ impl Itp32 {
 	#[cfg(feature = "ddsfile")]
 	pub fn to_bc7_dds(self) -> ddsfile::Dds {
 		let mut dds = ddsfile::Dds::new_dxgi(ddsfile::NewDxgiParams {
-			height: self.width as u32,
-			width: self.height as u32,
+			width: self.width as u32,
+			height: self.height as u32,
 			depth: None,
 			format: ddsfile::DxgiFormat::BC7_UNorm,
 			mipmap_levels: self.has_mipmaps().then_some(self.levels() as u32),

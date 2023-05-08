@@ -56,9 +56,11 @@
 
 # Cradle
 
-## 0.2.2 (TBA)
+## 0.3.0 (2023-05-08)
 - Faces are 1555, not 4444
 - c\_vis225 is 128×64
+- itp32: Support swizzle mode 4
+  - this is used in a few images in Zero/Azure, and also in several Ys games
 
 ## 0.2.1 (2023-04-17)
 - Fix a number of issues concerning itp32

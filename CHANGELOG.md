@@ -61,6 +61,7 @@
 - c\_vis225 is 128×64
 - itp32: Support swizzle mode 4
   - this is used in a few images in Zero/Azure, and also in several Ys games
+- Fix confusion of width and height when converting to dds
 
 ## 0.2.1 (2023-04-17)
 - Fix a number of issues concerning itp32

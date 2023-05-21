@@ -11,7 +11,7 @@ scenes!
 Let's take a look at `t0121` for the scene in Rolent's Bracer Guild, when Aina
 informs Estelle, Joshua, and Schera that Cassius has gone missing.
 
-![A scene of Aina talking on the phone. We only see one side of the conversation.](./img/music1.gif)
+![A scene of Aina talking on the phone. We only see one side of the conversation.](./img/music1.webp)
 
 At the beginning of the scene we have the usual Rolent theme, [*Provincial City
 of Rolent*][BGM_Rolent]. However, when Aina receives the bad news, the music
@@ -19,7 +19,7 @@ gradually fades out. After a brief silence, the music switches to [*People
 Engaged in Secret Maneuvers*][BGM_Plot]. Here's the scene again, this
 time with subtitles to indicate the playing audio.
 
-![The same scene, but with annotations for the BGM that is playing.](./img/music2.gif)
+![The same scene, but with annotations for the BGM that is playing.](./img/music2.webp)
 
 ```clm
 	TextTalk char[0] {

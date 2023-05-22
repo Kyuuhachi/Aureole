@@ -6,7 +6,7 @@ hljs.registerLanguage("calmare", hljs => {
 	});
 	TERM.push({
 		className: "number",
-		begin: /(-?|\b)\d+(\.\d*)?((mm|ms|deg|mdeg)(\/s)?)?\b/,
+		begin: /(-|\b)\d+(\.\d*)?((mm|ms|deg|mdeg)(\/s)?)?\b/,
 	});
 	TERM.push({
 		className: "tag",
@@ -22,6 +22,10 @@ hljs.registerLanguage("calmare", hljs => {
 		className: "string",
 		begin: /"/,
 		end: /"/,
+	});
+	TERM.push({
+		className: "string",
+		begin: /@\w+/
 	});
 
 	return {

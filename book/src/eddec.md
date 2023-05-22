@@ -86,7 +86,7 @@ function (namely Azure's `e3020`, function 0):
 
 ### Calmare
 
-```
+```clm
 fn[0]:
 	switch random % 8:
 		case 0:
@@ -134,7 +134,7 @@ and thus parses the exact sequence of instructions.
 
 For an example, consider the following pseudocode snippet:
 
-```
+```clm
 if flag[8]:
 	var[0] = 0
 	Return
@@ -145,7 +145,7 @@ else:
 
 This would compile to the bytecode sequence:
 
-```
+```clm
 if flag[8] @l1
 var[0] = 0
 Return
@@ -160,7 +160,7 @@ EDDecompiler would deduce that the `goto @l2` is unreachable and remove it.
 While this change does not matter to the game engine, it *does* affect
 Themelios, which would give a slightly different decompilation:
 
-```
+```clm
 if flag[8]:
 	var[0] = 0
 	Return

@@ -95,7 +95,7 @@ In fact, `Emote` only handles the visuals for these emotes. The sound effects
 are handled by the next line of code that appears, in `SoundPlay`. Which you
 might have guessed from the name.
 
-```
+```clm
 	SoundPlay sound[38] 0 0 100
 ```
 
@@ -206,7 +206,7 @@ event, such as another character speaking, comes to stop the dialogue.
 This is done by setting the number of loops to zero. Let's test this out by
 giving Joshua an indefinite emote:
 
-```chr
+```clm
 	TextTalk name[0] {
 		#06102v#501FPardon?{wait}
 	}
@@ -230,7 +230,7 @@ As expected, Joshua's emote isn't going away. We need some way to get rid of
 these emotes at some point. For that, we can use `EmoteStop`!
 
 
-```chr
+```clm
 	TextTalk name[0] {
 		#06103v#006FSure.{wait}
 	}

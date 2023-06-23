@@ -175,9 +175,9 @@ original, Aina only moves once the effect is completed. As a result, the
 dialogue begins earlier in our modded version!
 
 There may be times where it will be appropriate to not include `FadeWait`, such
-as when you'd like to imply that the actions are on-going during a fade to the
+as when you'd like to imply that the actions are ongoing during a fade to the
 new camera angle. Other times, we might want to include it, such as if we want
-to ensure characters don't speak while the camera effect is still on-going.
+to ensure characters don't speak while the camera effect is still ongoing.
 `FadeWait` can be a useful tool for fixing up the timing of your scenes, so
 please use it accordingly!
 

@@ -33,8 +33,9 @@ these scena files from a normal directory.
 
    ![Inside the "voice" directory, there are directories "dll", "ogg", and "scena", as well as a file "ed_voice.dll".](./img/install3.png)
 
-5. If you wish, install the voice files themselves. This step is not necessary
-   for modding, and so no instructions are given here.
+5. If you wish, install the voice files themselves. These are most easily
+   downloaded from [archive.org].
+   The voice files go in the `ogg` directory, depicted above.
 
 6. Check that the mod is running. An easy way to do this, aside from just
    checking if there are voices playing, is that it will create a file named
@@ -66,6 +67,7 @@ newest of bracers!
 [SoraVoiceScripts]: https://github.com/ZhenjianYang/SoraVoiceScripts/releases/
 [Aureole]: https://github.com/Kyuuhachi/Aureole
 [calmare-latest]: https://github.com/Kyuuhachi/Aureole/releases/latest/
+[archive.org]: https://archive.org/details/trails-evo-voices
 
 [^filename]:
   The file will actually be named `C0100␣␣␣._SN`, but both due to personal

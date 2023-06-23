@@ -108,7 +108,7 @@ mnemonics, however, are not attested, and are purely informational.
 
 - `#_R_#`: (Ruby) This one's got a slightly different syntax. It is used for [ruby text][ruby],
   small characters sometimes used in Japanese text. The number specifies how far back the text is
-  to be put, with two units per kanji. For example, `夏休#4RWelp.#` is rendered as
+  to be put, with two units per kanji. For example, `夏休#2RWelp.#` is rendered as
   <ruby>夏<rt></rt>休<rt>Welp.</ruby>. The exact details of how it looks may vary between games.
 
 - `#_V`: (Voice) Sets a voice clip to play along the dialogue. Depending on the game, a mod may

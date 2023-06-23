@@ -61,13 +61,15 @@ Here, we can see the first function that we'll be covering: `CharSetChipPattern`
 	CharSetChipPattern char[1] 2
 ```
 
-In step 2, we covered how we can use `CharTurnToChar` and `CharTurnTo` to have
-characters turn to face another character or a specific direction. However, in
-this case, Joshua and Estelle aren't turning their bodies; rather, they're only
-moving their heads. These head-turned sprites are considered different sprites!
-Using the *falcnvrt* tool, we can open the sprite files and convert them to PNG
-files for us to view. Here's Joshua's sitting sprite, `npl/ch00013`[^npl]
-(lightly edited for browser viewing):
+In [chapter 5.2](movement.md), we covered how we can use `CharTurnToChar` and
+`CharTurnTo` to have characters turn to face another character or a specific
+direction. However, in this case, Joshua and Estelle aren't turning their
+bodies; rather, they're only moving their heads. There is no specific
+functionality for rotating only the head; instead, these head-turned images are
+a different sprite sheet! Using *Cradle*, we can convert sprite images (which
+are [chcps](../cradle-formats.md#_ch--_cp)) into png files for viewing. Here's
+Joshua's sitting sprite, `npl/ch00013`[^npl] (lightly edited for browser
+viewing):
 
 ![A grid of images of Joshua sitting down.](./img/ch00013.png)
 
@@ -79,7 +81,7 @@ Joshua looking to the right, just like what happens in this scene. As such,
 look to his right. Similarly, when Estelle looks to her left, she uses 1 as the
 2nd parameter. Turning heads while sitting down is just one example of using
 `CharSetChipPattern` to switch between different sprites in the same sprite
-file.
+sheet.
 
 [^npl]:
   It is unclear what exactly `npl` means, but sprites in this folder refer to
@@ -96,7 +98,7 @@ sheds her Jenis Royal Academy uniform to reveal her true colors.
 
 ![Josette says "Hey, that's my line!", and throws of her disguise, continuing "All right boys, get 'em!"](./img/chips3.webp)
 
-Here is the same code for this scene:
+Here is the code for this scene:
 
 ```clm
 		TextTalk char[0] {
@@ -129,11 +131,11 @@ refer to. In fact, this information is up at the top of the file, in these
 lines:
 
 ```clm
-chip[0] "npl/ch00310._ch" "npl/ch00310p._cp"
-chip[1] "npl/ch00311._ch" "npl/ch00311p._cp"
-chip[2] "npl/ch00314._ch" "npl/ch00314p._cp"
-chip[3] "npl/ch00360._ch" "npl/ch00360p._cp"
-chip[4] "npl/ch00361._ch" "npl/ch00361p._cp"
+chip[0] "npl/ch00310._ch" "npl/ch00310p._cp" // Josette walking, shown below
+chip[1] "npl/ch00311._ch" "npl/ch00311p._cp" // Josette running
+chip[2] "npl/ch00314._ch" "npl/ch00314p._cp" // Josette kneeling
+chip[3] "npl/ch00360._ch" "npl/ch00360p._cp" // Sky Bandit walking
+chip[4] "npl/ch00361._ch" "npl/ch00361p._cp" // Sky Bandit running
 ```
 
 This lists two filenames per line, but they are almost always the same but with
@@ -142,32 +144,32 @@ won't have to pay much attention to that part.
 
 Anyway, this is where sprite information for NPCs is stored! Since Estelle and
 Joshua are `name[n]`, their sprite information is normally read from
-`t_name._dt` rather than from here. But Josette is a `char[n]`, so she will be
-using data from here.
+`t_name._dt` rather than from this list. But Josette is a `char[n]`, so she
+will be using data from here.
 
 Now, checking our `CharSetChipBase`, we are looking for `chip[0]`.
-We can see quite easily that this is `npl/ch00310`, which looks as below:
+We see that this is `npl/ch00310`, which looks as below:
 
 ![A grid of sprites of Josette in her bandit outfit.](./img/ch00310.png)
 
 Now that we know how to choose a sprite for our character, we can alter our
 `CharSetChipBase` function call to select a different sprite; better yet, we
 can even change the contents of the `chip[n]` declarations to bring in sprites
-that weren't traditionally in the file!
+that weren't originally in the file!
 
 Let's try to change what sprite Josette transforms into by swapping her sprites
 with someone else's.
 
 ```clm
-chip[0] "npl/ch00160._ch" "npl/ch00160p._cp" // Tita's standing sprite
-chip[1] "npl/ch00161._ch" "npl/ch00161p._cp" // Tita's running sprite
+chip[0] "npl/ch00160._ch" "npl/ch00160p._cp" // Tita walking
+chip[1] "npl/ch00161._ch" "npl/ch00161p._cp" // Tita running
 ```
 
 Note that in this case, we've changed both `chip[0]` and `chip[1]`, replacing
 them with Tita's standing and running sprites respectively. Now, look at what
 happens when Josette transforms!
 
-![You expected a sky bandit, but itt was me, Tita!](./img/chips4.webp)
+![You expected a sky bandit, but it was me, Tita!](./img/chips4.webp)
 
 Now, we've changed both Josette's standing and running sprites. While we
 haven't had to worry about the difference between standing and running sprites
@@ -177,7 +179,7 @@ built in. Let's check what happens if we replace only `chip[0]`, leaving
 
 ![Nevermind, it was Josette all along.](./img/chips5.webp)
 
-The game engine will not know to look for Tita's running sprite simply because
+The game engine will not know to look for Tita's running sprite just because
 her standing sprite is being used -- if you look a little farther down, there's
 another line `CharSetChipBase char[0] chip[1]`, so it'll simply use that sprite
 and not care which character it portrays.

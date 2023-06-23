@@ -57,7 +57,7 @@ could also be effectful sometimes.
 makes the script wait until the `BgmStop` has finished -- it may otherwise
 feel janky to have the scene progress while the audio is still fading out.
 
-Finally, `BgmPlay` tell the game to start playing a new track. The way these
+Finally, `BgmPlay` tells the game to start playing a new track. The way these
 IDs map to filenames is done through a file called `t_bgmtbl._dt`. Calmare does
 not currently handle this file, though this is intended to be added in the future.
 
@@ -89,6 +89,9 @@ expand.)
 [(Raw)](../bgmtbl/3rd.txt)
 
 </details>
+
+No such files are known to exist for the Crossbell games; however, they have a
+`bgm/info.yaml` file that contains some of the same information.
 
 Each of the files consists of two parts: lines starting with `#define`, and
 lines with `bgmtbl`. In this case we can see from the `#define` lines that

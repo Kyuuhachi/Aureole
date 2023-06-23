@@ -71,14 +71,13 @@ files for us to view. Here's Joshua's sitting sprite, `npl/ch00013`[^npl]
 
 ![A grid of images of Joshua sitting down.](./img/ch00013.png)
 
-And here is where the pattern comes into play! The left (0th) column is Joshua
-looking straight ahead, viewed from all eight directions (though only three are
-shown here, to save space). The middle (1st) column is a similar sprite, except
-Joshua looks to the left. Finally, the right (2nd) column is Joshua looking to
-the right, just like what happens in this scene; as such, `CharSetChipPattern`
-takes in 2 as its second parameter here to get Joshua to look to his right.
-Similarly, when Estelle looks to her left, she uses 1 as the 2nd parameter.
-Turning heads while sitting down is just one example of using
+And here is where the pattern comes into play! The top (0th) row is Joshua
+looking straight ahead, viewed from all eight directions. The middle (1st) row
+is similar, except Joshua looks to the left. Finally, the bottom (2nd) row is
+Joshua looking to the right, just like what happens in this scene. As such,
+`CharSetChipPattern` takes in 2 as its second parameter here to get Joshua to
+look to his right. Similarly, when Estelle looks to her left, she uses 1 as the
+2nd parameter. Turning heads while sitting down is just one example of using
 `CharSetChipPattern` to switch between different sprites in the same sprite
 file.
 

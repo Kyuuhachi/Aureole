@@ -1,3 +1,5 @@
+#![feature(array_try_map, array_try_from_fn, array_methods)]
+
 pub mod tables;
 #[doc(inline)]
 pub use themelios_common::types as types;

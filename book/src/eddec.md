@@ -180,7 +180,7 @@ EDDecompiler does not provide any way to manipulate scripts programmatically.
 It converts from binary to text, and from text to binary. If you need anything
 else, you're on your own.
 
-The Themelios Suite provides, well, Themelios for this purpose. Calmare is
+The Aureole Suite provides Themelios for this purpose. Calmare is
 a fairly thin layer on top of this, so anything Calmare does, any Rust
 programmer can do too.
 
@@ -192,7 +192,7 @@ number of benefits:
 - **Readability**. In my opinion, it is simply easier to see what the script
   does this way.
 - **Searching**. Want to find all references[^item-ref] to a specific quest?
-  `rg 'quest\[125\]'. Very useful for finding what I needed to patch for
+  `rg 'quest\[125\]'`. Very useful for finding what I needed to patch for
   Inevitable Zero and Azure Vitality.
 - **Manipulation**. Like above, you can do simple search-and-replace on terms.
   This also works programmatically: remapping `fn[]` or `char[]` terms came in

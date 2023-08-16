@@ -65,18 +65,33 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 	// TODO add .name() -> &'static str
 	// TODO define FlatInsn in the same table
 
-	let write: Vec<_> = ctx.writes.iter().map(|WriteArm { span, games, pat, body, .. }| {
-		let games_name = games.iter().map(|a| &a.0).collect::<Vec<_>>();
-		let games_hex  = games.iter().map(|a| &a.1).collect::<Vec<_>>();
+	let mut opcode: Punctuated<syn::Arm, Token![,]> = Punctuated::new();
+	for WriteArm { span, ident, games, .. } in &ctx.writes {
+		let mut op = BTreeMap::<u8, Vec<Ident>>::new();
+		for (g, hex) in games {
+			op.entry(*hex).or_default().push(g.clone());
+		}
+
+		for (hex, g) in op {
+			let hex = syn::LitInt::new(&format!("0x{hex:02X}"), *span);
+			opcode.push(pq! {span=>
+				(Self::#ident(..), #(IS::#g)|*) => #hex
+			});
+		}
+	}
+	opcode.push(pq! {_=>
+		_ => return None,
+	});
+	let opcode = q!{_=>
+		pub fn opcode(&self, game: Game) -> Option<u8> {
+			type IS = #game_ty;
+			Some(match (self, #game_expr) { #opcode })
+		}
+	};
+
+	let write: Vec<_> = ctx.writes.iter().map(|WriteArm { span, pat, body, .. }| {
 		q!{span=>
-			(__iset@(#(IS::#games_name)|*), Self::#pat) => {
-				__f.u8(match __iset {
-					#(IS::#games_name => #games_hex,)*
-					#[allow(unreachable_patterns)]
-					_g => unsafe { std::hint::unreachable_unchecked() }
-				});
-				run(__f, #body)?;
-			}
+			Self::#pat => run(__f, #body)?,
 		}
 	}).collect();
 	let write = q!{_=>
@@ -85,9 +100,13 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 				fun(__f)
 			}
 			type IS = #game_ty;
-			match (#game_expr, __insn) {
+			if let Some(opcode) = Insn::opcode(__insn, game) {
+				__f.u8(opcode);
+			} else {
+				return Err(format!("'{}' is not supported on '{:?}'", __insn.name(), game).into())
+			}
+			match (__insn) {
 				#(#write)*
-				(_is, _i) => return Err(format!("'{}' is not supported on '{:?}'", _i.name(), _is).into())
 			}
 			Ok(())
 		}
@@ -119,6 +138,7 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		impl Insn {
 			#read
 			#write
+			#opcode
 		}
 	};
 

@@ -54,25 +54,65 @@ pub enum Def {
 	Custom(DefCustom),
 	#[parse(peek_func = |i| i.peek(kw::def) && i.peek2(Token![!]))]
 	Def(DefDef),
-	Standard(DefStandard),
+	Decl(DefDecl),
 }
 
 #[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
-pub struct DefStandard {
+pub struct DefDecl {
 	pub attrs: DefAttributes,
+	pub decl: Decl,
+}
+
+#[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
+pub enum Decl {
+	#[parse(peek = Token![_])]
+	Match(DeclMatch),
+	Standard(DeclStandard),
+}
+
+#[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
+pub struct DeclStandard {
 	pub ident: Ident,
 	#[syn(parenthesized)]
 	pub paren_token: Paren,
 	#[syn(in = paren_token)]
 	#[parse(Punctuated::parse_terminated)]
-	pub args: Punctuated<Arg, Token![,]>,
+	pub args: Punctuated<Source, Token![,]>,
 }
 
 #[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
-pub enum Arg {
-	#[parse(peek = Token![match])]
-	Match(Match),
-	Source(Source),
+pub struct DeclMatch {
+	pub attrs: DefAttributes,
+	pub ident: Token![_],
+	#[syn(parenthesized)]
+	pub paren_token: Paren,
+	#[syn(in = paren_token)]
+	#[parse(|input| {
+		let mut punctuated = Punctuated::new();
+		loop {
+			if input.is_empty() || input.peek(Token![match]) {
+				break;
+			}
+			if input.peek(Token![match]) {
+				break;
+			}
+			punctuated.push_value(input.parse()?);
+			punctuated.push_punct(input.parse()?);
+		}
+		Ok(punctuated)
+	})]
+	pub args: Punctuated<Source, Token![,]>,
+
+	#[syn(in = paren_token)]
+	pub match_token: Token![match],
+	#[syn(in = paren_token)]
+	pub expr: Source,
+	#[syn(in = paren_token)]
+	#[syn(braced)]
+	pub brace_token: Brace,
+	#[syn(in = brace_token)]
+	#[parse(Punctuated::parse_terminated)]
+	pub arms: Punctuated<TailArm, Token![,]>,
 }
 
 #[derive(Clone, syn_derive::ToTokens)]
@@ -141,22 +181,11 @@ pub struct SourceConst {
 }
 
 #[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
-pub struct Match {
-	pub match_token: Token![match],
-	#[syn(braced)]
-	pub brace_token: Brace,
-	#[syn(in = brace_token)]
-	#[parse(Punctuated::parse_terminated)]
-	pub arms: Punctuated<TailArm, Token![,]>,
-}
-
-#[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]
 pub struct TailArm {
 	pub attrs: Attributes,
 	pub key: syn::LitInt,
 	pub arrow_token: Token![=>],
-	// This does accidentally allow attrs here, unfortunately.
-	pub def: DefStandard,
+	pub decl: Decl,
 }
 
 #[derive(Clone, syn_derive::Parse, syn_derive::ToTokens)]

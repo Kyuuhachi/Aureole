@@ -25,7 +25,6 @@ macro_rules! pq {
 	($a:expr=> $($b:tt)*) => { ::syn::parse_quote_spanned! { ($a).span() => $($b)* } };
 }
 
-// {{{1 Main
 #[proc_macro]
 #[allow(non_snake_case)]
 pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
@@ -61,6 +60,10 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 			}
 		}
 	};
+
+	// TODO add .opcode(ISet) -> Option<u8>
+	// TODO add .name() -> &'static str
+	// TODO define FlatInsn in the same table
 
 	let write: Vec<_> = ctx.writes.iter().map(|WriteArm { span, games, pat, body, .. }| {
 		let games_name = games.iter().map(|a| &a.0).collect::<Vec<_>>();
@@ -150,7 +153,6 @@ struct Ctx {
 
 #[derive(Clone)]
 struct InwardContext {
-	ident: Ident,
 	attrs: Attributes,
 	arg_names: Punctuated<Ident, Token![,]>,
 	#[allow(clippy::vec_box)]
@@ -356,19 +358,18 @@ fn gather_top(input: Top) -> syn::Result<Ctx> {
 					args: def.args.into_iter().collect(),
 				});
 			}
-			Def::Standard(mut def) => {
+			Def::Decl(mut def) => {
 				let span = def.span();
 				let games = get_games(&mut def.attrs, &all_games, &mut n, 1)?;
 
 				let ictx = InwardContext {
-					ident: def.ident.clone(),
 					attrs: def.attrs.other.clone(),
 					arg_names: Punctuated::new(),
 					args: Vec::new(),
 					games: games.clone(),
 					write: Vec::new(),
 				};
-				let read = gather_arm(&mut ctx, ictx, def);
+				let read = process_decl(&mut ctx, ictx, def.decl);
 				ctx.reads.push(ReadArm {
 					span,
 					games: games.clone(),
@@ -414,73 +415,66 @@ fn get_games(attrs: &mut DefAttributes, all_games: &[Ident], n: &mut [usize], nu
 	Ok(games)
 }
 
-fn gather_arm(ctx: &mut Ctx, mut ictx: InwardContext, arm: DefStandard) -> Vec<syn::Stmt> {
+fn process_decl(ctx: &mut Ctx, mut ictx: InwardContext, decl: Decl) -> Vec<syn::Stmt> {
 	let mut read = Vec::<syn::Stmt>::new();
-	let span = arm.span();
+	let span = decl.span();
 
-	for pair in arm.args.into_pairs() {
-		match pair.into_tuple() {
-			(Arg::Source(arg), _) => {
-				let varname = format_ident!("_{}", ictx.args.len(), span=arg.span());
+	let args = match &decl {
+		Decl::Standard(decl) => &decl.args,
+		Decl::Match(decl) => &decl.args,
+	};
 
-				let read_expr = read_source(ctx, &arg);
-				let write_expr = write_source(ctx, &arg, pq!{arg=> #varname });
+	for arg in args.iter() {
+		let varname = format_ident!("_{}", ictx.args.len(), span=arg.span());
 
-				read.push(pq!{arg=> let #varname = #read_expr; });
-				ictx.write.push(pq!{arg=> #write_expr; });
+		let read_expr = read_source(ctx, &arg);
+		let write_expr = write_source(ctx, &arg, pq!{arg=> #varname });
 
-				ictx.arg_names.push(varname);
-				ictx.args.push(source_ty(&arg));
-			}
-			(Arg::Match(arg), comma) => {
-				if let Some(comma) = comma {
-					Diagnostic::spanned(comma.span().unwrap(), Level::Error, "tail must be last").emit();
-				}
+		read.push(pq!{arg=> let #varname = #read_expr; });
+		ictx.write.push(pq!{arg=> #write_expr; });
 
-				let mut arms = Vec::<syn::Arm>::new();
-				for arm in arg.arms {
-					let mut ictx = ictx.clone();
-					ictx.ident = format_ident!("{}{}", &ictx.ident, &arm.def.ident, span=arm.def.ident.span());
-					ictx.attrs.extend((*arm.attrs).clone());
-					let key = &arm.key;
-					ictx.write.push(pq!{arm=> __f.u8(#key); });
-					let span = arm.span();
-					let body = gather_arm(ctx, ictx, arm.def);
-					arms.push(pq!{span=> #key => { #(#body)* } });
-				}
-
-				let name = &ictx.ident.to_string();
-				read.push(syn::Stmt::Expr(pq!{span=>
-					match __f.u8()? {
-						#(#arms)*
-						_v => Err(format!("invalid Insn::{}*: 0x{:02X}", #name, _v).into())
-					}
-				}, None));
-				return read
-			}
-		};
+		ictx.arg_names.push(varname);
+		ictx.args.push(source_ty(&arg));
 	}
 
-	ctx.defs.push(Insn {
-		span,
-		ident: ictx.ident.clone(),
-		attrs: ictx.attrs,
-		args: ictx.args,
-	});
+	match decl {
+		Decl::Standard(decl) => {
+			let write = ictx.write;
+			let ident = decl.ident;
+			let arg_names = ictx.arg_names;
+			ctx.writes.push(WriteArm {
+				span,
+				games: ictx.games,
+				ident: ident.clone(),
+				pat: pq!{span=> #ident(#arg_names) },
+				body: pq!{span=> |__f| { #(#write)* Ok(()) } },
+			});
 
-	let write = ictx.write;
-	let ident = ictx.ident;
-	let arg_names = ictx.arg_names;
-	ctx.writes.push(WriteArm {
-		span,
-		games: ictx.games,
-		ident: ident.clone(),
-		pat: pq!{span=> #ident(#arg_names) },
-		body: pq!{span=> |__f| { #(#write)* Ok(()) } },
-	});
+			read.push(syn::Stmt::Expr(pq!{span=> Ok(Self::#ident(#arg_names)) }, None));
+			return read
+		}
 
-	read.push(syn::Stmt::Expr(pq!{span=> Ok(Self::#ident(#arg_names)) }, None));
-	read
+		Decl::Match(decl) => {
+			let mut arms = Vec::<syn::Arm>::new();
+			for arm in decl.arms {
+				let mut ictx = ictx.clone();
+				ictx.attrs.extend((*arm.attrs).clone());
+				let key = &arm.key;
+				ictx.write.push(pq!{arm=> __f.u8(#key); });
+				let span = arm.span();
+				let body = process_decl(ctx, ictx, arm.decl);
+				arms.push(pq!{span=> #key => { #(#body)* } });
+			}
+
+			read.push(syn::Stmt::Expr(pq!{span=>
+				match __f.u8()? {
+					#(#arms)*
+					_v => Err(format!("invalid Insn::*: 0x{:02X}", _v).into())
+				}
+			}, None));
+			return read
+		},
+	};
 }
 
 fn source_ty(source: &Source) -> Box<syn::Type> {

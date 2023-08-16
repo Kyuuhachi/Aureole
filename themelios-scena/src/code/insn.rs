@@ -150,15 +150,15 @@ themelios_macros::bytecode! {
 		BlurOff(u32 as Time),
 
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)]
-		Map(match {
-			0 => Hide(),
-			1 => Show(),
-			2 => Set(i32, Pos2, FileId),
+		_(match u8 {
+			0 => MapHide(),
+			1 => MapShow(),
+			2 => MapSet(i32, Pos2, FileId),
 		}),
 		#[game(Zero, ZeroEvo)]
-		ZeroMap(match {
-			2 => _2(i32, Pos2, u16, u16, u16, u16),
-			3 => _3(u8, u16),
+		_(match u8 {
+			2 => ZeroMap_2(i32, Pos2, u16, u16, u16, u16),
+			3 => ZeroMap_3(u8, u16),
 		}),
 		#[game(Ao, AoEvo)]
 		AoMap(u8),
@@ -188,10 +188,10 @@ themelios_macros::bytecode! {
 		ED7_1C(u8, u8 as u16 as ObjectId, u8, u8, FuncId via func_id, u16 as Flag, u16),
 
 		#[game(Zero, ZeroEvo, Ao, AoEvo)]
-		ED7_1D(match {
-			0 => _0(u8, u8, u8, Pos3, i32, i32, i32),
-			2 => _2(u8, u8),
-			3 => _3(u8, u8),
+		_(match u8 {
+			0 => ED7_1D_0(u8, u8, u8, Pos3, i32, i32, i32),
+			2 => ED7_1D_2(u8, u8),
+			3 => ED7_1D_3(u8, u8),
 		}),
 
 		BgmPlay(
@@ -221,15 +221,15 @@ themelios_macros::bytecode! {
 		#[game(Fc,FcEvo,Sc,ScEvo,Tc,TcEvo)] skip!(1),
 		#[game(Zero,ZeroEvo,Ao,AoEvo)] NextFrame2(),
 
-		Quest(u16 as QuestId, match {
-			0x01 => TaskSet(u16 as QuestTask),
-			0x02 => TaskUnset(u16 as QuestTask),
-			0x03 => FlagsUnset(u8 as QuestFlags),
-			0x04 => FlagsSet(u8 as QuestFlags),
+		_(u16 as QuestId, match u8 {
+			0x01 => QuestTaskSet(u16 as QuestTask),
+			0x02 => QuestTaskUnset(u16 as QuestTask),
+			0x03 => QuestFlagsUnset(u8 as QuestFlags),
+			0x04 => QuestFlagsSet(u8 as QuestFlags),
 		}),
-		Quest(u16 as QuestId, match {
-			0x00 => FlagsGet(u8 as QuestFlags),
-			0x01 => TaskGet(u16 as QuestTask),
+		_(u16 as QuestId, match u8 {
+			0x00 => QuestFlagsGet(u8 as QuestFlags),
+			0x01 => QuestTaskGet(u16 as QuestTask),
 		}),
 		QuestList(Vec<QuestId> via quest_list),
 		QuestBonusBp(u16 as QuestId, u16),
@@ -391,12 +391,12 @@ themelios_macros::bytecode! {
 
 		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_74(u8 as u16 as ObjectId, u8, u8),
 		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_75(u8 as u16 as ObjectId, u8, u32 as Time),
-		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_76(u8 as u16 as ObjectId, String, match {
-			0 => _0(u32),
-			1 => _1(u32),
-			2 => _2(String),
-			3 => _3(i32),
-			4 => _4(i32),
+		#[game(Zero,ZeroEvo,Ao,AoEvo)] _(u8 as u16 as ObjectId, String, match u8 {
+			0 => ED7_76_0(u32),
+			1 => ED7_76_1(u32),
+			2 => ED7_76_2(String),
+			3 => ED7_76_3(i32),
+			4 => ED7_76_4(i32),
 		}),
 		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_77(u8 as u16 as ObjectId, u16),
 		#[game(Zero,ZeroEvo,Ao,AoEvo)] ED7_78(u8 as u16 as ObjectId, CharId),
@@ -421,9 +421,9 @@ themelios_macros::bytecode! {
 		Shake(u32, u32, u32, u32 as Time), // [quake]
 
 		#[game(Fc, FcEvo)] skip!(1), // {asm} two-byte nop
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_7D(match {
-			0 => _0(CharId, u16, u16),
-			1 => _1(CharId, u16, u16), // args always zero; always paired with a _0 except when the char is 254
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] _(match u8 {
+			0 => Sc_7D_0(CharId, u16, u16),
+			1 => Sc_7D_1(CharId, u16, u16), // args always zero; always paired with a _0 except when the char is 254
 		}),
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] _7E(i16, i16, i16, u8, u32),
 
@@ -498,10 +498,10 @@ themelios_macros::bytecode! {
 		CharJump       (CharId, i32, i32, i32, u32, u32 as Speed), // [jump]
 		_Char96        (CharId, Pos3, i32, i32),
 		_Char97        (CharId, Pos2, i32 as Angle32, u32, u16),
-		CharPath(match {
-			0 => New(CharId),
-			1 => Add(Pos3),
-			2 => Run(CharId, u32 as Speed, u8),
+		_(match u8 {
+			0 => CharPathNew(CharId),
+			1 => CharPathAdd(Pos3),
+			2 => CharPathRun(CharId, u32 as Speed, u8),
 		}),
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_A0(CharId, u16 as u32 as Time, u8, u8),
 		#[game(Fc, FcEvo, Sc, ScEvo, Tc, TcEvo)] CharAnimation(CharId, u8, u8, u32 as Time), // [chr_anime]
@@ -570,10 +570,10 @@ themelios_macros::bytecode! {
 		/// Never used.
 		#[game(Fc, FcEvo, Sc, ScEvo)] PartyLoad(),
 
-		#[game(Tc, TcEvo)] TcMonument(match {
-			0 => Open(u8, u8, u8),
-			1 => Disable(u8, u8, u8),
-			2 => Enable(u8, u8, u8),
+		#[game(Tc, TcEvo)] _(match u8 {
+			0 => TcMonumentOpen(u8, u8, u8),
+			1 => TcMonumentDisable(u8, u8, u8),
+			2 => TcMonumentEnable(u8, u8, u8),
 		}),
 		#[game(Tc, TcEvo)] skip!(1),
 
@@ -597,14 +597,14 @@ themelios_macros::bytecode! {
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_B1(u8),
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] skip!(3),
 
-		TriggerFlags(match {
-			0 => Set(u8 as u16 as TriggerId, u16 as TriggerFlags),
-			1 => Unset(u8 as u16 as TriggerId, u16 as TriggerFlags),
+		_(match u8 {
+			0 => TriggerFlagsSet(u8 as u16 as TriggerId, u16 as TriggerFlags),
+			1 => TriggerFlagsUnset(u8 as u16 as TriggerId, u16 as TriggerFlags),
 		}),
 
-		Video(match {
-			0 => Play(String, if game.base() == BaseGame::Fc { const 0u16 } else { u16 }, if game.base() == BaseGame::Fc { const 0u16 } else { u16 }), // [movie(MOVIE_START)]
-			1 => End(String,  if game.base() == BaseGame::Fc { const 0u16 } else { u16 }, if game.base() == BaseGame::Fc { const 0u16 } else { u16 }), // [movie(MOVIE_END)]
+		_(match u8 {
+			0 => VideoPlay(String, if game.base() == BaseGame::Fc { const 0u16 } else { u16 }, if game.base() == BaseGame::Fc { const 0u16 } else { u16 }), // [movie(MOVIE_START)]
+			1 => VideoEnd(String,  if game.base() == BaseGame::Fc { const 0u16 } else { u16 }, if game.base() == BaseGame::Fc { const 0u16 } else { u16 }), // [movie(MOVIE_END)]
 		}),
 
 		ReturnToTitle(u8),
@@ -641,9 +641,9 @@ themelios_macros::bytecode! {
 
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] PartySetPortrait(u8 as u16 as NameId, u8, u8, u8, u8, u8),
 		// This instruction is only used a single time throughout FC..=3rd, but this is its signature according to the asm
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, Ao)] Sc_BC(u8, match {
-			0 => _0(u16),
-			1 => _1(u16),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, Ao)] _(u8, match u8 {
+			0 => Sc_BC_0(u16),
+			1 => Sc_BC_1(u16),
 		}),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] PartySetPortraitFinish(),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_BE(u8,u8,u8,u8, u16, u16, u8, i32,i32,i32,i32,i32,i32),
@@ -658,9 +658,9 @@ themelios_macros::bytecode! {
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, Ao)] Sc_C3(u16),
 
 		/// Something for setting some kind of bit flags I guess.
-		#[game(Sc, ScEvo, Tc, TcEvo, Zero, Ao, AoEvo, ZeroEvo)] Sc_C4(match {
-			0 => Set(u32),
-			1 => Unset(u32),
+		#[game(Sc, ScEvo, Tc, TcEvo, Zero, Ao, AoEvo, ZeroEvo)] _(match u8 {
+			0 => Sc_C4Set(u32),
+			1 => Sc_C4Unset(u32),
 		}),
 
 		#[game(Fc)] skip!(3),
@@ -674,17 +674,17 @@ themelios_macros::bytecode! {
 		// VisSet vis[_] 2 i32 i32 Time 0
 		// VisSet vis[_] 3 Color Time 0 0
 		// 4..9 are unknown
-		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Vis(match {
-			0 => Wait(u8 as VisId, u8),
-			1 => Hide(u8 as VisId, u8),
+		#[game(FcEvo, Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] _(match u8 {
+			0 => VisWait(u8 as VisId, u8),
+			1 => VisHide(u8 as VisId, u8),
 		}),
 
 		#[game(Fc,FcEvo)] skip!(19),
 
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_C8(u16, u16, String, u8, u16), // Something with C_PLATnn._CH
 		#[game(Zero, Ao, AoEvo)] ED7_CC(u8),
-		#[game(Zero, Ao, AoEvo)] CharId(match {
-			1 => Set(CharId via char_id8, u8 as u16 as NameId),
+		#[game(Zero, Ao, AoEvo)] _(match u8 {
+			1 => CharIdSet(CharId via char_id8, u8 as u16 as NameId),
 		}),
 		#[game(ZeroEvo)] skip!(1),
 
@@ -692,20 +692,20 @@ themelios_macros::bytecode! {
 		#[game(Sc, ScEvo)] Sc_CA(u8 as u16 as ObjectId, u8, u32),
 		#[game(Tc, TcEvo)] Tc_CA(u8 as u16 as ObjectId, u8, i32, u32),
 		#[game(Sc, ScEvo, Tc, TcEvo)] CharInSlot(if game.base() == BaseGame::Tc { u8 } else { const 0u8 }, CharId via char_id8),
-		#[game(Sc, ScEvo, Tc, TcEvo)] ED6Menu(match {
-			0 => New(u8 as u16 as MenuId, u16, u16, u8),
-			1 => Add(u8 as u16 as MenuId, TString),
-			2 => Show(u8 as u16 as MenuId),
-			3 => SetDisabled(u8 as u16 as MenuId, u8),
+		#[game(Sc, ScEvo, Tc, TcEvo)] _(match u8 {
+			0 => ED6MenuNew(u8 as u16 as MenuId, u16, u16, u8),
+			1 => ED6MenuAdd(u8 as u16 as MenuId, TString),
+			2 => ED6MenuShow(u8 as u16 as MenuId),
+			3 => ED6MenuSetDisabled(u8 as u16 as MenuId, u8),
 		}),
-		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7Menu(match {
-			0 => New(u8 as u16 as MenuId),
-			1 => Add(u8 as u16 as MenuId, TString),
-			2 => Show(u8 as u16 as MenuId, u16, u16, u8),
-			3 => SetDisabled(u8 as u16 as MenuId, u8),
-			4 => SetStyle(u8 as u16 as MenuId, u8),
-			5 => Select(u8 as u16 as MenuId, u8),
-			6 => _6(u8 as u16 as MenuId),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] _(match u8 {
+			0 => ED7MenuNew(u8 as u16 as MenuId),
+			1 => ED7MenuAdd(u8 as u16 as MenuId, TString),
+			2 => ED7MenuShow(u8 as u16 as MenuId, u16, u16, u8),
+			3 => ED7MenuSetDisabled(u8 as u16 as MenuId, u8),
+			4 => ED7MenuSetStyle(u8 as u16 as MenuId, u8),
+			5 => ED7MenuSelect(u8 as u16 as MenuId, u8),
+			6 => ED7Menu_6(u8 as u16 as MenuId),
 		}),
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_CD(CharId), // related to showing photographs
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Global(u8 as Global, Expr),
@@ -722,9 +722,9 @@ themelios_macros::bytecode! {
 		#[game(Sc, ScEvo, Tc, TcEvo)] Sc_D7(u8, u32, CharId),
 		/// Always occurs before ObjSetFrame and ObjPlay. Probably animation speed?
 		#[game(Sc, ScEvo, Tc, TcEvo)] Sc_D8(u8 as u16 as ObjectId, u16),
-		#[game(Sc, ScEvo, Tc, TcEvo)] ScCutIn(match {
-			0 => Show(String), // CTInnnnn
-			1 => Hide(),
+		#[game(Sc, ScEvo, Tc, TcEvo)] _(match u8 {
+			0 => ScCutInShow(String), // CTInnnnn
+			1 => ScCutInHide(),
 		}),
 
 		#[game(Zero)] skip!(2),
@@ -739,16 +739,16 @@ themelios_macros::bytecode! {
 		#[game(Zero, Ao)] skip!(1),
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_E0(u8),
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_E1(Pos3),
-		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7Note(match {
-			0 => Fish(u8, match {
-				0 => Count(),
-				1 => MaxSize(),
+		#[game(Zero, ZeroEvo, Ao, AoEvo)] _(match u8 {
+			0 => _(u8, match u8 {
+				0 => ED7NoteFishCount(),
+				1 => ED7NoteFishMaxSize(),
 			}),
-			1 => Battle(match {
-				0 => MonsterCount(),
+			1 => _(match u8 {
+				0 => ED7NoteBattleMonsterCount(),
 			}),
-			2 => _2(u8),
-			3 => _3(),
+			2 => ED7Note_2(u8),
+			3 => ED7Note_3(),
 		}),
 		#[game(Zero, ZeroEvo, Ao, AoEvo)] ED7_E3(u8),
 		#[game(Zero, ZeroEvo)] skip!(1),
@@ -756,15 +756,15 @@ themelios_macros::bytecode! {
 
 		#[game(Sc, ScEvo, Tc, TcEvo, Zero, ZeroEvo, Ao, AoEvo)] Sc_DA(), // Something to do with menus
 
-		#[game(Tc, TcEvo)] TcTeamMember(match {
-			0 => Enable(u8 as u16 as NameId),
-			1 => Disable(u8 as u16 as NameId),
-			2 => _2(u8),
+		#[game(Tc, TcEvo)] _(match u8 {
+			0 => TcTeamMemberEnable(u8 as u16 as NameId),
+			1 => TcTeamMemberDisable(u8 as u16 as NameId),
+			2 => TcTeamMember_2(u8),
 		}),
-		#[game(Tc, TcEvo)] TcTeam(match {
-			0 => Use(u8),
-			1 => AddMember(u8, u8 as u16 as NameId),
-			2 => Clear(u8),
+		#[game(Tc, TcEvo)] _(match u8 {
+			0 => TcTeamUse(u8),
+			1 => TcTeamAddMember(u8, u8 as u16 as NameId),
+			2 => TcTeamClear(u8),
 		}),
 		#[game(Tc, TcEvo)] TcOrganizeTeams(u8, u8, u8, u32 as TcMembers, u32 as TcMembers, u32 as TcMembers, u32 as TcMembers),
 		#[game(Tc, TcEvo)] Tc_DE(u8, u32),
@@ -772,33 +772,33 @@ themelios_macros::bytecode! {
 		#[game(Tc, TcEvo)] Tc_E0(CharId, u8, u8),
 		#[game(Tc, TcEvo)] TcIndexInTeam(u8 as u16 as NameId, u8),
 		/// Only used in a0028. Possibly related to minigames?
-		#[game(Tc, TcEvo)] Tc_E2(match {
-			0 => _0(u8),
-			1 => _1(),
-			3 => _3(u8),
-			4 => _4(u8),
-			5 => _5(u16, u16, u16),
-			7 => _7(),
-			8 => _8(),
-			9 => _9(u8),
-			10 => _10(), // A getter
-			11 => _11(u8),
+		#[game(Tc, TcEvo)] _(match u8 {
+			0 => Tc_E2_0(u8),
+			1 => Tc_E2_1(),
+			3 => Tc_E2_3(u8),
+			4 => Tc_E2_4(u8),
+			5 => Tc_E2_5(u16, u16, u16),
+			7 => Tc_E2_7(),
+			8 => Tc_E2_8(),
+			9 => Tc_E2_9(u8),
+			10 => Tc_E2_10(), // A getter
+			11 => Tc_E2_11(u8),
 		}),
-		#[game(Tc, TcEvo)] TcEpisode(match {
-			0 => Start(u8, u32, u8),
-			1 => End(u8),
-			4 => _4(u8),
+		#[game(Tc, TcEvo)] _(match u8 {
+			0 => TcEpisodeStart(u8, u32, u8),
+			1 => TcEpisodeEnd(u8),
+			4 => TcEpisode_4(u8),
 		}),
 		#[game(Tc, TcEvo)] skip!(1),
-		#[game(Tc, TcEvo)] Tc_E5(match {
-			0 => _0(u8, u8, u16, u16),
-			1 => _1(u8, u8, u16, u16),
-			2 => _2(u8, u8, u32),
+		#[game(Tc, TcEvo)] _(match u8 {
+			0 => Tc_E5_0(u8, u8, u16, u16),
+			1 => Tc_E5_1(u8, u8, u16, u16),
+			2 => Tc_E5_2(u8, u8, u32),
 		}),
-		#[game(Tc, TcEvo)] Tc_E6(match {
-			0 => _0(u8),
-			1 => _1(u8),
-			2 => _2(),
+		#[game(Tc, TcEvo)] _(match u8 {
+			0 => Tc_E6_0(u8),
+			1 => Tc_E6_1(u8),
+			2 => Tc_E6_2(),
 		}),
 		#[game(Tc, TcEvo)] Tc_E7(u8 as VisId, u8, u32 as Color, u32 as Time),
 

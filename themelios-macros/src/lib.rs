@@ -29,7 +29,7 @@ macro_rules! pq {
 #[allow(non_snake_case)]
 pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 	let input: Top = syn::parse_macro_input!(tokens);
-	let ctx = match gather_top(input) {
+	let ctx = match gather_top(&input) {
 		Ok(ctx) => ctx,
 		Err(err) => return err.into_compile_error().into()
 	};
@@ -289,42 +289,42 @@ fn make_table(ctx: &Ctx) -> String {
 	}.0)
 }
 
-fn gather_top(input: Top) -> syn::Result<Ctx> {
-	let games = input.attrs.games;
+fn gather_top(input: &Top) -> syn::Result<Ctx> {
+	let games = &input.attrs.games;
 	let all_games: Vec<Ident> = games.idents.iter().cloned().collect();
 
 	let mut ctx = Ctx {
-		func_args: input.args,
-		attrs: input.attrs.other,
+		func_args: input.args.clone(),
+		attrs: input.attrs.other.clone(),
 		games: games.idents.iter().cloned().collect(),
 		defs: Vec::new(),
 		reads: Vec::new(),
 		writes: Vec::new(),
-		game_expr: games.expr,
-		game_ty: games.ty,
+		game_expr: games.expr.clone(),
+		game_ty: games.ty.clone(),
 	};
 
 	let mut n = vec![0; games.idents.len()];
-	for item in input.defs {
+	for item in &input.defs {
 		match item {
-			Def::Skip(mut def) => {
+			Def::Skip(def) => {
 				let val = def.count.base10_parse::<u8>()?;
 
-				get_games(&mut def.attrs, &all_games, &mut n, val as usize)?;
+				get_games(&def.attrs, &all_games, &mut n, val as usize)?;
 
 				for attr in def.attrs.other.iter() {
 					Diagnostic::spanned(attr.path().span().unwrap(), Level::Error, format!("cannot find attribute `{}` in this scope", attr.path().to_token_stream())).emit();
 				}
 			}
-			Def::Custom(mut def) => {
-				let games = get_games(&mut def.attrs, &all_games, &mut n, 1)?;
+			Def::Custom(def) => {
+				let games = get_games(&def.attrs, &all_games, &mut n, 1)?;
 
 				for attr in def.attrs.other.iter() {
 					Diagnostic::spanned(attr.path().span().unwrap(), Level::Error, format!("cannot find attribute `{}` in this scope", attr.path().to_token_stream())).emit();
 				}
 
 				let mut has_read = false;
-				for clause in def.clauses {
+				for clause in &def.clauses {
 					match clause {
 						Clause::Read(clause) => {
 							if has_read {
@@ -335,16 +335,16 @@ fn gather_top(input: Top) -> syn::Result<Ctx> {
 							ctx.reads.push(ReadArm {
 								span: clause.span(),
 								games: games.clone(),
-								body: clause.expr,
+								body: clause.expr.clone(),
 							});
 						}
 						Clause::Write(clause) => {
 							ctx.writes.push(WriteArm {
 								span: clause.span(),
 								games: games.clone(),
-								ident: clause.ident,
-								pat: clause.pat,
-								body: clause.expr,
+								ident: clause.ident.clone(),
+								pat: clause.pat.clone(),
+								body: clause.expr.clone(),
 							});
 						}
 					}
@@ -353,14 +353,14 @@ fn gather_top(input: Top) -> syn::Result<Ctx> {
 			Def::Def(def) => {
 				ctx.defs.push(Insn {
 					span: def.span(),
-					ident: def.ident,
-					attrs: def.attrs,
-					args: def.args.into_iter().collect(),
+					ident: def.ident.clone(),
+					attrs: def.attrs.clone(),
+					args: def.args.iter().cloned().collect(),
 				});
 			}
-			Def::Decl(mut def) => {
+			Def::Decl(def) => {
 				let span = def.span();
-				let games = get_games(&mut def.attrs, &all_games, &mut n, 1)?;
+				let games = get_games(&def.attrs, &all_games, &mut n, 1)?;
 
 				let ictx = InwardContext {
 					attrs: def.attrs.other.clone(),
@@ -369,7 +369,7 @@ fn gather_top(input: Top) -> syn::Result<Ctx> {
 					games: games.clone(),
 					write: Vec::new(),
 				};
-				let read = process_decl(&mut ctx, ictx, def.decl);
+				let read = process_decl(&mut ctx, ictx, &def.decl);
 				ctx.reads.push(ReadArm {
 					span,
 					games: games.clone(),
@@ -388,7 +388,7 @@ fn gather_top(input: Top) -> syn::Result<Ctx> {
 	Ok(ctx)
 }
 
-fn get_games(attrs: &mut DefAttributes, all_games: &[Ident], n: &mut [usize], num: usize) -> syn::Result<GameSpec> {
+fn get_games(attrs: &DefAttributes, all_games: &[Ident], n: &mut [usize], num: usize) -> syn::Result<GameSpec> {
 	let games = if let Some(attr) = &attrs.game {
 		attr.idents.iter().cloned().collect()
 	} else {
@@ -415,7 +415,7 @@ fn get_games(attrs: &mut DefAttributes, all_games: &[Ident], n: &mut [usize], nu
 	Ok(games)
 }
 
-fn process_decl(ctx: &mut Ctx, mut ictx: InwardContext, decl: Decl) -> Vec<syn::Stmt> {
+fn process_decl(ctx: &mut Ctx, mut ictx: InwardContext, decl: &Decl) -> Vec<syn::Stmt> {
 	let mut read = Vec::<syn::Stmt>::new();
 	let span = decl.span();
 
@@ -427,20 +427,20 @@ fn process_decl(ctx: &mut Ctx, mut ictx: InwardContext, decl: Decl) -> Vec<syn::
 	for arg in args.iter() {
 		let varname = format_ident!("_{}", ictx.args.len(), span=arg.span());
 
-		let read_expr = read_source(ctx, &arg);
-		let write_expr = write_source(ctx, &arg, pq!{arg=> #varname });
+		let read_expr = read_source(ctx, arg);
+		let write_expr = write_source(ctx, arg, pq!{arg=> #varname });
 
 		read.push(pq!{arg=> let #varname = #read_expr; });
 		ictx.write.push(pq!{arg=> #write_expr; });
 
 		ictx.arg_names.push(varname);
-		ictx.args.push(source_ty(&arg));
+		ictx.args.push(source_ty(arg));
 	}
 
 	match decl {
 		Decl::Standard(decl) => {
 			let write = ictx.write;
-			let ident = decl.ident;
+			let ident = &decl.ident;
 			let arg_names = ictx.arg_names;
 			ctx.writes.push(WriteArm {
 				span,
@@ -456,13 +456,13 @@ fn process_decl(ctx: &mut Ctx, mut ictx: InwardContext, decl: Decl) -> Vec<syn::
 
 		Decl::Match(decl) => {
 			let mut arms = Vec::<syn::Arm>::new();
-			for arm in decl.arms {
+			for arm in &decl.arms {
 				let mut ictx = ictx.clone();
 				ictx.attrs.extend((*arm.attrs).clone());
 				let key = &arm.key;
 				ictx.write.push(pq!{arm=> __f.u8(#key); });
 				let span = arm.span();
-				let body = process_decl(ctx, ictx, arm.decl);
+				let body = process_decl(ctx, ictx, &arm.decl);
 				arms.push(pq!{span=> #key => { #(#body)* } });
 			}
 

@@ -190,6 +190,7 @@ fn make_table(ctx: &Ctx) -> String {
 	for insn in &ctx.defs {
 		hex.insert(insn.ident.clone(), BTreeMap::new());
 	}
+
 	for WriteArm { games, ident, .. } in &ctx.writes {
 		let entry = hex.get_mut(ident).unwrap();
 		for (game, h) in games {
@@ -451,7 +452,13 @@ fn process_decl(ctx: &mut Ctx, mut ictx: InwardContext, decl: &Decl) -> Vec<syn:
 			});
 
 			read.push(syn::Stmt::Expr(pq!{span=> Ok(Self::#ident(#arg_names)) }, None));
-			return read
+
+			ctx.defs.push(Insn {
+				span,
+				ident: ident.clone(),
+				attrs: ictx.attrs,
+				args: ictx.args,
+			});
 		}
 
 		Decl::Match(decl) => {
@@ -472,9 +479,10 @@ fn process_decl(ctx: &mut Ctx, mut ictx: InwardContext, decl: &Decl) -> Vec<syn:
 					_v => Err(format!("invalid Insn::*: 0x{:02X}", _v).into())
 				}
 			}, None));
-			return read
 		},
 	};
+
+	read
 }
 
 fn source_ty(source: &Source) -> Box<syn::Type> {

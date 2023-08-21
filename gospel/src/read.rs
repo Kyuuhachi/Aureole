@@ -78,6 +78,7 @@ impl<'a> std::fmt::Debug for Reader<'a> {
 
 impl<'a> Reader<'a> {
 	/// Constructs a new `Reader`.
+	#[inline(always)]
 	pub fn new(data: &'a [u8]) -> Reader<'a> {
 		Self {
 			pos: 0,
@@ -89,6 +90,7 @@ impl<'a> Reader<'a> {
 	///
 	/// Returns an error if there is not enough data left, in which case the read position is
 	/// unchanged.
+	#[inline(always)]
 	pub fn slice(&mut self, len: usize) -> Result<&'a [u8]> {
 		if len > self.remaining().len() {
 			return Err(Error::Read { pos: self.pos(), len, size: self.len() });
@@ -101,6 +103,7 @@ impl<'a> Reader<'a> {
 	/// Reads a fixed-size slice of data from the input.
 	///
 	/// Handles errors identically to [`slice`](`Self::slice`).
+	#[inline(always)]
 	pub fn array<const N: usize>(&mut self) -> Result<[u8; N]> {
 		let mut x = [0; N];
 		self.read_into(&mut x)?;
@@ -110,6 +113,7 @@ impl<'a> Reader<'a> {
 	/// Reads a slice of data into a preexisting buffer.
 	///
 	/// Handles errors identically to [`slice`](`Self::slice`).
+	#[inline(always)]
 	pub fn read_into(&mut self, buf: &mut [u8]) -> Result<()> {
 		buf.copy_from_slice(self.slice(buf.len())?);
 		Ok(())
@@ -119,6 +123,7 @@ impl<'a> Reader<'a> {
 	///
 	/// To change the position, use [`seek`](`Self::seek`) or [`at`](`Self::at`).
 	#[must_use]
+	#[inline(always)]
 	pub fn pos(&self) -> usize {
 		self.pos
 	}
@@ -128,6 +133,7 @@ impl<'a> Reader<'a> {
 	/// Note that this is the total length, which does not change. See
 	/// [`remaining`](`Self::remaining`) for the number of bytes left that can be read.
 	#[must_use]
+	#[inline(always)]
 	pub fn len(&self) -> usize {
 		self.data.len()
 	}
@@ -137,12 +143,14 @@ impl<'a> Reader<'a> {
 	/// Note that unlike slices, this is based on [`remaining`](`Self::remaining`), not
 	/// [`len`](`Self::len`).
 	#[must_use]
+	#[inline(always)]
 	pub fn is_empty(&self) -> bool {
 		self.remaining().is_empty()
 	}
 
 	/// Returns the remaining data in the buffer.
 	#[must_use]
+	#[inline(always)]
 	pub fn remaining(&self) -> &'a [u8] {
 		&self.data[self.pos()..]
 	}
@@ -151,6 +159,7 @@ impl<'a> Reader<'a> {
 	///
 	/// This is the full slice; for only the remainder, see [`remaining`](`Self::remaining`).
 	#[must_use]
+	#[inline(always)]
 	pub fn data(&self) -> &'a [u8] {
 		self.data
 	}
@@ -160,6 +169,7 @@ impl<'a> Reader<'a> {
 	/// Returns an error if the position is out of bounds.
 	///
 	/// See [`at`](`Self::at`) for a version that returns a copy.
+	#[inline(always)]
 	pub fn seek(&mut self, pos: usize) -> Result<()> {
 		if pos > self.len() {
 			return Err(Error::Seek { pos, size: self.len() })
@@ -172,6 +182,7 @@ impl<'a> Reader<'a> {
 	///
 	/// See also [`ptrN`](`Self::ptrN`) for a shorthand for the common pattern of
 	/// `f.clone().at(f.u32()? as usize)?`.
+	#[inline(always)]
 	pub fn at(&self, pos: usize) -> Result<Self> {
 		let mut a = self.clone();
 		a.seek(pos)?;
@@ -179,6 +190,7 @@ impl<'a> Reader<'a> {
 	}
 
 	/// Rounds the read position up to the next multiple of `size`.
+	#[inline(always)]
 	pub fn align(&mut self, size: usize) -> Result<&'a [u8]> {
 		self.slice((size-(self.pos()%size))%size)
 	}
@@ -186,6 +198,7 @@ impl<'a> Reader<'a> {
 	/// Reads a number of bytes and returns an error if they are not as expected.
 	///
 	/// If it does not match, the read position is not affected.
+	#[inline(always)]
 	pub fn check(&mut self, v: &[u8]) -> Result<()> {
 		let pos = self.pos();
 		let u = self.slice(v.len())?;
@@ -243,10 +256,10 @@ macro_rules! primitives {
 	) => { paste::paste! {
 		#[doc(hidden)]
 		impl<'a> Reader<'a> {
-			$(pub fn [<$type $suf>](&mut self) -> Result<$type> {
+			$(#[inline(always)] pub fn [<$type $suf>](&mut self) -> Result<$type> {
 				Ok($type::$conv(self.array()?))
 			})*
-			$(pub fn [<check_ $type $suf>](&mut self, v: $type) -> Result<()> {
+			$(#[inline(always)] pub fn [<check_ $type $suf>](&mut self, v: $type) -> Result<()> {
 				let pos = self.pos();
 				let u = self.[< $type $suf >]()?;
 				if u != v {
@@ -258,7 +271,7 @@ macro_rules! primitives {
 				}
 				Ok(())
 			})*
-			$(pub fn [<ptr$ptr $suf>](&mut self) -> Result<Self> {
+			$(#[inline(always)] pub fn [<ptr$ptr $suf>](&mut self) -> Result<Self> {
 				self.clone().at(self.[<u$ptr $suf>]()? as usize)
 			})*
 		}
@@ -271,13 +284,13 @@ macro_rules! primitives {
 		}
 
 		impl<'a> $trait for Reader<'a> {
-			$(#[doc(hidden)] fn $type(&mut self) -> Result<$type> {
+			$(#[doc(hidden)] #[inline(always)] fn $type(&mut self) -> Result<$type> {
 				self.[<$type $suf>]()
 			})*
-			$(#[doc(hidden)] fn [<check_ $type>](&mut self, v: $type) -> Result<()> {
+			$(#[doc(hidden)] #[inline(always)] fn [<check_ $type>](&mut self, v: $type) -> Result<()> {
 				self.[<check_ $type $suf>](v)
 			})*
-			$(#[doc(hidden)] fn [<ptr$ptr>](&mut self) -> Result<Self> {
+			$(#[doc(hidden)] #[inline(always)] fn [<ptr$ptr>](&mut self) -> Result<Self> {
 				self.[<ptr$ptr $suf>]()
 			})*
 		}

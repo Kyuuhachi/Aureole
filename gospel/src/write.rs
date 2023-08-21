@@ -58,6 +58,7 @@ pub struct DelayContext<'a> {
 
 impl<'a> DelayContext<'a> {
 	/// The position where the delayed data will be written.
+	#[inline(always)]
 	pub fn pos(&self) -> usize {
 		self.pos
 	}
@@ -65,6 +66,7 @@ impl<'a> DelayContext<'a> {
 	/// Look up an address.
 	///
 	/// Returns an error if the label does not exist.
+	#[inline(always)]
 	pub fn label(&self, label: Label) -> Result<usize> {
 		self.labels.get(&label).copied()
 			.ok_or(Error::Label { pos: self.pos(), label })
@@ -73,6 +75,7 @@ impl<'a> DelayContext<'a> {
 
 impl Writer {
 	/// Constructs a new `Writer`.
+	#[inline(always)]
 	pub fn new() -> Self {
 		Self {
 			data: Vec::new(),
@@ -104,6 +107,7 @@ impl Writer {
 	}
 
 	/// Writes some data.
+	#[inline(always)]
 	pub fn slice(&mut self, data: &[u8]) {
 		self.data.extend_from_slice(data)
 	}
@@ -111,16 +115,19 @@ impl Writer {
 	/// Writes some data.
 	///
 	/// This function is redundant, and exists only for symmetry.
+	#[inline(always)]
 	pub fn array<const N: usize>(&mut self, data: [u8; N]) {
 		self.slice(&data)
 	}
 
 	/// Places a label at the current position, so it can be referenced with [`delay`](`Self::delay`).
+	#[inline(always)]
 	pub fn label(&mut self, label: Label) {
 		self.put_label(label, self.len());
 	}
 
 	/// Creates and places a label at the current position.
+	#[inline(always)]
 	pub fn here(&mut self) -> Label {
 		let l = Label::new();
 		self.label(l);
@@ -137,6 +144,7 @@ impl Writer {
 	///
 	/// The given closure is called with a function that allows looking up labels.
 	/// Other kinds of state are not currently officially allowed.
+	#[inline(always)]
 	pub fn delay<const N: usize, F>(&mut self, cb: F) where
 		F: FnOnce(&DelayContext) -> Result<[u8; N], BoxError> + 'static,
 	{
@@ -150,6 +158,7 @@ impl Writer {
 	}
 
 	/// Concatenates two `Writer`s, including labels.
+	#[inline]
 	pub fn append(&mut self, mut other: Writer) {
 		let shift = self.len();
 		self.data.reserve(other.data.capacity());
@@ -167,27 +176,32 @@ impl Writer {
 
 	/// Returns the number of bytes written so far, including delayed ones.
 	#[must_use]
+	#[inline(always)]
 	pub fn len(&self) -> usize {
 		self.data.len()
 	}
 
 	/// Returns whether any bytes have been written so far.
 	#[must_use]
+	#[inline(always)]
 	pub fn is_empty(&self) -> bool {
 		self.len() == 0
 	}
 
 	/// Calls [`Vec::reserve`] on the underlying `Vec`.
+	#[inline(always)]
 	pub fn reserve(&mut self, size: usize) {
 		self.data.reserve(size);
 	}
 
 	/// Returns the capacity of the underlying `Vec`.
+	#[inline(always)]
 	pub fn capacity(&self) -> usize {
 		self.data.capacity()
 	}
 
 	/// Writes null bytes until the length is a multiple of `size`.
+	#[inline(always)]
 	pub fn align(&mut self, size: usize) {
 		self.slice(&vec![0;(size-(self.len()%size))%size]);
 	}
@@ -234,17 +248,17 @@ macro_rules! primitives {
 	) => { paste::paste! {
 		// #[doc(hidden)]
 		impl Writer {
-			$(pub fn [<$type $suf>](&mut self, val: $type) {
+			$(#[inline(always)] pub fn [<$type $suf>](&mut self, val: $type) {
 				self.array($type::$conv(val));
 			})*
-			$(pub fn [<delay$ptr $suf>](&mut self, label: Label) {
+			$(#[inline(always)] pub fn [<delay$ptr $suf>](&mut self, label: Label) {
 				self.delay(move |ctx| {
 					let value = ctx.label(label)?;
 					let value = [<u$ptr>]::try_from(value).map_err(|_| LabelSizeError { value, size: $ptr })?;
 					Ok([<u$ptr>]::$conv(value))
 				});
 			})*
-			$(pub fn [<ptr$ptr $suf>](&mut self) -> Self {
+			$(#[inline(always)] pub fn [<ptr$ptr $suf>](&mut self) -> Self {
 				let mut g = Writer::new();
 				self.[<delay$ptr $suf>](g.here());
 				g
@@ -259,13 +273,13 @@ macro_rules! primitives {
 		}
 
 		impl $trait for Writer {
-			$(#[doc(hidden)] fn $type(&mut self, val: $type) {
+			$(#[doc(hidden)] #[inline(always)] fn $type(&mut self, val: $type) {
 				self.[<$type $suf>](val)
 			})*
-			$(#[doc(hidden)] fn [<delay$ptr>](&mut self, label: Label) {
+			$(#[doc(hidden)] #[inline(always)] fn [<delay$ptr>](&mut self, label: Label) {
 				self.[<delay$ptr $suf>](label)
 			})*
-			$(#[doc(hidden)] fn [<ptr$ptr>](&mut self) -> Self {
+			$(#[doc(hidden)] #[inline(always)] fn [<ptr$ptr>](&mut self) -> Self {
 				self.[<ptr$ptr $suf>]()
 			})*
 		}

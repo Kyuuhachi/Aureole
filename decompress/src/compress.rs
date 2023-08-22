@@ -13,11 +13,7 @@ pub fn compress(input: &[u8], out: &mut Vec<u8>) {
 		let mut run_pos = input_pos;
 
 		if run_len < 64 && input_pos + 3 < input.len() {
-			if let Some((rep_len, rep_pos)) = dig.get() {
-				if rep_len >= run_len {
-					(run_len, run_pos) = (rep_len, rep_pos);
-				}
-			}
+			 dig.get(&mut run_len, &mut run_pos);
 		}
 
 		assert!(run_len > 0);
@@ -67,12 +63,29 @@ pub fn compress(input: &[u8], out: &mut Vec<u8>) {
 	b.bits(13, 0);
 }
 
-fn count_equal(a: &[u8], b: &[u8], limit: usize) -> usize {
-	std::iter::zip(a, b)
+pub fn count_equal(a: &[u8], b: &[u8], limit: usize) -> usize {
+	use std::iter::zip;
+
+	let n = limit.min(a.len()).min(b.len());
+	const N: usize = 8;
+
+	let mut i = 0;
+	for (a, b) in zip(a[..n].chunks_exact(N), b[..n].chunks_exact(N)) {
+		if a == b {
+			i += N;
+		} else {
+			let a = u64::from_le_bytes(a.try_into().unwrap());
+			let b = u64::from_le_bytes(b.try_into().unwrap());
+			return i + ((a ^ b).trailing_zeros() / 8) as usize;
+		}
+	}
+
+	i = n.saturating_sub(N);
+	zip(&a[i..n], &b[i..n])
 		.take_while(|(a, b)| a == b)
-		.take(limit)
-		.count()
+		.count() + i
 }
+
 
 struct Digraphs<'a> {
 	input: &'a [u8],
@@ -93,13 +106,13 @@ impl Digraphs<'_> {
 		}
 	}
 
-	#[inline(always)]
 	fn digraph(&self, pos: usize) -> usize {
 		let b1 = self.input[pos];
 		let b2 = *self.input.get(pos+1).unwrap_or(&0);
 		u16::from_le_bytes([b1, b2]) as usize
 	}
 
+	#[inline(never)]
 	fn advance(&mut self) {
 		if self.pos >= 0x1FFF {
 			let prev_pos = self.pos - 0x1FFF;
@@ -120,19 +133,16 @@ impl Digraphs<'_> {
 		self.pos += 1;
 	}
 
-	fn get(&self) -> Option<(usize, usize)> {
-		fn slot_to_pos(a: u16) -> Option<usize> {
-			(a != 0xFFFF).then_some(a as usize)
+	#[inline(never)]
+	fn get(&self, rep_len: &mut usize, rep_pos: &mut usize) {
+		let mut pos = self.head[self.digraph(self.pos)] as usize;
+		while pos != 0xFFFF {
+			let len = count_equal(&self.input[self.pos+2..], &self.input[pos+2..], 267)+2;
+			if len >= *rep_len {
+				(*rep_len, *rep_pos) = (len, pos);
+			}
+			pos = self.next[pos % self.next.len()] as usize;
 		}
-		std::iter::successors(
-			slot_to_pos(self.head[self.digraph(self.pos)]),
-			|a| slot_to_pos(self.next[*a % self.next.len()]),
-		)
-			.map(|pos| {
-				let len = count_equal(&self.input[self.pos..], &self.input[pos..], 269);
-				(len, pos)
-			})
-			.max_by_key(|a| a.0)
 	}
 }
 

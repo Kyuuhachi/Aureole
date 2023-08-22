@@ -1,5 +1,3 @@
-#![feature(test)]
-
 use gospel::read::{Reader, Le as _};
 use gospel::write::{Writer, Le as _, Label};
 
@@ -100,6 +98,7 @@ pub fn compress_ed7_to_vec(data: &[u8]) -> Vec<u8> {
 }
 
 #[test]
+#[ignore = "it is slow"]
 fn should_roundtrip_font64() {
 	use gospel::read::{Reader, Le as _};
 

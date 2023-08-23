@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 gospel.path = "../gospel"
-decompress.path = "../decompress"
+bzip.path = "../bzip"
 bc7.path = "../bc7"
 thiserror = "1.0.0"
 image = { version = "0.24.5", default-features = false }

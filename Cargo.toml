@@ -2,10 +2,11 @@
 members = [
 	"cp932",
 	"bc7",
+	"bzip",
+
 	"gospel",
 	"gospel-dump",
 
-	"decompress",
 	"themelios-macros",
 	"themelios-common",
 	"themelios-scena",
@@ -23,12 +24,12 @@ members = [
 [profile.dev]
 package.choubun.opt-level = 3
 package.cp932.opt-level = 3
-package.decompress.opt-level = 3
+package.bzip.opt-level = 3
 package.bc7.opt-level = 3
 
 package.backtrace.opt-level = 3
 
-package.themelios-macros.opt-level = 3
+# package.themelios-macros.opt-level = 3
 package.syn.opt-level = 3
 package.quote.opt-level = 3
 package.proc-macro2.opt-level = 3

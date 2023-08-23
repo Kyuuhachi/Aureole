@@ -4,6 +4,7 @@
 // which I value higher than saving a few bytes.
 
 pub fn compress(input: &[u8], out: &mut Vec<u8>) {
+	assert!(input.len() < 0x10000);
 	let mut input_pos = 0;
 	let mut b = Bits::new(out);
 	let mut dig = Digraphs::new(input);

@@ -5,7 +5,7 @@ pub enum Error {
 	#[error("{error}")]
 	Invalid { error: String, backtrace: std::backtrace::Backtrace },
 	#[error("{source}")]
-	Decompress{ #[from] source: decompress::Error, backtrace: std::backtrace::Backtrace },
+	Decompress{ #[from] source: bzip::Error, backtrace: std::backtrace::Backtrace },
 	#[error("{source}")]
 	Read { #[from] source: gospel::read::Error, backtrace: std::backtrace::Backtrace },
 	#[error("{source}")]

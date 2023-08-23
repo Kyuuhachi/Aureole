@@ -1,3 +1,20 @@
+/// An implementation of Falcom's BZip compression algorithm,
+/// used in *Trails in the Sky* as well as in their `itp` and `it3` file formats.
+///
+/// Note that this algorithm has no relation whatsoever to the bzip2 algorithm in common use.
+///
+/// BZip has two modes:
+/// - Mode 1 appears to suffer less from barely-compressible data, but is only known to be supported by *Trails in the Sky*, which uses it in its 3d model files.
+/// - Mode 2 is supported by all known games that use this algorithm, including *Trails in the Sky*.
+///
+/// There are also two framing modes. They have no known names, so I call them ed6 and ed7 from which game I first encountered them:
+/// There is no known benefit for either of them, other than being in different contexts:
+/// - *Trails in the Sky* uses `ed6` framing in its archive files.
+/// - Certain forms of `itp` files also use ed6 framing. (Others use C77 compression, another proprietary Falcom algorithm.)
+/// - `it3` files use ed7 framing.
+///
+/// Mode 2 is sometimes inofficially known as FALCOM2, and ed7 framing as FALCOM3.
+
 use gospel::read::{Reader, Le as _};
 use gospel::write::{Writer, Le as _, Label};
 
@@ -5,8 +22,12 @@ mod decompress;
 mod compress;
 
 pub use decompress::Error;
+
+/// Decompresses a single chunk of compressed data. Both mode 1 and 2 are supported.
+/// There are no notable limitations regarding input or output size.
+///
+/// In most cases you will likely want to use the framed formats instead, [`decompress_ed6`] or [`decompress_ed7`].
 pub use decompress::decompress as decompress_chunk;
-pub use compress::compress as compress_chunk;
 
 pub fn decompress_ed6(f: &mut Reader) -> Result<Vec<u8>, Error> {
 	let mut out = Vec::new();
@@ -20,26 +41,6 @@ pub fn decompress_ed6(f: &mut Reader) -> Result<Vec<u8>, Error> {
 		}
 	}
 	Ok(out)
-}
-
-pub fn compress_ed6(f: &mut Writer, data: &[u8]) {
-	for chunk in data.chunks(0xFFF0) {
-		let mut data = Vec::new();
-		compress_chunk(chunk, &mut data);
-		f.u16(data.len() as u16 + 2);
-		f.slice(&data);
-		f.u8((chunk.as_ptr_range().end == data.as_ptr_range().end).into());
-	}
-}
-
-pub fn decompress_ed6_from_slice(data: &[u8]) -> Result<Vec<u8>, Error> {
-	decompress_ed6(&mut Reader::new(data))
-}
-
-pub fn compress_ed6_to_vec(data: &[u8]) -> Vec<u8> {
-	let mut w = Writer::new();
-	compress_ed6(&mut w, data);
-	w.finish().unwrap()
 }
 
 pub fn decompress_ed7(f: &mut Reader) -> Result<Vec<u8>, Error> {
@@ -68,6 +69,30 @@ pub fn decompress_ed7(f: &mut Reader) -> Result<Vec<u8>, Error> {
 	Ok(out)
 }
 
+pub fn decompress_ed6_from_slice(data: &[u8]) -> Result<Vec<u8>, Error> {
+	decompress_ed6(&mut Reader::new(data))
+}
+
+pub fn decompress_ed7_from_slice(data: &[u8]) -> Result<Vec<u8>, Error> {
+	decompress_ed7(&mut Reader::new(data))
+}
+
+/// Compresses a single chunk of compressed data. Only mode 2 is supported.
+/// This can currently not compress files larger than `0xFFFF` bytes. Usually, chunks no larger than `0xFFFF` bytes are used.
+///
+/// In most cases you will likely want to use the framed formats instead, [`compress_ed6`] or [`compress_ed7`].
+pub use compress::compress as compress_chunk;
+
+pub fn compress_ed6(f: &mut Writer, data: &[u8]) {
+	for chunk in data.chunks(0xFFF0) {
+		let mut data = Vec::new();
+		compress_chunk(chunk, &mut data);
+		f.u16(data.len() as u16 + 2);
+		f.slice(&data);
+		f.u8((chunk.as_ptr_range().end == data.as_ptr_range().end).into());
+	}
+}
+
 pub fn compress_ed7(f: &mut Writer, data: &[u8]) {
 	let start = Label::new();
 	let end = Label::new();
@@ -87,8 +112,10 @@ pub fn compress_ed7(f: &mut Writer, data: &[u8]) {
 	f.label(end);
 }
 
-pub fn decompress_ed7_from_slice(data: &[u8]) -> Result<Vec<u8>, Error> {
-	decompress_ed7(&mut Reader::new(data))
+pub fn compress_ed6_to_vec(data: &[u8]) -> Vec<u8> {
+	let mut w = Writer::new();
+	compress_ed6(&mut w, data);
+	w.finish().unwrap()
 }
 
 pub fn compress_ed7_to_vec(data: &[u8]) -> Vec<u8> {
@@ -111,10 +138,7 @@ fn should_roundtrip_font64() {
 	loop {
 		let chunklen = f.u16().unwrap() as usize - 2;
 		let inchunk = f.slice(chunklen).unwrap();
-		if inchunk[0] != 0 {
-			println!("skip");
-			continue
-		}
+		assert!(inchunk[0] == 0);
 		println!("{} / {}", f.pos(), f.len());
 
 		let mut chunk = Vec::new();

@@ -5,7 +5,7 @@ use image::{GrayImage, Rgba, RgbaImage};
 
 use gospel::read::{Reader, Le as _};
 use gospel::write::{Writer, Le as _};
-use decompress::{decompress_ed7 as decompress, compress_ed7 as compress};
+use bzip::{decompress_ed7 as decompress, compress_ed7 as compress};
 use crate::util::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

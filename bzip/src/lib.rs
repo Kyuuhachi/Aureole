@@ -77,23 +77,26 @@ pub fn decompress_ed7_from_slice(data: &[u8]) -> Result<Vec<u8>, Error> {
 	decompress_ed7(&mut Reader::new(data))
 }
 
-/// Compresses a single chunk of compressed data. Only mode 2 is supported.
-/// This can currently not compress files larger than `0xFFFF` bytes. Usually, chunks no larger than `0xFFFF` bytes are used.
+pub use compress::CompressMode;
+/// Compresses a single chunk of compressed data, in the specified mode.
+/// The mode 2 compressor can currently not handle chunks larger than `0xFFFF` bytes,
+/// but mode 1 has no such restrictions.
+/// Usually, chunks no larger than `0xFFF0` bytes are used, in either mode.
 ///
 /// In most cases you will likely want to use the framed formats instead, [`compress_ed6`] or [`compress_ed7`].
 pub use compress::compress as compress_chunk;
 
-pub fn compress_ed6(f: &mut Writer, data: &[u8]) {
+pub fn compress_ed6(f: &mut Writer, data: &[u8], mode: CompressMode) {
 	for chunk in data.chunks(0xFFF0) {
 		let mut data = Vec::new();
-		compress_chunk(chunk, &mut data);
+		compress_chunk(chunk, &mut data, mode);
 		f.u16(data.len() as u16 + 2);
 		f.slice(&data);
 		f.u8((chunk.as_ptr_range().end == data.as_ptr_range().end).into());
 	}
 }
 
-pub fn compress_ed7(f: &mut Writer, data: &[u8]) {
+pub fn compress_ed7(f: &mut Writer, data: &[u8], mode: CompressMode) {
 	let start = Label::new();
 	let end = Label::new();
 	f.delay(move |ctx| Ok(u32::to_le_bytes((ctx.label(end)? - ctx.label(start)?) as u32)));
@@ -102,7 +105,7 @@ pub fn compress_ed7(f: &mut Writer, data: &[u8]) {
 	f.u32(1+data.chunks(0xFFF0).count() as u32);
 	for chunk in data.chunks(0xFFF0) {
 		let mut data = Vec::new();
-		compress_chunk(chunk, &mut data);
+		compress_chunk(chunk, &mut data, mode);
 		f.u16(data.len() as u16 + 2);
 		f.slice(&data);
 		f.u8(1);
@@ -112,21 +115,21 @@ pub fn compress_ed7(f: &mut Writer, data: &[u8]) {
 	f.label(end);
 }
 
-pub fn compress_ed6_to_vec(data: &[u8]) -> Vec<u8> {
+pub fn compress_ed6_to_vec(data: &[u8], mode: CompressMode) -> Vec<u8> {
 	let mut w = Writer::new();
-	compress_ed6(&mut w, data);
+	compress_ed6(&mut w, data, mode);
 	w.finish().unwrap()
 }
 
-pub fn compress_ed7_to_vec(data: &[u8]) -> Vec<u8> {
+pub fn compress_ed7_to_vec(data: &[u8], mode: CompressMode) -> Vec<u8> {
 	let mut w = Writer::new();
-	compress_ed7(&mut w, data);
+	compress_ed7(&mut w, data, mode);
 	w.finish().unwrap()
 }
 
 #[test]
 #[ignore = "it is slow"]
-fn should_roundtrip_font64() {
+fn mode2_should_roundtrip() {
 	use gospel::read::{Reader, Le as _};
 
 	let data = std::fs::read("../data/fc.extract2/00/font64._da").unwrap();
@@ -149,7 +152,46 @@ fn should_roundtrip_font64() {
 
 		let mut outchunk = Vec::new();
 		let start = std::time::Instant::now();
-		compress_chunk(&chunk, &mut outchunk);
+		compress_chunk(&chunk, &mut outchunk, CompressMode::Mode2);
+		let end = std::time::Instant::now();
+		d2 += end - start;
+
+		assert!(inchunk == outchunk);
+
+		if f.u8().unwrap() == 0 {
+			break
+		}
+	}
+	let end = std::time::Instant::now();
+
+	println!("Decompress {}, compress {}, total {}", d1.as_secs_f64(), d2.as_secs_f64(), (end-start).as_secs_f64());
+}
+
+#[test]
+fn mode1_should_roundtrip() {
+	use gospel::read::{Reader, Le as _};
+
+	let data = std::fs::read("../data/3rd.extract2/33/val2._x3").unwrap();
+	let mut f = Reader::new(&data);
+	let start = std::time::Instant::now();
+	let mut d1 = std::time::Duration::ZERO;
+	let mut d2 = std::time::Duration::ZERO;
+
+	loop {
+		let chunklen = f.u16().unwrap() as usize - 2;
+		let inchunk = f.slice(chunklen).unwrap();
+		assert!(inchunk[0] != 0);
+		println!("{} / {}", f.pos(), f.len());
+
+		let mut chunk = Vec::new();
+		let start = std::time::Instant::now();
+		decompress_chunk(inchunk, &mut chunk).unwrap();
+		let end = std::time::Instant::now();
+		d1 += end - start;
+
+		let mut outchunk = Vec::new();
+		let start = std::time::Instant::now();
+		compress_chunk(&chunk, &mut outchunk, CompressMode::Mode1);
 		let end = std::time::Instant::now();
 		d2 += end - start;
 

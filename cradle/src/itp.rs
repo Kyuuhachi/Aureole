@@ -86,8 +86,8 @@ pub fn write1002(itp: &Itp) -> Result<Vec<u8>, Error> {
 		let mut g = Writer::new();
 		write_palette(&itp.palette, &mut g);
 		g.finish()?
-	});
-	compress(&mut f, itp.image.as_raw());
+	}, bzip::CompressMode::default());
+	compress(&mut f, itp.image.as_raw(), bzip::CompressMode::default());
 	Ok(f.finish()?)
 }
 
@@ -112,11 +112,11 @@ pub fn write1004(itp: &Itp) -> Result<Vec<u8>, Error> {
 		let mut g = Writer::new();
 		write_palette(&itp.palette, &mut g);
 		g.finish()?
-	});
+	}, bzip::CompressMode::default());
 	let mut pixels = itp.image.as_raw().clone();
 	let (w, h) = (itp.image.width() as usize, itp.image.height() as usize);
 	swizzle(&pixels.clone(), &mut pixels, [h/8, 8, w/16, 16], [0,2,1,3]);
-	compress(&mut f, &pixels);
+	compress(&mut f, &pixels, bzip::CompressMode::default());
 	Ok(f.finish()?)
 }
 

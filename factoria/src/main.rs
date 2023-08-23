@@ -1,5 +1,3 @@
-#![feature(let_chains)]
-
 use std::path::PathBuf;
 
 use clap::{Parser, ValueHint};
@@ -45,7 +43,6 @@ struct MakeIndex {
 
 #[derive(Debug, Clone, clap::Subcommand)]
 enum Command {
-	/// List archive contents.
 	#[clap(visible_alias = "ls")]
 	List(list::List),
 	#[clap(visible_alias = "x")]
@@ -57,7 +54,7 @@ enum Command {
 fn main() -> eyre::Result<()> {
 	let cli = Cli::parse();
 	match cli.command {
-		Command::List(cmd) => list::list(&cmd)?,
+		Command::List(cmd) => list::run(&cmd)?,
 		Command::Extract(cmd) => todo!(),
 		Command::MakeIndex(cmd) => todo!(),
 	}

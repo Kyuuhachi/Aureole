@@ -77,6 +77,39 @@ pub fn decompress_ed7_from_slice(data: &[u8]) -> Result<Vec<u8>, Error> {
 	decompress_ed7(&mut Reader::new(data))
 }
 
+pub fn compression_info_ed6(data: &[u8]) -> Option<(usize, Option<CompressMode>)> {
+	let f = &mut Reader::new(data);
+	let mut len = 0;
+	let mut has_mode1 = false;
+	let mut has_mode2 = false;
+	loop {
+		let chunklen = (f.u16().ok()? as usize).checked_sub(2)?;
+		let chunk = f.slice(chunklen).ok()?;
+		if chunk.is_empty() { return None }
+		if chunk[0] == 0 {
+			has_mode2 = true;
+		} else {
+			has_mode1 = true
+		};
+		if f.u8().ok()? == 0 {
+			let mut out = Vec::new();
+			decompress_chunk(chunk, &mut out).ok()?;
+			len += out.len();
+			break
+		} else {
+			len += 0xFFF0;
+		}
+	}
+
+	let mode = match (has_mode1, has_mode2) {
+		(true, true) => None,
+		(true, false) => Some(CompressMode::Mode1),
+		(false, _) => Some(CompressMode::Mode2),
+	};
+
+	Some((len, mode))
+}
+
 pub use compress::CompressMode;
 /// Compresses a single chunk of compressed data, in the specified mode.
 /// The mode 2 compressor can currently not handle chunks larger than `0xFFFF` bytes,

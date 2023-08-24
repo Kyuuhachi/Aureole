@@ -16,6 +16,12 @@ pub enum Error {
 
 type Result<A, E=Error> = std::result::Result<A, E>;
 
+trait Output {
+	fn constant(&mut self, n: usize, b: u8);
+	fn verbatim(&mut self, s: &[u8]);
+	fn repeat(&mut self, n: usize, o: usize) -> Result<()>;
+}
+
 struct OutBuf<'a> {
 	start: usize,
 	out: &'a mut Vec<u8>,
@@ -28,7 +34,9 @@ impl<'a> OutBuf<'a> {
 			out,
 		}
 	}
+}
 
+impl Output for OutBuf<'_> {
 	fn constant(&mut self, n: usize, b: u8) {
 		for _ in 0..n {
 			self.out.push(b);
@@ -46,6 +54,23 @@ impl<'a> OutBuf<'a> {
 		for _ in 0..n {
 			self.out.push(self.out[self.out.len()-o]);
 		}
+		Ok(())
+	}
+}
+
+struct CountSize(usize);
+
+impl Output for CountSize {
+	fn constant(&mut self, n: usize, _: u8) {
+		self.0 += n;
+	}
+
+	fn verbatim(&mut self, s: &[u8]) {
+		self.0 += s.len();
+	}
+
+	fn repeat(&mut self, n: usize, _: usize) -> Result<()> {
+		self.0 += n;
 		Ok(())
 	}
 }
@@ -103,7 +128,7 @@ impl Bits {
 	}
 }
 
-fn decompress_mode2(data: &[u8], w: &mut OutBuf) -> Result<(), Error> {
+fn decompress_mode2(data: &[u8], w: &mut impl Output) -> Result<(), Error> {
 	let f = &mut Reader::new(data);
 	let mut b = Bits::new();
 	b.renew_bits(f)?;
@@ -138,7 +163,7 @@ fn decompress_mode2(data: &[u8], w: &mut OutBuf) -> Result<(), Error> {
 }
 
 #[bitmatch::bitmatch]
-fn decompress_mode1(data: &[u8], w: &mut OutBuf) -> Result<(), Error> {
+fn decompress_mode1(data: &[u8], w: &mut impl Output) -> Result<(), Error> {
 	let f = &mut Reader::new(data);
 
 	let mut last_o = 0;
@@ -171,4 +196,14 @@ pub fn decompress(data: &[u8], w: &mut Vec<u8>) -> Result<()> {
 	} else {
 		decompress_mode1(data, w)
 	}
+}
+
+pub fn get_size(data: &[u8]) -> Option<usize> {
+	let w = &mut CountSize(0);
+	if data.first() == Some(&0) {
+		decompress_mode2(data, w).ok()?;
+	} else {
+		decompress_mode1(data, w).ok()?;
+	}
+	Some(w.0)
 }

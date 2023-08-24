@@ -1,6 +1,5 @@
 // Adapted from https://github.com/nushell/nushell/blob/79000aa/crates/nu-term-grid/src/grid.rs
 
-use std::fmt::{self, Display};
 use unicode_width::UnicodeWidthChar;
 
 fn strwidth(text: &str) -> usize {
@@ -45,8 +44,8 @@ impl Cell {
 	}
 }
 
-impl fmt::Debug for Cell {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl std::fmt::Debug for Cell {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		match self.alignment {
 			Alignment::Left  => write!(f, "Cell::left({:?})", &self.text),
 			Alignment::Right => write!(f, "Cell::right({:?})", &self.text),
@@ -84,7 +83,7 @@ impl Columns {
 		}
 	}
 
-	pub fn on_rows<T: fmt::Debug>(
+	pub fn on_rows<T>(
 		nrows: usize,
 		group: usize,
 		cells: &[T],
@@ -109,7 +108,7 @@ impl Columns {
 		}
 	}
 
-	pub fn fit_width_vertical<T: fmt::Debug>(
+	pub fn fit_width_vertical<T>(
 		width: usize,
 		group: usize,
 		cells: &[T],
@@ -172,8 +171,8 @@ impl<'a> Grid<'a> {
 	}
 }
 
-impl fmt::Display for Grid<'_> {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl std::fmt::Display for Grid<'_> {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		let cols = self.columns.cols.len();
 		let rows = self.columns.rows;
 		for y in 0..rows {

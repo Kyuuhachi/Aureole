@@ -125,16 +125,10 @@ impl Columns {
 		cells: &[T],
 		measure: impl Fn(&T) -> usize,
 	) -> Option<Columns> {
-		let mut prev = None;
-		let iter = (group..cells.len()).step_by(group)
-			.map(|ncols| Self::on_columns(ncols, cells, &measure));
-		for c in iter {
-			if c.total_width() > width {
-				return prev
-			}
-			prev = Some(c)
-		}
-		None
+		(group..=cells.len()).step_by(group)
+			.map(|ncols| Self::on_columns(ncols, cells, &measure))
+			.take_while(|c| c.total_width() <= width)
+			.last()
 	}
 }
 

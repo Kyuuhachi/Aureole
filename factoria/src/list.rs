@@ -14,8 +14,8 @@ pub struct List {
 	#[clap(short, long)]
 	all: bool,
 	/// Filter which files to include
-	#[clap(short, long)]
-	glob: Vec<String>,
+	#[clap(short, long, value_parser = crate::util::glob_parser())]
+	glob: Vec<globset::Glob>,
 
 	/// Show a detailed view with one file per line
 	#[clap(short, long)]
@@ -287,13 +287,7 @@ fn get_color(ext: &str) -> Option<u8> {
 fn get_entries(cmd: &List, dir_file: &Path) -> eyre::Result<Vec<Entry>> {
 	let mut globset = globset::GlobSetBuilder::new();
 	for glob in &cmd.glob {
-		let glob = globset::GlobBuilder::new(glob)
-			.case_insensitive(true)
-			.backslash_escape(true)
-			.empty_alternates(true)
-			.literal_separator(false)
-			.build()?;
-		globset.add(glob);
+		globset.add(glob.clone());
 	}
 	let globset = globset.build()?;
 

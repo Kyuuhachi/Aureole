@@ -1,8 +1,10 @@
-use std::{path::{PathBuf, Path}, borrow::Cow};
+use std::borrow::Cow;
+use std::path::{PathBuf, Path};
 
 use clap::ValueHint;
 
 use eyre_span::emit;
+use indicatif::ParallelProgressIterator;
 use rayon::prelude::*;
 use themelios_archive::dirdat;
 
@@ -60,20 +62,21 @@ fn extract(cmd: &Extract, dir_file: &Path) -> eyre::Result<()> {
 	}
 	let globset = globset.build()?;
 
+	let dir_entries = dir_entries.into_iter()
+		.filter(|e| cmd.all || e.timestamp != 0)
+		.filter(|e| globset.is_empty() || globset.is_match(&e.name))
+		.collect::<Vec<_>>();
+
 	let span = tracing::Span::current();
-	dir_entries.par_iter().for_each(|e| {
+	let style = indicatif::ProgressStyle::with_template("{bar} {prefix} {pos}/{len}").unwrap()
+		.progress_chars("█🮆🮅🮄▀🮃🮂▔ ");
+	let ind = indicatif::ProgressBar::new(dir_entries.len() as _)
+		.with_style(style)
+		.with_prefix(dir_file.display().to_string());
+	dir_entries.par_iter().progress_with(ind.clone()).for_each(|e| {
 		emit(try {
 			let _span = tracing::info_span!(parent: &span, "extract_file", name=%e.name).entered();
 			let outfile = outdir.join(&e.name);
-			if e.timestamp == 0 && !cmd.all {
-				tracing::debug!("empty");
-				return;
-			}
-			if !globset.is_empty() && !globset.is_match(&e.name) {
-				tracing::debug!("filtered");
-				return;
-			}
-
 			let Some(rawdata) = dat.get(e.offset..e.offset+e.compressed_size) else {
 				tracing::error!("invalid bounds");
 				return
@@ -84,12 +87,10 @@ fn extract(cmd: &Extract, dir_file: &Path) -> eyre::Result<()> {
 				Cow::Borrowed(rawdata)
 			};
 
-			std::fs::write(&outfile, data)?;
-
-			// This slows it down significantly
-			tracing::info!("{}", outfile.display())
+			std::fs::write(outfile, data)?;
 		});
 	});
+	ind.abandon();
 
 	Ok(())
 }

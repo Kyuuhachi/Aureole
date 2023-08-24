@@ -8,7 +8,7 @@ use clap::ValueHint;
 use clap::builder::TypedValueParser;
 
 use eyre_span::emit;
-use themelios_archive::dirdat::{self, DirEntry};
+use themelios_archive::dirdat::{self, DirEntry, Name};
 
 #[derive(Debug, Clone, clap::Args)]
 #[command(arg_required_else_help = true)]
@@ -72,11 +72,9 @@ fn add(cmd: &Add, dir: &mut Vec<DirEntry>, dat: &mut File, file: &Path) -> eyre:
 	let timestamp = timestamp.duration_since(SystemTime::UNIX_EPOCH)?.as_secs();
 
 	let name = file.file_name().unwrap().to_string_lossy();
-	let Some(raw_name) = dirdat::unnormalize_name(&name) else {
-		eyre::bail!("name cannot be converted to 8.3");
-	};
+	let name = Name::try_from(&*name)?;
 
-	let id = get_id(dir, raw_name)?;
+	let id = get_id(dir, name)?;
 	let ent = &mut dir[id];
 
 	let exists = ent.timestamp != 0;
@@ -137,22 +135,22 @@ fn add(cmd: &Add, dir: &mut Vec<DirEntry>, dat: &mut File, file: &Path) -> eyre:
 	ent.timestamp = timestamp as u32;
 
 	
-	tracing::info!("added {} as {:04X}", ent.name(), id);
+	tracing::info!("added {} as {:04X}", ent.name, id);
 
 	Ok(())
 }
 
 #[tracing::instrument(skip_all)]
-fn get_id(dir: &mut Vec<DirEntry>, raw_name: [u8; 12]) -> eyre::Result<usize> {
-	if let Some(id) = dir.iter().position(|e| e.raw_name == raw_name) {
+fn get_id(dir: &mut Vec<DirEntry>, name: Name) -> eyre::Result<usize> {
+	if let Some(id) = dir.iter().position(|e| e.name == name) {
 		tracing::debug!("found existing at {id:04X}");
 		Ok(id)
 	} else {
 		let ent = DirEntry {
-			raw_name,
+			name,
 			..DirEntry::default()
 		};
-		if let Some(id) = dir.iter().position(|e| e.raw_name == *b"/_______.___") {
+		if let Some(id) = dir.iter().position(|e| e == &DirEntry::default()) {
 			dir[id] = ent;
 			tracing::debug!("found empty at {id:04X}");
 			Ok(id)

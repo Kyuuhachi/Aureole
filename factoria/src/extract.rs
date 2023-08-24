@@ -64,7 +64,7 @@ fn extract(cmd: &Extract, dir_file: &Path) -> eyre::Result<()> {
 
 	let dir_entries = dir_entries.into_iter()
 		.filter(|e| cmd.all || e.timestamp != 0)
-		.filter(|e| globset.is_empty() || globset.is_match(e.name()))
+		.filter(|e| globset.is_empty() || globset.is_match(e.name.to_string()))
 		.collect::<Vec<_>>();
 
 	let span = tracing::Span::current();
@@ -75,8 +75,8 @@ fn extract(cmd: &Extract, dir_file: &Path) -> eyre::Result<()> {
 		.with_prefix(dir_file.display().to_string());
 	dir_entries.par_iter().progress_with(ind.clone()).for_each(|e| {
 		emit(try {
-			let _span = tracing::info_span!(parent: &span, "extract_file", name=%e.name()).entered();
-			let outfile = outdir.join(e.name());
+			let _span = tracing::info_span!(parent: &span, "extract_file", name=%e.name).entered();
+			let outfile = outdir.join(e.name.to_string());
 			let Some(rawdata) = dat.get(e.offset..e.offset+e.compressed_size) else {
 				tracing::error!("invalid bounds");
 				return

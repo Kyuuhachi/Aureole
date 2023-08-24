@@ -75,15 +75,15 @@ impl ED6Lookup {
 			*x = crate::dirdat::read_dir(&data)
 				.map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
 				.into_iter()
-				.filter(|a| a.raw_name != *b"/_______.___")
+				.filter(|a| a.name != crate::dirdat::Name::default())
 				.map(|a| match n {
-					0x06 => format!("apl/{}", a.name()),
-					0x26 => format!("apl2/{}", a.name()),
-					0x07 => format!("npl/{}", a.name()),
-					0x27 => format!("npl2/{}", a.name()),
-					0x09 => format!("mons/{}", a.name()),
-					0x29 => format!("mons2/{}", a.name()),
-					_ => a.name(),
+					0x06 => format!("apl/{}", a.name),
+					0x26 => format!("apl2/{}", a.name),
+					0x07 => format!("npl/{}", a.name),
+					0x27 => format!("npl2/{}", a.name),
+					0x09 => format!("mons/{}", a.name),
+					0x29 => format!("mons2/{}", a.name),
+					_ => a.name.to_string(),
 				})
 			.collect();
 		}

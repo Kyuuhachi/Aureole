@@ -1,7 +1,7 @@
 use std::path::{PathBuf, Path};
 
 use clap::ValueHint;
-use crate::grid::{Grid, Columns, Cell, Orientation};
+use crate::grid::{Grid, Cell, Orientation};
 
 use bzip::CompressMode;
 use themelios_archive::dirdat::{self, DirEntry};
@@ -119,7 +119,21 @@ fn list_one(cmd: &List, dir_file: &Path) -> eyre::Result<()> {
 			format_entry_short(cmd, archive_number, e, &mut cells);
 		}
 
-		print_grid(cmd, usize::from(cmd.size) + usize::from(cmd.id) + 1, cells);
+		let group = usize::from(cmd.size) + usize::from(cmd.id) + 1;
+		let width = if cmd.oneline {
+			0
+		} else if let Some(dim) = term_size::dimensions_stdout() {
+			dim.0
+		} else {
+			0
+		};
+
+		let orientation = if cmd.across {
+			Orientation::Horizontal
+		} else {
+			Orientation::Vertical
+		};
+		print!("{}", Grid::best_fit(width, orientation, group, &cells, " "));
 	}
 	Ok(())
 }
@@ -187,24 +201,30 @@ fn format_size2(cmd: &List, size: usize) -> String {
 }
 
 fn get_color(ext: &str) -> Option<u8> {
+	// General policy: files that are likely to appear in the same or adjacent archive should have different colors
 	Some(match ext {
-		"_x2" =>  2, // model, green
-		"_x3" =>  2, // model, green
-		"_hd" => 10, // shadow mesh, bright green
-		"_ct" => 10, // collision mesh, bright green
+		"_ch" => 5, // image
+		"_cp" => 2, // sprite
+		"_ds" => 3, // dds file
+		"_da" => 1, // font
+		"_dt" => 3, // table or ani script
+		"_op" => 4, // object placement
+		"_en" => 2, // entrance placement
+		"_x2" => 4, // model
+		"_x3" => 4, // model
+		"_ef" => 2, // effect
+		"_ep" => 1, // effect placement
+		"_sn" => 2, // scena script
+		"_hd" => 5, // shadow mesh
+		"_mh" => 5, // battlefield shape
+		"wav" => 6, // sound
+		"_ct" => 5, // collision mesh
+		"_lm" => 6, // lightmap
+		"_cl" => 2, // ?
+		"_vs" => 1, // shader
+		"_sy" => 6, // battle face
 
-		"_sn" =>  3, // scena, yellow
-		"_dt" => 11, // data or aniscript, bright yellow
-
-		"_ef" =>  4, // effect, blue
-		"_ep" => 12, // effect placement, bright blue
-
-		"_ds" =>  5, // texture, purple
-		"_ch" =>  5, // image, purple
-		"_cp" => 13, // sprite, bright purple
-
-		"wav" =>  6, // sound, cyan
-
+		// There exist .dm and .{blank}, but those can be uncolored
 		_ => return None
 	})
 }
@@ -276,17 +296,4 @@ fn get_archive_number(path: &Path) -> Option<u8> {
 		.strip_prefix("ED6_DT")?
 		.strip_suffix(".dir")?;
 	u8::from_str_radix(name, 16).ok()
-}
-
-fn print_grid(cmd: &List, group: usize, cells: Vec<Cell>) {
-	let width = if cmd.oneline {
-		0
-	} else if let Some(dim) = term_size::dimensions_stdout() {
-		dim.0
-	} else {
-		0
-	};
-
-	let orientation = if cmd.across { Orientation::Horizontal } else { Orientation::Vertical };
-	print!("{}", Grid::best_fit(width, orientation, group, &cells, " "));
 }

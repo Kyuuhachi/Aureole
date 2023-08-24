@@ -29,23 +29,17 @@ impl<'a> OutBuf<'a> {
 		}
 	}
 
-	fn constant(&mut self, n: usize, f: &mut Reader) -> Result<()> {
-		let b = f.u8()?;
+	fn constant(&mut self, n: usize, b: u8) {
 		for _ in 0..n {
 			self.out.push(b);
 		}
-		Ok(())
 	}
 
-	fn verbatim(&mut self, n: usize, f: &mut Reader) -> Result<()> {
-		for _ in 0..n {
-			let b = f.u8()?;
-			self.out.push(b);
-		}
-		Ok(())
+	fn verbatim(&mut self, s: &[u8]) {
+		self.out.extend_from_slice(s)
 	}
 
-	fn repeat(&mut self, n: usize, o: usize, _f: &mut Reader) -> Result<()> {
+	fn repeat(&mut self, n: usize, o: usize) -> Result<()> {
 		if !(1..=self.out.len()-self.start).contains(&o) {
 			return Err(Error::BadRepeat { count: n, offset: o, len: self.out.len() })
 		}
@@ -117,11 +111,11 @@ fn decompress_mode2(data: &[u8], w: &mut OutBuf) -> Result<(), Error> {
 
 	loop {
 		if !b.bit(f)? {
-			w.verbatim(1, f)?
+			w.verbatim(f.slice(1)?)
 		} else if !b.bit(f)? {
 			let o = b.bits(8, f)?;
 			let n = b.read_count(f)?;
-			w.repeat(n, o, f)?
+			w.repeat(n, o)?
 		} else {
 			match b.bits(13, f)? {
 				0 => break,
@@ -131,11 +125,11 @@ fn decompress_mode2(data: &[u8], w: &mut OutBuf) -> Result<(), Error> {
 					} else {
 						b.bits(4, f)?
 					};
-					w.constant(14 + n, f)?;
+					w.constant(14 + n, f.u8()?);
 				}
 				o => {
 					let n = b.read_count(f)?;
-					w.repeat(n, o, f)?;
+					w.repeat(n, o)?;
 				}
 			}
 		}
@@ -152,18 +146,18 @@ fn decompress_mode1(data: &[u8], w: &mut OutBuf) -> Result<(), Error> {
 		#[bitmatch] match f.u8()? as usize {
 			"00xnnnnn" => {
 				let n = if x == 1 { n << 8 | f.u8()? as usize } else { n };
-				w.verbatim(n, f)?;
+				w.verbatim(f.slice(n)?);
 			}
 			"010xnnnn" => {
 				let n = if x == 1 { n << 8 | f.u8()? as usize } else { n };
-				w.constant(4 + n, f)?;
+				w.constant(4 + n, f.u8()?);
 			}
 			"011nnnnn" => {
-				w.repeat(n, last_o, f)?;
+				w.repeat(n, last_o)?;
 			}
 			"1nnooooo" => {
 				last_o = o << 8 | f.u8()? as usize;
-				w.repeat(4 + n, last_o, f)?;
+				w.repeat(4 + n, last_o)?;
 			},
 		}
 	}

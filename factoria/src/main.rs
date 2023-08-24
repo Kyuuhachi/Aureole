@@ -1,9 +1,11 @@
-use std::path::PathBuf;
+#![feature(try_blocks)]
 
-use clap::{Parser, ValueHint};
+use clap::Parser;
 mod util;
-mod list;
 mod grid;
+
+mod list;
+mod extract;
 
 #[derive(Debug, Clone, Parser)]
 #[command(args_conflicts_with_subcommands = true, disable_help_subcommand = true)]
@@ -11,30 +13,13 @@ struct Cli {
 	#[clap(subcommand)]
 	command: Option<Command>,
 	#[clap(flatten)]
-	extract: Option<Extract>,
-}
-
-#[derive(Debug, Clone, clap::Args)]
-#[command(arg_required_else_help = true)]
-struct Extract {
-	/// Directory to place resulting files in.
-	///
-	/// If unspecified, a directory will be created adjacent to the dir file, with the .dir suffix removed.
-	#[clap(long, short, value_hint = ValueHint::DirPath)]
-	output: Option<PathBuf>,
-	/// Do not attempt to decompress files.
-	#[clap(short='C', long)]
-	compressed: bool,
-
-	/// The .dir file(s) to extract.
-	#[clap(value_hint = ValueHint::FilePath, required = true)]
-	dir_file: Vec<PathBuf>,
+	extract: Option<extract::Extract>,
 }
 
 #[derive(Debug, Clone, clap::Subcommand)]
 enum Command {
 	/// Extract files from archives [default]
-	Extract(Extract),
+	Extract(extract::Extract),
 	/// List files in archives [ls]
 	#[clap(alias = "ls")]
 	List(list::List),
@@ -52,11 +37,26 @@ enum Command {
 }
 
 fn main() -> eyre::Result<()> {
+	use tracing_error::ErrorLayer;
+	use tracing_subscriber::prelude::*;
+	use tracing_subscriber::{fmt, EnvFilter};
+
+	let fmt_layer = fmt::layer().with_target(false);
+	let filter_layer = EnvFilter::try_from_default_env()
+		.or_else(|_| EnvFilter::try_new("info"))?;
+
+	tracing_subscriber::registry()
+		.with(filter_layer)
+		.with(fmt_layer)
+		.with(ErrorLayer::default())
+		.init();
+
+	eyre_span::install()?;
+
 	let cli = Cli::parse();
 	let command = cli.command.or(cli.extract.map(Command::Extract)).expect("no command");
-	println!("{:?}", command);
 	match command {
-		Command::Extract(cmd) => todo!(),
+		Command::Extract(cmd) => extract::run(&cmd)?,
 		Command::List(cmd) => list::run(&cmd)?,
 		Command::Add => todo!(),
 		Command::Remove => todo!(),

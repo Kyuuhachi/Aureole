@@ -1,12 +1,12 @@
 use std::path::{PathBuf, Path};
 
 use clap::ValueHint;
-use crate::grid::{Grid, Cell, Orientation};
 
 use bzip::CompressMode;
 use themelios_archive::dirdat::{self, DirEntry};
 
 use crate::util::mmap;
+use crate::grid::{Grid, Cell, Orientation};
 
 #[derive(Debug, Clone, clap::Args)]
 #[command(arg_required_else_help = true)]
@@ -295,8 +295,8 @@ fn get_entries(cmd: &List, dir_file: &Path) -> eyre::Result<Vec<Entry>> {
 
 	let mut entries = dirdat::read_dir(&mmap(dir_file)?)?
 		.into_iter()
-		.filter(|e| globset.is_empty() || globset.is_match(&e.name))
 		.filter(|e| cmd.all || e.timestamp != 0)
+		.filter(|e| globset.is_empty() || globset.is_match(&e.name))
 		.enumerate()
 		.map(|(index, dirent)| Entry {
 			dirent,

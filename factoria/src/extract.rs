@@ -3,6 +3,7 @@ use std::{path::{PathBuf, Path}, borrow::Cow};
 use clap::ValueHint;
 
 use eyre_span::emit;
+use rayon::prelude::*;
 use themelios_archive::dirdat;
 
 use crate::util::mmap;
@@ -59,21 +60,23 @@ fn extract(cmd: &Extract, dir_file: &Path) -> eyre::Result<()> {
 	}
 	let globset = globset.build()?;
 
-	for e in dir_entries {
+	let span = tracing::Span::current();
+	dir_entries.par_iter().for_each(|e| {
 		emit(try {
-			let _span = tracing::info_span!("extract_file", name=%e.name).entered();
+			let _span = tracing::info_span!(parent: &span, "extract_file", name=%e.name).entered();
 			let outfile = outdir.join(&e.name);
 			if e.timestamp == 0 && !cmd.all {
 				tracing::debug!("empty");
-				continue;
+				return;
 			}
 			if !globset.is_empty() && !globset.is_match(&e.name) {
 				tracing::debug!("filtered");
-				continue;
+				return;
 			}
 
 			let Some(rawdata) = dat.get(e.offset..e.offset+e.compressed_size) else {
-				eyre::bail!("{}: mismatched dat file (bounds)", outfile.display());
+				tracing::error!("invalid bounds");
+				return
 			};
 			let data = if !cmd.compressed && bzip::compression_info_ed6(rawdata).is_some() {
 				Cow::Owned(bzip::decompress_ed6_from_slice(rawdata)?)
@@ -84,9 +87,9 @@ fn extract(cmd: &Extract, dir_file: &Path) -> eyre::Result<()> {
 			std::fs::write(&outfile, data)?;
 
 			// This slows it down significantly
-			// tracing::info!(file = %outfile.display(), "done")
+			tracing::info!("{}", outfile.display())
 		});
-	}
+	});
 
 	Ok(())
 }

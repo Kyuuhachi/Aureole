@@ -16,6 +16,7 @@ chrono = "0.4.23"
 unicode-width = "0.1.10"
 number_prefix = "0.4.0"
 globset = "0.4.13"
+rayon = "1.7"
 
 eyre-span = "0.1"
 tracing = "0.1.37"

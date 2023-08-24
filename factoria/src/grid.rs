@@ -114,6 +114,9 @@ impl Columns {
 		cells: &[T],
 		measure: impl Fn(&T) -> usize,
 	) -> Option<Columns> {
+		if Self::on_columns(group, cells, &measure).total_width() > width {
+			return None
+		}
 		(1..cells.len())
 			.map(|nrows| Self::on_rows(nrows, group, cells, &measure))
 			.find(|c| c.total_width() <= width)
@@ -125,6 +128,9 @@ impl Columns {
 		cells: &[T],
 		measure: impl Fn(&T) -> usize,
 	) -> Option<Columns> {
+		if Self::on_columns(group, cells, &measure).total_width() > width {
+			return None
+		}
 		(group..=cells.len()).step_by(group)
 			.map(|ncols| Self::on_columns(ncols, cells, &measure))
 			.take_while(|c| c.total_width() <= width)
@@ -160,23 +166,6 @@ impl<'a> Grid<'a> {
 			cells,
 			sep,
 			orientation,
-			group,
-		}
-	}
-
-	pub fn columns(
-		group: usize,
-		cells: &'a [Cell],
-		sep: &'a str,
-	) -> Grid<'a> {
-		let w = strwidth(sep);
-		let mut columns = Columns::on_columns(group, cells, |c| c.width + w);
-		columns.cols.iter_mut().for_each(|a| *a -= w);
-		Grid {
-			columns,
-			cells,
-			sep,
-			orientation: Orientation::Horizontal, // makes no difference
 			group,
 		}
 	}

@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use clap::{Parser, ValueHint};
 mod util;
 mod list;
+mod grid;
 
 #[derive(Debug, Clone, Parser)]
 struct Cli {

@@ -1,9 +1,10 @@
-use std::{path::{PathBuf, Path}, borrow::Cow};
+use std::path::{PathBuf, Path};
+
+use clap::ValueHint;
+use crate::grid::{Grid, Columns, Cell, Orientation};
 
 use bzip::CompressMode;
-use clap::ValueHint;
 use themelios_archive::dirdat::{self, DirEntry};
-use unicode_width::UnicodeWidthChar;
 
 use crate::util::mmap;
 
@@ -25,6 +26,9 @@ pub struct List {
 	/// Show several files per line (default)
 	#[clap(short='G', long, overrides_with("long"), overrides_with("oneline"))]
 	grid: bool,
+	/// Draws grid left to right, not downwards
+	#[clap(short='x', long)]
+	across: bool,
 
 	/// Use binary prefixes instead of SI for file sizes
 	#[clap(short, long)]
@@ -50,7 +54,7 @@ pub struct List {
 	compressed_size: bool,
 
 	/// Specify sort order
-	#[clap(short, long, default_value="name")]
+	#[clap(short, long, default_value="id", require_equals(true), num_args=0..=1, default_missing_value="name")]
 	sort: SortColumn,
 	/// Reverse sort order
 	#[clap(short, long)]
@@ -111,31 +115,32 @@ fn list_one(cmd: &List, dir_file: &Path) -> eyre::Result<()> {
 		let mut cells = Vec::new();
 
 		for e in &entries {
-			cells.push(format_entry_short(cmd, archive_number, e));
+			format_entry_short(cmd, archive_number, e, &mut cells);
 		}
 
-		print_grid(cmd, cells);
+		print_grid(cmd, usize::from(cmd.size) + usize::from(cmd.id) + 1, cells);
 	}
 	Ok(())
 }
 
-fn format_entry_short(cmd: &List, archive_number: Option<u8>, e: &Entry) -> String {
-	let mut s = String::new();
+fn format_entry_short(cmd: &List, archive_number: Option<u8>, e: &Entry, cells: &mut Vec<Cell>) {
+	// ls puts inode before size, but since id is fixed size it looks better in the middle
+	if cmd.size {
+		cells.push(Cell::right(format_size(cmd, e)));
+	}
 	if cmd.id {
+		let mut s = String::new();
 		if let Some(archive_number) = archive_number {
 			s.push_str(&format!("{:02X}", archive_number));
 		}
-		s.push_str(&format!("{:04X} ", e.index));
+		s.push_str(&format!("{:04X}", e.index));
+		cells.push(Cell::left(s));
 	}
-	if cmd.size {
-		format_size(cmd, e, &mut s);
-		s.push(' ');
-	}
-	format_name(cmd, e, &mut s);
-	s
+	cells.push(Cell::left(format_name(cmd, e)));
 }
 
-fn format_name(_cmd: &List, e: &Entry, s: &mut String) {
+fn format_name(_cmd: &List, e: &Entry) -> String {
+	let mut s = String::new();
 	let ext = e.name.split_once('.').map_or("", |a| a.1);
 	if let Some(color) = get_color(ext) {
 		s.push_str(&format!("\x1B[38;5;{color}m"))
@@ -145,11 +150,13 @@ fn format_name(_cmd: &List, e: &Entry, s: &mut String) {
 	}
 	s.push_str(&e.name);
 	s.push_str("\x1B[m");
+	s
 }
 
-fn format_size(cmd: &List, e: &Entry, s: &mut String) {
+fn format_size(cmd: &List, e: &Entry) -> String {
+	let mut s = String::new();
 	if cmd.compressed_size && e.decompressed_size.is_some() {
-		format_size2(cmd, e.compressed_size, s);
+		s.push_str(&format_size2(cmd, e.compressed_size));
 	}
 	match e.compression_mode {
 		Some(CompressMode::Mode1) => s.push('⇒'),
@@ -157,12 +164,13 @@ fn format_size(cmd: &List, e: &Entry, s: &mut String) {
 		None if e.decompressed_size.is_some() => s.push('⇢'),
 		None => {},
 	}
-	format_size2(cmd, e.decompressed_size.unwrap_or(e.compressed_size), s);
+	s.push_str(&format_size2(cmd, e.decompressed_size.unwrap_or(e.compressed_size)));
+	s
 }
 
-fn format_size2(cmd: &List, size: usize, s: &mut String) {
+fn format_size2(cmd: &List, size: usize) -> String {
 	if cmd.bytes {
-		s.push_str(&size.to_string());
+		size.to_string()
 	} else {
 		use number_prefix::NumberPrefix as NP;
 		let n = if cmd.binary {
@@ -171,11 +179,8 @@ fn format_size2(cmd: &List, size: usize, s: &mut String) {
 			NP::decimal(size as f64)
 		};
 		match n {
-			NP::Standalone(n) => s.push_str(&n.round().to_string()),
-			NP::Prefixed(p, n) => {
-				s.push_str(&n.round().to_string());
-				s.push_str(p.symbol());
-			},
+			NP::Standalone(n) => n.round().to_string(),
+			NP::Prefixed(p, n) => format!("{}{}", n.round(), p.symbol()),
 		}
 	}
 }
@@ -267,34 +272,15 @@ fn get_archive_number(path: &Path) -> Option<u8> {
 	u8::from_str_radix(name, 16).ok()
 }
 
-fn print_grid(cmd: &List, cells: Vec<String>) {
-	use nu_term_grid::grid::{Grid, GridOptions, Direction, Filling, Cell };
-	let mut grid = Grid::new(GridOptions {
-		direction: Direction::TopToBottom,
-		filling: Filling::Spaces(1),
-	});
-	for text in cells {
-		grid.add(Cell::from(text))
-	}
-	let mut display = None;
-	if !cmd.oneline {
-		if let Some(dim) = term_size::dimensions_stdout() {
-			display = grid.fit_into_width(dim.0);
-		}
-	}
-	print!("{}", display.unwrap_or_else(|| grid.fit_into_columns(1)));
-}
+fn print_grid(cmd: &List, group: usize, cells: Vec<Cell>) {
+	let width = if cmd.oneline {
+		0
+	} else if let Some(dim) = term_size::dimensions_stdout() {
+		dim.0
+	} else {
+		0
+	};
 
-fn strwidth(text: &str) -> usize {
-	let mut keep = true;
-	let mut width = 0;
-	for c in text.chars() {
-		match c {
-			'\x1B' => keep = false,
-			'm' if !keep => keep = true,
-			c if keep => width += c.width().unwrap_or(0),
-			_ => {}
-		}
-	}
-	width
+	let orientation = if cmd.across { Orientation::Horizontal } else { Orientation::Vertical };
+	print!("{}", Grid::best_fit(width, orientation, group, &cells, " "));
 }

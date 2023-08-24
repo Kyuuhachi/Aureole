@@ -23,35 +23,12 @@ pub struct List {
 	/// Show one file per line
 	#[clap(short='1', long, overrides_with("long"))]
 	oneline: bool,
-	/// Show several files per line (default)
-	#[clap(short='G', long, overrides_with("long"), overrides_with("oneline"))]
+	/// Show several files per line
+	#[clap(short='G', long, overrides_with("oneline"))]
 	grid: bool,
 	/// Draws grid left to right, not downwards
 	#[clap(short='x', long)]
 	across: bool,
-
-	/// Use binary prefixes instead of SI for file sizes
-	#[clap(short, long)]
-	binary: bool,
-	/// Display raw number of bytes for file sizes
-	#[clap(short='B', long, overrides_with("binary"))]
-	bytes: bool,
-
-	/// Do not attempt to decompress files
-	#[clap(short='C', long)]
-	compressed: bool,
-
-	/// Show (decompressed) file size in short modes
-	#[clap(short='S', long)]
-	size: bool,
-
-	/// Show file id in short modes
-	#[clap(short, long)]
-	id: bool,
-
-	/// Show compressed size in addition to decompressed size
-	#[clap(short='c', long)]
-	compressed_size: bool,
 
 	/// Specify sort order
 	#[clap(short, long, default_value="id", require_equals(true), num_args=0..=1, default_missing_value="name")]
@@ -59,6 +36,30 @@ pub struct List {
 	/// Reverse sort order
 	#[clap(short, long)]
 	reverse: bool,
+
+	/// Use binary prefixes instead of SI for file sizes
+	#[clap(short, long)]
+	binary: bool,
+	/// Display raw number of bytes for file sizes
+	#[clap(short='B', long, overrides_with("binary"))]
+	bytes: bool,
+	/// Show (decompressed) file size in short modes
+	#[clap(short='S', long)]
+	size: bool,
+	/// Do not attempt to estimate decompressed size
+	#[clap(short='C', long)]
+	compressed: bool,
+	/// Show compressed size in addition to decompressed size
+	#[clap(short='c', long)]
+	compressed_size: bool,
+
+	/// Show file id in short modes (always shown in -l)
+	#[clap(short, long)]
+	id: bool,
+
+	/// Show unix timestamp instead of ISO format
+	#[clap(short, long)]
+	unix: bool,
 
 	/// The .dir file(s) to inspect.
 	#[clap(value_hint = ValueHint::FilePath, required = true)]
@@ -110,8 +111,27 @@ pub fn run(cmd: &List) -> eyre::Result<()> {
 fn list_one(cmd: &List, dir_file: &Path) -> eyre::Result<()> {
 	let archive_number = get_archive_number(dir_file);
 	let entries = get_entries(cmd, dir_file)?;
+
+	let orientation = if cmd.across {
+		Orientation::Horizontal
+	} else {
+		Orientation::Vertical
+	};
+
 	if cmd.long {
-		todo!();
+		let mut cells = Vec::new();
+
+		for e in &entries {
+			format_entry_long(cmd, archive_number, e, &mut cells);
+		}
+
+		let width = if cmd.grid {
+			term_size::dimensions_stdout().map_or(0, |a| a.0)
+		} else  {
+			0
+		};
+		let group = 7;
+		print!("{}", Grid::best_fit(width, orientation, group, &cells, " "));
 	} else {
 		let mut cells = Vec::new();
 
@@ -128,11 +148,6 @@ fn list_one(cmd: &List, dir_file: &Path) -> eyre::Result<()> {
 			0
 		};
 
-		let orientation = if cmd.across {
-			Orientation::Horizontal
-		} else {
-			Orientation::Vertical
-		};
 		print!("{}", Grid::best_fit(width, orientation, group, &cells, " "));
 	}
 	Ok(())
@@ -145,12 +160,52 @@ fn format_entry_short(cmd: &List, archive_number: Option<u8>, e: &Entry, cells: 
 	}
 	if cmd.id {
 		let mut s = String::new();
+		s.push_str("\x1B[2m");
 		if let Some(archive_number) = archive_number {
 			s.push_str(&format!("{:02X}", archive_number));
 		}
+		s.push_str("\x1B[m");
 		s.push_str(&format!("{:04X}", e.index));
 		cells.push(Cell::left(s));
 	}
+	cells.push(Cell::left(format_name(cmd, e)));
+}
+
+fn format_entry_long(cmd: &List, archive_number: Option<u8>, e: &Entry, cells: &mut Vec<Cell>) {
+	let mut s = String::new();
+	s.push_str("\x1B[2m");
+	if let Some(archive_number) = archive_number {
+		s.push_str(&format!("{:04X}", archive_number));
+	}
+	s.push_str("\x1B[m");
+	s.push_str(&format!("{:04X}", e.index));
+	cells.push(Cell::left(s));
+
+	cells.push(Cell::right(e.unk1.to_string()));
+
+	if e.unk3 == e.compressed_size {
+		cells.push(Cell::right("-".into()));
+	} else {
+		cells.push(Cell::right(format_size2(cmd, e.unk3)));
+	}
+
+	if e.archived_size == e.compressed_size {
+		cells.push(Cell::right("-".into()));
+	} else {
+		cells.push(Cell::right(format_size2(cmd, e.archived_size)));
+	}
+
+	cells.push(Cell::right(format_size(cmd, e)));
+
+	if cmd.unix {
+		cells.push(Cell::right(e.timestamp.to_string()));
+	} else if e.timestamp == 0 {
+		cells.push(Cell::right("---- -- -- --:--:--".into()));
+	} else {
+		let ts = chrono::NaiveDateTime::from_timestamp_opt(e.timestamp as i64, 0).unwrap();
+		cells.push(Cell::right(ts.to_string()));
+	}
+
 	cells.push(Cell::left(format_name(cmd, e)));
 }
 

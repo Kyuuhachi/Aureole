@@ -163,6 +163,23 @@ impl<'a> Grid<'a> {
 			group,
 		}
 	}
+
+	pub fn columns(
+		group: usize,
+		cells: &'a [Cell],
+		sep: &'a str,
+	) -> Grid<'a> {
+		let w = strwidth(sep);
+		let mut columns = Columns::on_columns(group, cells, |c| c.width + w);
+		columns.cols.iter_mut().for_each(|a| *a -= w);
+		Grid {
+			columns,
+			cells,
+			sep,
+			orientation: Orientation::Horizontal, // makes no difference
+			group,
+		}
+	}
 }
 
 impl std::fmt::Display for Grid<'_> {

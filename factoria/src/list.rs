@@ -213,14 +213,15 @@ fn format_entry_long(cmd: &List, archive_number: Option<u8>, e: &Entry, cells: &
 
 fn format_name(_cmd: &List, e: &Entry) -> String {
 	let mut s = String::new();
-	let ext = e.name.split_once('.').map_or("", |a| a.1);
+	let name = e.name();
+	let ext = name.split_once('.').map_or("", |a| a.1);
 	if let Some(color) = get_color(ext) {
 		s.push_str(&format!("\x1B[38;5;{color}m"))
 	}
 	if e.timestamp == 0 {
 		s.push_str("\x1B[2m");
 	}
-	s.push_str(&e.name);
+	s.push_str(&name);
 	s.push_str("\x1B[m");
 	s
 }
@@ -296,7 +297,7 @@ fn get_entries(cmd: &List, dir_file: &Path) -> eyre::Result<Vec<Entry>> {
 	let mut entries = dirdat::read_dir(&mmap(dir_file)?)?
 		.into_iter()
 		.filter(|e| cmd.all || e.timestamp != 0)
-		.filter(|e| globset.is_empty() || globset.is_match(&e.name))
+		.filter(|e| globset.is_empty() || globset.is_match(e.name()))
 		.enumerate()
 		.map(|(index, dirent)| Entry {
 			dirent,
@@ -322,13 +323,15 @@ fn get_entries(cmd: &List, dir_file: &Path) -> eyre::Result<Vec<Entry>> {
 
 	match cmd.sort {
 		SortColumn::Id => {},
-		SortColumn::Name => entries.sort_by(|a, b| a.name.cmp(&b.name)),
+		SortColumn::Name => entries.sort_by_key(|e| e.name()),
 		SortColumn::Size => entries.sort_by_key(|e| e.decompressed_size.unwrap_or(e.compressed_size)),
 		SortColumn::CSize => entries.sort_by_key(|e| e.compressed_size),
 		SortColumn::Time => entries.sort_by_key(|e| e.timestamp),
 		SortColumn::Ext => entries.sort_by(|a, b| {
-			let a = (a.name.split_once('.').map(|a| a.1), &a.name);
-			let b = (b.name.split_once('.').map(|b| b.1), &b.name);
+			let a = a.name();
+			let b = b.name();
+			let a = (a.split_once('.').map(|a| a.1), &a);
+			let b = (b.split_once('.').map(|b| b.1), &b);
 			a.cmp(&b)
 		}),
 	}

@@ -6,6 +6,7 @@ mod grid;
 
 mod list;
 mod extract;
+mod add;
 
 #[derive(Debug, Clone, Parser)]
 #[command(args_conflicts_with_subcommands = true, disable_help_subcommand = true)]
@@ -23,8 +24,8 @@ enum Command {
 	/// List files in archives [ls]
 	#[clap(alias = "ls")]
 	List(list::List),
-	/// Add files to archives (TBI)
-	Add,
+	/// Add files to archives
+	Add(add::Add),
 	/// Delete files from archives (TBI) [rm]
 	#[clap(alias = "rm")]
 	Remove,
@@ -58,7 +59,7 @@ fn main() -> eyre::Result<()> {
 	match command {
 		Command::Extract(cmd) => extract::run(&cmd)?,
 		Command::List(cmd) => list::run(&cmd)?,
-		Command::Add => todo!(),
+		Command::Add(cmd) => add::run(&cmd)?,
 		Command::Remove => todo!(),
 		Command::Defrag => todo!(),
 		Command::Index => todo!(),

@@ -9,6 +9,7 @@ use themelios_archive::dirdat::{self, DirEntry};
 use crate::util::mmap;
 
 #[derive(Debug, Clone, clap::Args)]
+#[command(arg_required_else_help = true)]
 pub struct List {
 	/// Include zero-sized files
 	#[clap(short, long)]
@@ -93,7 +94,6 @@ impl std::ops::Deref for Entry {
 }
 
 pub fn run(cmd: &List) -> eyre::Result<()> {
-	println!("{:?}", cmd);
 	for (idx, dir_file) in cmd.dir_file.iter().enumerate() {
 		if cmd.dir_file.len() != 1 {
 			println!("{}:", dir_file.display());

@@ -72,6 +72,7 @@ pub enum SortColumn {
 	Size,
 	CSize,
 	Time,
+	Ext,
 }
 
 #[derive(Debug)]
@@ -254,6 +255,11 @@ fn get_entries(cmd: &List, dir_file: &Path) -> eyre::Result<Vec<Entry>> {
 		SortColumn::Size => entries.sort_by_key(|e| e.decompressed_size.unwrap_or(e.compressed_size)),
 		SortColumn::CSize => entries.sort_by_key(|e| e.compressed_size),
 		SortColumn::Time => entries.sort_by_key(|e| e.timestamp),
+		SortColumn::Ext => entries.sort_by(|a, b| {
+			let a = (a.name.split_once('.').map(|a| a.1), &a.name);
+			let b = (b.name.split_once('.').map(|b| b.1), &b.name);
+			a.cmp(&b)
+		}),
 	}
 
 	if cmd.reverse {

@@ -99,7 +99,9 @@ pub fn run(cmd: &List) -> eyre::Result<()> {
 			println!("{}:", dir_file.display());
 		}
 
-		list_one(cmd, dir_file)?;
+		if let Err(e) = list_one(cmd, dir_file) {
+			eprintln!("{e}");
+		};
 
 		if idx + 1 != cmd.dir_file.len() {
 			println!();

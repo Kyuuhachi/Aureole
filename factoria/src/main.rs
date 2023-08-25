@@ -1,12 +1,15 @@
 #![feature(try_blocks)]
 
 use clap::Parser;
+use eyre_span::emit;
+
 mod util;
 mod grid;
 
-mod list;
 mod extract;
+mod list;
 mod add;
+mod remove;
 
 #[derive(Debug, Clone, Parser)]
 #[command(args_conflicts_with_subcommands = true, disable_help_subcommand = true)]
@@ -26,9 +29,9 @@ enum Command {
 	List(list::List),
 	/// Add files to archives
 	Add(add::Add),
-	/// Delete files from archives (TBI) [rm]
+	/// Delete files from archives [rm]
 	#[clap(alias = "rm")]
-	Remove,
+	Remove(remove::Remove),
 	/// Clear out unused data from archives (TBI)
 	Defrag,
 	/// Create a json index file for an archive (TBI)
@@ -57,13 +60,13 @@ fn main() -> eyre::Result<()> {
 	let cli = Cli::parse();
 	let command = cli.command.or(cli.extract.map(Command::Extract)).expect("no command");
 	match command {
-		Command::Extract(cmd) => extract::run(&cmd)?,
-		Command::List(cmd) => list::run(&cmd)?,
-		Command::Add(cmd) => add::run(&cmd)?,
-		Command::Remove => todo!(),
+		Command::Extract(cmd) => emit(extract::run(&cmd)),
+		Command::List(cmd) => emit(list::run(&cmd)),
+		Command::Add(cmd) => emit(add::run(&cmd)),
+		Command::Remove(cmd) => emit(remove::run(&cmd)),
 		Command::Defrag => todo!(),
 		Command::Index => todo!(),
 		Command::Create => todo!(),
-	}
+	};
 	Ok(())
 }

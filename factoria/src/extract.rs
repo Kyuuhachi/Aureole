@@ -76,7 +76,7 @@ fn extract(cmd: &Extract, dir_file: &Path) -> eyre::Result<()> {
 	dir_entries.par_iter().progress_with(ind.clone()).for_each(|e| {
 		emit(try {
 			let _span = tracing::info_span!(parent: &span, "extract_file", name=%e.name).entered();
-			let outfile = outdir.join(e.name.to_string());
+			let outfile = &outdir.join(e.name.to_string());
 			let Some(rawdata) = dat.get(e.offset..e.offset+e.compressed_size) else {
 				tracing::error!("invalid bounds");
 				return
@@ -88,6 +88,7 @@ fn extract(cmd: &Extract, dir_file: &Path) -> eyre::Result<()> {
 			};
 
 			std::fs::write(outfile, data)?;
+			filetime::set_file_mtime(outfile, filetime::FileTime::from_unix_time(e.timestamp as _, 0))?;
 		});
 	});
 	ind.abandon();

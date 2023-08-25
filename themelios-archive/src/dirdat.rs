@@ -1,11 +1,13 @@
 //! Utilities for reading ED6 PC's .dir/.dat archives.
-//!
-//! There is currently no support for writing archives; this may be added later.
 use std::ops::Range;
 
 use gospel::read::{Reader, Le as _};
 use gospel::write::{Writer, Le as _};
 
+/// A name of a file in an archive.
+///
+/// Internally this is represented as a `[u8; 12]` usually denoting a 8.3 uppercase shift-jis encoded name, but
+/// the public interface treats it like a more normal looking string.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Name([u8; 12]);
 
@@ -25,7 +27,7 @@ impl Default for Name {
 
 impl std::fmt::Debug for Name {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-		f.debug_tuple("Name").field(&self.0).finish()
+		write!(f, "Name({:?})", self.to_string())
 	}
 }
 
@@ -36,7 +38,7 @@ impl std::fmt::Display for Name {
 		if let Some((name, ext)) = name.split_once('.') {
 			write!(f, "{}.{}", name.trim_end_matches(' '), ext.trim_end_matches(' '))
 		} else {
-			f.write_str(&name)
+			f.write_str(name.trim_end_matches(' '))
 		}
 	}
 }

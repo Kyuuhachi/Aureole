@@ -124,6 +124,10 @@ fn add(cmd: &Add, dir: &mut Vec<DirEntry>, dat: &mut File, file: &Path) -> eyre:
 		dat.write_all(&data)?;
 		dat.seek(SeekFrom::Start(16 + 4 * id as u64))?;
 		dat.write_all(&u32::to_le_bytes(pos as u32))?;
+		if exists {
+			dat.seek(SeekFrom::Start(ent.offset as u64))?;
+			dat.write_all(&vec![0; ent.archived_size])?;
+		}
 		ent.offset = pos as usize;
 		ent.archived_size = data.len();
 	} else {

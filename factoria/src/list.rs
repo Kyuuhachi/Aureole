@@ -3,6 +3,7 @@ use std::path::{PathBuf, Path};
 use clap::ValueHint;
 
 use bzip::CompressMode;
+use eyre_span::emit;
 use themelios_archive::dirdat::{self, DirEntry};
 
 use crate::util::mmap;
@@ -99,9 +100,7 @@ pub fn run(cmd: &Command) -> eyre::Result<()> {
 			println!("{}:", dir_file.display());
 		}
 
-		if let Err(e) = list_one(cmd, dir_file) {
-			eprintln!("{e}");
-		};
+		emit(list(cmd, dir_file));
 
 		if idx + 1 != cmd.dir_file.len() {
 			println!();
@@ -110,7 +109,8 @@ pub fn run(cmd: &Command) -> eyre::Result<()> {
 	Ok(())
 }
 
-fn list_one(cmd: &Command, dir_file: &Path) -> eyre::Result<()> {
+#[tracing::instrument(skip_all, fields(path=%dir_file.display()))]
+fn list(cmd: &Command, dir_file: &Path) -> eyre::Result<()> {
 	let archive_number = get_archive_number(dir_file);
 	let entries = get_entries(cmd, dir_file)?;
 
@@ -287,6 +287,7 @@ fn get_color(ext: &str) -> Option<u8> {
 	})
 }
 
+#[tracing::instrument(skip_all)]
 fn get_entries(cmd: &Command, dir_file: &Path) -> eyre::Result<Vec<Entry>> {
 	let mut globset = globset::GlobSetBuilder::new();
 	for glob in &cmd.glob {

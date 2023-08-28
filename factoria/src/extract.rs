@@ -45,8 +45,7 @@ pub fn run(cmd: &Command) -> eyre::Result<()> {
 
 #[tracing::instrument(skip_all, fields(path=%dir_file.display()))]
 fn extract(cmd: &Command, dir_file: &Path) -> eyre::Result<()> {
-	let dir = mmap(dir_file)?;
-	let dir_entries = dirdat::read_dir(&dir)?;
+	let dir_entries = dirdat::read_dir(&std::fs::read(dir_file)?)?;
 	let dat = mmap(&dir_file.with_extension("dat"))?;
 	let dat_entries = dirdat::read_dat(&dat)?;
 	eyre::ensure!(dir_entries.capacity() == dat_entries.capacity(), "mismatched dat file (capacity, {} != {})", dir_entries.capacity(), dat_entries.capacity());

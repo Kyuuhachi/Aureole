@@ -294,7 +294,7 @@ fn get_entries(cmd: &Command, dir_file: &Path) -> eyre::Result<Vec<Entry>> {
 	}
 	let globset = globset.build()?;
 
-	let mut entries = dirdat::read_dir(&mmap(dir_file)?)?
+	let mut entries = dirdat::read_dir(&std::fs::read(dir_file)?)?
 		.into_iter()
 		.filter(|e| cmd.all || e.timestamp != 0)
 		.filter(|e| globset.is_empty() || globset.is_match(e.name.to_string()))

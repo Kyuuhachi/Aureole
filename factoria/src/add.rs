@@ -12,6 +12,11 @@ use themelios_archive::dirdat::{self, DirEntry, Name};
 
 #[derive(Debug, Clone, clap::Args)]
 #[command(arg_required_else_help = true)]
+/// Adds one or more files into an archive file.
+///
+/// If the file to be added already exists in the archive, it will be updated.
+/// This may require expanding the dat file, leaving a gap where the previous data was.
+/// To eliminate this gap, use `factorial defrag`.
 pub struct Add {
 	/// Compress newly-added files (updated files keep existing compression)
 	#[clap(

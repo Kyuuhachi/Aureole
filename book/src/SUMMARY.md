@@ -4,10 +4,11 @@
 
 - [Calmare - Data](./calmare.md)
   - [Vs. EDDecompiler](./eddec.md)
-- [Factoria - Archives]()
+- [Factoria - Archives](./factoria.md)
 - [Cradle - Visuals](./cradle.md)
   - [Formats](./cradle-formats.md)
 - [Themelios - Core](./themelios.md)
+- [LB-ARK - Runtime hook](./lb-ark.md)
 
 ---
 

@@ -47,6 +47,7 @@ be used standalone:
 - `cp932` - Conversions between codepage 932 and UTF-8; `encoding_rs` seems to
   implement a different shift-jis variant that is not compatible with *Trails*.
 - `bc7` - For decoding BC7-compressed images. For compression, try `intel_tex_2`.
+- `bz` - One of Falcom's proprietary compression algorithms.
 
 ## MSRV
 

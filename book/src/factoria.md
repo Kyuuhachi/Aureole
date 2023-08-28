@@ -7,14 +7,27 @@
 > The district is made up of 64 blocks, with blocks one
 > through eight designed as the Ark's primary trade port.
 
-Factoria is a work-in-progress application for manipulating the `.dir`/`.dat`
-archives used in the PC versions of the Sky games.
+Factoria is an application for manipulating the `.dir`/`.dat` archives used in
+the PC versions of the Sky games.
 
-Current functionality is limited to listing archive contents, but planned
-features include extracting (full and selective), creating, inserting, replacing, and optimizing[^optimize] archives.
+The most important functionality, of course, is extracting the constituent
+files from an archive. This can be done simply by dragging the `.dir`[^dir]
+file over the exe, which will place the files in a subdirectory of the same
+name next to it.
 
+Other functionality, only available on the command line, includes:
+- listing file contents,
+- adding and deleting files[^optimize],
+- creating archives from scratch (not yet implemented).
+
+However, **use of these features is largely discouraged:** there is very little
+benefit in creating or editing archives compared to using [LB-ARK](./lb-ark.md).
+
+[^dir]: Dragging the `.dat` file currently does not work. This may change in the future.
 [^optimize]:
-  Replacing files inside an archive is not possible if the file is larger than
-  the original, so they will instead be added to the end of the archive, with
-  the original data left behind. The optimize subcommand will put files back
-  into order and eliminate this junk data.
+  For performance reasons, adding and deleting files will avoid affecting other
+  entries of the archive. Deleted or relocated entries will be zeroed out, so
+  there's no risk of accidentally leaking deleted file data, but the space it
+  previously occupied is still there, as well as other evidence of the edit
+  history. Before publishing an archive, it is therefore recommended to use the
+  `defrag` subcommand to eliminate this unused space.

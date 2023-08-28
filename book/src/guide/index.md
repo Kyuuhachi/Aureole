@@ -11,20 +11,27 @@ files. These are essentially a series of scripts that tells the game's engine
 about each scene in the game -- which characters are in the scene, where they
 are positioned in the world, what they are saying, and so on.
 
+Aside from this introductory chapter, the guide works equally well for the
+Crossbell duology as well; most of the functionality is identical. Crossbell
+doesn't need any setup, so you can skip this section. One thing to note,
+however, is that Crossbell's scripts are named `.bin` rather than *Sky*'s `._sn`.
+
 ## Setup
 
-The game normally loads these from inside a file named `ED6_DT01.dat`. This file
-is rather inconvenient to edit, however, so we will start by installing the
-[SoraVoice] mod, which, in addition to adding voices, also allows loading
-these scena files from a normal directory.
+The game normally loads these from inside a file named `ED6_DT01.dat`. This
+file is not possible to edit by hand, so we will need some extra tools. We
+could use [Factoria](../factoria.md) to extract the scripts from the archive.
+But nobody would be happy if you made mods not compatible with SoraVoice, so
+we'll use its scripts instead.
 
-1. Install the game and find its installation directory. It should look
-   something like this:
+1. Install the game and find its installation directory, normally
+   `C:\Program Files (x86)\Steam\steamapps\common\Trails in the Sky FC`.
+   It should look something like this:
 
    ![The installation directory for Trails in the Sky FC.](./img/install1.png)
 
-2. Download `SoraVoice_*.7z` from [SoraVoice], and extract its contents into
-   the game directory.
+2. Optional, but recommended: download `SoraVoice_*.7z` from [SoraVoice], and
+   extract its contents into the game directory.
 
    ![The same directory as before, but a directory "voice" and a file "dinput8.dll" have been added.](./img/install2.png)
 
@@ -37,7 +44,10 @@ these scena files from a normal directory.
    downloaded from [archive.org].
    The voice files go in the `ogg` directory, depicted above.
 
-6. Check that the mod is running. An easy way to do this, aside from just
+6. Install [LB-ARK](../lb-ark.md) and run its `move_sora_voice.ps1` script.
+   This is a small system that simplifies various aspects of *Sky*'s file handling.
+
+7. Check that the mod is running. An easy way to do this, aside from just
    checking if there are voices playing, is that it will create a file named
    `ed_voice.ini` in the `voice` directory. If this file is not created,
    something went wrong.
@@ -48,7 +58,7 @@ read, but it is not readable by humans. To convert them to something that is
 useful for humans, we will use [Calmare][Aureole]. Simply download the latest
 [`calmare.exe`][calmare-latest] and place it somewhere easily accessible.
 
-Next, drag `c0100._sn`[^filename] files onto `calmare.exe`[^drag]. A `c0100.clm`
+Next, go to `data\ED6_DT01` and drag `c0100._sn` onto `calmare.exe`. A `c0100.clm`
 file will appear next to it, with a (hopefully) nice and readable syntax. To
 convert back to `._sn`, simply drag the `.clm` file onto `calmare.exe` again.
 
@@ -68,14 +78,3 @@ newest of bracers!
 [Aureole]: https://github.com/Kyuuhachi/Aureole
 [calmare-latest]: https://github.com/Kyuuhachi/Aureole/releases/latest/
 [archive.org]: https://archive.org/details/trails-evo-voices
-
-[^filename]:
-  The file will actually be named `C0100␣␣␣._SN`, but both due to personal
-  preference and technical limitations with this markdown preprocessor, I will
-  refer to it as `c0100._sn`.
-
-[^drag]:
-  Note that the exact behavior of dragging files is subject to change. In
-  particular, I want it to be possible to drag multiple files at the same time.
-  If I change this behavior and forget to update the preceding paragraphs, please
-  poke me.

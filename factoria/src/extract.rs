@@ -12,7 +12,7 @@ use crate::util::mmap;
 
 #[derive(Debug, Clone, clap::Args)]
 #[command(arg_required_else_help = true)]
-pub struct Extract {
+pub struct Command {
 	/// Directory to place resulting files in.
 	///
 	/// If unspecified, a directory will be created adjacent to the dir file, with the .dir suffix removed.
@@ -33,7 +33,7 @@ pub struct Extract {
 	dir_file: Vec<PathBuf>,
 }
 
-pub fn run(cmd: &Extract) -> eyre::Result<()> {
+pub fn run(cmd: &Command) -> eyre::Result<()> {
 	for dir_file in &cmd.dir_file {
 		emit(extract(cmd, dir_file));
 	}
@@ -41,7 +41,7 @@ pub fn run(cmd: &Extract) -> eyre::Result<()> {
 }
 
 #[tracing::instrument(skip_all, fields(path=%dir_file.display()))]
-fn extract(cmd: &Extract, dir_file: &Path) -> eyre::Result<()> {
+fn extract(cmd: &Command, dir_file: &Path) -> eyre::Result<()> {
 	let dir = mmap(dir_file)?;
 	let dir_entries = dirdat::read_dir(&dir)?;
 	let dat = mmap(&dir_file.with_extension("dat"))?;

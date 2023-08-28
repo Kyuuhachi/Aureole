@@ -17,21 +17,21 @@ struct Cli {
 	#[clap(subcommand)]
 	command: Option<Command>,
 	#[clap(flatten)]
-	extract: Option<extract::Extract>,
+	extract: Option<extract::Command>,
 }
 
 #[derive(Debug, Clone, clap::Subcommand)]
 enum Command {
 	/// Extract files from archives [default]
-	Extract(extract::Extract),
+	Extract(extract::Command),
 	/// List files in archives [ls]
 	#[clap(alias = "ls")]
-	List(list::List),
+	List(list::Command),
 	/// Add files to archives
-	Add(add::Add),
+	Add(add::Command),
 	/// Delete files from archives [rm]
 	#[clap(alias = "rm")]
-	Remove(remove::Remove),
+	Remove(remove::Command),
 	/// Clear out unused data from archives (TBI)
 	Defrag,
 	/// Create a json index file for an archive (TBI)

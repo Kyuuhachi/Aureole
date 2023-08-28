@@ -17,7 +17,7 @@ use themelios_archive::dirdat::{self, DirEntry, Name};
 /// If the file to be added already exists in the archive, it will be updated.
 /// This may require expanding the dat file, leaving a gap where the previous data was.
 /// To eliminate this gap, use `factorial defrag`.
-pub struct Add {
+pub struct Command {
 	/// Compress newly-added files (updated files keep existing compression)
 	#[clap(
 		short='c', long,
@@ -45,7 +45,7 @@ pub struct Add {
 }
 
 #[tracing::instrument(skip_all, fields(path=%cmd.dir_file.display()))]
-pub fn run(cmd: &Add) -> eyre::Result<()> {
+pub fn run(cmd: &Command) -> eyre::Result<()> {
 	let mut dir = dirdat::read_dir(&std::fs::read(&cmd.dir_file)?)?;
 
 	let mut dat = File::options()
@@ -69,7 +69,7 @@ pub fn run(cmd: &Add) -> eyre::Result<()> {
 }
 
 #[tracing::instrument(skip_all, fields(file=%file.display()))]
-fn add(cmd: &Add, dir: &mut Vec<DirEntry>, dat: &mut File, file: &Path) -> eyre::Result<()> {
+fn add(cmd: &Command, dir: &mut Vec<DirEntry>, dat: &mut File, file: &Path) -> eyre::Result<()> {
 	// Starting with a stat call gives us a nice error if it doesn't exist
 	let timestamp = std::fs::metadata(file)?
 		.modified()

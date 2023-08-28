@@ -10,7 +10,7 @@ use crate::grid::{Grid, Cell, Orientation};
 
 #[derive(Debug, Clone, clap::Args)]
 #[command(arg_required_else_help = true)]
-pub struct List {
+pub struct Command {
 	/// Include zero-sized files
 	#[clap(short, long)]
 	all: bool,
@@ -93,7 +93,7 @@ impl std::ops::Deref for Entry {
 	}
 }
 
-pub fn run(cmd: &List) -> eyre::Result<()> {
+pub fn run(cmd: &Command) -> eyre::Result<()> {
 	for (idx, dir_file) in cmd.dir_file.iter().enumerate() {
 		if cmd.dir_file.len() != 1 {
 			println!("{}:", dir_file.display());
@@ -110,7 +110,7 @@ pub fn run(cmd: &List) -> eyre::Result<()> {
 	Ok(())
 }
 
-fn list_one(cmd: &List, dir_file: &Path) -> eyre::Result<()> {
+fn list_one(cmd: &Command, dir_file: &Path) -> eyre::Result<()> {
 	let archive_number = get_archive_number(dir_file);
 	let entries = get_entries(cmd, dir_file)?;
 
@@ -155,7 +155,7 @@ fn list_one(cmd: &List, dir_file: &Path) -> eyre::Result<()> {
 	Ok(())
 }
 
-fn format_entry_short(cmd: &List, archive_number: Option<u8>, e: &Entry, cells: &mut Vec<Cell>) {
+fn format_entry_short(cmd: &Command, archive_number: Option<u8>, e: &Entry, cells: &mut Vec<Cell>) {
 	// ls puts inode before size, but since id is fixed size it looks better in the middle
 	if cmd.size {
 		cells.push(Cell::right(format_size(cmd, e)));
@@ -173,7 +173,7 @@ fn format_entry_short(cmd: &List, archive_number: Option<u8>, e: &Entry, cells: 
 	cells.push(Cell::left(format_name(cmd, e)));
 }
 
-fn format_entry_long(cmd: &List, archive_number: Option<u8>, e: &Entry, cells: &mut Vec<Cell>) {
+fn format_entry_long(cmd: &Command, archive_number: Option<u8>, e: &Entry, cells: &mut Vec<Cell>) {
 	let mut s = String::new();
 	s.push_str("\x1B[2m");
 	if let Some(archive_number) = archive_number {
@@ -211,7 +211,7 @@ fn format_entry_long(cmd: &List, archive_number: Option<u8>, e: &Entry, cells: &
 	cells.push(Cell::left(format_name(cmd, e)));
 }
 
-fn format_name(_cmd: &List, e: &Entry) -> String {
+fn format_name(_cmd: &Command, e: &Entry) -> String {
 	let mut s = String::new();
 	let name = e.name.to_string();
 	let ext = name.split_once('.').map_or("", |a| a.1);
@@ -226,7 +226,7 @@ fn format_name(_cmd: &List, e: &Entry) -> String {
 	s
 }
 
-fn format_size(cmd: &List, e: &Entry) -> String {
+fn format_size(cmd: &Command, e: &Entry) -> String {
 	let mut s = String::new();
 	if cmd.compressed_size && e.decompressed_size.is_some() {
 		s.push_str(&format_size2(cmd, e.compressed_size));
@@ -241,7 +241,7 @@ fn format_size(cmd: &List, e: &Entry) -> String {
 	s
 }
 
-fn format_size2(cmd: &List, size: usize) -> String {
+fn format_size2(cmd: &Command, size: usize) -> String {
 	if cmd.bytes {
 		size.to_string()
 	} else {
@@ -287,7 +287,7 @@ fn get_color(ext: &str) -> Option<u8> {
 	})
 }
 
-fn get_entries(cmd: &List, dir_file: &Path) -> eyre::Result<Vec<Entry>> {
+fn get_entries(cmd: &Command, dir_file: &Path) -> eyre::Result<Vec<Entry>> {
 	let mut globset = globset::GlobSetBuilder::new();
 	for glob in &cmd.glob {
 		globset.add(glob.clone());

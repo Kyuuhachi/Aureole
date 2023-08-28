@@ -15,7 +15,7 @@ use themelios_archive::dirdat::{self, DirEntry, Name};
 /// Falcom's archives have many files that are nothing but a filename. By default,
 /// this command replicates this behavior: the -f flag overrides this behavior and
 /// removes the filename as well.
-pub struct Remove {
+pub struct Command {
 	/// Do not keep the filename in the dir file.
 	#[clap(short, long)]
 	force: bool,
@@ -30,7 +30,7 @@ pub struct Remove {
 }
 
 #[tracing::instrument(skip_all, fields(path=%cmd.dir_file.display()))]
-pub fn run(cmd: &Remove) -> eyre::Result<()> {
+pub fn run(cmd: &Command) -> eyre::Result<()> {
 	let mut dir = dirdat::read_dir(&std::fs::read(&cmd.dir_file)?)?;
 	let mut dat = crate::util::mmap_mut(&cmd.dir_file.with_extension("dat"))?;
 
@@ -46,7 +46,7 @@ pub fn run(cmd: &Remove) -> eyre::Result<()> {
 }
 
 #[tracing::instrument(skip_all, fields(file=%file))]
-fn remove(cmd: &Remove, dir: &mut [DirEntry], dat: &mut [u8], file: &str) -> eyre::Result<()> {
+fn remove(cmd: &Command, dir: &mut [DirEntry], dat: &mut [u8], file: &str) -> eyre::Result<()> {
 	let name = Name::try_from(file)?;
 
 	let Some(id) = dir.iter().position(|e| e.name == name) else {

@@ -132,7 +132,7 @@ impl DatEntry {
 /// Read the list of entries from a .dir file.
 ///
 /// In many cases, .dir files contain a number of trailing entries named `/_______.___`.
-/// These entries are not returned, but the capacity of the returned Vec is set to accomodate them.
+/// These entries are retained as well.
 pub fn read_dir(data: &[u8]) -> Result<Vec<DirEntry>, gospel::read::Error> {
 	let mut f = Reader::new(data);
 	f.check(b"LB DIR\x1A\0")?;
@@ -160,20 +160,14 @@ pub fn read_dir(data: &[u8]) -> Result<Vec<DirEntry>, gospel::read::Error> {
 		});
 	}
 
-	while items.last() == Some(&DirEntry::default()) {
-		items.pop();
-	}
-
-	assert_eq!(items.capacity(), count);
 	Ok(items)
 }
 
 /// Writes a list of entries into a .dir file.
-pub fn write_dir(entries: &[DirEntry], capacity: usize) -> Vec<u8> {
-	assert!(capacity >= entries.len());
+pub fn write_dir(entries: &[DirEntry]) -> Vec<u8> {
 	let mut f = Writer::new();
 	f.slice(b"LB DIR\x1A\0");
-	f.u64(capacity as u64);
+	f.u64(entries.len() as u64);
 
 	for e in entries {
 		f.array::<12>(e.name.0);
@@ -183,11 +177,6 @@ pub fn write_dir(entries: &[DirEntry], capacity: usize) -> Vec<u8> {
 		f.u32(e.archived_size as u32);
 		f.u32(e.timestamp);
 		f.u32(e.offset as u32);
-	}
-
-	for _ in entries.len()..capacity {
-		f.array::<12>(*b"/_______.___");
-		f.array([0; 6*4]);
 	}
 
 	f.finish().unwrap()
@@ -206,6 +195,5 @@ pub fn read_dat(data: &[u8]) -> Result<Vec<DatEntry>, gospel::read::Error> {
 	}
 	f.u32()?;
 
-	assert_eq!(items.capacity(), count);
 	Ok(items)
 }

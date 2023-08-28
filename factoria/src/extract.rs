@@ -48,7 +48,7 @@ fn extract(cmd: &Command, dir_file: &Path) -> eyre::Result<()> {
 	let dir_entries = dirdat::read_dir(&std::fs::read(dir_file)?)?;
 	let dat = mmap(&dir_file.with_extension("dat"))?;
 	let dat_entries = dirdat::read_dat(&dat)?;
-	eyre::ensure!(dir_entries.capacity() == dat_entries.capacity(), "mismatched dat file (capacity, {} != {})", dir_entries.capacity(), dat_entries.capacity());
+	eyre::ensure!(dir_entries.len() == dat_entries.len(), "mismatched dat file ({} != {})", dir_entries.len(), dat_entries.len());
 
 	let outdir = cmd.output.as_ref()
 		.map_or_else(|| dir_file.parent().unwrap(), |v| v.as_path())
@@ -63,6 +63,7 @@ fn extract(cmd: &Command, dir_file: &Path) -> eyre::Result<()> {
 	let globset = globset.build()?;
 
 	let dir_entries = dir_entries.into_iter()
+		.filter(|e| e.name != dirdat::Name::default())
 		.filter(|e| cmd.all || e.timestamp != 0)
 		.filter(|e| globset.is_empty() || globset.is_match(e.name.to_string()))
 		.collect::<Vec<_>>();

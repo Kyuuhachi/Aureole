@@ -40,7 +40,7 @@ pub fn run(cmd: &Command) -> eyre::Result<()> {
 		emit(remove(cmd, &mut dir, &mut dat, file));
 	}
 
-	std::fs::write(&cmd.dir_file, dirdat::write_dir(&dir, dir.capacity()))?;
+	std::fs::write(&cmd.dir_file, dirdat::write_dir(&dir))?;
 
 	Ok(())
 }
@@ -72,7 +72,7 @@ fn remove(cmd: &Command, dir: &mut [DirEntry], dat: &mut [u8], file: &str) -> ey
 	};
 
 	if cmd.force {
-		ent.offset = 0;
+		*ent = DirEntry::default();
 		dat[16+id*4..][..4].fill(0);
 	}
 

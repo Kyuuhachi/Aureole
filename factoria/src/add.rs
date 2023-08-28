@@ -63,7 +63,7 @@ pub fn run(cmd: &Command) -> eyre::Result<()> {
 		emit(add(cmd, &mut dir, &mut dat, file));
 	}
 
-	std::fs::write(&cmd.dir_file, dirdat::write_dir(&dir, dir.capacity()))?;
+	std::fs::write(&cmd.dir_file, dirdat::write_dir(&dir))?;
 
 	Ok(())
 }
@@ -143,33 +143,22 @@ fn add(cmd: &Command, dir: &mut Vec<DirEntry>, dat: &mut File, file: &Path) -> e
 	ent.compressed_size = compressed_size;
 	ent.timestamp = timestamp as u32;
 
-	
 	tracing::info!("added {} as {:04X}", ent.name, id);
 
 	Ok(())
 }
 
 #[tracing::instrument(skip_all)]
-fn get_id(dir: &mut Vec<DirEntry>, name: Name) -> eyre::Result<usize> {
+fn get_id(dir: &mut [DirEntry], name: Name) -> eyre::Result<usize> {
 	if let Some(id) = dir.iter().position(|e| e.name == name) {
 		tracing::debug!("found existing at {id:04X}");
 		Ok(id)
+	} else if let Some(id) = dir.iter().position(|e| e.name == Name::default()) {
+		dir[id].name = name;
+		tracing::debug!("found empty at {id:04X}");
+		Ok(id)
 	} else {
-		let ent = DirEntry {
-			name,
-			..DirEntry::default()
-		};
-		if let Some(id) = dir.iter().position(|e| e == &DirEntry::default()) {
-			dir[id] = ent;
-			tracing::debug!("found empty at {id:04X}");
-			Ok(id)
-		} else {
-			eyre::ensure!(dir.len() < dir.capacity(), "no more space in index; use `factoria defrag` to allocate more");
-			let id = dir.len();
-			tracing::debug!("creating new at {id:04X}");
-			dir.push(ent);
-			Ok(id)
-		}
+		eyre::bail!("no more space in index; use `factoria defrag` to allocate more");
 	}
 }
 

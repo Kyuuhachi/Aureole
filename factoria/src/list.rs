@@ -15,6 +15,9 @@ pub struct Command {
 	/// Include zero-sized files
 	#[clap(short, long)]
 	all: bool,
+	/// Include placeholder files
+	#[clap(short='A', long)]
+	actually_all: bool,
 	/// Filter which files to include
 	#[clap(short, long, value_parser = crate::util::glob_parser())]
 	glob: Vec<globset::Glob>,
@@ -297,7 +300,8 @@ fn get_entries(cmd: &Command, dir_file: &Path) -> eyre::Result<Vec<Entry>> {
 
 	let mut entries = dirdat::read_dir(&std::fs::read(dir_file)?)?
 		.into_iter()
-		.filter(|e| cmd.all || e.timestamp != 0)
+		.filter(|e| cmd.actually_all || e.name != dirdat::Name::default())
+		.filter(|e| cmd.actually_all || cmd.all || e.timestamp != 0)
 		.filter(|e| globset.is_empty() || globset.is_match(e.name.to_string()))
 		.enumerate()
 		.map(|(index, dirent)| Entry {

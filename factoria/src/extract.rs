@@ -12,10 +12,13 @@ use crate::util::mmap;
 
 #[derive(Debug, Clone, clap::Args)]
 #[command(arg_required_else_help = true)]
+/// Extracts files from an archive into a directory.
+///
+/// Files will be placed in a directory with the name of the archive.
 pub struct Command {
-	/// Directory to place resulting files in.
+	/// Directory to place resulting subdirectory in.
 	///
-	/// If unspecified, a directory will be created adjacent to the dir file, with the .dir suffix removed.
+	/// If unspecified, place the subdirectory next to the .dir file.
 	#[clap(long, short, value_hint = ValueHint::DirPath)]
 	output: Option<PathBuf>,
 	/// Include zero-sized files
@@ -48,11 +51,9 @@ fn extract(cmd: &Command, dir_file: &Path) -> eyre::Result<()> {
 	let dat_entries = dirdat::read_dat(&dat)?;
 	eyre::ensure!(dir_entries.capacity() == dat_entries.capacity(), "mismatched dat file (capacity, {} != {})", dir_entries.capacity(), dat_entries.capacity());
 
-	let outdir = match &cmd.output {
-		Some(v) if cmd.dir_file.len() > 1 => v.join(dir_file.file_stem().unwrap()),
-		Some(v) => v.clone(),
-		None => dir_file.parent().unwrap().join(dir_file.file_stem().unwrap()),
-	};
+	let outdir = cmd.output.as_ref()
+		.map_or_else(|| dir_file.parent().unwrap(), |v| v.as_path())
+		.join(dir_file.file_stem().unwrap());
 
 	std::fs::create_dir_all(&outdir)?;
 

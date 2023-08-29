@@ -1,11 +1,7 @@
-use std::fs::File;
 use std::io::{prelude::*, SeekFrom};
 use std::path::{Path, PathBuf};
-use std::time::SystemTime;
 
-use bzip::CompressMode;
 use clap::ValueHint;
-use clap::builder::TypedValueParser;
 
 use eyre_span::emit;
 use themelios_archive::dirdat::{self, DirEntry, Name};

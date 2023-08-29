@@ -93,7 +93,7 @@ pub struct DirEntry {
 	pub size: usize,
 	/// Unknown. In many cases it is equal to `size`, but not always.
 	/// In other cases it is a power of two that is often fairly consistent with adjacent files, but is wholly uncorrelated with any file sizes.
-	pub unk3: usize,
+	pub unk2: usize,
 	/// Usually equal to `size`, but in SC/dt31 it is bigger. The difference is filled with null bytes.
 	pub reserved_size: usize,
 	/// A unix timestamp, presumably when the file was last edited. Timezone is unknown.
@@ -118,7 +118,7 @@ pub fn read_dir(data: &[u8]) -> Result<Vec<DirEntry>, gospel::read::Error> {
 			name: Name(f.array::<12>()?),
 			unk1: f.u32()?,
 			size: f.u32()? as usize,
-			unk3: f.u32()? as usize,
+			unk2: f.u32()? as usize,
 			reserved_size: f.u32()? as usize,
 			timestamp: f.u32()?,
 			offset: f.u32()? as usize,
@@ -138,7 +138,7 @@ pub fn write_dir(entries: &[DirEntry]) -> Vec<u8> {
 		f.array::<12>(e.name.0);
 		f.u32(e.unk1);
 		f.u32(e.size as u32);
-		f.u32(e.unk3 as u32);
+		f.u32(e.unk2 as u32);
 		f.u32(e.reserved_size as u32);
 		f.u32(e.timestamp);
 		f.u32(e.offset as u32);

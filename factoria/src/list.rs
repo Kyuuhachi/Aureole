@@ -188,10 +188,10 @@ fn format_entry_long(cmd: &Command, archive_number: Option<u8>, e: &Entry, cells
 
 	cells.push(Cell::right(e.unk1.to_string()));
 
-	if e.unk3 == e.size {
+	if e.unk2 == e.size {
 		cells.push(Cell::right("-".into()));
 	} else {
-		cells.push(Cell::right(format_size2(cmd, e.unk3)));
+		cells.push(Cell::right(format_size2(cmd, e.unk2)));
 	}
 
 	if e.reserved_size == e.size {

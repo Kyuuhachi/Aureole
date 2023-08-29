@@ -65,7 +65,7 @@ fn remove(cmd: &Command, dir: &mut [DirEntry], dat: &mut [u8], file: &str) -> ey
 		name,
 		unk1: 0,
 		size: 0,
-		unk3: 0,
+		unk2: 0,
 		reserved_size: 0,
 		timestamp: 0,
 		offset: ent.offset,

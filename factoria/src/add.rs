@@ -89,7 +89,7 @@ fn add(cmd: &Command, dir: &mut [DirEntry], dat: &mut File, file: &Path) -> eyre
 		let dat_offset = u32::from_le_bytes(dat.read_array()?) as usize;
 		eyre::ensure!(dat_offset == ent.offset, "mismatched dat file offset");
 		dat.seek(SeekFrom::Start(ent.offset as u64))?;
-		let mut existing = vec![0; ent.compressed_size];
+		let mut existing = vec![0; ent.size];
 		dat.read_exact(&mut existing)?;
 		bzip::compression_info_ed6(&existing).map(|a| a.1.unwrap_or_default())
 	} else {
@@ -107,7 +107,7 @@ fn add(cmd: &Command, dir: &mut [DirEntry], dat: &mut File, file: &Path) -> eyre
 		Some(method) => bzip::compress_ed6_to_vec(&data, method),
 		None => data,
 	};
-	let compressed_size = data.len();
+	let size = data.len();
 
 	while data.len() < cmd.reserve.unwrap_or(0) {
 		data.push(0);
@@ -116,7 +116,7 @@ fn add(cmd: &Command, dir: &mut [DirEntry], dat: &mut File, file: &Path) -> eyre
 	let needs_alloc = if !exists {
 		tracing::debug!("allocating");
 		true
-	} else if data.len() > ent.archived_size {
+	} else if data.len() > ent.reserved_size {
 		tracing::warn!("reallocating");
 		true
 	} else {
@@ -131,16 +131,16 @@ fn add(cmd: &Command, dir: &mut [DirEntry], dat: &mut File, file: &Path) -> eyre
 		dat.write_all(&u32::to_le_bytes(pos as u32))?;
 		if exists {
 			dat.seek(SeekFrom::Start(ent.offset as u64))?;
-			dat.write_all(&vec![0; ent.archived_size.max(ent.compressed_size)])?;
+			dat.write_all(&vec![0; ent.reserved_size.max(ent.size)])?;
 		}
 		ent.offset = pos as usize;
-		ent.archived_size = cmd.reserve.unwrap_or(data.len());
+		ent.reserved_size = cmd.reserve.unwrap_or(data.len());
 	} else {
 		dat.seek(SeekFrom::Start(ent.offset as u64))?;
 		dat.write_all(&data)?;
 	}
 
-	ent.compressed_size = compressed_size;
+	ent.size = size;
 	ent.timestamp = timestamp as u32;
 
 	tracing::info!("added {} as {:04X}", ent.name, id);

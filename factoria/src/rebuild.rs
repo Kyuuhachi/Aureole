@@ -81,9 +81,9 @@ fn rebuild(cmd: &Command, dir_file: &Path) -> eyre::Result<()> {
 			*ent = DirEntry::default();
 		} else {
 			if cmd.pack {
-				ent.archived_size = ent.compressed_size;
+				ent.reserved_size = ent.size;
 			}
-			let size = ent.compressed_size.max(ent.archived_size);
+			let size = ent.size.max(ent.reserved_size);
 			let Some(data) = dat.get(ent.offset..ent.offset+size) else {
 				eyre::bail!("invalid range")
 			};

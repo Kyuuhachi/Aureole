@@ -81,7 +81,7 @@ impl std::error::Error for NameError {}
 
 /// An entry in a .dir file,
 ///
-/// Only three of the fields are actually used by the games: `name`, `compressed_size`, and `offset`.
+/// Only three of the fields are actually used by the games: `name`, `size`, and `offset`.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct DirEntry {
 	/// The name of the file.
@@ -90,12 +90,12 @@ pub struct DirEntry {
 	/// In those cases, it looks like a timestamp pointing to 2009-08-12 21:58:33.
 	pub unk1: u32,
 	/// The size of the file data in the archive.
-	pub compressed_size: usize,
-	/// Unknown. In many cases it is equal to `compressed_size`, but not always.
+	pub size: usize,
+	/// Unknown. In many cases it is equal to `size`, but not always.
 	/// In other cases it is a power of two that is often fairly consistent with adjacent files, but is wholly uncorrelated with any file sizes.
 	pub unk3: usize,
-	/// Usually equal to `compressed_size`, but in SC/dt31 it is bigger. The difference is filled with null bytes.
-	pub archived_size: usize,
+	/// Usually equal to `size`, but in SC/dt31 it is bigger. The difference is filled with null bytes.
+	pub reserved_size: usize,
 	/// A unix timestamp, presumably when the file was last edited. Timezone is unknown.
 	pub timestamp: u32,
 	/// Offset in the .dat file where the data starts.
@@ -117,9 +117,9 @@ pub fn read_dir(data: &[u8]) -> Result<Vec<DirEntry>, gospel::read::Error> {
 		items.push(DirEntry {
 			name: Name(f.array::<12>()?),
 			unk1: f.u32()?,
-			compressed_size: f.u32()? as usize,
+			size: f.u32()? as usize,
 			unk3: f.u32()? as usize,
-			archived_size: f.u32()? as usize,
+			reserved_size: f.u32()? as usize,
 			timestamp: f.u32()?,
 			offset: f.u32()? as usize,
 		});
@@ -137,9 +137,9 @@ pub fn write_dir(entries: &[DirEntry]) -> Vec<u8> {
 	for e in entries {
 		f.array::<12>(e.name.0);
 		f.u32(e.unk1);
-		f.u32(e.compressed_size as u32);
+		f.u32(e.size as u32);
 		f.u32(e.unk3 as u32);
-		f.u32(e.archived_size as u32);
+		f.u32(e.reserved_size as u32);
 		f.u32(e.timestamp);
 		f.u32(e.offset as u32);
 	}

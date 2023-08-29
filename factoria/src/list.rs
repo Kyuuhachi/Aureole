@@ -188,16 +188,16 @@ fn format_entry_long(cmd: &Command, archive_number: Option<u8>, e: &Entry, cells
 
 	cells.push(Cell::right(e.unk1.to_string()));
 
-	if e.unk3 == e.compressed_size {
+	if e.unk3 == e.size {
 		cells.push(Cell::right("-".into()));
 	} else {
 		cells.push(Cell::right(format_size2(cmd, e.unk3)));
 	}
 
-	if e.archived_size == e.compressed_size {
+	if e.reserved_size == e.size {
 		cells.push(Cell::right("-".into()));
 	} else {
-		cells.push(Cell::right(format_size2(cmd, e.archived_size)));
+		cells.push(Cell::right(format_size2(cmd, e.reserved_size)));
 	}
 
 	cells.push(Cell::right(format_size(cmd, e)));
@@ -232,7 +232,7 @@ fn format_name(_cmd: &Command, e: &Entry) -> String {
 fn format_size(cmd: &Command, e: &Entry) -> String {
 	let mut s = String::new();
 	if cmd.compressed_size && e.decompressed_size.is_some() {
-		s.push_str(&format_size2(cmd, e.compressed_size));
+		s.push_str(&format_size2(cmd, e.size));
 	}
 	match e.compression_mode {
 		Some(CompressMode::Mode1) => s.push('⇒'),
@@ -240,7 +240,7 @@ fn format_size(cmd: &Command, e: &Entry) -> String {
 		None if e.decompressed_size.is_some() => s.push('⇢'),
 		None => {},
 	}
-	s.push_str(&format_size2(cmd, e.decompressed_size.unwrap_or(e.compressed_size)));
+	s.push_str(&format_size2(cmd, e.decompressed_size.unwrap_or(e.size)));
 	s
 }
 
@@ -316,7 +316,7 @@ fn get_entries(cmd: &Command, dir_file: &Path) -> eyre::Result<Vec<Entry>> {
 		if let Ok(dat) = mmap(&dir_file.with_extension("dat")) {
 			for m in &mut entries {
 				if m.timestamp == 0 { continue }
-				let Some(data) = dat.get(m.offset..m.offset+m.compressed_size) else { continue };
+				let Some(data) = dat.get(m.offset..m.offset+m.size) else { continue };
 				let Some(info) = bzip::compression_info_ed6(data) else { continue };
 				m.decompressed_size = Some(info.0);
 				m.compression_mode = info.1;
@@ -327,8 +327,8 @@ fn get_entries(cmd: &Command, dir_file: &Path) -> eyre::Result<Vec<Entry>> {
 	match cmd.sort {
 		SortColumn::Id => {},
 		SortColumn::Name => entries.sort_by_key(|e| e.name.to_string()),
-		SortColumn::Size => entries.sort_by_key(|e| e.decompressed_size.unwrap_or(e.compressed_size)),
-		SortColumn::CSize => entries.sort_by_key(|e| e.compressed_size),
+		SortColumn::Size => entries.sort_by_key(|e| e.decompressed_size.unwrap_or(e.size)),
+		SortColumn::CSize => entries.sort_by_key(|e| e.size),
 		SortColumn::Time => entries.sort_by_key(|e| e.timestamp),
 		SortColumn::Ext => entries.sort_by(|a, b| {
 			let a = a.name.to_string();

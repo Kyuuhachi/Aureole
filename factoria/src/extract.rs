@@ -76,7 +76,7 @@ fn extract(cmd: &Command, dir_file: &Path) -> eyre::Result<()> {
 		emit(try {
 			let _span = tracing::info_span!(parent: &span, "extract_file", name=%e.name).entered();
 			let outfile = &outdir.join(e.name.to_string());
-			let Some(rawdata) = dat.get(e.offset..e.offset+e.compressed_size) else {
+			let Some(rawdata) = dat.get(e.offset..e.offset+e.size) else {
 				tracing::error!("invalid range");
 				return
 			};

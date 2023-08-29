@@ -141,22 +141,14 @@ pub fn read_dir(data: &[u8]) -> Result<Vec<DirEntry>, gospel::read::Error> {
 	let mut items = Vec::with_capacity(count);
 
 	for _ in 0..count {
-		let name            = Name(f.array::<12>()?);
-		let unk1            = f.u32()?;
-		let compressed_size = f.u32()? as usize;
-		let unk3            = f.u32()? as usize;
-		let archived_size   = f.u32()? as usize;
-		let timestamp       = f.u32()?;
-		let offset          = f.u32()? as usize;
-
 		items.push(DirEntry {
-			name,
-			unk1,
-			compressed_size,
-			unk3,
-			archived_size,
-			timestamp,
-			offset,
+			name: Name(f.array::<12>()?),
+			unk1: f.u32()?,
+			compressed_size: f.u32()? as usize,
+			unk3: f.u32()? as usize,
+			archived_size: f.u32()? as usize,
+			timestamp: f.u32()?,
+			offset: f.u32()? as usize,
 		});
 	}
 

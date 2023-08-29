@@ -1,5 +1,4 @@
-//! Utilities for reading ED6 PC's .dir/.dat archives.
-use std::ops::Range;
+//! Utilities for reading ED6 PC's LB DIR files.
 
 use gospel::read::{Reader, Le as _};
 use gospel::write::{Writer, Le as _};
@@ -82,7 +81,7 @@ impl std::error::Error for NameError {}
 
 /// An entry in a .dir file,
 ///
-/// As far as I am aware, only three of the fields are actually used by the games: `name`, `compressed_size`, and `offset`.
+/// Only three of the fields are actually used by the games: `name`, `compressed_size`, and `offset`.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct DirEntry {
 	/// The name of the file.
@@ -101,16 +100,6 @@ pub struct DirEntry {
 	pub timestamp: u32,
 	/// Offset in the .dat file where the data starts.
 	pub offset: usize,
-}
-
-impl DirEntry {
-	pub fn range(&self) -> Option<Range<usize>> {
-		if self.timestamp == 0 {
-			None
-		} else {
-			Some(self.offset .. self.offset + self.archived_size)
-		}
-	}
 }
 
 /// Read the list of entries from a .dir file.

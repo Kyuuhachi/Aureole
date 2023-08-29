@@ -315,13 +315,11 @@ fn get_entries(cmd: &Command, dir_file: &Path) -> eyre::Result<Vec<Entry>> {
 	if !cmd.compressed && (cmd.size || cmd.long || cmd.sort == SortColumn::Size) {
 		if let Ok(dat) = mmap(&dir_file.with_extension("dat")) {
 			for m in &mut entries {
-				let info = m.range()
-					.and_then(|r| dat.get(r))
-					.and_then(bzip::compression_info_ed6);
-				if let Some(info) = info {
-					m.decompressed_size = Some(info.0);
-					m.compression_mode = info.1;
-				}
+				if m.timestamp == 0 { continue }
+				let Some(data) = dat.get(m.offset..m.offset+m.compressed_size) else { continue };
+				let Some(info) = bzip::compression_info_ed6(data) else { continue };
+				m.decompressed_size = Some(info.0);
+				m.compression_mode = info.1;
 			}
 		}
 	}

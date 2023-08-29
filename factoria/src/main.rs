@@ -10,6 +10,7 @@ mod extract;
 mod list;
 mod add;
 mod remove;
+mod rebuild;
 
 #[derive(Debug, Clone, Parser)]
 #[command(args_conflicts_with_subcommands = true, disable_help_subcommand = true)]
@@ -32,8 +33,8 @@ enum Command {
 	/// Delete files from archives [rm]
 	#[clap(alias = "rm")]
 	Remove(remove::Command),
-	/// Clear out unused data from archives (TBI)
-	Defrag,
+	/// Clear out unused data from archives
+	Rebuild(rebuild::Command),
 	/// Create a json index file for an archive (TBI)
 	Index,
 	/// Create an archive from a json index file (TBI)
@@ -64,7 +65,7 @@ fn main() -> eyre::Result<()> {
 		Command::List(cmd) => emit(list::run(&cmd)),
 		Command::Add(cmd) => emit(add::run(&cmd)),
 		Command::Remove(cmd) => emit(remove::run(&cmd)),
-		Command::Defrag => todo!(),
+		Command::Rebuild(cmd) => emit(rebuild::run(&cmd)),
 		Command::Index => todo!(),
 		Command::Create => todo!(),
 	};

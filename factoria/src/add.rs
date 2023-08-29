@@ -16,7 +16,7 @@ use themelios_archive::dirdat::{self, DirEntry, Name};
 ///
 /// If the file to be added already exists in the archive, it will be updated.
 /// This may require expanding the dat file, leaving a gap where the previous data was.
-/// To eliminate this gap, use `factorial defrag`.
+/// To eliminate this gap, use `factorial rebuild`.
 pub struct Command {
 	/// Compress newly-added files (updated files keep existing compression)
 	#[clap(
@@ -158,7 +158,7 @@ fn get_id(dir: &mut [DirEntry], name: Name) -> eyre::Result<usize> {
 		tracing::debug!("found empty at {id:04X}");
 		Ok(id)
 	} else {
-		eyre::bail!("no more space in index; use `factoria defrag` to allocate more");
+		eyre::bail!("no more space in index; use `factoria rebuild` to allocate more");
 	}
 }
 

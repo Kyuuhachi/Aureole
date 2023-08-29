@@ -10,7 +10,7 @@ use themelios_archive::dirdat::{self, DirEntry, Name};
 /// Deletes one or more files from an archive file.
 ///
 /// Note however that while the data is zeroed out, the space it previously occupied
-/// remains. Use `factoria defrag` to remove this.
+/// remains. Use `factoria rebuild` to remove this.
 ///
 /// Falcom's archives have many files that are nothing but a filename. By default,
 /// this command replicates this behavior: the -f flag overrides this behavior and

@@ -113,22 +113,6 @@ impl DirEntry {
 	}
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DatEntry {
-	pub offset: usize,
-	pub end: usize,
-}
-
-impl DatEntry {
-	pub fn range(&self) -> Option<Range<usize>> {
-		if self.end == 0 {
-			None
-		} else {
-			Some(self.offset .. self.end)
-		}
-	}
-}
-
 /// Read the list of entries from a .dir file.
 ///
 /// In many cases, .dir files contain a number of trailing entries named `/_______.___`.

@@ -69,7 +69,7 @@ pub fn run(cmd: &Command) -> eyre::Result<()> {
 }
 
 #[tracing::instrument(skip_all, fields(file=%file.display()))]
-fn add(cmd: &Command, dir: &mut Vec<DirEntry>, dat: &mut File, file: &Path) -> eyre::Result<()> {
+fn add(cmd: &Command, dir: &mut [DirEntry], dat: &mut File, file: &Path) -> eyre::Result<()> {
 	// Starting with a stat call gives us a nice error if it doesn't exist
 	let timestamp = std::fs::metadata(file)?
 		.modified()
@@ -91,7 +91,7 @@ fn add(cmd: &Command, dir: &mut Vec<DirEntry>, dat: &mut File, file: &Path) -> e
 		dat.seek(SeekFrom::Start(ent.offset as u64))?;
 		let mut existing = vec![0; ent.compressed_size];
 		dat.read_exact(&mut existing)?;
-		bzip::compression_info_ed6(&existing).and_then(|a| a.1)
+		bzip::compression_info_ed6(&existing).map(|a| a.1.unwrap_or_default())
 	} else {
 		cmd.compression
 	};
@@ -131,10 +131,10 @@ fn add(cmd: &Command, dir: &mut Vec<DirEntry>, dat: &mut File, file: &Path) -> e
 		dat.write_all(&u32::to_le_bytes(pos as u32))?;
 		if exists {
 			dat.seek(SeekFrom::Start(ent.offset as u64))?;
-			dat.write_all(&vec![0; ent.archived_size])?;
+			dat.write_all(&vec![0; ent.archived_size.max(ent.compressed_size)])?;
 		}
 		ent.offset = pos as usize;
-		ent.archived_size = data.len();
+		ent.archived_size = cmd.reserve.unwrap_or(data.len());
 	} else {
 		dat.seek(SeekFrom::Start(ent.offset as u64))?;
 		dat.write_all(&data)?;

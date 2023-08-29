@@ -59,7 +59,7 @@ fn remove(cmd: &Command, dir: &mut [DirEntry], dat: &mut [u8], file: &str) -> ey
 		eyre::bail!("file is already soft-deleted (use -f to hard delete)");
 	}
 
-	dat[ent.offset..][..ent.archived_size].fill(0);
+	dat[ent.offset..][..ent.archived_size.max(ent.compressed_size)].fill(0);
 
 	*ent = DirEntry {
 		name,

@@ -181,19 +181,3 @@ pub fn write_dir(entries: &[DirEntry]) -> Vec<u8> {
 
 	f.finish().unwrap()
 }
-
-pub fn read_dat(data: &[u8]) -> Result<Vec<DatEntry>, gospel::read::Error> {
-	let mut f = Reader::new(data);
-	f.check(b"LB DAT\x1A\0")?;
-	let count = f.u64()? as usize;
-
-	let mut items = Vec::with_capacity(count);
-	for _ in 0..count {
-		let offset = f.u32()? as usize;
-		let end = f.clone().u32()? as usize;
-		items.push(DatEntry { offset, end });
-	}
-	f.u32()?;
-
-	Ok(items)
-}

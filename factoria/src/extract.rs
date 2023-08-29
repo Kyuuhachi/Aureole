@@ -47,8 +47,6 @@ pub fn run(cmd: &Command) -> eyre::Result<()> {
 fn extract(cmd: &Command, dir_file: &Path) -> eyre::Result<()> {
 	let dir_entries = dirdat::read_dir(&std::fs::read(dir_file)?)?;
 	let dat = mmap(&dir_file.with_extension("dat"))?;
-	let dat_entries = dirdat::read_dat(&dat)?;
-	eyre::ensure!(dir_entries.len() == dat_entries.len(), "mismatched dat file ({} != {})", dir_entries.len(), dat_entries.len());
 
 	let outdir = cmd.output.as_ref()
 		.map_or_else(|| dir_file.parent().unwrap(), |v| v.as_path())
@@ -79,7 +77,7 @@ fn extract(cmd: &Command, dir_file: &Path) -> eyre::Result<()> {
 			let _span = tracing::info_span!(parent: &span, "extract_file", name=%e.name).entered();
 			let outfile = &outdir.join(e.name.to_string());
 			let Some(rawdata) = dat.get(e.offset..e.offset+e.compressed_size) else {
-				tracing::error!("invalid bounds");
+				tracing::error!("invalid range");
 				return
 			};
 			let data = if !cmd.compressed && bzip::compression_info_ed6(rawdata).is_some() {

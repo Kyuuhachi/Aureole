@@ -30,4 +30,4 @@ benefit in creating or editing archives compared to using [LB-ARK](./lb-ark.md).
   there's no risk of accidentally leaking deleted file data, but the space it
   previously occupied is still there, as well as other evidence of the edit
   history. Before publishing an archive, it is therefore recommended to use the
-  `defrag` subcommand to eliminate this unused space.
+  `rebuild` subcommand to eliminate this unused space.

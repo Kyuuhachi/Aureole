@@ -482,7 +482,7 @@ dependencies = [
 
 [[package]]
 name = "factoria"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "bzip",
  "chrono",
@@ -495,6 +495,8 @@ dependencies = [
  "memmap2",
  "number_prefix",
  "rayon",
+ "serde",
+ "serde_json",
  "term_size",
  "themelios-archive",
  "tracing",
@@ -1134,6 +1136,7 @@ version = "1.0.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "076066c5f1078eac5b722a31827a8832fe108bed65dfa75e233c89f8206e976c"
 dependencies = [
+ "indexmap",
  "itoa",
  "ryu",
  "serde",

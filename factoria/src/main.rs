@@ -11,6 +11,8 @@ mod list;
 mod add;
 mod remove;
 mod rebuild;
+mod index;
+mod create;
 
 #[derive(Debug, Clone, Parser)]
 #[command(args_conflicts_with_subcommands = true, disable_help_subcommand = true)]
@@ -35,10 +37,10 @@ enum Command {
 	Remove(remove::Command),
 	/// Clear out unused data from archives
 	Rebuild(rebuild::Command),
-	/// Create a json index file for an archive (TBI)
-	Index,
-	/// Create an archive from a json index file (TBI)
-	Create,
+	/// Create a json index file for an archive
+	Index(index::Command),
+	/// Create an archive from a json index file
+	Create(create::Command),
 }
 
 fn main() -> eyre::Result<()> {
@@ -66,8 +68,8 @@ fn main() -> eyre::Result<()> {
 		Command::Add(cmd) => emit(add::run(&cmd)),
 		Command::Remove(cmd) => emit(remove::run(&cmd)),
 		Command::Rebuild(cmd) => emit(rebuild::run(&cmd)),
-		Command::Index => todo!(),
-		Command::Create => todo!(),
+		Command::Index(cmd) => emit(index::run(&cmd)),
+		Command::Create(cmd) => emit(create::run(&cmd)),
 	};
 	Ok(())
 }

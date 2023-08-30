@@ -346,7 +346,7 @@ fn get_entries(cmd: &Command, dir_file: &Path) -> eyre::Result<Vec<Entry>> {
 	Ok(entries)
 }
 
-fn get_archive_number(path: &Path) -> Option<u8> {
+pub(crate) fn get_archive_number(path: &Path) -> Option<u8> {
 	let name = path
 		.file_name()?
 		.to_str()?

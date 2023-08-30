@@ -1,4 +1,4 @@
-#![feature(error_generic_member_access, provide_any)]
+#![feature(error_generic_member_access)]
 #![feature(slice_flatten)]
 #![feature(decl_macro)]
 

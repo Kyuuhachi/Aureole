@@ -61,7 +61,6 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		}
 	};
 
-	// TODO add .opcode(ISet) -> Option<u8>
 	// TODO add .name() -> &'static str
 	// TODO define FlatInsn in the same table
 
@@ -114,9 +113,32 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 
 	let doc_insn_table = make_table(&ctx);
 
-	let Insn_body: Punctuated<_, Token![,]> = ctx.defs.iter().map(|Insn { span, attrs, ident, args, .. }| q!{span=>
-		#attrs
-		#ident(#(#args),*)
+	let mut hex = BTreeMap::<Ident, BTreeMap<u8, Vec<Ident>>>::new();
+	for insn in &ctx.defs {
+		hex.insert(insn.ident.clone(), BTreeMap::new());
+	}
+
+	for WriteArm { games, ident, .. } in &ctx.writes {
+		let entry = hex.get_mut(ident).unwrap();
+		for (game, h) in games {
+			entry.entry(*h).or_default().push(game.clone())
+		}
+	}
+
+	let Insn_body: Punctuated<_, Token![,]> = ctx.defs.iter().map(|Insn { span, attrs, ident, args, .. }| {
+		let mut doc = String::new();
+		for (hex, g) in hex.get(ident).unwrap() {
+			doc.push_str(&format!("\n{hex:02X}:"));
+			for g in g {
+				doc.push_str(&format!(" {g}"));
+			}
+		}
+
+		q!{span=>
+			#attrs
+			#[cfg_attr(not(docs), doc = #doc)]
+			#ident(#(#args),*)
+		}
 	}).collect();
 
 	let main = quote! {
@@ -124,9 +146,6 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 		#[derive(Debug, Clone, PartialEq, Eq)]
 		#attrs
 		/// # Encoding
-		/// Below is a table listing the hex codes for each instruction.
-		/// This can for example be used to see which instructions are available in each game.
-		/// Though do keep in mind that this is only based on research; it may not fully reflect what the games actually accept.
 		// /// <details><summary>Click to expand</summary>
 		#[doc = #doc_insn_table]
 		// /// </details>
@@ -153,6 +172,12 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 			$m!{ $({$($arg)*})? [#(#introspect)*] }
 		}
 	};
+
+	// println!("{}", quote! {
+	// 	#main
+	// 	#introspect
+	// });
+	// std::io::Write::flush(&mut std::io::stdout()).unwrap();
 
 	quote! {
 		#main

@@ -888,7 +888,7 @@ themelios_macros::bytecode! {
 		#[game(Ao, AoEvo)] Ao_FC(u16),
 		#[game(Ao, AoEvo)] Ao_FD(u16, u16),
 		#[game(Ao, AoEvo)] Ao_FE(u8),
-		#[game(Ao, AoEvo)] Ao_FF(u8, Pos3),
+		#[game(Ao, AoEvo)] Ao_FF(u8 as u16 as ObjectId, Pos3),
 
 		#[game(ZeroEvo, AoEvo)] ZeroEvo_E0(),
 		#[game(ZeroEvo, AoEvo)] ZeroEvo_E1(u32,u32,u32,u32, u32,u32,u32,u32, u32,u32,u32,u32),

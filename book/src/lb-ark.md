@@ -1,4 +1,4 @@
-# Substratum access passages — LB-ARK
+# Substratum Access Passages — LB-ARK
 > In the event of service disruption of the Halo Rail, a gate may be unlocked
 > at each station, leading to substratum access passages. In accordance with
 > emergency protocols, this station's gate can be unlocked.

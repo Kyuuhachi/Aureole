@@ -80,8 +80,15 @@ fn create(cmd: &Command, json_file: &Path) -> eyre::Result<()> {
 	let ind = indicatif::ProgressBar::new(entries.iter().filter(|a| a.is_some()).count() as _)
 		.with_style(style)
 		.with_prefix(out_dir.display().to_string());
-	for (id, e) in entries.into_iter().progress_with(ind.clone()).enumerate() {
-		let (mut ent, data) = process_entry(e, json_file)?;
+	let iter = par_map(
+		entries.into_iter(),
+		{
+			let json_file = json_file.to_owned();
+			move |e| process_entry(e, &json_file)
+		},
+	).progress_with(ind.clone());
+	for (id, e) in iter.enumerate() {
+		let (mut ent, data) = e?;
 
 		if let Some(data) = data {
 			let pos = out_dat.seek(SeekFrom::End(0))?;
@@ -146,6 +153,31 @@ fn process_entry(e: Option<Entry>, json_file: &Path) -> eyre::Result<(DirEntry, 
 	};
 
 	Ok((ent, data))
+}
+
+fn par_map<T, U>(
+	iter: impl Iterator<Item=T> + Send + 'static,
+	map: impl Fn(T) -> U + Send + Sync + 'static,
+) -> impl Iterator<Item=U> where
+	T: Send + 'static,
+	U: Send + 'static,
+{
+	use std::sync::mpsc;
+	use rayon::prelude::*;
+	let (channel_send, channel_recv) = mpsc::channel();
+	std::thread::spawn(move || {
+		iter.map_while(move |item| {
+			let (result_send, result_recv) = mpsc::sync_channel(0);
+			channel_send.send(result_recv).ok()?;
+			Some((item, result_send))
+		})
+		.par_bridge()
+		.try_for_each(|(item, result_send)| {
+			result_send.send(map(item))
+		})
+		.ok()
+	});
+	channel_recv.into_iter().map_while(|a| a.recv().ok())
 }
 
 fn parse_compress_mode<'de, D: serde::Deserializer<'de>>(des: D) -> Result<Option<bzip::CompressMode>, D::Error> {

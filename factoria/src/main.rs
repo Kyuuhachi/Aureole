@@ -39,7 +39,7 @@ enum Command {
 	Rebuild(rebuild::Command),
 	/// Create a json index file for an archive
 	Index(index::Command),
-	/// Create an archive from a json index file
+	/// Create an brand new archive from scratch a json index file
 	Create(create::Command),
 }
 

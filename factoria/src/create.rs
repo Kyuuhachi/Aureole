@@ -81,45 +81,7 @@ fn create(cmd: &Command, json_file: &Path) -> eyre::Result<()> {
 		.with_style(style)
 		.with_prefix(out_dir.display().to_string());
 	for (id, e) in entries.into_iter().progress_with(ind.clone()).enumerate() {
-		let mut ent = DirEntry::default();
-		let data = if let Some(e) = e {
-			let name = match &e {
-				Entry { name: Some(name), .. } => name.as_str(),
-				Entry { path: Some(path), .. } => path.file_name().unwrap().to_str().unwrap(),
-				_ => unreachable!()
-			};
-			let _span = tracing::info_span!("file", name=%name, path=tracing::field::Empty).entered();
-			ent.name = Name::try_from(name)?;
-			ent.unk1 = e.unknown1;
-			ent.unk2 = e.unknown2;
-
-			if let Some(path) = &e.path {
-				let path = json_file.parent().unwrap().join(path);
-				_span.record("path", tracing::field::display(path.display()));
-
-				let data = std::fs::read(&path)?;
-				let mut data = match e.compress {
-					Some(method) => bzip::compress_ed6_to_vec(&data, method),
-					None => data,
-				};
-				ent.size = data.len();
-				ent.reserved_size = e.reserve.unwrap_or(data.len());
-
-				while data.len() < e.reserve.unwrap_or(0) {
-					data.push(0);
-				}
-
-				let timestamp = std::fs::metadata(path)?
-					.modified()
-					.unwrap_or_else(|_| SystemTime::now());
-				ent.timestamp = timestamp.duration_since(SystemTime::UNIX_EPOCH)?.as_secs() as u32;
-				Some(data)
-			} else {
-				Some(Vec::new())
-			}
-		} else {
-			None
-		};
+		let (mut ent, data) = process_entry(e, json_file)?;
 
 		if let Some(data) = data {
 			let pos = out_dat.seek(SeekFrom::End(0))?;
@@ -140,6 +102,50 @@ fn create(cmd: &Command, json_file: &Path) -> eyre::Result<()> {
 	tracing::info!("created");
 
 	Ok(())
+}
+
+fn process_entry(e: Option<Entry>, json_file: &Path) -> eyre::Result<(DirEntry, Option<Vec<u8>>)> {
+	let mut ent = DirEntry::default();
+	let data = if let Some(e) = e {
+		let name = match &e {
+			Entry { name: Some(name), .. } => name.as_str(),
+			Entry { path: Some(path), .. } => path.file_name().unwrap().to_str().unwrap(),
+			_ => unreachable!()
+		};
+		let _span = tracing::info_span!("file", name=%name, path=tracing::field::Empty).entered();
+		ent.name = Name::try_from(name)?;
+		ent.unk1 = e.unknown1;
+		ent.unk2 = e.unknown2;
+
+		if let Some(path) = &e.path {
+			let path = json_file.parent().unwrap().join(path);
+			_span.record("path", tracing::field::display(path.display()));
+
+			let data = std::fs::read(&path)?;
+			let mut data = match e.compress {
+				Some(method) => bzip::compress_ed6_to_vec(&data, method),
+				None => data,
+			};
+			ent.size = data.len();
+			ent.reserved_size = e.reserve.unwrap_or(data.len());
+
+			while data.len() < e.reserve.unwrap_or(0) {
+				data.push(0);
+			}
+
+			let timestamp = std::fs::metadata(path)?
+				.modified()
+				.unwrap_or_else(|_| SystemTime::now());
+			ent.timestamp = timestamp.duration_since(SystemTime::UNIX_EPOCH)?.as_secs() as u32;
+			Some(data)
+		} else {
+			Some(Vec::new())
+		}
+	} else {
+		None
+	};
+
+	Ok((ent, data))
 }
 
 fn parse_compress_mode<'de, D: serde::Deserializer<'de>>(des: D) -> Result<Option<bzip::CompressMode>, D::Error> {

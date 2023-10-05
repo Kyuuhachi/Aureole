@@ -4,6 +4,7 @@ use std::io::{prelude::*, SeekFrom};
 use std::time::SystemTime;
 
 use clap::ValueHint;
+use indicatif::ProgressIterator;
 use serde::de::{self, Deserialize};
 use eyre_span::emit;
 
@@ -74,7 +75,12 @@ fn create(cmd: &Command, json_file: &Path) -> eyre::Result<()> {
 	}
 
 	let mut dir = Vec::with_capacity(size);
-	for (id, e) in entries.into_iter().enumerate() {
+	let style = indicatif::ProgressStyle::with_template("{bar} {prefix} {pos}/{len}").unwrap()
+		.progress_chars("█🮆🮅🮄▀🮃🮂▔ ");
+	let ind = indicatif::ProgressBar::new(entries.len() as _)
+		.with_style(style)
+		.with_prefix(out_dir.display().to_string());
+	for (id, e) in entries.into_iter().progress_with(ind.clone()).enumerate() {
 		let mut ent = DirEntry::default();
 		if let Some(e) = e {
 			let name = match &e {
@@ -120,6 +126,7 @@ fn create(cmd: &Command, json_file: &Path) -> eyre::Result<()> {
 		}
 		dir.push(ent)
 	}
+	ind.abandon();
 
 	std::fs::rename(out_dir.with_extension("dat.tmp"), out_dir.with_extension("dat"))?;
 	std::fs::write(&out_dir, dirdat::write_dir(&dir))?;

@@ -82,7 +82,7 @@ fn create(cmd: &Command, json_file: &Path) -> eyre::Result<()> {
 		.with_prefix(out_dir.display().to_string());
 	for (id, e) in entries.into_iter().progress_with(ind.clone()).enumerate() {
 		let mut ent = DirEntry::default();
-		if let Some(e) = e {
+		let data = if let Some(e) = e {
 			let name = match &e {
 				Entry { name: Some(name), .. } => name.as_str(),
 				Entry { path: Some(path), .. } => path.file_name().unwrap().to_str().unwrap(),
@@ -92,9 +92,6 @@ fn create(cmd: &Command, json_file: &Path) -> eyre::Result<()> {
 			ent.name = Name::try_from(name)?;
 			ent.unk1 = e.unknown1;
 			ent.unk2 = e.unknown2;
-
-			let pos = out_dat.seek(SeekFrom::End(0))?;
-			ent.offset = pos as usize;
 
 			if let Some(path) = &e.path {
 				let path = json_file.parent().unwrap().join(path);
@@ -111,14 +108,23 @@ fn create(cmd: &Command, json_file: &Path) -> eyre::Result<()> {
 				while data.len() < e.reserve.unwrap_or(0) {
 					data.push(0);
 				}
-				out_dat.write_all(&data)?;
 
 				let timestamp = std::fs::metadata(path)?
 					.modified()
 					.unwrap_or_else(|_| SystemTime::now());
 				ent.timestamp = timestamp.duration_since(SystemTime::UNIX_EPOCH)?.as_secs() as u32;
+				Some(data)
+			} else {
+				Some(Vec::new())
 			}
+		} else {
+			None
+		};
 
+		if let Some(data) = data {
+			let pos = out_dat.seek(SeekFrom::End(0))?;
+			ent.offset = pos as usize;
+			out_dat.write_all(&data)?;
 			let pos2 = out_dat.seek(SeekFrom::End(0))?;
 			out_dat.seek(SeekFrom::Start(16 + 4 * id as u64))?;
 			out_dat.write_all(&u32::to_le_bytes(pos as u32))?;

@@ -77,7 +77,7 @@ fn create(cmd: &Command, json_file: &Path) -> eyre::Result<()> {
 	let mut dir = Vec::with_capacity(size);
 	let style = indicatif::ProgressStyle::with_template("{bar} {prefix} {pos}/{len}").unwrap()
 		.progress_chars("█🮆🮅🮄▀🮃🮂▔ ");
-	let ind = indicatif::ProgressBar::new(entries.len() as _)
+	let ind = indicatif::ProgressBar::new(entries.iter().filter(|a| a.is_some()).count() as _)
 		.with_style(style)
 		.with_prefix(out_dir.display().to_string());
 	for (id, e) in entries.into_iter().progress_with(ind.clone()).enumerate() {

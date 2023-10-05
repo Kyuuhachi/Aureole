@@ -121,12 +121,14 @@ pub use compress::CompressMode;
 pub use compress::compress as compress_chunk;
 
 pub fn compress_ed6(f: &mut Writer, data: &[u8], mode: CompressMode) {
+	let mut nchunks = data.chunks(0xFFF0).count();
 	for chunk in data.chunks(0xFFF0) {
 		let mut data = Vec::new();
 		compress_chunk(chunk, &mut data, mode);
 		f.u16(data.len() as u16 + 2);
 		f.slice(&data);
-		f.u8((chunk.as_ptr_range().end == data.as_ptr_range().end).into());
+		nchunks -= 1;
+		f.u8(nchunks as u8);
 	}
 }
 
@@ -159,6 +161,20 @@ pub fn compress_ed7_to_vec(data: &[u8], mode: CompressMode) -> Vec<u8> {
 	let mut w = Writer::new();
 	compress_ed7(&mut w, data, mode);
 	w.finish().unwrap()
+}
+
+#[test]
+fn framing_should_roundtrip() {
+	let data = std::fs::read("../data/fc.extract2/03/mt4301._ch").unwrap();
+	let start = std::time::Instant::now();
+	let decomp = decompress_ed6_from_slice(&data).unwrap();
+	let d1 = start.elapsed();
+	let start = std::time::Instant::now();
+	let recomp = compress_ed6_to_vec(&decomp, CompressMode::Mode2);
+	let d2 = start.elapsed();
+	assert!(data == recomp);
+
+	println!("Decompress {}, compress {}", d1.as_secs_f64(), d2.as_secs_f64());
 }
 
 #[test]

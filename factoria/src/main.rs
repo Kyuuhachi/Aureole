@@ -30,7 +30,7 @@ enum Command {
 	/// List files in archives [ls]
 	#[clap(alias = "ls")]
 	List(list::Command),
-	/// Add files to archives
+	/// Add or replaces files to archives
 	Add(add::Command),
 	/// Delete files from archives [rm]
 	#[clap(alias = "rm")]

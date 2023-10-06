@@ -75,7 +75,9 @@ Most of this should be fairly self-explanatory, but there are a number of things
 
 - `#00631v` - Syntax like this is used for various kinds of text formatting and
   similar. The `v` specifier, like here, it is used to play voice clips with the
-  dialogue. I do not know how this maps to a filename.
+  dialogue. The Crossbell games use capital `V`, which maps directly to files
+  in `data/voice`. Lowercase `v` like here comes from SoraVoice, and uses a
+  mapping defined [here][voice-map].
 
 - `#001F` - The `F` specifier sets the portrait that is shown next to the text.
   It refers to the file `h_kao###._ch`[^kao] (顔 *kao* is Japanese for "face").
@@ -111,3 +113,5 @@ As seen above, it is possible to change the dialogue and the shown portraits!
 [^kao]:
   In later games you may see four-digit numbers. They map to `h_ka####._ch`,
   with the "o" being cut off.
+
+[voice-map]: https://raw.githubusercontent.com/ZhenjianYang/SoraVoice/master/src/ed_voice/core/voice_id_mapping.h

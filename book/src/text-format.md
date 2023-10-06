@@ -111,8 +111,11 @@ mnemonics, however, are not attested, and are purely informational.
   to be put, with two units per kanji. For example, `夏休#2RWelp.#` is rendered as
   <ruby>夏<rt></rt>休<rt>Welp.</ruby>. The exact details of how it looks may vary between games.
 
-- `#_V`: (Voice) Sets a voice clip to play along the dialogue. Depending on the game, a mod may
-  be required for this.
+- `#_V`: (Voice) Sets a voice clip to play along the dialogue, used in the Crossbell games.
+
+- `#_v`: (Voice) SoraVoice's counterpart to `#_V`, which uses [a mapping][voice-map]
+  in order to reduce file sizes. Yes, really! If they used the full voice IDs
+  the scena files would grow larger than 65535 bytes, which is not allowed in *Sky*.
 
 ### Lip sync
 
@@ -131,3 +134,4 @@ These directives are exclusive to the *Evolution* versions, and are therefore la
   `h_ka####._ch` for larger numbers. In Crossbell, they resolve to `ka#####.itp`.
 
 [ruby]: https://en.wikipedia.org/wiki/Ruby_character
+[voice-map]: https://raw.githubusercontent.com/ZhenjianYang/SoraVoice/master/src/ed_voice/core/voice_id_mapping.h

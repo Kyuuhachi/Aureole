@@ -16,10 +16,10 @@ members = [
 
 	"calmare",
 	"calmare-cli",
-	"factoria",
 	"cradle",
 	"cradle-cli",
 ]
+resolver = "2"
 
 [profile.dev]
 package.choubun.opt-level = 3

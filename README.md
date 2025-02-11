@@ -20,6 +20,8 @@ to and from more conventional formats.
 Factoria is a tool for managing the file archived used in the *Trails in the
 Sky* trilogy. It can extract, edit, and create archives from scratch.
 
+Factoria has been moved to its own repository, [Factoria](https://github.com/Aureole-Suite/Factoria).
+
 ## Substratum Access Passages — LB-ARK
 
 The Liberl Archive Redirection Kludge is a dll hook for the *Trails in the Sky*

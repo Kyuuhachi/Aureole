@@ -136,7 +136,7 @@ pub fn bytecode(tokens: TokenStream0) -> TokenStream0 {
 
 		q!{span=>
 			#attrs
-			#[cfg_attr(not(docs), doc = #doc)]
+			#[cfg_attr(not(doc), doc = #doc)]
 			#ident(#(#args),*)
 		}
 	}).collect();

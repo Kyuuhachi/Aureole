@@ -11,6 +11,7 @@ enum Space {
 pub struct Context<'a> {
 	pub game: Game,
 	pub decompile: bool,
+	pub has_warn: bool,
 	indent: usize,
 	space: Space,
 	pub lookup: &'a dyn Lookup,
@@ -22,6 +23,7 @@ impl<'a> Context<'a> {
 		Self {
 			game,
 			decompile: true,
+			has_warn: false,
 			indent: 0,
 			space: Space::None,
 			lookup: lookup.unwrap_or_else(|| themelios::lookup::default_for(game)),
@@ -32,6 +34,10 @@ impl<'a> Context<'a> {
 	pub fn flat(mut self) -> Self {
 		self.decompile = false;
 		self
+	}
+
+	pub fn warn(&mut self) {
+		self.has_warn = true;
 	}
 
 	pub fn finish(self) -> String {

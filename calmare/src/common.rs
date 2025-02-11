@@ -34,6 +34,7 @@ pub fn func(f: &mut Context, func: &Code) {
 		Err(err) => {
 			f.kw("flat").suf(":");
 			if let Some(err) = err {
+				f.warn();
 				write!(f, " // {err}");
 			}
 			f.line();
@@ -523,6 +524,7 @@ fn expr(f: &mut Context, e: &Expr) {
 		for (i, e) in stack.into_iter().enumerate() {
 			if i != 0 {
 				f.kw("¤");
+				f.warn();
 			}
 			expr_prio(f, e, 0);
 		}

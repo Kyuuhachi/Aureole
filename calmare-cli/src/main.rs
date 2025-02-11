@@ -168,14 +168,16 @@ fn write_scena(game: Option<CliGame>, buf: &[u8], lookup: Option<&dyn Lookup>) -
 				Game::FcEvo, Game::ScEvo, Game::TcEvo, Game::ZeroEvo, Game::AoEvo, // Evo
 				Game::Zero, Game::Ao, // Geofront
 			] {
+				let mut ctx = calmare::Context::new(game, lookup);
 				if game.is_ed7() {
-					if let Ok(scena) = ED7Scena::read(game, buf) {
-						return Ok(calmare::to_string(game, &calmare::Content::ED7Scena(scena), lookup))
-					}
+					let Ok(scena) = ED7Scena::read(game, buf) else { continue };
+					calmare::ed7::write(&mut ctx, &scena);
 				} else {
-					if let Ok(scena) = ED6Scena::read(game, buf) {
-						return Ok(calmare::to_string(game, &calmare::Content::ED6Scena(scena), lookup))
-					}
+					let Ok(scena) = ED6Scena::read(game, buf) else { continue };
+					calmare::ed6::write(&mut ctx, &scena);
+				}
+				if !ctx.has_warn {
+					return Ok(ctx.finish());
 				}
 			}
 			eyre::bail!("could not parse script; specify --game for more details")

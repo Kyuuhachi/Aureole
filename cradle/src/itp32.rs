@@ -16,7 +16,7 @@ impl Itp32 {
 		let height = self.height >> level;
 		let mut pixels = Vec::with_capacity(width * height * 4);
 		for p in &self.levels[level] {
-			pixels.extend(bc7::decode(*p).flatten().flatten())
+			pixels.extend(bc7::decode(*p).as_flattened().as_flattened())
 		}
 		swizzle(&pixels.clone(), &mut pixels, [height/4, width/4, 4, 4, 4], [0, 2, 1, 3, 4]);
 		image(width, height, pixels).unwrap()

@@ -53,7 +53,7 @@ pub fn write<I>(frames: &[I]) -> Result<(Vec<u8>, Vec<u8>), Error> where
 				for x in 0..16 {
 					let sub = f.view(x*16, y*16, 16, 16);
 					let mut c = [[0; 16]; 16];
-					for (c, (_, _, p)) in c.flatten_mut().iter_mut().zip(sub.pixels()) {
+					for (c, (_, _, p)) in c.as_flattened_mut().iter_mut().zip(sub.pixels()) {
 						*c = ch::to4444(p);
 					}
 					let p = &mut p[y as usize][x as usize];

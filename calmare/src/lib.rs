@@ -1,4 +1,3 @@
-#![feature(let_chains)]
 #![feature(pattern)]
 #![feature(decl_macro)]
 #![feature(try_blocks)]

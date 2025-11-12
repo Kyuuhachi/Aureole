@@ -67,7 +67,7 @@ impl Text {
 			}
 			for item in page {
 				match &item {
-					TextSegment::String(ref s) => f.slice(&encode(s)?),
+					TextSegment::String(s) => f.slice(&encode(s)?),
 					TextSegment::Line => f.u8(0x01),
 					TextSegment::Wait => f.u8(0x02),
 					TextSegment::Color(n) => { f.u8(0x07); f.u8(*n); }

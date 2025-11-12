@@ -92,18 +92,18 @@ impl<'a> Lex<'a> {
 		Span::new_at(r.start)
 	}
 
-	fn pat_<P: Pattern<'a> + 'a>(&mut self, p: P) -> Option<Span> {
+	fn pat_<P: Pattern + 'a>(&mut self, p: P) -> Option<Span> {
 		let i0 = self.pos();
 		self.pos = self.pos.strip_prefix(p)?;
 		self.last_indent = None;
 		Some(i0 | self.pos())
 	}
 
-	fn pat<P: Pattern<'a> + 'a>(&mut self, p: P) -> Option<&'a str> {
+	fn pat<P: Pattern + 'a>(&mut self, p: P) -> Option<&'a str> {
 		self.pat_(p).map(|s| self.span_text(s))
 	}
 
-	fn pat_mul<P: Pattern<'a> + Clone + 'a>(&mut self, p: P) -> &'a str {
+	fn pat_mul<P: Pattern + Clone + 'a>(&mut self, p: P) -> &'a str {
 		let mut s = self.pos();
 		while let Some(s1) = self.pat_(p.clone()) {
 			s |= s1;

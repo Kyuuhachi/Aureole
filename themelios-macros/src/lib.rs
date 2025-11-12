@@ -1,5 +1,4 @@
 #![feature(proc_macro_diagnostic)]
-#![feature(let_chains)]
 
 use std::collections::BTreeMap;
 
@@ -314,7 +313,7 @@ fn make_table(ctx: &Ctx) -> String {
 	}
 
 	let table = maud::html! {
-		table #"insn-table" {
+		table # "insn-table" {
 			style { (css) }
 			thead {
 				"\n\t" tr { (head) } "\n\t"

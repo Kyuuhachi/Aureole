@@ -58,7 +58,6 @@ compiler is needed. These features include (but this list might not be complete)
   with overeager hygiene, though.
 - `error_generic_member_access`, `provide_any` - Needed for `thiserror`. Could
   probably do without them, but since I'm already using nightly, who cares?
-- `let_chains` - Some very nice QoL. Not strictly necessary, but again, why not.
 - `try_blocks` - Can't believe this isn't in the language already.
 - `slice_flatten`, `array_try_map`, `pattern` - Some small API improvements for `std`.
 - `try_trait_v2`, `never_type`, `try_trait_v2_residual` - Used for a couple of

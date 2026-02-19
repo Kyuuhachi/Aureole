@@ -349,8 +349,10 @@ impl Scena {
 
 		let mut btl = BattleRead::default();
 
-		let sepith_start = strings_start - (strings_start - code_end) / 8 * 8;
-		let mut g = f.clone().at(sepith_start)?;
+		ensure!((strings_start - code_end) % 8 == 0, "incorrect sepith table size");
+		ensure!((strings_start - code_end) / 8 <= 128, "too many sepith entries");
+
+		let mut g = f.clone().at(code_end)?;
 		while g.pos() < strings_start {
 			btl.get_sepith(&mut g)?;
 		}
